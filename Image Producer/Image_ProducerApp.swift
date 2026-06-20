@@ -6,27 +6,20 @@
 //
 
 import SwiftUI
-import SwiftData
 
 @main
 struct Image_ProducerApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
-
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        // Document-based (roadmap 2.4.1): each icon is a saved package the user owns
+        // in Files / iCloud Drive. New documents open with the default layer stack.
+        DocumentGroup(newDocument: { IconDocument.newDefault() }) { configuration in
+            ContentView(document: configuration.document)
+                // Self-driven autosave — the app has no UndoManager (undo/redo is the
+                // future History system's job), so SwiftUI's undo-based autosave never
+                // fires. This writes the package directly as edits settle.
+                .autosave(document: configuration.document,
+                          fileURL: configuration.fileURL,
+                          isEditable: configuration.isEditable)
         }
-        .modelContainer(sharedModelContainer)
     }
 }

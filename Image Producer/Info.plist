@@ -2,9 +2,60 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key>
+	<key>CFBundleDisplayName</key>
+	<string>Image Producer</string>
+	<key>UTExportedTypeDeclarations</key>
 	<array>
-		<string>remote-notification</string>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.nightgard.Icon-Producer.project</string>
+			<key>UTTypeDescription</key>
+			<string>Image Producer Project</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>picprod</string>
+					<string>iconproj</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.nightgard.Icon-Producer.palette</string>
+			<key>UTTypeDescription</key>
+			<string>Image Producer Palette</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>iconpalette</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Image Producer Project</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.nightgard.Icon-Producer.project</string>
+			</array>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+		</dict>
 	</array>
 </dict>
 </plist>
