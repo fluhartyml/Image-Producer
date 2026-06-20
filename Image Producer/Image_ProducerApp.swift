@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 struct Image_ProducerApp: App {
@@ -44,5 +45,44 @@ struct Image_ProducerApp: App {
             // (ContentView.historyPage); only the engine is missing ("no engine yet").
             CommandGroup(replacing: .undoRedo) { }
         }
+        // macOS: suppress the default open-panel on launch so the custom Welcome window
+        // (below) is the front door instead. .defaultLaunchBehavior is macOS 15+/visionOS
+        // only, so gate to macOS — iOS/visionOS keep their DocumentGroupLaunchScene path.
+        #if os(macOS)
+        .defaultLaunchBehavior(.suppressed)
+        #endif
+
+        // Branded launch experience (option B) — iPhone / iPad / Vision only.
+        // DocumentGroupLaunchScene is NOT available on native macOS (iOS/iPadOS/Mac
+        // Catalyst/visionOS only), and this app builds a native Mac target, so the Mac
+        // keeps the default open-panel launch. Gated with #if !os(macOS).
+        //
+        // Replaces the bare document browser with a branded screen: the wordmark/title,
+        // a prominent "New Image" button, and the recent-documents browser (free). New
+        // docs are created as .iconProject (the first writable content type).
+        #if !os(macOS)
+        DocumentGroupLaunchScene("Image Producer") {
+            NewDocumentButton("New Image", contentType: .iconProject)
+        } background: {
+            LinearGradient(
+                colors: [Color(red: 0.11, green: 0.14, blue: 0.22),
+                         Color(red: 0.05, green: 0.06, blue: 0.10)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        #endif
+
+        // macOS branded launch — DocumentGroupLaunchScene isn't available on native macOS,
+        // so the Mac gets a custom Welcome window instead. .defaultLaunchBehavior(.presented)
+        // makes it the window shown at launch (paired with .suppressed on the DocumentGroup
+        // above). WelcomeView has the wordmark, a New Image button, and recent documents.
+        #if os(macOS)
+        Window("Welcome to Image Producer", id: "welcome") {
+            WelcomeView()
+        }
+        .defaultLaunchBehavior(.presented)
+        .windowResizability(.contentSize)
+        #endif
     }
 }
