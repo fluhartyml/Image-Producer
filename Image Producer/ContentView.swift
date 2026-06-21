@@ -1192,11 +1192,14 @@ struct MoveTransformInspector: View {
 
     /// Destructive commit (v1.1): crop ONLY the active layer to the crop rect, keeping
     /// every other layer and the project's layer structure intact (NO flatten). The
-    /// active layer's content is baked into a full-canvas PNG that is transparent
-    /// outside the crop region, then stored with an identity transform so it renders
-    /// exactly where it sat. Other layers + the document are left alone. Share/Export
-    /// still flattens a throwaway copy, so the project is never destroyed. No undo
-    /// (no UndoManager — hence the confirmation).
+    /// active layer's content is baked into a TIGHTLY-CROPPED PNG (just the kept region,
+    /// at the crop rect's pixel size), then placed back with a transform that is
+    /// centered on the canvas, scaled to the crop's limiting dimension, and tagged with
+    /// the crop's aspect. So the cropped image lands as a normal selectable object — the
+    /// Move box hugs it (no orphaned full-canvas handles, no dead checkerboard frame) —
+    /// and the Fit/Fill control can snap it to the canvas. Other layers + the document
+    /// are left alone; Share/Export still flattens a throwaway copy, so the project is
+    /// never destroyed. No undo (no UndoManager — hence the confirmation).
     /// Cropping MULTIPLE selected layers at once = v1.2 (needs multi-layer selection).
     private func commitCrop() {
         guard let crop = document.cropRect, let idx = index,
@@ -1209,20 +1212,31 @@ struct MoveTransformInspector: View {
         }
         let side = CGFloat(document.canvasSize)
         let layerID = document.layers[idx].id
-        // Render JUST the active layer (with its current transform) masked to the crop
-        // rect, into a full-canvas PNG that is transparent outside the kept region.
+        // Render JUST the active layer (with its current transform), then crop the
+        // resulting bitmap to the kept region — yielding a tight crop-sized PNG.
         let solo = IconDocument(name: document.name, canvasSize: document.canvasSize,
                                 layers: [document.layers[idx]], palette: document.palette,
                                 cropRect: nil)
-        let renderer = ImageRenderer(content: CroppedLayerRender(document: solo, side: side, crop: crop))
+        let renderer = ImageRenderer(content: IconCompositeView(document: solo, side: side))
         renderer.scale = 1
-        guard let cg = renderer.cgImage, let png = pngData(from: cg) else { return }
+        let px = CGRect(x: crop.minX * side, y: crop.minY * side,
+                        width: crop.width * side, height: crop.height * side).integral
+        guard px.width >= 1, px.height >= 1,
+              let full = renderer.cgImage,
+              let cropped = full.cropping(to: px),
+              let png = pngData(from: cropped) else { return }
         // Defer the mutation so the confirmation dialog fully dismisses and any in-flight
         // slider bindings settle before the layer's content changes.
         DispatchQueue.main.async {
             guard let i = document.layers.firstIndex(where: { $0.id == layerID }) else { return }
             document.layers[i].setImage(png)
-            document.layers[i].transform = LayerTransform()   // identity: fills canvas 1:1
+            // Centered, sized to the crop, aspect recorded → the cropped image becomes a
+            // selectable object the Move box hugs, ready for Fit/Fill.
+            document.layers[i].transform = LayerTransform(
+                center: CGPoint(x: 0.5, y: 0.5),
+                scale: max(crop.width, crop.height),
+                rotationDegrees: 0,
+                contentAspect: crop.height > 0 ? crop.width / crop.height : 1)
             document.cropRect = nil
             cropAspect = .original
         }
@@ -1283,6 +1297,24 @@ struct MoveTransformInspector: View {
         // Crop collapses the stack) while a stale `idx` is still in flight.
         if document.layers.indices.contains(idx) {
             VStack(alignment: .leading, spacing: 18) {
+                // Fit / Fill — snap the active object to the canvas. Live and explicit:
+                // each tap re-snaps so what you see is exactly the result (no inferred
+                // position). Only meaningful for a content layer that has something on it
+                // — e.g. the object you just cropped. Fit honors the object's aspect (so
+                // a non-square crop letterboxes); Fill covers the canvas and clips.
+                if case .content = document.layers[idx].role,
+                   !document.layers[idx].elements.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Snap to Canvas").font(.subheadline)
+                        HStack {
+                            Button("Fit")  { applyFitFill(.fit,  idx) }
+                            Button("Fill") { applyFitFill(.fill, idx) }
+                        }
+                        .buttonStyle(.bordered)
+                        Text("Fit insets the object inside the canvas (letterbox if it isn't square). Fill covers the canvas and clips the overflow.")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Scale  \(Int(document.layers[idx].transform.scale * 100))%")
                         .font(.subheadline)
@@ -1317,7 +1349,23 @@ struct MoveTransformInspector: View {
                 set: { if document.layers.indices.contains(idx) {
                         document.layers[idx].transform[keyPath: keyPath] = $0 } })
     }
+
+    /// Snap the active object to the canvas, centered. Fit = the limiting (larger)
+    /// dimension fills the canvas, the other letterboxes (scale 1.0). Fill = the
+    /// smaller dimension fills the canvas, the larger overflows and is clipped
+    /// (scale = max(aspect, 1/aspect), capped to the slider's 4× ceiling). Uses the
+    /// content's recorded aspect; a square object behaves identically either way.
+    private func applyFitFill(_ mode: FitFillMode, _ idx: Int) {
+        guard document.layers.indices.contains(idx) else { return }
+        let aspect = document.layers[idx].transform.contentAspect ?? 1
+        let scale: Double = (mode == .fit) ? 1.0 : min(max(aspect, 1 / aspect), 4.0)
+        document.layers[idx].transform.scale = scale
+        document.layers[idx].transform.center = CGPoint(x: 0.5, y: 0.5)
+    }
 }
+
+/// The two ways to snap a placed/cropped object to the canvas (Move inspector).
+enum FitFillMode { case fit, fill }
 
 /// Crop aspect choices in the Move/Transform inspector (Photos-style presets).
 /// `ratio(w:h:)` covers Square (1:1) and every fixed preset; Freeform = independent
@@ -1339,29 +1387,6 @@ enum CropAspect: Hashable {
         case .custom:   "Custom"
         case .ratio(let w, let h): w == h ? "Square" : "\(w):\(h)"
         }
-    }
-}
-
-/// Renders a single-layer document masked to a normalized crop rect (origin top-left),
-/// yielding a full-canvas image that is transparent OUTSIDE the crop. Used to bake a
-/// per-layer crop (Apply Crop) without flattening the rest of the project.
-private struct CroppedLayerRender: View {
-    let document: IconDocument
-    let side: CGFloat
-    let crop: CGRect
-    var body: some View {
-        IconCompositeView(document: document, side: side)
-            .frame(width: side, height: side)
-            .mask {
-                ZStack {
-                    Color.clear
-                    Rectangle()
-                        .frame(width: crop.width * side, height: crop.height * side)
-                        .position(x: (crop.minX + crop.width / 2) * side,
-                                  y: (crop.minY + crop.height / 2) * side)
-                }
-                .frame(width: side, height: side)
-            }
     }
 }
 
@@ -1643,14 +1668,19 @@ struct TransformBox: View {
         // leaving `index` pointing past the end of the array for one update pass.
         if index >= 0, index < document.layers.count {
             let t = document.layers[index].transform
-            let boxSide = max(24, t.scale * side)
+            // Hug the content's true shape (a cropped image is a rectangle, not a
+            // square) so the grabbers sit on the object, never orphaned at the canvas
+            // corners. contentSize is square for legacy layers (no contentAspect).
+            let cs = t.contentSize
+            let boxW = max(24, cs.width * side)
+            let boxH = max(24, cs.height * side)
             let center = CGPoint(x: t.center.x * side, y: t.center.y * side)
 
             // The movable box.
             Rectangle()
                 .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
                 .background(Color.accentColor.opacity(0.06))
-                .frame(width: boxSide, height: boxSide)
+                .frame(width: boxW, height: boxH)
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(center)
                 .contentShape(Rectangle())
@@ -1672,8 +1702,8 @@ struct TransformBox: View {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.accentColor)
                     .frame(width: 14, height: 14)
-                    .position(x: center.x + off.width * boxSide / 2,
-                              y: center.y + off.height * boxSide / 2)
+                    .position(x: center.x + off.width * boxW / 2,
+                              y: center.y + off.height * boxH / 2)
                     .gesture(
                         DragGesture(minimumDistance: 1, coordinateSpace: .named("canvas"))
                             .onChanged { value in

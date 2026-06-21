@@ -201,9 +201,24 @@ struct IconLayer: Identifiable, Codable {
 struct LayerTransform: Codable {
     /// Normalized center in canvas space (0...1, origin top-left).
     var center = CGPoint(x: 0.5, y: 0.5)
-    /// Scale as a fraction of the canvas edge.
+    /// Scale as a fraction of the canvas edge — the LIMITING (larger) content dimension.
     var scale = 1.0
     var rotationDegrees = 0.0
+    /// Intrinsic width÷height of the layer's content (e.g. a cropped image's aspect).
+    /// `nil` = treat as square (1:1), the legacy assumption and the default for files
+    /// saved before crop set it. Lets the Move box hug a non-square object and lets
+    /// Fit/Fill snap it to the canvas with the right geometry.
+    var contentAspect: Double? = nil
+
+    /// The content's displayed size as a fraction of the canvas edge (width, height),
+    /// honoring `contentAspect`. `scale` drives the limiting (larger) dimension; the
+    /// other follows the aspect. Square when `contentAspect` is nil.
+    var contentSize: CGSize {
+        let a = contentAspect ?? 1
+        let width  = a >= 1 ? scale : scale * a
+        let height = a >= 1 ? scale / a : scale
+        return CGSize(width: width, height: height)
+    }
 }
 
 // MARK: - Layer role
