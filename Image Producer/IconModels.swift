@@ -89,6 +89,24 @@ final class IconDocument: ObservableObject {
     }
 }
 
+extension IconDocument {
+    /// Non-destructive "Apply": put the result of a destructive edit on a NEW content
+    /// layer directly ABOVE the source, and HIDE the source (kept, re-showable) so the
+    /// result composites correctly. The original is never overwritten — there's no undo
+    /// (Cmd-Z is off until the History engine exists), so every destructive Apply
+    /// (Crop / AI Filter / Magic Eraser) preserves the source this way. Returns the new
+    /// layer's id (e.g. so the caller can set its transform).
+    @discardableResult
+    func addResultLayer(_ png: Data, above sourceIndex: Int, nameSuffix: String) -> IconLayer.ID? {
+        guard layers.indices.contains(sourceIndex) else { return nil }
+        var layer = IconLayer(name: "\(layers[sourceIndex].name) (\(nameSuffix))", role: .content)
+        layer.setImage(png)
+        layers[sourceIndex].isVisible = false        // keep the original, just hidden
+        layers.insert(layer, at: sourceIndex + 1)    // directly above the source
+        return layer.id
+    }
+}
+
 // MARK: - Layer
 
 /// One layer in the stack.

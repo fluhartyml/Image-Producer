@@ -178,12 +178,13 @@ struct ImagePlaygroundInspector: View {
         document.layers.append(layer)   // end of array = top of the visual stack
     }
 
-    /// Filter result -> replace the active content layer's art.
+    /// Filter result -> NON-DESTRUCTIVE: the AI edit lands on a new layer above the
+    /// source, and the original is hidden (kept), not overwritten — there's no undo.
     private func replaceActiveLayer(from url: URL) {
         guard let png = loadPNG(from: url), let i = activeIndex,
               case .content = document.layers[i].role else { failed = true; return }
         failed = false
-        document.layers[i].setImage(png)
+        document.addResultLayer(png, above: i, nameSuffix: "AI edit")
     }
 
     /// The sheet hands back a file URL to the generated image (not necessarily PNG);

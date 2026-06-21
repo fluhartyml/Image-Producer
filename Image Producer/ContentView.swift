@@ -1102,7 +1102,6 @@ struct MoveTransformInspector: View {
     @State private var freeHeight: Double = 0.8     // Freeform height fraction
     @State private var customW: Int = 4             // Custom ratio width
     @State private var customH: Int = 3             // Custom ratio height
-    @State private var showCropConfirm = false
 
     private var index: Int? {
         guard let id = activeLayerID else { return nil }
@@ -1146,22 +1145,18 @@ struct MoveTransformInspector: View {
             .labelsHidden()
             if cropAspect != .original {
                 // Apply (destructive) sits a short space below the aspect picker.
-                Button(role: .destructive) { showCropConfirm = true } label: {
+                // Non-destructive now (makes a new cropped layer), so no "can't be undone"
+                // confirmation needed.
+                Button { commitCrop() } label: {
                     Label("Apply Crop", systemImage: "crop")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .padding(.top, 4)
-                .confirmationDialog("Apply crop?", isPresented: $showCropConfirm, titleVisibility: .visible) {
-                    Button("Apply Crop", role: .destructive) { commitCrop() }
-                    Button("Cancel", role: .cancel) { }
-                } message: {
-                    Text("Permanently crops the active layer to the selection. Other layers and the project are left intact. This can't be undone.")
-                }
 
                 cropSizeControls
 
-                Text("Live preview is non-destructive (Export/Share trim to it). Apply Crop bakes it into the active layer.")
+                Text("Live preview is non-destructive (Export/Share trim to it). Apply Crop makes a new cropped layer and hides the original (kept).")
                     .font(.caption2).foregroundStyle(.secondary)
             }
         }
@@ -1235,14 +1230,17 @@ struct MoveTransformInspector: View {
         // slider bindings settle before the layer's content changes.
         DispatchQueue.main.async {
             guard let i = document.layers.firstIndex(where: { $0.id == layerID }) else { return }
-            document.layers[i].setImage(png)
-            // Centered, sized to the crop, aspect recorded → the cropped image becomes a
-            // selectable object the Move box hugs, ready for Fit/Fill.
-            document.layers[i].transform = LayerTransform(
-                center: CGPoint(x: 0.5, y: 0.5),
-                scale: max(crop.width, crop.height),
-                rotationDegrees: 0,
-                contentAspect: crop.height > 0 ? crop.width / crop.height : 1)
+            // Non-destructive: the cropped image becomes a NEW layer above; the original
+            // is hidden (kept), not overwritten — there's no undo. Then give the new layer
+            // the centered/scaled/aspect transform so the Move box hugs it (ready for Fit/Fill).
+            if let newID = document.addResultLayer(png, above: i, nameSuffix: "cropped"),
+               let ni = document.layers.firstIndex(where: { $0.id == newID }) {
+                document.layers[ni].transform = LayerTransform(
+                    center: CGPoint(x: 0.5, y: 0.5),
+                    scale: max(crop.width, crop.height),
+                    rotationDegrees: 0,
+                    contentAspect: crop.height > 0 ? crop.width / crop.height : 1)
+            }
             document.cropRect = nil
             cropAspect = .original
         }

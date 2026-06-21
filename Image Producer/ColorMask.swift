@@ -246,6 +246,8 @@ struct EraserInspector: View {
               let masked = colorMaskedImage(cg, target: fillColor.rgb8,
                                             tolerance: Int(tolerance), contiguous: contiguous),
               let out = pngData(from: masked) else { failed = true; return }
-        document.layers[idx].setImage(out)
+        // Non-destructive: the masked result goes on a new layer above; the original
+        // (with its background) is hidden, not overwritten — there's no undo.
+        document.addResultLayer(out, above: idx, nameSuffix: "erased")
     }
 }
