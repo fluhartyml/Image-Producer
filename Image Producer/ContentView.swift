@@ -245,7 +245,7 @@ struct ContentView: View {
                    activeLayerID: $activeLayerID,
                    showTransformBox: activeTool == .move,
                    activeTool: activeTool,
-                   fillColor: fillColor)
+                   fillColor: $fillColor)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scaleEffect(canvasZoom)
             .padding()
@@ -443,6 +443,10 @@ struct ToolInspector: View {
             ImageImportInspector(document: document, activeLayerID: activeLayerID)
         case .imagePlayground:
             ImagePlaygroundInspector(document: document, activeLayerID: activeLayerID)
+        case .eyedropper:
+            EyedropperInspector(fillColor: $fillColor)
+        case .eraser:
+            EraserInspector(document: document, activeLayerID: activeLayerID, fillColor: $fillColor)
         case .pen:
             PenInspector(document: document, activeLayerID: activeLayerID)
         default:
@@ -1457,7 +1461,7 @@ struct CanvasView: View {
     @Binding var activeLayerID: IconLayer.ID?
     var showTransformBox: Bool = false
     var activeTool: Tool = .move
-    var fillColor: Color = .white
+    @Binding var fillColor: Color
     @EnvironmentObject var pen: PixelPen
 
     private var activeIndex: Int? {
@@ -1477,6 +1481,21 @@ struct CanvasView: View {
         guard activeTool == .fill, let idx = activeIndex,
               document.layers[idx].backgroundRole != nil else { return }
         document.layers[idx].setBackgroundFill(fillColor.hexString())
+    }
+
+    /// Eyedropper: render the active layer and sample its color (averaged over the
+    /// sample circle) at a normalized canvas point into fillColor.
+    @MainActor private func sampleEyedropper(at n: CGPoint) {
+        guard activeTool == .eyedropper, let idx = activeIndex else { return }
+        let s = CGFloat(document.canvasSize)
+        let solo = IconDocument(name: document.name, canvasSize: document.canvasSize,
+                                layers: [document.layers[idx]], palette: document.palette, cropRect: nil)
+        let renderer = ImageRenderer(content: IconCompositeView(document: solo, side: s))
+        renderer.scale = 1
+        if let cg = renderer.cgImage,
+           let color = averagedColor(in: cg, atNormalized: n, radiusPixels: pen.eyedropperRadius) {
+            fillColor = color
+        }
     }
 
     var body: some View {
@@ -1545,7 +1564,7 @@ struct CanvasView: View {
                         let n = CGPoint(x: value.location.x / side, y: value.location.y / side)
                         if pen.erasing { pen.erase(toNormalized: n) } else { pen.stroke(toNormalized: n) }
                     }
-                    .onEnded { _ in
+                    .onEnded { value in
                         switch activeTool {
                         case .pen:
                             pen.endStroke()
@@ -1554,11 +1573,13 @@ struct CanvasView: View {
                             }
                         case .fill:
                             pourIfFilling()
+                        case .eyedropper:
+                            sampleEyedropper(at: CGPoint(x: value.location.x / side, y: value.location.y / side))
                         default:
                             break
                         }
                     },
-                including: (activeTool == .pen || activeTool == .fill) ? .all : .subviews
+                including: (activeTool == .pen || activeTool == .fill || activeTool == .eyedropper) ? .all : .subviews
             )
             .onAppear { if activeTool == .pen { pen.load(activePixelData) } }
             .onChange(of: activeTool) { if activeTool == .pen { pen.load(activePixelData) } }
@@ -2063,6 +2084,8 @@ final class PixelPen: ObservableObject {
     /// Mac right-click erases momentarily without flipping this.
     @Published var erasing = false
     @Published var showGrid = true
+    /// Eyedropper sample radius in pixels (0 = single pixel; >0 = averaged circle).
+    @Published var eyedropperRadius: Int = 2
     @Published private(set) var image: CGImage?
 
     private var ctx: CGContext?
