@@ -1,5 +1,5 @@
 //
-//  IconProducer_DeveloperNotes.swift
+//  ImageProducer_DeveloperNotes.swift
 //  Image Producer
 //
 //  Created by Michael Fluharty on 6/9/26.

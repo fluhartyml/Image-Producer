@@ -5,7 +5,7 @@
 //  Created by Michael Fluharty on 6/10/26.
 //
 //  The icon-document domain model — the data shapes from the design.
-//  See IconProducer_DeveloperNotes.swift for the full plan-of-record.
+//  See ImageProducer_DeveloperNotes.swift for the full plan-of-record.
 //
 //  KEY MODEL DECISION (Michael 2026-06-10): layers are NOT pre-typed. There is
 //  one kind of content layer — a BLANK, TRANSPARENT canvas — and "pixels / image

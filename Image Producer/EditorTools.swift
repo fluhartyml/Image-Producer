@@ -5,7 +5,7 @@
 //  Created by Michael Fluharty on 6/11/26.
 //
 //  The toolbox lineup. These are the SELECTABLE tools that populate the tool
-//  strip. The set is locked in IconProducer_DeveloperNotes.swift ("TOOL
+//  strip. The set is locked in ImageProducer_DeveloperNotes.swift ("TOOL
 //  VOCABULARY"); the BEHAVIOUR of each tool is built later, one at a time. For
 //  now a tool just selects (highlights) and shows its placeholder inspector.
 //
