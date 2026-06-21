@@ -2300,12 +2300,22 @@ struct AutosaveModifier: ViewModifier {
     let isEditable: Bool
     @Environment(\.scenePhase) private var scenePhase
     @State private var debounce: Task<Void, Never>?
+    /// Where an UNTITLED document is auto-materialized so an unnamed canvas can never
+    /// be lost before its first manual Save. Cleared once the user names/saves it.
+    @State private var recoveryURL: URL?
 
     func body(content: Content) -> some View {
         content
             .onReceive(document.objectWillChange) { _ in schedule() }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { debounce?.cancel(); save() }   // flush on background
+            }
+            .onChange(of: fileURL) { _, newURL in
+                // The user just named/saved it → drop the auto-recovery copy.
+                if newURL != nil, let r = recoveryURL {
+                    try? FileManager.default.removeItem(at: r)
+                    recoveryURL = nil
+                }
             }
     }
 
@@ -2319,8 +2329,39 @@ struct AutosaveModifier: ViewModifier {
     }
 
     private func save() {
-        guard isEditable, let url = fileURL else { return }   // skip new/untitled or read-only
-        try? document.writePackage(to: url)                   // fail-safe: never crash on a bad write
+        guard isEditable else { return }                      // read-only → nothing to do
+        if let url = fileURL {
+            try? document.writePackage(to: url)               // saved doc: write in place
+        } else {
+            // UNTITLED → auto-materialize a recovery copy so the canvas is never lost,
+            // even on a crash before the first Save. One stable file per window,
+            // overwritten each autosave; removed when the user finally names/saves it.
+            if recoveryURL == nil { recoveryURL = makeRecoveryURL() }
+            if let url = recoveryURL { try? document.writePackage(to: url) }
+        }
+    }
+
+    /// The next free "Image Producer N.picprod" in the app's iCloud Documents folder
+    /// (findable in Files, syncs); falls back to the local Documents container.
+    private func makeRecoveryURL() -> URL? {
+        let fm = FileManager.default
+        let dir: URL
+        if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.image-producer") {
+            dir = icloud.appendingPathComponent("Documents", isDirectory: true)
+        } else if let local = try? fm.url(for: .documentDirectory, in: .userDomainMask,
+                                          appropriateFor: nil, create: true) {
+            dir = local
+        } else {
+            return nil
+        }
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        var n = 1
+        var url = dir.appendingPathComponent("Image Producer \(n).picprod")
+        while fm.fileExists(atPath: url.path) {
+            n += 1
+            url = dir.appendingPathComponent("Image Producer \(n).picprod")
+        }
+        return url
     }
 }
 
