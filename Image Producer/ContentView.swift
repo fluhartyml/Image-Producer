@@ -441,6 +441,8 @@ struct ToolInspector: View {
             FontPickerInspector(document: document, activeLayerID: activeLayerID)
         case .image:
             ImageImportInspector(document: document, activeLayerID: activeLayerID)
+        case .imagePlayground:
+            ImagePlaygroundInspector(document: document, activeLayerID: activeLayerID)
         case .pen:
             PenInspector(document: document, activeLayerID: activeLayerID)
         default:
