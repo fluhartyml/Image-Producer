@@ -4,33 +4,35 @@
 //
 //  The Image Playground tool (roadmap A1): Apple's on-device AI image generation,
 //  wired as ONE tool with TWO modes (Michael 2026-06-11):
-//    • MAKER  — a text prompt generates a brand-new image on a NEW layer.
-//    • FILTER — a text prompt + the ACTIVE layer's current art are fed in together,
-//               and the result REPLACES that layer (restyle what's already there).
+//    • MAKER  — generate a brand-new image on a NEW layer.
+//    • FILTER — feed the ACTIVE layer's current art + a prompt, and REPLACE that
+//               layer with the restyled result.
 //
-//  ENGINE = Apple's vetted `.imagePlaygroundSheet` (iOS 18.1+ / macOS 15.1+),
-//  chosen over the programmatic `ImageCreator` for a publishable v1: Apple owns the
-//  generation UX, style selection, content safety, and candidate picking — we just
-//  hand it a concept (+ an optional source image) and place the returned image.
-//  The inspector keeps Michael's TWO prompt boxes; the sheet is seeded from them.
-//  API verified against the installed Xcode-27 SDK swiftinterface (2026-06-21):
+//  ENGINE = Apple's vetted `.imagePlaygroundSheet` (iOS 18.1+ / macOS 15.1+). The
+//  PROMPT IS TYPED IN APPLE'S SHEET, not in the inspector: our own in-inspector
+//  text field was disrupting typing (per-keystroke churn / focus loss that drove
+//  Michael up the wall 2026-06-21), and Apple's panel already has a solid prompt
+//  input plus styles, content safety, and candidate picking. So the inspector is
+//  just two buttons that present the sheet; the user types there. Cleaner AND more
+//  publishable. (If a reliable in-inspector field is wanted later, it can be added
+//  back once the field-rebuild issue is understood — kept out for now on purpose.)
+//
+//  API verified vs the installed Xcode-27 SDK swiftinterface (2026-06-21):
 //    func imagePlaygroundSheet(isPresented:concept:sourceImage:onCompletion:) -> View
 //    var EnvironmentValues.supportsImagePlayground: Bool   (cross-platform gate)
 //
-//  AVAILABILITY: gated by @Environment(\.supportsImagePlayground) — true only where
-//  Apple Intelligence is present + enabled (iPhone 15 Pro / 16+, Apple-silicon Mac).
-//  Where it's false the inspector shows a graceful "not available here" state — no
-//  error path. Deployment target is 27.0, so the 18.1+ APIs need no #available guards.
+//  AVAILABILITY: gated by @Environment(\.supportsImagePlayground); graceful
+//  "needs Apple Intelligence" state where unsupported. Deployment target 27.0, so
+//  the 18.1+ APIs need no #available guards.
 //
-//  ⚠️ NOT yet device-verified: AI generation only runs on Apple-Intelligence
-//  hardware, so the generate/restyle round-trip needs Michael to confirm on a
-//  capable device. Compiles green on iOS + macOS; the wiring is what's verified here.
+//  ⚠️ NOT device-verified: AI generation only runs on Apple-Intelligence hardware,
+//  so the generate/restyle round-trip needs Michael's confirmation. Compiles green.
 //
 
 import SwiftUI
 import ImagePlayground
 
-/// Tool #11's inspector — the Image Playground Maker/Filter surface.
+/// Tool #11's inspector — two buttons that present Apple's Image Playground sheet.
 struct ImagePlaygroundInspector: View {
     @ObservedObject var document: IconDocument
     let activeLayerID: IconLayer.ID?
@@ -38,15 +40,6 @@ struct ImagePlaygroundInspector: View {
     /// Cross-platform Apple-Intelligence capability check (no UIKit needed).
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
 
-    @State private var makerPrompt = ""
-    @State private var filterPrompt = ""
-    // The concept the SHEET actually uses — captured at present-time from the prompt
-    // above, NOT bound live. Passing the live prompt into .imagePlaygroundSheet made
-    // its machinery re-configure on every keystroke, which froze the field and wiped
-    // in-progress typing (Michael 2026-06-21). Capturing on the button tap decouples
-    // the sheet from the editor field so typing stays smooth.
-    @State private var makerConcept = ""
-    @State private var filterConcept = ""
     @State private var showMaker = false
     @State private var showFilter = false
     @State private var filterSource: Image?     // the active layer rendered, seeds Filter
@@ -76,13 +69,12 @@ struct ImagePlaygroundInspector: View {
                     subtitle: "Needs Apple Intelligence. Turn it on in Settings on a supported device (iPhone 15 Pro / 16 or later, or an Apple-silicon Mac), then this tool generates art on device.")
             }
         }
-        // Maker: prompt only -> generate a fresh image. concept = the captured
-        // makerConcept (set on tap), not the live field, so typing doesn't churn the sheet.
-        .imagePlaygroundSheet(isPresented: $showMaker, concept: makerConcept) { url in
+        // The user types the prompt inside Apple's sheet (concept seeded empty).
+        .imagePlaygroundSheet(isPresented: $showMaker, concept: "") { url in
             placeNewLayer(from: url)
         }
-        // Filter: captured prompt + the active layer's current art as the source.
-        .imagePlaygroundSheet(isPresented: $showFilter, concept: filterConcept, sourceImage: filterSource) { url in
+        // Filter seeds the sheet with the active layer's current art as the source.
+        .imagePlaygroundSheet(isPresented: $showFilter, concept: "", sourceImage: filterSource) { url in
             replaceActiveLayer(from: url)
         }
     }
@@ -90,22 +82,15 @@ struct ImagePlaygroundInspector: View {
     @ViewBuilder private var supported: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                // MAKER — a new layer from a prompt.
+                // MAKER — a new layer from a prompt typed in Apple's sheet.
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Make — new layer").font(.subheadline).bold()
-                    TextField("Describe an image to generate…", text: $makerPrompt, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                        .lineLimit(1...3)
-                        // Kill QuickType/autofill suggestions: the predicted "past
-                        // words" were hijacking the field — replacing text mid-sentence
-                        // and causing the freeze (Michael 2026-06-21).
-                        .autocorrectionDisabled()
-                    Button { makerConcept = makerPrompt; showMaker = true } label: {
-                        Label("Generate New Layer", systemImage: "plus.rectangle.on.rectangle")
+                    Button { showMaker = true } label: {
+                        Label("New Image…", systemImage: "plus.rectangle.on.rectangle")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    Text("Generates from your prompt in Apple's Image Playground, then drops the result on a new layer.")
+                    Text("Opens Apple's Image Playground — type your prompt there, generate, and the result drops on a new layer.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
 
@@ -114,19 +99,15 @@ struct ImagePlaygroundInspector: View {
                 // FILTER — restyle the active layer's current art.
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Filter — restyle this layer").font(.subheadline).bold()
-                    TextField("Describe how to restyle the active layer…", text: $filterPrompt, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                        .lineLimit(1...3)
-                        .autocorrectionDisabled()
                     Button { startFilter() } label: {
-                        Label("Restyle Active Layer", systemImage: "wand.and.stars")
+                        Label("Restyle This Layer…", systemImage: "wand.and.stars")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .disabled(activeFilterable == nil)
                     Text(activeFilterable == nil
                          ? "Select a content layer that has art on it to restyle."
-                         : "Feeds this layer's current art plus your prompt to Image Playground and replaces it with the result.")
+                         : "Opens Image Playground seeded with this layer's art — describe the change there; the result replaces it.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
 
@@ -158,7 +139,6 @@ struct ImagePlaygroundInspector: View {
         } else {
             filterSource = nil
         }
-        filterConcept = filterPrompt
         showFilter = true
     }
 
@@ -166,7 +146,7 @@ struct ImagePlaygroundInspector: View {
     private func placeNewLayer(from url: URL) {
         guard let png = loadPNG(from: url) else { failed = true; return }
         failed = false
-        var layer = IconLayer(name: layerName(from: makerPrompt), role: .content)
+        var layer = IconLayer(name: "AI Image", role: .content)
         layer.setImage(png)
         document.layers.append(layer)   // end of array = top of the visual stack
     }
@@ -184,11 +164,5 @@ struct ImagePlaygroundInspector: View {
     private func loadPNG(from url: URL) -> Data? {
         guard let raw = try? Data(contentsOf: url) else { return nil }
         return pngData(fromImageData: raw)
-    }
-
-    /// Auto-name a new layer from its prompt (content names the layer).
-    private func layerName(from prompt: String) -> String {
-        let t = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.isEmpty ? "AI Image" : String(t.prefix(24))
     }
 }
