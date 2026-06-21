@@ -58,6 +58,16 @@ struct ImagePlaygroundInspector: View {
         return document.layers[i]
     }
 
+    /// Image Playground options with Apple's "Personalization" (the people-from-your-
+    /// library feature) turned OFF — so typing a word like "and" stops getting turned
+    /// into a contact ("Andrew") inside Apple's sheet. ImagePlaygroundOptions.Personalization
+    /// = automatic / enabled / disabled (SDK-verified 2026-06-21).
+    private var personalizationDisabled: ImagePlaygroundOptions {
+        var options = ImagePlaygroundOptions()
+        options.personalization = .disabled
+        return options
+    }
+
     var body: some View {
         Group {
             if supportsImagePlayground {
@@ -77,6 +87,8 @@ struct ImagePlaygroundInspector: View {
         .imagePlaygroundSheet(isPresented: $showFilter, concept: "", sourceImage: filterSource) { url in
             replaceActiveLayer(from: url)
         }
+        // Turn off the people/contact personalization inside Apple's sheet.
+        .imagePlaygroundOptions(personalizationDisabled)
     }
 
     @ViewBuilder private var supported: some View {
