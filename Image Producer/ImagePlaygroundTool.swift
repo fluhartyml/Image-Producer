@@ -121,7 +121,7 @@ struct ImagePlaygroundInspector: View {
                 .buttonStyle(.borderedProminent)
 
                 Button { startFilter() } label: {
-                    Label("Filter — Restyle Selected Layer", systemImage: "wand.and.stars")
+                    Label("Filter → Edit Current Layer", systemImage: "wand.and.stars")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
