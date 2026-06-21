@@ -101,12 +101,18 @@ struct ImagePlaygroundInspector: View {
                 Text("Describe what Image Playground should make:")
                     .font(.subheadline)
 
-                // Plain text box — type here, then press a button. Autocomplete off.
+                // Plain text box on a LIGHTER fill so it stands out against the dark
+                // inspector (Michael 2026-06-21). Autocomplete off.
                 TextField("e.g. a vase of sunflowers, no background…",
                           text: $prompt, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
                     .lineLimit(2...6)
                     .autocorrectionDisabled()
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.white.opacity(0.18))
+                    )
 
                 Button { startMaker() } label: {
                     Label("Image Playground: New Layer", systemImage: "plus.rectangle.on.rectangle")
