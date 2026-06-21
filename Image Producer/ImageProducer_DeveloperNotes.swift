@@ -452,8 +452,25 @@
 //        Rides the existing AI gating (Apple-Intelligence HW + iOS 18.4 / macOS
 //        15.4); graceful-absent on older devices. GLYPH VERIFIED IN SDK 2026-06-11
 //        via NSImage(systemSymbolName:): `apple.image.playground` and `.fill`
-//        EXIST (alternates: wand.and.sparkles / wand.and.stars). NOT committed —
-//        candidate; one tool at a time, this is a later add.
+//        EXIST (alternates: wand.and.sparkles / wand.and.stars).
+//        ✅ BUILT 2026-06-21 (commit eb774ee, ImagePlaygroundTool.swift). ENGINE
+//        DECISION (Claude's autonomous call during a hands-off build session) =
+//        Apple's vetted `.imagePlaygroundSheet(isPresented:concept:sourceImage:
+//        onCompletion:)` (iOS 18.1+/macOS 15.1+) INSTEAD of the programmatic
+//        `ImageCreator`, for a publishable v1 — Apple owns the generation UX, the
+//        styles, content safety, and candidate picking; we hand it a concept (+ an
+//        optional sourceImage) and place the returned image. Maker -> new content
+//        layer; Filter -> renders the active layer to a source Image, feeds it +
+//        the prompt, replaces that layer. GATING = the cross-platform
+//        `@Environment(\.supportsImagePlayground)` (no UIKit `isAvailable` needed)
+//        with a graceful "needs Apple Intelligence" state. API verified against the
+//        installed Xcode-27 SDK swiftinterface; both targets green.
+//        ⚠️ NOT device-verified — AI generation needs Apple-Intelligence hardware
+//        (Michael to confirm the round-trip). OPEN FOLLOW-UPS: a STYLE picker in the
+//        inspector? the GLYPH-AS-STATE-LIGHT below is largely MOOT with the modal
+//        sheet (the sheet IS the "working" UI); and whether to FILTER THE STRIP to
+//        hide the tool entirely on unsupported devices vs the current inspector
+//        absent-state — a fork for Michael.
 //        GLYPH-AS-STATE-LIGHT (Michael 2026-06-11): use the OUTLINE/FILL pair as a
 //        status indicator on the toolbox icon — IDLE = outline `…playground`;
 //        SELECTED = the usual accent highlight (like every tool); WORKING = the
