@@ -40,6 +40,13 @@ struct ImagePlaygroundInspector: View {
 
     @State private var makerPrompt = ""
     @State private var filterPrompt = ""
+    // The concept the SHEET actually uses — captured at present-time from the prompt
+    // above, NOT bound live. Passing the live prompt into .imagePlaygroundSheet made
+    // its machinery re-configure on every keystroke, which froze the field and wiped
+    // in-progress typing (Michael 2026-06-21). Capturing on the button tap decouples
+    // the sheet from the editor field so typing stays smooth.
+    @State private var makerConcept = ""
+    @State private var filterConcept = ""
     @State private var showMaker = false
     @State private var showFilter = false
     @State private var filterSource: Image?     // the active layer rendered, seeds Filter
@@ -69,12 +76,13 @@ struct ImagePlaygroundInspector: View {
                     subtitle: "Needs Apple Intelligence. Turn it on in Settings on a supported device (iPhone 15 Pro / 16 or later, or an Apple-silicon Mac), then this tool generates art on device.")
             }
         }
-        // Maker: prompt only -> generate a fresh image.
-        .imagePlaygroundSheet(isPresented: $showMaker, concept: makerPrompt) { url in
+        // Maker: prompt only -> generate a fresh image. concept = the captured
+        // makerConcept (set on tap), not the live field, so typing doesn't churn the sheet.
+        .imagePlaygroundSheet(isPresented: $showMaker, concept: makerConcept) { url in
             placeNewLayer(from: url)
         }
-        // Filter: prompt + the active layer's current art as the source.
-        .imagePlaygroundSheet(isPresented: $showFilter, concept: filterPrompt, sourceImage: filterSource) { url in
+        // Filter: captured prompt + the active layer's current art as the source.
+        .imagePlaygroundSheet(isPresented: $showFilter, concept: filterConcept, sourceImage: filterSource) { url in
             replaceActiveLayer(from: url)
         }
     }
@@ -92,7 +100,7 @@ struct ImagePlaygroundInspector: View {
                         // words" were hijacking the field — replacing text mid-sentence
                         // and causing the freeze (Michael 2026-06-21).
                         .autocorrectionDisabled()
-                    Button { showMaker = true } label: {
+                    Button { makerConcept = makerPrompt; showMaker = true } label: {
                         Label("Generate New Layer", systemImage: "plus.rectangle.on.rectangle")
                             .frame(maxWidth: .infinity)
                     }
@@ -150,6 +158,7 @@ struct ImagePlaygroundInspector: View {
         } else {
             filterSource = nil
         }
+        filterConcept = filterPrompt
         showFilter = true
     }
 
