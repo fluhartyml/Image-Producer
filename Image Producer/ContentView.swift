@@ -2280,15 +2280,19 @@ extension View {
 /// The brand wordmark shown inside the open app: "Image Producer" with the "Graphic Arts"
 /// subheading the home-screen / App Store name can't display. Reached from the
 /// toolbar's info button.
+/// "Version 1.0 · Build 1" — read live from the bundle so it tracks
+/// MARKETING_VERSION / CURRENT_PROJECT_VERSION without manual edits. Shared by
+/// the About sheet, the macOS Welcome window, and the iOS launch scene so the
+/// version reads identically on every platform.
+var appVersionLine: String {
+    let info = Bundle.main.infoDictionary
+    let short = info?["CFBundleShortVersionString"] as? String ?? "1.0"
+    let build = info?["CFBundleVersion"] as? String ?? "1"
+    return "Version \(short) · Build \(build)"
+}
+
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
-
-    private var versionLine: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = info?["CFBundleVersion"] as? String ?? "1"
-        return "Version \(short) (\(build))"
-    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -2300,10 +2304,10 @@ struct AboutView: View {
                 .font(.subheadline)
                 .tracking(4)
                 .foregroundStyle(.secondary)
-            Spacer()
-            Text(versionLine)
+            Text(appVersionLine)
                 .font(.footnote)
                 .foregroundStyle(.tertiary)
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)

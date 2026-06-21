@@ -70,6 +70,18 @@ struct Image_ProducerApp: App {
                 startPoint: .top,
                 endPoint: .bottom
             )
+        } overlayAccessoryView: { _ in
+            // The launch scene shows only the "Image Producer" title (no GRAPHIC ARTS
+            // subtitle like the Mac Welcome window / About sheet), so the version line
+            // sits at the bottom — the conventional spot for a build stamp on a launch
+            // screen. Same appVersionLine text as the other platforms.
+            VStack {
+                Spacer()
+                Text(appVersionLine)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 24)
+            }
         }
         #endif
 

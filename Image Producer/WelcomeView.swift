@@ -34,6 +34,9 @@ struct WelcomeView: View {
                     .font(.subheadline)
                     .tracking(4)
                     .foregroundStyle(.secondary)
+                Text(appVersionLine)
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
             }
 
             Button {
