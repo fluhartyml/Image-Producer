@@ -8,31 +8,34 @@
 //    • FILTER — feed the ACTIVE layer's current art + a prompt, and REPLACE that
 //               layer with the restyled result.
 //
-//  ENGINE = Apple's vetted `.imagePlaygroundSheet` (iOS 18.1+ / macOS 15.1+). The
-//  PROMPT IS TYPED IN APPLE'S SHEET, not in the inspector: our own in-inspector
-//  text field was disrupting typing (per-keystroke churn / focus loss that drove
-//  Michael up the wall 2026-06-21), and Apple's panel already has a solid prompt
-//  input plus styles, content safety, and candidate picking. So the inspector is
-//  just two buttons that present the sheet; the user types there. Cleaner AND more
-//  publishable. (If a reliable in-inspector field is wanted later, it can be added
-//  back once the field-rebuild issue is understood — kept out for now on purpose.)
+//  DESIGN (Michael 2026-06-21): the user TYPES their prompt in a text box IN THIS
+//  INSPECTOR (one-stop, intuitive — no pasting required), then presses one of two
+//  buttons. The typed prompt is handed to Apple's `.imagePlaygroundSheet` as the
+//  `concept:` SEED only when a button is pressed — so the sheet opens already
+//  filled in and the user never types into Apple's own field.
 //
-//  API verified vs the installed Xcode-27 SDK swiftinterface (2026-06-21):
-//    func imagePlaygroundSheet(isPresented:concept:sourceImage:onCompletion:) -> View
-//    var EnvironmentValues.supportsImagePlayground: Bool   (cross-platform gate)
+//  WHY type here and not in Apple's sheet: on the OS/Xcode 27 beta Apple's sheet
+//  field ignores the controls that should disable name-detection/autocomplete
+//  (personalization=.disabled + every system text setting off) and resets typing
+//  per keystroke. Our box is a PLAIN text field (no people-detection), and the
+//  prompt is decoupled from the sheet (passed only on button press — a LIVE
+//  concept binding was what reset our field in an earlier attempt). See memory
+//  project_image_producer_playground_paste_workaround.
 //
-//  AVAILABILITY: gated by @Environment(\.supportsImagePlayground); graceful
-//  "needs Apple Intelligence" state where unsupported. Deployment target 27.0, so
-//  the 18.1+ APIs need no #available guards.
+//  ENGINE = Apple's vetted `.imagePlaygroundSheet` (iOS 18.1+/macOS 15.1+);
+//  ImageCreator is deprecated in iOS 27. API verified vs the installed Xcode-27
+//  SDK swiftinterface (2026-06-21). AVAILABILITY gated by
+//  @Environment(\.supportsImagePlayground); graceful "needs Apple Intelligence"
+//  state where unsupported. Deployment target 27.0 → no #available guards.
 //
-//  ⚠️ NOT device-verified: AI generation only runs on Apple-Intelligence hardware,
-//  so the generate/restyle round-trip needs Michael's confirmation. Compiles green.
+//  ⚠️ NOT device-verified: AI generation needs Apple-Intelligence hardware, and
+//  whether typing in our box is clean on the 27 beta is Michael's to confirm.
 //
 
 import SwiftUI
 import ImagePlayground
 
-/// Tool #11's inspector — two buttons that present Apple's Image Playground sheet.
+/// Tool #11's inspector — a prompt box + Make/Restyle buttons that seed Apple's sheet.
 struct ImagePlaygroundInspector: View {
     @ObservedObject var document: IconDocument
     let activeLayerID: IconLayer.ID?
@@ -40,9 +43,11 @@ struct ImagePlaygroundInspector: View {
     /// Cross-platform Apple-Intelligence capability check (no UIKit needed).
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
 
+    @State private var prompt = ""            // what the user types (touched only by typing)
+    @State private var sheetConcept = ""      // seeded into the sheet ONLY on a button press
     @State private var showMaker = false
     @State private var showFilter = false
-    @State private var filterSource: Image?     // the active layer rendered, seeds Filter
+    @State private var filterSource: Image?   // the active layer rendered, seeds Filter
     @State private var failed = false
 
     private var activeIndex: Int? {
@@ -58,10 +63,10 @@ struct ImagePlaygroundInspector: View {
         return document.layers[i]
     }
 
-    /// Image Playground options with Apple's "Personalization" (the people-from-your-
-    /// library feature) turned OFF — so typing a word like "and" stops getting turned
-    /// into a contact ("Andrew") inside Apple's sheet. ImagePlaygroundOptions.Personalization
-    /// = automatic / enabled / disabled (SDK-verified 2026-06-21).
+    /// Image Playground options with Apple's "Personalization" (people-from-library)
+    /// turned OFF. ImagePlaygroundOptions.Personalization = automatic/enabled/disabled
+    /// (SDK-verified). NOTE: the 27 beta currently ignores this — kept anyway since
+    /// it's the documented control.
     private var personalizationDisabled: ImagePlaygroundOptions {
         var options = ImagePlaygroundOptions()
         options.personalization = .disabled
@@ -79,49 +84,47 @@ struct ImagePlaygroundInspector: View {
                     subtitle: "Needs Apple Intelligence. Turn it on in Settings on a supported device (iPhone 15 Pro / 16 or later, or an Apple-silicon Mac), then this tool generates art on device.")
             }
         }
-        // The user types the prompt inside Apple's sheet (concept seeded empty).
-        .imagePlaygroundSheet(isPresented: $showMaker, concept: "") { url in
+        // concept = sheetConcept (set on button press), NOT the live `prompt`, so typing
+        // in the box never re-configures the sheet.
+        .imagePlaygroundSheet(isPresented: $showMaker, concept: sheetConcept) { url in
             placeNewLayer(from: url)
         }
-        // Filter seeds the sheet with the active layer's current art as the source.
-        .imagePlaygroundSheet(isPresented: $showFilter, concept: "", sourceImage: filterSource) { url in
+        .imagePlaygroundSheet(isPresented: $showFilter, concept: sheetConcept, sourceImage: filterSource) { url in
             replaceActiveLayer(from: url)
         }
-        // Turn off the people/contact personalization inside Apple's sheet.
         .imagePlaygroundOptions(personalizationDisabled)
     }
 
     @ViewBuilder private var supported: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                // MAKER — a new layer from a prompt typed in Apple's sheet.
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Make — new layer").font(.subheadline).bold()
-                    Button { showMaker = true } label: {
-                        Label("New Image…", systemImage: "plus.rectangle.on.rectangle")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Text("Opens Apple's Image Playground — type your prompt there, generate, and the result drops on a new layer.")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Describe what Image Playground should make:")
+                    .font(.subheadline)
 
-                Divider()
+                // Plain text box — type here, then press a button. Autocomplete off.
+                TextField("e.g. a vase of sunflowers, no background…",
+                          text: $prompt, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...6)
+                    .autocorrectionDisabled()
 
-                // FILTER — restyle the active layer's current art.
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Filter — restyle this layer").font(.subheadline).bold()
-                    Button { startFilter() } label: {
-                        Label("Restyle This Layer…", systemImage: "wand.and.stars")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(activeFilterable == nil)
-                    Text(activeFilterable == nil
-                         ? "Select a content layer that has art on it to restyle."
-                         : "Opens Image Playground seeded with this layer's art — describe the change there; the result replaces it.")
-                        .font(.caption2).foregroundStyle(.secondary)
+                Button { startMaker() } label: {
+                    Label("Image Playground: New Layer", systemImage: "plus.rectangle.on.rectangle")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.borderedProminent)
+
+                Button { startFilter() } label: {
+                    Label("Filter — Restyle Selected Layer", systemImage: "wand.and.stars")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(activeFilterable == nil)
+
+                Text(activeFilterable == nil
+                     ? "New Layer drops the result on a fresh layer. Restyle needs a content layer with art selected."
+                     : "New Layer = fresh layer · Restyle = redo the selected layer's art with your prompt.")
+                    .font(.caption2).foregroundStyle(.secondary)
 
                 if failed {
                     Text("Couldn't place the generated image.")
@@ -136,8 +139,13 @@ struct ImagePlaygroundInspector: View {
 
     // MARK: - Actions
 
-    /// Render the active layer's current look into a SwiftUI Image to seed the
-    /// Filter sheet's source, then present it.
+    /// Maker — seed the sheet with the typed prompt and present it.
+    private func startMaker() {
+        sheetConcept = prompt
+        showMaker = true
+    }
+
+    /// Filter — render the active layer to seed the source image, set the prompt, present.
     @MainActor private func startFilter() {
         guard let layer = activeFilterable else { return }
         let side = CGFloat(document.canvasSize)
@@ -151,14 +159,15 @@ struct ImagePlaygroundInspector: View {
         } else {
             filterSource = nil
         }
+        sheetConcept = prompt
         showFilter = true
     }
 
-    /// Maker result -> a brand-new content layer at the top of the stack.
+    /// Maker result -> a brand-new content layer at the top of the stack, named from the prompt.
     private func placeNewLayer(from url: URL) {
         guard let png = loadPNG(from: url) else { failed = true; return }
         failed = false
-        var layer = IconLayer(name: "AI Image", role: .content)
+        var layer = IconLayer(name: layerName(from: prompt), role: .content)
         layer.setImage(png)
         document.layers.append(layer)   // end of array = top of the visual stack
     }
@@ -176,5 +185,11 @@ struct ImagePlaygroundInspector: View {
     private func loadPNG(from url: URL) -> Data? {
         guard let raw = try? Data(contentsOf: url) else { return nil }
         return pngData(fromImageData: raw)
+    }
+
+    /// Auto-name a new layer from its prompt (content names the layer).
+    private func layerName(from prompt: String) -> String {
+        let t = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? "AI Image" : String(t.prefix(24))
     }
 }
