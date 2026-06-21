@@ -88,6 +88,10 @@ struct ImagePlaygroundInspector: View {
                     TextField("Describe an image to generate…", text: $makerPrompt, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .lineLimit(1...3)
+                        // Kill QuickType/autofill suggestions: the predicted "past
+                        // words" were hijacking the field — replacing text mid-sentence
+                        // and causing the freeze (Michael 2026-06-21).
+                        .autocorrectionDisabled()
                     Button { showMaker = true } label: {
                         Label("Generate New Layer", systemImage: "plus.rectangle.on.rectangle")
                             .frame(maxWidth: .infinity)
@@ -105,6 +109,7 @@ struct ImagePlaygroundInspector: View {
                     TextField("Describe how to restyle the active layer…", text: $filterPrompt, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .lineLimit(1...3)
+                        .autocorrectionDisabled()
                     Button { startFilter() } label: {
                         Label("Restyle Active Layer", systemImage: "wand.and.stars")
                             .frame(maxWidth: .infinity)
