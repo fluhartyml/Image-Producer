@@ -1,28 +1,35 @@
 //
 //  IconProducer_DeveloperNotes.swift
-//  Icon Producer
+//  Image Producer
 //
 //  Created by Michael Fluharty on 6/9/26.
 //
 //  ============================================================================
-//  PLAN OF RECORD — living brainstorm doc (this file is the only one being
-//  edited during the design phase; no app code is being written yet).
-//  Last updated: 2026-06-10.
+//  PLAN OF RECORD — living design doc. The app is now BUILT (document-based,
+//  multiplatform) and shipping green; this file is the design history + roadmap.
+//  Last updated: 2026-06-21.
 //  ============================================================================
 //
 //  WHY THIS APP / ORIGIN
 //  ---------------------
 //  Conceived 2026-06-10 out of a brainstorm about Apple's Image Playground
 //  framework. The "aha": an app you build can host on-device AI image
-//  generation, then turn that art into a shippable app icon. "Icon Producer"
+//  generation, then turn that art into a shippable app icon. "Image Producer"
 //  = produce app icons, AI-first.
 //
-//  CURRENT STATE OF THE PROJECT (as of 2026-06-10)
+//  CURRENT STATE OF THE PROJECT (as of 2026-06-21)
 //  -----------------------------------------------
-//  - Blank Xcode Multiplatform template (created 6/9/26).
-//  - SwiftUI + SwiftData; stock `Item.self` schema + stock `ContentView`.
-//  - Entitlements: CloudKit + push-notification (aps-environment=development).
-//  - Nothing custom built yet. Clean slate.
+//  - SHIPPED & BUILDING GREEN. Document-based multiplatform app (DocumentGroup /
+//    IconDocument; SwiftData dropped). Repo github.com/fluhartyml/Image-Producer,
+//    bundle id com.nightgard.Image-Producer, iCloud container
+//    iCloud.com.nightgard.image-producer (Files folder "Image Producer").
+//  - Built: layered editor + canvas; Move/Transform (crop now bakes a selectable
+//    object the box hugs, centered, with Fit/Fill snap-to-canvas); paint bucket
+//    (backgrounds); pixel pen + erase; tool strip + custom tool icons; branded
+//    launch (iOS DocumentGroupLaunchScene + a Mac Welcome window); version line
+//    on all platforms. Undo is OFF by design (no UndoManager; History is future).
+//  - Roadmap (below): History engine, selection subsystem (Path/Magic Wand),
+//    Image Playground tool, effects, print/canvas-size, the registration gate.
 //
 //  ----------------------------------------------------------------------------
 //  VERIFIED APPLE FACTS (sourced from Apple Developer docs, 2026-06-10)
@@ -61,8 +68,8 @@
 //  ----------------------------------------------------------------------------
 //  DECIDED 2026-06-10 — THE EDITOR: SQUARE LAYERED + HISTORY CANVAS
 //  ----------------------------------------------------------------------------
-//  Michael: "similar to the shelf app, I want Icon Producer to have a square
-//  canvas that is layer and history like Photoshop." So Icon Producer adopts
+//  Michael: "similar to the shelf app, I want Image Producer to have a square
+//  canvas that is layer and history like Photoshop." So Image Producer adopts
 //  the SAME editor paradigm proven in Shelf-Ready's icon editor. The reference
 //  design lives in:
 //    ~/Developer.complex/NightGard/Shelf-Ready/Shelf-Ready/
@@ -199,7 +206,7 @@
 //          glyph-only; they are general LAYER STYLES usable on ANY layer.
 //          Michael's idea: if a user IMPORTS A SMALL IMAGE WITH ROOM AROUND IT,
 //          they can open the SAME effects inspector and add a glow (or any
-//          Icon Producer effect) to that imported image — same inspector, same
+//          Image Producer effect) to that imported image — same inspector, same
 //          effect stack, just on an image layer instead of a glyph.
 //          MECHANICS NOTE: outward effects (glow, drop shadow, flame) need
 //          TRANSPARENT ROOM around the content to render INTO. A small image
@@ -310,41 +317,43 @@
 //              PLUS a CUSTOM override — user types an exact "nnn dpi".
 //          Both pickers = preset list + a "Custom…" entry for an explicit value
 //          (Michael 2026-06-16). Presets are shortcuts, never a ceiling.
-//        NOTE (no scope cut — capture in full): this pushes Icon Producer toward a
+//        NOTE (no scope cut — capture in full): this pushes Image Producer toward a
 //        general print-design tool, not only an app-icon maker. Worth a product-
 //        positioning decision later (icon maker that ALSO prints, vs. broaden the
 //        app's identity). Recorded as Michael's vision; do not trim.
-//        REBRAND (Michael 2026-06-16): if these features land, the name likely
-//        changes — "Icon Producer" is narrow (says "icons"), but a print/canvas/PDF
-//        tool is broader, so "Icon Producer" becomes a MODE, not the product. Fits
-//        Michael's standing naming rule: prefer an umbrella noun with room to grow
-//        over a narrow-specific name. Decide the new name alongside the print build.
-//        CHOSEN NAME (Michael 2026-06-17): **PICTORIAL PRODUCER.**
-//          - Lineage: Icon Producer -> Praelum -> Pictorial Studio -> Pictorial Producer.
-//            PRAELUM RETIRED (too abstract / Latin). "Pictorial Studio" was briefly locked,
-//            then dropped because "Studio" BREAKS Michael's naming voice (see "Producer").
-//          - "Pictorial" = the one word a long elimination session landed on that Michael
-//            found genuinely PLEASANT (real, smooth, familiar; says "picture" without being
-//            literal-blunt or foreign).
-//          - "Producer" = Michael's established MAKER-SUFFIX / house naming voice:
-//            [output] + agentive role-noun -- Icon Producer, Typeface Producer (cf. Contact/
-//            Transcription Keeper, Cryo Playlist Manager, CryoTunes Player, NightGard Library
-//            Commander). So "Pictorial Producer" reads self-evidently as "makes pictures/
-//            graphics" AND extends the Icon Producer -> Typeface Producer suite. "Studio" was
-//            off-voice; "Producer" is on-voice. Method: Workshop/Naming-Brainstorm-Method-2026-06-17.md
-//          - PRIORITY: CLARITY OVER OWNABILITY. Michael de-prioritized owning/defending the
-//            name -- optimize for clear/familiar/pleasant, not a distinctive/protectable mark.
-//          - Availability (checked 2026-06-17, App Store iTunes API): exact name
-//            "Pictorial Producer" is FREE -- the only HARD gate (ASC blocks identical names).
-//          - Bundle ID stays com.nightgard.Icon-Producer (wired to the iCloud container +
-//            .iconproj docs); the rename is display-name only -- do NOT touch the bundle ID.
-//          - "Graphic Arts" descriptor kept (spans graphic design AND printmaking; covers
-//            the icon side and the future print side).
-//          - Gauntlet rejects: Praelum/Stampa (Latin/abstract), Inkstone (loved it, collides
-//            w/ Inkstone Software), Pictographic Studio (Picto- thicket + Pictogram Studio TM),
-//            Markwright/Tilesmith (maker-coinage, no evident connection), Pictorial Studio
-//            (off-voice "Studio"), Glyph (reads as font), Tessera (sci-fi "tesseract" halo),
-//            plus Pixel Press / Imprint / Seal Press / Vellum / Calque / Signum.
+//        REBRAND (Michael 2026-06-16): as the app broadened beyond app-icons
+//        (print, canvas sizes, general graphics), the original narrow name "Icon
+//        Producer" (it says "icons") became a MODE, not the product — per Michael's
+//        standing rule, prefer an umbrella noun with room to grow over a narrow name.
+//        FINAL NAME (Michael 2026-06-20): **IMAGE PRODUCER.**
+//          - FULL LINEAGE (kept as history): Icon Producer -> Praelum -> Pictorial
+//            Studio -> Pictorial Producer -> Image Producer. Praelum retired (too
+//            abstract/Latin); "Studio" dropped (off Michael's naming voice);
+//            "Pictorial" dropped 2026-06-20 — the "-al" tail reads weak, and
+//            "Picture" reads as motion/video. "Image" is clean and still.
+//          - "Producer" = Michael's house MAKER-SUFFIX voice: [output] + agentive
+//            role-noun — Image Producer, Icon/Typeface Producer (cf. Contact/
+//            Transcription Keeper, Cryo Playlist Manager, CryoTunes Player, NightGard
+//            Library Commander). "Image Producer" = "makes images," on-voice and
+//            App-Store-clear. Method: Workshop/Naming-Brainstorm-Method-2026-06-17.md
+//          - PRIORITY: clarity/familiar/pleasant OVER ownability (Michael
+//            de-prioritized owning/defending the mark).
+//          - Availability (checked 2026-06-20): no exact App Store match for "Image
+//            Producer" (nor the prior "Pictorial Producer"). The only HARD gate is
+//            App Store Connect at reservation (it blocks identical names).
+//          - ⚠️ BUNDLE ID CHANGED (2026-06-20): this is now a FRESH project with a
+//            clean bundle id **com.nightgard.Image-Producer** + iCloud container
+//            iCloud.com.nightgard.image-producer (Files folder "Image Producer").
+//            The OLD "Icon Producer" project (com.nightgard.Icon-Producer) is kept
+//            intact as a backup; its existing iCloud docs do NOT auto-migrate.
+//            (SUPERSEDES the earlier "rename is display-name only, do NOT touch the
+//            bundle ID" plan — that in-place rename was NOT the path taken.)
+//          - "Graphic Arts" descriptor kept (spans graphic design AND printmaking).
+//          - Gauntlet rejects (kept for history): Praelum/Stampa (Latin/abstract),
+//            Inkstone (collides w/ Inkstone Software), Pictographic Studio (Pictogram
+//            Studio TM), Markwright/Tilesmith (maker-coinage), Pictorial Studio
+//            (off-voice "Studio"), Glyph (reads as font), Tessera, plus Pixel Press /
+//            Imprint / Seal Press / Vellum / Calque / Signum.
 //      • STATUS / HINT BAR (Michael 2026-06-11): a text bar BELOW THE CANVAS (both
 //        orientations) = the app's single VOICE to the user. PRIMARY PURPOSE: it
 //        solves the NO-HOVER problem on touch — desktop rollover/hover hints have
@@ -619,7 +628,7 @@
 //  DECIDED 2026-06-10 — HISTORY (per-stroke lives here; SAME engine as
 //  Shelf-Ready's IMAGE-HISTORY, designed with Michael 2026-06-09). Source of
 //  truth for the full model: Shelf-Ready_DeveloperNotes.swift, "ICON EDITOR —
-//  IMAGE HISTORY, UNDO & LAYER INTERACTIONS". Icon Producer reuses it (shared
+//  IMAGE HISTORY, UNDO & LAYER INTERACTIONS". Image Producer reuses it (shared
 //  source engine, Q1). Michael 2026-06-10: "the per-stroke is in a reveal >
 //  Pixels > where each pixel is a stroke but nested within the tool-history
 //  parent. paint bucket > Pen > ... kept unless purged." (Michael noted the
@@ -630,7 +639,7 @@
 //      ⚠️ WHY (Michael 2026-06-10): the Cmd+Z UNDO IS WHAT KEPT CRASHING
 //      SHELF-READY yesterday. The app-wide SwiftData UndoManager snapshotted
 //      the WHOLE store on every change and blew up on deletes. It was REMOVED
-//      2026-06-09. => HARD RULE for Icon Producer's shared engine: DO NOT wire
+//      2026-06-09. => HARD RULE for Image Producer's shared engine: DO NOT wire
 //      an app-wide SwiftData UndoManager (or any whole-store snapshot undo).
 //      The custom linear tool-history below IS the undo, and it sidesteps that
 //      entire crash class. (cf. Chat-History 2026-06-09 delete-crash fix.)
@@ -917,7 +926,7 @@
 //  NEW REQUIREMENTS Michael added (all apply regardless of which path wins):
 //
 //  (R1) RESOLUTION LADDER = 128 / 256 / 512 / 1024 (RESOLVED 2026-06-10).
-//       Shelf-Ready offered only 64 / 128. Icon Producer's grid densities are
+//       Shelf-Ready offered only 64 / 128. Image Producer's grid densities are
 //       the four powers Michael named: 128, 256, 512, 1024. (No coarse retro
 //       16/32/64 rung — this app's pixel grids run fine-to-full-res.) The
 //       "pixel" is a CHOSEN ART-CELL: 128 = chunkier; 1024 = 1 cell = 1 device
@@ -1002,7 +1011,7 @@
 //      "Separate apps that share an editor engine — two unique apps,
 //      independent, with NO KITS other than Apple kits."
 //      MEANING (important nuance):
-//        • TWO INDEPENDENT SHIPPING APPS. Icon Producer and Shelf-Ready are
+//        • TWO INDEPENDENT SHIPPING APPS. Image Producer and Shelf-Ready are
 //          separate products; neither depends on the other.
 //        • SHARED ENGINE AT THE SOURCE LEVEL, NOT AS A PACKAGE. The editor
 //          "engine" is a clean, self-contained set of Swift source files that
@@ -1029,23 +1038,24 @@
 //      Shelf-Ready has no icon editor, the engine just LIVES IN ICON PRODUCER
 //      (no copy, no manual sync). (Only revisit sharing if Shelf-Ready keeps a
 //      MINIMAL icon-assembly step.) The two apps are COMPLEMENTARY (create icon
-//      in Icon Producer; package screenshots in Shelf-Ready) and can ship as an
+//      in Image Producer; package screenshots in Shelf-Ready) and can ship as an
 //      APP BUNDLE. ***
 //
-//  GIT / GITHUB WORKFLOW (Michael 2026-06-10): repo = github.com/fluhartyml/
-//  Icon-Producer (origin wired, gh authed). PUSH ON EACH SUCCESSFUL BUILD
+//  GIT / GITHUB WORKFLOW: repo = github.com/fluhartyml/Image-Producer (origin
+//  wired, gh authed; the legacy Icon-Producer repo is the backup). PUSH ON EACH
+//  SUCCESSFUL BUILD
 //  (standing rule — BUILD SUCCEEDED = commit + stage + push, don't ask). GitHub
 //  is ALSO the MacBook<->minis bridge: write/commit/push on the MacBook (dev),
 //  the minis PULL + build/submit on RELEASE Xcode 26. Repos default PUBLIC; no
 //  secrets in repo.
 //
 //  VIABILITY / APP-REVIEW RISK (analyzed w/ Michael 2026-06-10, web-verified):
-//    • NAME "Icon Producer": no exact App Store match found (likely available —
-//      confirm in App Store Connect). BUT generic/descriptive in a SATURATED
-//      category; weak as a distinctive/trademark name (cf. naming-strategy
-//      memory: prefer umbrella/distinctive). Usable, not memorable. Reconsider.
+//    • NAME "Image Producer" (FINAL 2026-06-20): no exact App Store match
+//      (confirm in App Store Connect at reservation). Broadened up from the
+//      narrow "Icon Producer" per the naming-strategy memory (umbrella noun,
+//      room to grow). Generic/descriptive — chosen for clarity over ownability.
 //    • vs Apple's ICON COMPOSER: complementary, not competing (Icon Composer
-//      ASSEMBLES the layered .icon; Icon Producer CREATES artwork -> PNG). Low
+//      ASSEMBLES the layered .icon; Image Producer CREATES artwork -> PNG). Low
 //      risk on this axis.
 //    • 4.2 minimum functionality: SAFE — deep editor (layers/pixel/effects/
 //      fonts) is substantial.
@@ -1071,7 +1081,7 @@
 //      CANVAS SIZE would be a 4.3 DUPLICATE-SPAM risk — two ~95%-identical
 //      binaries differing by one feature is exactly the lite/full pattern Apple
 //      steers away from (use ONE app + IAP, not duplicate apps). INSTEAD: ONE
-//      Icon Producer, with user-defined canvas size as the premium feature.
+//      Image Producer, with user-defined canvas size as the premium feature.
 //      PRICING — FREE, NOT PAID (Michael 2026-06-11, OVERRIDES the usual paid/
 //      premium internal default for THIS app): Michael does NOT want money here.
 //      The premium feature is unlocked by a FREE REGISTRATION that EXPIRES
@@ -1227,7 +1237,7 @@
 //  - BUILD/SUBMIT: low floor is NOT a problem for App Store Connect. The BETA
 //    XCODE is — ASC rejects binaries built with a BETA Xcode/SDK. The shipping
 //    binary MUST be built on a RELEASE Xcode (Mac minis' Xcode 26). KEY INSIGHT:
-//    Icon Producer uses only APIs through iOS 18.4 / macOS 15.4, ALL of which
+//    Image Producer uses only APIs through iOS 18.4 / macOS 15.4, ALL of which
 //    are in the RELEASE iOS-26 / macOS-26 SDK -> the app can be developed AND
 //    shipped ENTIRELY on the minis' Xcode 26; the Xcode 27 BETA is NOT needed
 //    for this app (it's for the book + the later iOS-27 upgrade pass). Avoid
