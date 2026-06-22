@@ -582,6 +582,7 @@ struct CanvasInspector: View {
     var fileURL: URL?
 
     @State private var draftName = ""
+    @State private var renameError = false
     // Export (sections C/D)
     @State private var exportData = Data()
     @State private var exportType: UTType = .pdf
@@ -591,24 +592,29 @@ struct CanvasInspector: View {
     @State private var showWebExporter = false
 
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 16) {
             // --- Project name ---
             VStack(alignment: .leading, spacing: 4) {
                 Text("Project name").font(.caption).foregroundStyle(.secondary)
                 if fileURL == nil {
-                    // Untitled: editable working name (becomes the manifest name).
+                    // Untitled: editable working name (becomes the manifest name on first save).
                     TextField("Project name", text: $draftName)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit { commitName() }
                     Text("Working name for this untitled project.")
                         .font(.caption2).foregroundStyle(.tertiary)
                 } else {
-                    // Saved: the authoritative name is the FILE name on disk.
-                    TextField("", text: .constant(displayName))
+                    // Saved: editing here renames the FILE on disk (one-stop — no trip to Finder).
+                    TextField("Project name", text: $draftName)
                         .textFieldStyle(.roundedBorder)
-                        .disabled(true)
-                    Text("This is the file's name. Rename it from the window title bar (control-click the title) or Finder — in-app rename is a later step.")
+                        .onSubmit { renameFile() }
+                    Text("Renames the file on disk. Press Return to apply.")
                         .font(.caption2).foregroundStyle(.tertiary)
+                    if renameError {
+                        Text("Couldn't rename — a file with that name may already exist.")
+                            .font(.caption2).foregroundStyle(.red)
+                    }
                 }
             }
 
@@ -759,10 +765,10 @@ struct CanvasInspector: View {
                     .font(.caption2).foregroundStyle(.tertiary)
             }
 
-            Spacer()
         }
         .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
         .fileExporter(isPresented: $showDataExporter,
                       document: CanvasDataDocument(exportData),
                       contentType: exportType,
@@ -771,8 +777,9 @@ struct CanvasInspector: View {
                       document: webBundle,
                       contentType: .folder,
                       defaultFilename: "\(displayName) Web") { _ in }
-        .onAppear { draftName = document.name }
-        .onChange(of: document.name) { draftName = document.name }
+        .onAppear { draftName = displayName }
+        .onChange(of: document.name) { draftName = displayName }
+        .onChange(of: fileURL) { draftName = displayName; renameError = false }
     }
 
     @ViewBuilder private func attrRow(_ label: String, _ value: String) -> some View {
@@ -786,8 +793,39 @@ struct CanvasInspector: View {
 
     private func commitName() {
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { draftName = document.name; return }
+        guard !trimmed.isEmpty else { draftName = displayName; return }
         document.name = trimmed
+    }
+
+    /// Rename the .picprod file on disk IN PLACE (one-stop — no trip to Finder). Uses a
+    /// coordinated move + presenter notification so the open document follows the new URL
+    /// (so autosave keeps writing to the right file).
+    private func renameFile() {
+        renameError = false
+        guard let url = fileURL else { return }
+        // Sanitize: a file name can't contain "/" or ":".
+        let clean = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        let current = url.deletingPathExtension().lastPathComponent
+        guard !clean.isEmpty, clean != current else { draftName = displayName; return }
+        let newURL = url.deletingLastPathComponent()
+            .appendingPathComponent(clean)
+            .appendingPathExtension(url.pathExtension)
+        guard !FileManager.default.fileExists(atPath: newURL.path) else { renameError = true; return }
+
+        let coordinator = NSFileCoordinator()
+        var coordErr: NSError?
+        coordinator.coordinate(writingItemAt: url, options: .forMoving,
+                               writingItemAt: newURL, options: .forReplacing, error: &coordErr) { src, dst in
+            do {
+                try FileManager.default.moveItem(at: src, to: dst)
+                coordinator.item(at: src, didMoveTo: dst)   // notify the open document to follow
+            } catch {
+                DispatchQueue.main.async { renameError = true; draftName = displayName }
+            }
+        }
+        if coordErr != nil { renameError = true; draftName = displayName }
     }
 
     /// The name to show: the FILE name when the project is saved (authoritative), else
