@@ -1496,6 +1496,24 @@ struct CanvasView: View {
         }
     }
 
+    /// The active content layer's image-element PNG (the Magic Eraser's source), if any.
+    private var activeImagePNG: Data? {
+        guard let idx = activeIndex else { return nil }
+        for el in document.layers[idx].elements {
+            if case .image(let img) = el.content, !img.pngData.isEmpty { return img.pngData }
+        }
+        return nil
+    }
+
+    /// Refresh the Magic Eraser's live highlight for the current tolerance/color/layer
+    /// (or clear it when the Eraser isn't active on an image layer).
+    @MainActor private func refreshEraserPreview() {
+        guard activeTool == .eraser, let id = activeLayerID, let png = activeImagePNG else {
+            pen.clearErasePreview(); return
+        }
+        pen.refreshErasePreview(png: png, layerKey: "\(id)-\(png.count)", target: fillColor.rgb8)
+    }
+
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
@@ -1521,6 +1539,23 @@ struct CanvasView: View {
                 if activeTool == .pen, pen.showGrid {
                     PixelGrid(resolution: pen.resolution)
                         .frame(width: side, height: side)
+                        .allowsHitTesting(false)
+                }
+                // Magic Eraser LIVE PREVIEW: magenta over exactly the pixels an Erase would
+                // clear, drawn over the active (visible) layer at its transform — so tolerance
+                // is tuned by eye, not fired blind. Same frame/scaledToFit as the image element
+                // so it lands pixel-aligned.
+                if activeTool == .eraser, let idx = activeIndex,
+                   document.layers[idx].isVisible, let hi = pen.erasePreview {
+                    let t = document.layers[idx].transform
+                    Image(decorative: hi, scale: 1)
+                        .interpolation(.low)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: side * t.scale, height: side * t.scale)
+                        .rotationEffect(.degrees(t.rotationDegrees))
+                        .position(x: t.center.x * side, y: t.center.y * side)
+                        .opacity(0.5)
                         .allowsHitTesting(false)
                 }
                 if showTransformBox, let idx = activeIndex {
@@ -1579,9 +1614,21 @@ struct CanvasView: View {
                     },
                 including: (activeTool == .pen || activeTool == .fill || activeTool == .eyedropper) ? .all : .subviews
             )
-            .onAppear { if activeTool == .pen { pen.load(activePixelData) } }
-            .onChange(of: activeTool) { if activeTool == .pen { pen.load(activePixelData) } }
-            .onChange(of: activeLayerID) { if activeTool == .pen { pen.load(activePixelData) } }
+            .onAppear {
+                if activeTool == .pen { pen.load(activePixelData) }
+                refreshEraserPreview()
+            }
+            .onChange(of: activeTool) {
+                if activeTool == .pen { pen.load(activePixelData) }
+                refreshEraserPreview()
+            }
+            .onChange(of: activeLayerID) {
+                if activeTool == .pen { pen.load(activePixelData) }
+                refreshEraserPreview()
+            }
+            .onChange(of: pen.eraseTolerance) { refreshEraserPreview() }
+            .onChange(of: pen.eraseContiguous) { refreshEraserPreview() }
+            .onChange(of: fillColor) { if activeTool == .eraser { refreshEraserPreview() } }
             .onChange(of: pen.resolution) {
                 guard activeTool == .pen else { return }
                 // Resolution locks once a layer has pixels — changing it starts a NEW
@@ -2085,6 +2132,42 @@ final class PixelPen: ObservableObject {
     /// Eyedropper sample radius in pixels (0 = single pixel; >0 = averaged circle).
     @Published var eyedropperRadius: Int = 2
     @Published private(set) var image: CGImage?
+
+    // MARK: Magic Eraser live preview (color mask)
+    /// Tolerance + contiguity for the Magic Eraser live HERE (not in the inspector's local
+    /// @State) so the canvas can render a live highlight of what an Erase would remove as
+    /// the slider drags. (Michael 2026-06-21: "the slider is not wired to a visual element".)
+    @Published var eraseTolerance: Double = 24
+    @Published var eraseContiguous = true
+    /// Highlight overlay the canvas draws over the active layer (downscaled; matched pixels
+    /// painted magenta, rest clear). nil when not previewing.
+    @Published private(set) var erasePreview: CGImage?
+    /// Cached downscaled source, so dragging the slider re-runs only the cheap match — not a
+    /// full-res PNG decode every tick. Keyed by "layerID-byteCount" to rebuild on layer change.
+    private var erasePreviewSource: CGImage?
+    private var erasePreviewKey: String?
+
+    /// Stop previewing (tool/layer left the Magic Eraser).
+    func clearErasePreview() { erasePreview = nil; erasePreviewSource = nil; erasePreviewKey = nil }
+
+    /// Recompute the highlight from the active layer's image. Decodes + downscales the source
+    /// only when the layer/image changes (keyed); the per-change match runs on the small copy.
+    func refreshErasePreview(png: Data?, layerKey: String?, target: (r: UInt8, g: UInt8, b: UInt8)) {
+        guard let png, let layerKey else { clearErasePreview(); return }
+        if erasePreviewKey != layerKey || erasePreviewSource == nil {
+            erasePreviewKey = layerKey
+            if let src = CGImageSourceCreateWithData(png as CFData, nil),
+               let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) {
+                erasePreviewSource = downscaledCGImage(cg, maxDimension: 320)
+            } else {
+                erasePreviewSource = nil
+            }
+        }
+        guard let cg = erasePreviewSource else { erasePreview = nil; return }
+        erasePreview = matchHighlightImage(cg, target: target,
+                                           tolerance: Int(eraseTolerance), contiguous: eraseContiguous,
+                                           highlight: (255, 0, 255, 255))
+    }
 
     private var ctx: CGContext?
     private var lastPoint: CGPoint?

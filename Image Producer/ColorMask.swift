@@ -119,6 +119,69 @@ func colorMaskedImage(_ cg: CGImage, target: (r: UInt8, g: UInt8, b: UInt8),
     return cgImage(fromRGBA: bytes, w: w, h: h)
 }
 
+/// Downscale a CGImage so its longest side ≤ `maxDimension` (aspect preserved) — used
+/// to make the live preview cheap. Returns the original if it's already small enough.
+func downscaledCGImage(_ cg: CGImage, maxDimension: Int) -> CGImage? {
+    let w = cg.width, h = cg.height
+    let longSide = max(w, h)
+    guard longSide > maxDimension, longSide > 0 else { return cg }
+    let f = Double(maxDimension) / Double(longSide)
+    let nw = max(1, Int((Double(w) * f).rounded()))
+    let nh = max(1, Int((Double(h) * f).rounded()))
+    let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+    guard let ctx = CGContext(data: nil, width: nw, height: nh, bitsPerComponent: 8,
+                              bytesPerRow: nw * 4, space: cs,
+                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+    ctx.interpolationQuality = .low
+    ctx.draw(cg, in: CGRect(x: 0, y: 0, width: nw, height: nh))
+    return ctx.makeImage()
+}
+
+/// LIVE-PREVIEW twin of `colorMaskedImage`: instead of clearing matched pixels, it
+/// paints them with `highlight` and leaves everything else transparent — so the canvas
+/// can overlay exactly what an Erase would remove. SAME match + contiguous semantics as
+/// the real mask, so what lights up is what gets cleared. (Michael 2026-06-21: the
+/// tolerance slider must be "wired to a visual element" — tune by eye, not blind.)
+func matchHighlightImage(_ cg: CGImage, target: (r: UInt8, g: UInt8, b: UInt8),
+                         tolerance: Int, contiguous: Bool,
+                         highlight: (r: UInt8, g: UInt8, b: UInt8, a: UInt8)) -> CGImage? {
+    guard let (src, w, h) = rgbaBytes(from: cg) else { return nil }
+    var out = [UInt8](repeating: 0, count: w * h * 4)        // all transparent
+    @inline(__always) func matches(_ i: Int) -> Bool {
+        src[i + 3] > 0 &&
+        abs(Int(src[i])     - Int(target.r)) <= tolerance &&
+        abs(Int(src[i + 1]) - Int(target.g)) <= tolerance &&
+        abs(Int(src[i + 2]) - Int(target.b)) <= tolerance
+    }
+    @inline(__always) func mark(_ i: Int) {
+        out[i] = highlight.r; out[i + 1] = highlight.g; out[i + 2] = highlight.b; out[i + 3] = highlight.a
+    }
+    if contiguous {
+        var visited = [Bool](repeating: false, count: w * h)
+        var stack: [Int] = []
+        @inline(__always) func seed(_ x: Int, _ y: Int) {
+            let p = y * w + x
+            if !visited[p] { visited[p] = true; stack.append(p) }
+        }
+        for x in 0..<w { seed(x, 0); seed(x, h - 1) }
+        for y in 0..<h { seed(0, y); seed(w - 1, y) }
+        while let p = stack.popLast() {
+            let i = p * 4
+            guard matches(i) else { continue }
+            mark(i)
+            let x = p % w, y = p / w
+            if x > 0 { seed(x - 1, y) }
+            if x < w - 1 { seed(x + 1, y) }
+            if y > 0 { seed(x, y - 1) }
+            if y < h - 1 { seed(x, y + 1) }
+        }
+    } else {
+        var i = 0
+        while i < out.count { if matches(i) { mark(i) }; i += 4 }
+    }
+    return cgImage(fromRGBA: out, w: w, h: h)
+}
+
 extension Color {
     /// 0–255 RGB for pixel comparison (best-effort via the platform CGColor).
     var rgb8: (r: UInt8, g: UInt8, b: UInt8) {
@@ -176,9 +239,9 @@ struct EraserInspector: View {
     @ObservedObject var document: IconDocument
     let activeLayerID: IconLayer.ID?
     @Binding var fillColor: Color
+    /// Tolerance + contiguity live on the pen so the canvas can draw the live highlight.
+    @EnvironmentObject var pen: PixelPen
 
-    @State private var tolerance: Double = 24
-    @State private var contiguous = true
     @State private var failed = false
 
     private var activeIndex: Int? {
@@ -199,7 +262,7 @@ struct EraserInspector: View {
         if activeImage != nil {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Magic Eraser — color mask").font(.subheadline).bold()
-                Text("Clears everything matching the eyedropper's color to transparent. Pick the background color with the Eyedropper first.")
+                Text("Pick the background color with the Eyedropper first. Matching pixels light up magenta on the canvas — raise Tolerance until the whole background lights up, then erase.")
                     .font(.caption).foregroundStyle(.secondary)
 
                 HStack(spacing: 10) {
@@ -211,11 +274,11 @@ struct EraserInspector: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Tolerance  \(Int(tolerance))").font(.subheadline)
-                    Slider(value: $tolerance, in: 0...160, step: 1)
+                    Text("Tolerance  \(Int(pen.eraseTolerance))").font(.subheadline)
+                    Slider(value: $pen.eraseTolerance, in: 0...160, step: 1)
                 }
 
-                Toggle("Contiguous (keep interior matches)", isOn: $contiguous)
+                Toggle("Contiguous (keep interior matches)", isOn: $pen.eraseContiguous)
                     .font(.caption)
 
                 Button(role: .destructive) { apply() } label: {
@@ -244,7 +307,7 @@ struct EraserInspector: View {
               let src = CGImageSourceCreateWithData(png as CFData, nil),
               let cg = CGImageSourceCreateImageAtIndex(src, 0, nil),
               let masked = colorMaskedImage(cg, target: fillColor.rgb8,
-                                            tolerance: Int(tolerance), contiguous: contiguous),
+                                            tolerance: Int(pen.eraseTolerance), contiguous: pen.eraseContiguous),
               let out = pngData(from: masked) else { failed = true; return }
         // Non-destructive: the masked result goes on a new layer above; the original
         // (with its background) is hidden, not overwritten — there's no undo.
