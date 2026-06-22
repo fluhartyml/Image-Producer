@@ -164,6 +164,9 @@ struct ContentView: View {
                 }
             }
         }
+        // A NEW (untitled) document lands on the Canvas hub so the user immediately sees
+        // where to name the project and set the canvas size. Opened files keep the Move tool.
+        .onAppear { if fileURL == nil { activeTool = .canvas } }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { prepareExport() } label: {
