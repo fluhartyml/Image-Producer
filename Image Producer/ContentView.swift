@@ -1454,6 +1454,22 @@ struct RightClickEraser: NSViewRepresentable {
 }
 #endif
 
+/// The brush eraser's footprint ring, shown at the cursor BEFORE you commit so you can
+/// see exactly which pixels a stroke will clear (there's no undo). Double-stroked (dark
+/// under, light over) so it reads on any background. Circle or square to match the brush.
+struct BrushCursor: View {
+    let diameter: CGFloat
+    let square: Bool
+    private var shape: AnyShape { square ? AnyShape(Rectangle()) : AnyShape(Circle()) }
+    var body: some View {
+        ZStack {
+            shape.stroke(Color.black.opacity(0.7), lineWidth: 3)
+            shape.stroke(Color.white, lineWidth: 1.5)
+        }
+        .frame(width: max(2, diameter), height: max(2, diameter))
+    }
+}
+
 struct CanvasView: View {
     @ObservedObject var document: IconDocument
     @Binding var activeLayerID: IconLayer.ID?
@@ -1461,6 +1477,8 @@ struct CanvasView: View {
     var activeTool: Tool = .move
     @Binding var fillColor: Color
     @EnvironmentObject var pen: PixelPen
+    /// Live cursor position (in canvas space) for the brush-eraser footprint ring.
+    @State private var brushHover: CGPoint?
 
     private var activeIndex: Int? {
         guard let id = activeLayerID else { return nil }
@@ -1604,6 +1622,13 @@ struct CanvasView: View {
                     CropOverlay(crop: crop, side: side)
                         .allowsHitTesting(false)
                 }
+                // Brush eraser footprint ring — follows the cursor so you see WHICH pixels
+                // a stroke will clear before committing (no undo). Circle ring / square box.
+                if activeTool == .eraser, pen.eraserMode == .brush, let hp = brushHover {
+                    BrushCursor(diameter: pen.eraserBrushFraction * side, square: pen.eraserSquare)
+                        .position(hp)
+                        .allowsHitTesting(false)
+                }
             }
             .frame(width: side, height: side)
             .coordinateSpace(name: "canvas")
@@ -1633,6 +1658,7 @@ struct CanvasView: View {
                     .onChanged { value in
                         let n = CGPoint(x: value.location.x / side, y: value.location.y / side)
                         if activeTool == .eraser, pen.eraserMode == .brush {
+                            brushHover = value.location   // ring follows the finger/cursor mid-stroke too
                             eraseAt(n, side: side); return
                         }
                         guard activeTool == .pen, activeIndex != nil else { return }
@@ -1658,6 +1684,16 @@ struct CanvasView: View {
                 including: (activeTool == .pen || activeTool == .fill || activeTool == .eyedropper
                             || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
+            .onContinuousHover(coordinateSpace: .named("canvas")) { phase in
+                // Trackpad/pointer hover (no press) → position the footprint ring so you can
+                // aim before committing. Touch has no hover; the mid-stroke update covers that.
+                switch phase {
+                case .active(let loc):
+                    if activeTool == .eraser, pen.eraserMode == .brush { brushHover = loc }
+                case .ended:
+                    brushHover = nil
+                }
+            }
             .onAppear {
                 if activeTool == .pen { pen.load(activePixelData) }
                 refreshEraserPreview()
