@@ -1164,6 +1164,7 @@ struct SymbolPickerInspector: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .frame(maxHeight: 240)
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -1262,6 +1263,7 @@ struct FontPickerInspector: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .frame(maxHeight: 220)
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -1433,10 +1435,6 @@ struct PenInspector: View {
 
     var body: some View {
         if activeIsContent {
-            // ScrollView so the lower controls (grid toggle, brush size) stay reachable
-            // when the inspector is height-cramped on iPhone. On iPad's tall column it
-            // simply doesn't scroll — the content fits — so this is safe for both.
-            ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Colors").font(.system(size: 18))
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
@@ -1520,7 +1518,6 @@ struct PenInspector: View {
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
             .fileExporter(isPresented: $savingPalette, document: paletteDoc,
                           contentType: .iconPalette, defaultFilename: paletteFilename) { _ in }
             .fileImporter(isPresented: $loadingPalette, allowedContentTypes: [.iconPalette]) { result in
@@ -1698,7 +1695,6 @@ struct MoveTransformInspector: View {
     }
 
     var body: some View {
-        ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 cropSection
                 Divider()
@@ -1713,8 +1709,7 @@ struct MoveTransformInspector: View {
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-        .onAppear(perform: syncCropStateFromDocument)
+            .onAppear(perform: syncCropStateFromDocument)
     }
 
     // MARK: Crop (document-level, non-destructive, centered — Photos-style presets)
