@@ -19,6 +19,7 @@ import SwiftUI
 /// scrolls horizontally when there are more tools than fit — see DeveloperNotes).
 enum Tool: String, CaseIterable, Identifiable {
     case canvas        // central hub for the open project (name/dimensions/print/export)
+    case colorPalette  // the project's color library + gatekeeper (all colors live here)
     case move
     case fill          // paint bucket
     case pen           // pixel painter
@@ -38,6 +39,7 @@ enum Tool: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .canvas:     "Canvas"
+        case .colorPalette: "Color Palette"
         case .move:       "Move / Transform"
         case .fill:       "Paint Bucket"
         case .pen:        "Pen (Pixels)"
@@ -57,6 +59,7 @@ enum Tool: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .canvas:     "photo.artframe"
+        case .colorPalette: "paintpalette"
         case .move:       "arrow.up.and.down.and.arrow.left.and.right"
         case .fill:       "drop.fill"
         case .pen:        "pencil.tip"
@@ -149,6 +152,7 @@ struct ToolGlyph: View {
     private var assetName: String? {
         switch tool {
         case .canvas:     "CanvasTool"
+        case .colorPalette: "PaletteTool"
         case .move:       "MoveTool"
         case .fill:       "BucketTool"
         case .pen:        "PixelArtPenTool"

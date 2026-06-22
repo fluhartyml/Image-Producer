@@ -443,6 +443,8 @@ struct ToolInspector: View {
         switch activeTool {
         case .canvas:
             CanvasInspector(document: document, fileURL: fileURL)
+        case .colorPalette:
+            ColorPaletteInspector(document: document, fillColor: $fillColor)
         case .move:
             MoveTransformInspector(document: document, activeLayerID: activeLayerID)
         case .fill:
@@ -936,6 +938,130 @@ struct CanvasInspector: View {
         }
         if total == 0 { total = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0 }
         return total
+    }
+}
+
+// MARK: - Color Palette inspector (Tool: Color Palette — the gatekeeper)
+
+/// The palette is the project's ENTIRE color set and the ONLY place colors are created or
+/// edited (Michael 2026-06-22). Every other tool picks FROM these swatches — there are no
+/// free color pickers elsewhere. Tap a swatch → it's the active color (pen/bucket/eraser/
+/// eyedropper); the picker here edits the selected swatch; Add/Remove grow the box (8 default
+/// → 24 max; the 8 base can't be removed). Save/Load reuses the .iconpalette brand file.
+struct ColorPaletteInspector: View {
+    @EnvironmentObject var pen: PixelPen
+    @ObservedObject var document: IconDocument
+    @Binding var fillColor: Color
+
+    @State private var savingPalette = false
+    @State private var loadingPalette = false
+    @State private var paletteDoc: PaletteFileDocument?
+    @State private var loadFailed = false
+
+    private var selected: Int { min(max(pen.selectedSlot, 0), max(0, document.palette.count - 1)) }
+
+    /// Edit the SELECTED swatch — the only place a custom color is created.
+    private var selectedColorBinding: Binding<Color> {
+        Binding(get: { Color(hex: document.palette[selected]) ?? .black },
+                set: { c in
+                    guard document.palette.indices.contains(selected) else { return }
+                    document.palette[selected] = c.hexString() ?? "#000000"
+                    IconDocument.lastUsedPalette = document.palette
+                    applyActive()
+                })
+    }
+
+    /// Push the selected swatch out as the shared active color (pen + fill tools).
+    private func applyActive() {
+        let c = Color(hex: document.palette[selected]) ?? .black
+        pen.color = c
+        fillColor = c
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 8).fill(fillColor)
+                    .frame(width: 44, height: 44)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.4)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Active color").font(.system(size: 18))
+                    Text(document.palette[selected]).font(.system(size: 18))
+                        .foregroundStyle(.secondary).textSelection(.enabled)
+                }
+            }
+
+            ColorPicker("Edit selected swatch", selection: selectedColorBinding, supportsOpacity: false)
+                .font(.system(size: 18))
+
+            Divider()
+
+            Text("Palette — \(document.palette.count) colors").font(.system(size: 20, weight: .semibold))
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
+                ForEach(document.palette.indices, id: \.self) { i in
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(hex: document.palette[i]) ?? .black)
+                        .frame(height: 30)
+                        .overlay(RoundedRectangle(cornerRadius: 6)
+                            .stroke(i == selected ? Color.accentColor : Color.gray.opacity(0.4),
+                                    lineWidth: i == selected ? 3 : 1))
+                        .onTapGesture { pen.selectedSlot = i; applyActive() }
+                        .contextMenu {
+                            if document.palette.count > 8 {
+                                Button(role: .destructive) { document.removePaletteColor(at: i) } label: {
+                                    Label("Remove", systemImage: "trash")
+                                }
+                            }
+                        }
+                }
+            }
+            HStack(spacing: 8) {
+                Button { if let n = document.addPaletteColor() { pen.selectedSlot = n; applyActive() } } label: {
+                    Label("Add color", systemImage: "plus").frame(maxWidth: .infinity)
+                }
+                .disabled(document.palette.count >= IconDocument.maxPaletteSlots)
+                Button(role: .destructive) { document.removePaletteColor(at: selected) } label: {
+                    Label("Remove", systemImage: "minus").frame(maxWidth: .infinity)
+                }
+                .disabled(document.palette.count <= 8)
+            }
+            .font(.system(size: 18)).buttonStyle(.bordered)
+
+            Text("Tap a swatch to make it the active color; edit it above. Add grows the box (8–24); the 8 base colors can't be removed. This palette is the only place colors are defined — every tool picks from it.")
+                .font(.system(size: 18)).foregroundStyle(.secondary)
+
+            Divider()
+
+            VStack(spacing: 6) {
+                Button {
+                    paletteDoc = PaletteFileDocument(palette: PaletteFile(name: document.name, colors: document.palette))
+                    savingPalette = true
+                } label: { Label("Save Palette…", systemImage: "plus.rectangle.on.folder").frame(maxWidth: .infinity) }
+                Button { loadFailed = false; loadingPalette = true } label: {
+                    Label("Load Palette…", systemImage: "paintpalette").frame(maxWidth: .infinity)
+                }
+            }
+            .font(.system(size: 18)).buttonStyle(.bordered)
+            if loadFailed {
+                Text("Couldn't read that palette file.").font(.system(size: 18)).foregroundStyle(.red)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .fileExporter(isPresented: $savingPalette, document: paletteDoc,
+                      contentType: .iconPalette, defaultFilename: "\(document.name) Palette") { _ in }
+        .fileImporter(isPresented: $loadingPalette, allowedContentTypes: [.iconPalette]) { result in
+            loadFailed = false
+            guard case .success(let url) = result else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url),
+                  let file = try? JSONDecoder().decode(PaletteFile.self, from: data) else { loadFailed = true; return }
+            document.palette = file.normalizedColors
+            IconDocument.lastUsedPalette = document.palette
+            if !document.palette.indices.contains(pen.selectedSlot) { pen.selectedSlot = 0 }
+            applyActive()
+        }
     }
 }
 

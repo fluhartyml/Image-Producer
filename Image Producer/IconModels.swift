@@ -75,6 +75,25 @@ final class IconDocument: ObservableObject {
     /// Crayon-box defaults — used for a new doc, or one saved before palettes existed.
     static let defaultPalette = ["#000000", "#FFFFFF", "#FF3B30", "#FF9500",
                                  "#FFCC00", "#34C759", "#007AFF", "#AF52DE"]
+    /// Palette = the project's gatekeeper color set. Default 8 (the "school crayon box"),
+    /// growable to 24 (Michael 2026-06-22). No color exists outside this palette.
+    static let maxPaletteSlots = 24
+
+    /// Add a slot (capped at 24), seeded from the last color. Returns the new index, or nil.
+    @discardableResult
+    func addPaletteColor() -> Int? {
+        guard palette.count < Self.maxPaletteSlots else { return nil }
+        palette.append(palette.last ?? "#000000")
+        IconDocument.lastUsedPalette = palette
+        return palette.count - 1
+    }
+
+    /// Remove a slot (never below the 8-color minimum).
+    func removePaletteColor(at i: Int) {
+        guard palette.count > 8, palette.indices.contains(i) else { return }
+        palette.remove(at: i)
+        IconDocument.lastUsedPalette = palette
+    }
 
     /// The last palette the user worked with — persists app-wide so a NEW document (or
     /// one saved without a palette) inherits it instead of resetting to the defaults.
@@ -360,15 +379,17 @@ struct PaletteFile: Codable {
     var name: String
     var colors: [String]
 
-    /// Exactly 8 valid `#RRGGBB` slots. Pads a short file with the crayon-box defaults,
-    /// drops extras past 8, and replaces any malformed hex — so a hand-edited or
-    /// foreign file can never corrupt the document's fixed 8-slot palette.
+    /// Valid `#RRGGBB` slots, 8…24. Keeps the file's colors (dropping malformed ones),
+    /// pads up to the 8-color minimum with the crayon-box defaults, and caps at 24 — so a
+    /// hand-edited or foreign file can never corrupt the document's palette (the gatekeeper).
     var normalizedColors: [String] {
-        let defaults = IconDocument.defaultPalette
-        return (0..<8).map { i in
-            if i < colors.count, let hex = PaletteFile.normalizeHex(colors[i]) { return hex }
-            return defaults[i]
+        let defaults = IconDocument.defaultPalette                 // 8
+        var out = colors.compactMap { PaletteFile.normalizeHex($0) }
+        if out.count < 8 { out += Array(defaults[out.count..<8]) } // pad to the 8 minimum
+        if out.count > IconDocument.maxPaletteSlots {              // cap at 24
+            out = Array(out.prefix(IconDocument.maxPaletteSlots))
         }
+        return out
     }
 
     /// Validate + canonicalize one hex string to "#RRGGBB" (uppercase). nil if malformed.
