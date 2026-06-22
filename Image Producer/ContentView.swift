@@ -534,6 +534,36 @@ struct PaintBucketInspector: View {
     }
 }
 
+/// Units for the Canvas hub's dimensions / print-size readouts.
+enum CanvasUnit: String, CaseIterable, Identifiable {
+    case px, inch, mm, pt
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .px:   "px"
+        case .inch: "in"
+        case .mm:   "mm"
+        case .pt:   "pt"
+        }
+    }
+    /// A length given in INCHES, expressed in this unit. (px path is read-only elsewhere.)
+    func fromInches(_ inches: Double) -> Double {
+        switch self {
+        case .px, .inch: inches
+        case .mm:        inches * 25.4
+        case .pt:        inches * 72
+        }
+    }
+    /// A length given in THIS unit, expressed in inches.
+    func toInches(_ value: Double) -> Double {
+        switch self {
+        case .px, .inch: value
+        case .mm:        value / 25.4
+        case .pt:        value / 72
+        }
+    }
+}
+
 // MARK: - Canvas inspector (Tool: Canvas — the open project's central hub)
 
 /// The Canvas tool is the CENTRAL HUB for the open project. SLICE A (2026-06-22):
@@ -565,6 +595,46 @@ struct CanvasInspector: View {
                     Text("This is the file's name. Rename it from the window title bar (control-click the title) or Finder — in-app rename is a later step.")
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
+            }
+
+            Divider()
+
+            // --- B · Dimensions & Resolution ---
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Dimensions & Resolution").font(.subheadline).bold()
+
+                attrRow("Pixels", "\(document.canvasSize) × \(document.canvasSize) px")
+
+                Picker("Units", selection: $unitRaw) {
+                    ForEach(CanvasUnit.allCases) { Text($0.label).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                HStack(spacing: 8) {
+                    Text("Resolution").font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 76, alignment: .leading)
+                    TextField("PPI", value: $document.ppi, format: .number.precision(.fractionLength(0...2)))
+                        .textFieldStyle(.roundedBorder).frame(width: 84)
+                        .onSubmit { if document.ppi < 1 { document.ppi = 1 } }
+                    Text("PPI").font(.caption).foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 8) {
+                    Text("Print size").font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 76, alignment: .leading)
+                    if unit == .px {
+                        Text("\(document.canvasSize) px (square)").font(.caption)
+                    } else {
+                        TextField("size", value: printSizeBinding,
+                                  format: .number.precision(.fractionLength(0...3)))
+                            .textFieldStyle(.roundedBorder).frame(width: 84)
+                        Text("\(unit.label) (square)").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+
+                Text("Lossless — print size and PPI change the final output only; your pixels stay the same. (Changing the pixel count itself — resample — is a separate step, coming.)")
+                    .font(.caption2).foregroundStyle(.tertiary)
             }
 
             Divider()
@@ -614,6 +684,23 @@ struct CanvasInspector: View {
     private var displayName: String {
         if let url = fileURL { return url.deletingPathExtension().lastPathComponent }
         return document.name
+    }
+
+    // MARK: B · Dimensions & Resolution
+    @AppStorage("ip.canvasUnit") private var unitRaw = CanvasUnit.inch.rawValue
+    private var unit: CanvasUnit { CanvasUnit(rawValue: unitRaw) ?? .inch }
+
+    /// Physical (square) print size in the chosen unit. Editing it changes ONLY the PPI —
+    /// the pixels are never touched (lossless): ppi = pixels ÷ inches.
+    private var printSizeBinding: Binding<Double> {
+        Binding(
+            get: { unit.fromInches(Double(document.canvasSize) / max(1, document.ppi)) },
+            set: { newValue in
+                let inches = unit.toInches(newValue)
+                guard inches > 0 else { return }
+                document.ppi = Double(document.canvasSize) / inches
+            }
+        )
     }
 
     // MARK: file attribute readouts (from the on-disk file)
