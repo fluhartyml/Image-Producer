@@ -59,7 +59,7 @@ final class IconDocument: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: "IconProducer.lastUsedPalette") }
     }
 
-    init(name: String = "Untitled Icon", canvasSize: Int = 1024, layers: [IconLayer] = [],
+    init(name: String = "Untitled Image", canvasSize: Int = 1024, layers: [IconLayer] = [],
          palette: [String] = IconDocument.lastUsedPalette, cropRect: CGRect? = nil) {
         self.name = name
         self.canvasSize = canvasSize

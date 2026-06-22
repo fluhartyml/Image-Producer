@@ -547,14 +547,24 @@ struct CanvasInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // --- Project name (rename) ---
+            // --- Project name ---
             VStack(alignment: .leading, spacing: 4) {
                 Text("Project name").font(.caption).foregroundStyle(.secondary)
-                TextField("Project name", text: $draftName)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { commitName() }
-                Text("Renames the project inside the file. (Renaming the file on disk is a later step.)")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                if fileURL == nil {
+                    // Untitled: editable working name (becomes the manifest name).
+                    TextField("Project name", text: $draftName)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { commitName() }
+                    Text("Working name for this untitled project.")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                } else {
+                    // Saved: the authoritative name is the FILE name on disk.
+                    TextField("", text: .constant(displayName))
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(true)
+                    Text("This is the file's name. Rename it from the window title bar (control-click the title) or Finder — in-app rename is a later step.")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
             }
 
             Divider()
@@ -597,6 +607,13 @@ struct CanvasInspector: View {
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { draftName = document.name; return }
         document.name = trimmed
+    }
+
+    /// The name to show: the FILE name when the project is saved (authoritative), else
+    /// the working/internal name. Fixes "shows Untitled when I opened erasertime.picprod."
+    private var displayName: String {
+        if let url = fileURL { return url.deletingPathExtension().lastPathComponent }
+        return document.name
     }
 
     // MARK: file attribute readouts (from the on-disk file)
