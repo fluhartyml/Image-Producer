@@ -611,15 +611,24 @@ struct CanvasInspector: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
 
+                // Resolution: manual field + a preset menu for when you don't know the number.
                 HStack(spacing: 8) {
                     Text("Resolution").font(.caption).foregroundStyle(.secondary)
                         .frame(width: 76, alignment: .leading)
                     TextField("PPI", value: $document.ppi, format: .number.precision(.fractionLength(0...2)))
-                        .textFieldStyle(.roundedBorder).frame(width: 84)
+                        .textFieldStyle(.roundedBorder).frame(width: 72)
                         .onSubmit { if document.ppi < 1 { document.ppi = 1 } }
                     Text("PPI").font(.caption).foregroundStyle(.secondary)
                 }
+                Menu("Common resolutions") {
+                    Button("72 — Screen / web")          { document.ppi = 72 }
+                    Button("150 — Draft print")          { document.ppi = 150 }
+                    Button("300 — Standard print")       { document.ppi = 300 }
+                    Button("600 — Fine art / line art")  { document.ppi = 600 }
+                }
+                .font(.caption2).fixedSize()
 
+                // Print size: manual field + square-size presets (these set PPI, lossless).
                 HStack(spacing: 8) {
                     Text("Print size").font(.caption).foregroundStyle(.secondary)
                         .frame(width: 76, alignment: .leading)
@@ -628,12 +637,22 @@ struct CanvasInspector: View {
                     } else {
                         TextField("size", value: printSizeBinding,
                                   format: .number.precision(.fractionLength(0...3)))
-                            .textFieldStyle(.roundedBorder).frame(width: 84)
+                            .textFieldStyle(.roundedBorder).frame(width: 72)
                         Text("\(unit.label) (square)").font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                if unit != .px {
+                    Menu("Common sizes (square)") {
+                        ForEach([1, 2, 3, 4, 5, 6, 8], id: \.self) { inches in
+                            Button("\(inches)\u{2033} square") {
+                                document.ppi = Double(document.canvasSize) / Double(inches)
+                            }
+                        }
+                    }
+                    .font(.caption2).fixedSize()
+                }
 
-                Text("Lossless — print size and PPI change the final output only; your pixels stay the same. (Changing the pixel count itself — resample — is a separate step, coming.)")
+                Text("Presets set common values; type your own when you know them. Lossless — these change the final output only; pixels stay the same. Standard PAPER sizes (Letter, etc.) are non-square — those arrive with the canvas-resize engine (next).")
                     .font(.caption2).foregroundStyle(.tertiary)
             }
 
