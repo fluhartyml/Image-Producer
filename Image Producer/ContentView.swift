@@ -1098,6 +1098,7 @@ struct ColorPaletteInspector: View {
 /// the primary case). Tint is user-chosen; picking replaces the layer's symbol so
 /// the user can change their mind. Scale/position via the Move tool.
 struct SymbolPickerInspector: View {
+    @EnvironmentObject var pen: PixelPen
     @ObservedObject var document: IconDocument
     let activeLayerID: IconLayer.ID?
     @State private var search = ""
@@ -1168,6 +1169,7 @@ struct SymbolPickerInspector: View {
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .onAppear { tint = pen.color }   // default the tint to the active palette color
         } else {
             PanelPlaceholder(systemImage: "star",
                              title: "Symbol",
@@ -1188,6 +1190,7 @@ struct SymbolPickerInspector: View {
 /// LIST renders each name in its own font, reflecting the live style toggles. Outline
 /// is stored but its rendering is a follow-up (no stock SwiftUI text-outline).
 struct FontPickerInspector: View {
+    @EnvironmentObject var pen: PixelPen
     @ObservedObject var document: IconDocument
     let activeLayerID: IconLayer.ID?
 
@@ -1197,6 +1200,7 @@ struct FontPickerInspector: View {
     @State private var italic = false
     @State private var underline = false
     @State private var outline = false
+    @State private var textInput: String = ""
     @State private var glyphs: [String] = []
 
     /// Installed font family names (Core Text — cross-platform), sorted.
@@ -1219,8 +1223,16 @@ struct FontPickerInspector: View {
 
     var body: some View {
         if activeIsContent {
-            VStack(alignment: .leading, spacing: 10) {
-                // Style toggles
+            VStack(alignment: .leading, spacing: 12) {
+                // Type with the keyboard (Michael 2026-06-22 — the glyph grid was replaced).
+                Text("Text").font(.system(size: 18)).foregroundStyle(.secondary)
+                TextField("Type your text…", text: $textInput, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 18))
+                    .lineLimit(1...4)
+                    .autocorrectionDisabled()
+                    .onSubmit { placeText() }
+
                 HStack(spacing: 8) {
                     styleToggle("bold", "Bold", $bold)
                     styleToggle("italic", "Italic", $italic)
@@ -1246,13 +1258,14 @@ struct FontPickerInspector: View {
                 }
                 .frame(maxHeight: 150)
 
-                PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
-
-                Text("Glyph").font(.system(size: 18)).foregroundStyle(.secondary)
+                // Glyph browser (a real FontBook for the chosen font) — tapping a glyph
+                // APPENDS it to the text above, so you can build a string from the keyboard
+                // AND the font's repertoire (Michael 2026-06-22).
+                Text("Insert glyph — tap to add to your text").font(.system(size: 18)).foregroundStyle(.secondary)
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 38), spacing: 6)], spacing: 6) {
                         ForEach(glyphs, id: \.self) { g in
-                            Button { place(g) } label: {
+                            Button { textInput += g } label: {
                                 styled(Text(g).font(.custom(family, size: 20)))
                                     .frame(width: 38, height: 38)
                                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.12)))
@@ -1263,15 +1276,26 @@ struct FontPickerInspector: View {
                     }
                     .padding(.vertical, 4)
                 }
-                .frame(maxHeight: 220)
+                .frame(maxHeight: 200)
+
+                PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
+
+                Button { placeText() } label: {
+                    Label("Place Text", systemImage: "text.cursor").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(textInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Text("Type with the keyboard and/or tap glyphs to build your text. Pick a font + palette tint, then Place Text. A dingbat font (e.g. Wingdings) shows its symbol glyphs to tap.")
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .onAppear { if glyphs.isEmpty { recomputeGlyphs() } }
+            .onAppear { tint = pen.color; if glyphs.isEmpty { recomputeGlyphs() } }
         } else {
             PanelPlaceholder(systemImage: "character.book.closed",
-                             title: "Font",
-                             subtitle: "Select the Icon layer (a content layer) to place a font glyph")
+                             title: "Text",
+                             subtitle: "Select the Icon layer (a content layer) to type text")
         }
     }
 
@@ -1301,9 +1325,10 @@ struct FontPickerInspector: View {
         glyphs = out
     }
 
-    private func place(_ glyph: String) {
-        guard let i = activeIndex else { return }
-        document.layers[i].setText(glyph, fontName: family, tintHex: tint.hexString() ?? "#000000",
+    private func placeText() {
+        let s = textInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let i = activeIndex, !s.isEmpty else { return }
+        document.layers[i].setText(s, fontName: family, tintHex: tint.hexString() ?? "#000000",
                                    bold: bold, italic: italic, underline: underline, outline: outline)
     }
 }
