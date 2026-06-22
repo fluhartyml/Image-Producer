@@ -182,6 +182,72 @@ func matchHighlightImage(_ cg: CGImage, target: (r: UInt8, g: UInt8, b: UInt8),
     return cgImage(fromRGBA: out, w: w, h: h)
 }
 
+/// Seeded FLOOD FILL (Paint Bucket): from `seed` (image pixels), replace the contiguous
+/// region of pixels matching the seed's color (± tolerance) with `fill`. Confined by color
+/// edges — lines/walls of a different color stop the flood (the "dam/dyke walls"). Shares
+/// the contiguous core with the Magic Eraser, but seeded from the tap and painting a color
+/// instead of clearing. nil on bad input / seed out of bounds.
+func floodFilledImage(_ cg: CGImage, seed: CGPoint, tolerance: Int,
+                      fill: (r: UInt8, g: UInt8, b: UInt8, a: UInt8)) -> CGImage? {
+    guard let (src, w, h) = rgbaBytes(from: cg) else { return nil }
+    var bytes = src
+    let sx = Int(seed.x), sy = Int(seed.y)
+    guard sx >= 0, sx < w, sy >= 0, sy < h else { return nil }
+    let si = (sy * w + sx) * 4
+    let t = (r: src[si], g: src[si + 1], b: src[si + 2], a: src[si + 3])   // seed color (from original)
+    @inline(__always) func matches(_ i: Int) -> Bool {
+        abs(Int(src[i])     - Int(t.r)) <= tolerance &&
+        abs(Int(src[i + 1]) - Int(t.g)) <= tolerance &&
+        abs(Int(src[i + 2]) - Int(t.b)) <= tolerance &&
+        abs(Int(src[i + 3]) - Int(t.a)) <= tolerance
+    }
+    var visited = [Bool](repeating: false, count: w * h)
+    var stack = [sy * w + sx]; visited[sy * w + sx] = true
+    while let p = stack.popLast() {
+        let i = p * 4
+        guard matches(i) else { continue }
+        bytes[i] = fill.r; bytes[i + 1] = fill.g; bytes[i + 2] = fill.b; bytes[i + 3] = fill.a
+        let x = p % w, y = p / w
+        if x > 0,     !visited[p - 1] { visited[p - 1] = true; stack.append(p - 1) }
+        if x < w - 1, !visited[p + 1] { visited[p + 1] = true; stack.append(p + 1) }
+        if y > 0,     !visited[p - w] { visited[p - w] = true; stack.append(p - w) }
+        if y < h - 1, !visited[p + w] { visited[p + w] = true; stack.append(p + w) }
+    }
+    return cgImage(fromRGBA: bytes, w: w, h: h)
+}
+
+/// LIVE-PREVIEW twin of `floodFilledImage`: mark the region a tap would fill (seed +
+/// tolerance) with `highlight`, rest transparent — so the bucket's fill area is visible
+/// before you commit, exactly like the Magic Eraser's highlight.
+func floodHighlightImage(_ cg: CGImage, seed: CGPoint, tolerance: Int,
+                         highlight: (r: UInt8, g: UInt8, b: UInt8, a: UInt8)) -> CGImage? {
+    guard let (src, w, h) = rgbaBytes(from: cg) else { return nil }
+    let sx = Int(seed.x), sy = Int(seed.y)
+    guard sx >= 0, sx < w, sy >= 0, sy < h else { return nil }
+    let si = (sy * w + sx) * 4
+    let t = (r: src[si], g: src[si + 1], b: src[si + 2], a: src[si + 3])
+    var out = [UInt8](repeating: 0, count: w * h * 4)
+    @inline(__always) func matches(_ i: Int) -> Bool {
+        abs(Int(src[i])     - Int(t.r)) <= tolerance &&
+        abs(Int(src[i + 1]) - Int(t.g)) <= tolerance &&
+        abs(Int(src[i + 2]) - Int(t.b)) <= tolerance &&
+        abs(Int(src[i + 3]) - Int(t.a)) <= tolerance
+    }
+    var visited = [Bool](repeating: false, count: w * h)
+    var stack = [sy * w + sx]; visited[sy * w + sx] = true
+    while let p = stack.popLast() {
+        let i = p * 4
+        guard matches(i) else { continue }
+        out[i] = highlight.r; out[i + 1] = highlight.g; out[i + 2] = highlight.b; out[i + 3] = highlight.a
+        let x = p % w, y = p / w
+        if x > 0,     !visited[p - 1] { visited[p - 1] = true; stack.append(p - 1) }
+        if x < w - 1, !visited[p + 1] { visited[p + 1] = true; stack.append(p + 1) }
+        if y > 0,     !visited[p - w] { visited[p - w] = true; stack.append(p - w) }
+        if y < h - 1, !visited[p + w] { visited[p + w] = true; stack.append(p + w) }
+    }
+    return cgImage(fromRGBA: out, w: w, h: h)
+}
+
 /// Map a canvas point (in canvas points, 0…side) to a pixel in a layer's image element,
 /// inverting the layer transform (center / rotation / scale) and the `scaledToFit` letterbox.
 /// Returns nil if the point falls outside the displayed image. Used by the manual brush

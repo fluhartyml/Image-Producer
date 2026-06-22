@@ -464,6 +464,8 @@ struct PaintBucketInspector: View {
     @ObservedObject var document: IconDocument
     let activeLayerID: IconLayer.ID?
     @Binding var fillColor: Color
+    /// Flood tolerance lives on the pen so the canvas can draw the live region preview.
+    @EnvironmentObject var pen: PixelPen
 
     private var activeIndex: Int? {
         guard let id = activeLayerID else { return nil }
@@ -473,6 +475,14 @@ struct PaintBucketInspector: View {
     private var activeIsBackground: Bool {
         guard let i = activeIndex else { return false }
         return document.layers[i].backgroundRole != nil
+    }
+
+    private var activeHasImage: Bool {
+        guard let i = activeIndex else { return false }
+        for el in document.layers[i].elements {
+            if case .image(let img) = el.content, !img.pngData.isEmpty { return true }
+        }
+        return false
     }
 
     var body: some View {
@@ -489,8 +499,17 @@ struct PaintBucketInspector: View {
                 Text("Or tap the canvas to pour.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            } else if activeHasImage {
+                Text("Flood fill — pour color up to the lines").font(.subheadline).bold()
+                Text("Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Tolerance  \(Int(pen.bucketTolerance))").font(.subheadline)
+                    Slider(value: $pen.bucketTolerance, in: 0...160, step: 1)
+                }
             } else {
-                Text("Select a background layer (Light or Dark) to fill it.")
+                Text("Select a background layer (Light or Dark) to fill it, or an image layer to flood-fill areas up to the lines.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1479,6 +1498,8 @@ struct CanvasView: View {
     @EnvironmentObject var pen: PixelPen
     /// Live cursor position (in canvas space) for the brush-eraser footprint ring.
     @State private var brushHover: CGPoint?
+    /// Live cursor position (canvas space) for the paint-bucket fill-region preview.
+    @State private var bucketHover: CGPoint?
 
     private var activeIndex: Int? {
         guard let id = activeLayerID else { return nil }
@@ -1491,12 +1512,49 @@ struct CanvasView: View {
         return document.layers[idx].pixelData
     }
 
-    /// Paint Bucket pour: with Fill active, tapping the canvas fills the active
-    /// BACKGROUND layer with the current colour (roadmap 2.1). No-op otherwise.
-    private func pourIfFilling() {
-        guard activeTool == .fill, let idx = activeIndex,
-              document.layers[idx].backgroundRole != nil else { return }
-        document.layers[idx].setBackgroundFill(fillColor.hexString())
+    /// Paint Bucket tap. BACKGROUND layer → solid fill (existing). CONTENT image layer →
+    /// seeded FLOOD fill bounded by the lines, onto a NEW layer (non-destructive; original
+    /// kept + hidden, same mantra as the other Applies — there's no undo).
+    @MainActor private func bucketFill(atNormalized n: CGPoint, side: CGFloat) {
+        guard activeTool == .fill, let idx = activeIndex else { return }
+        if document.layers[idx].backgroundRole != nil {
+            document.layers[idx].setBackgroundFill(fillColor.hexString())
+            return
+        }
+        guard let png = activeImagePNG,
+              let src = CGImageSourceCreateWithData(png as CFData, nil),
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return }
+        let t = document.layers[idx].transform
+        let canvasPt = CGPoint(x: n.x * side, y: n.y * side)
+        guard let seed = imagePixel(forCanvasPoint: canvasPt, side: side, transform: t,
+                                    imageW: cg.width, imageH: cg.height) else { return }
+        let fc = fillColor.rgb8
+        guard let filled = floodFilledImage(cg, seed: seed, tolerance: Int(pen.bucketTolerance),
+                                            fill: (fc.r, fc.g, fc.b, 255)),
+              let out = pngData(from: filled) else { return }
+        if let newID = document.addResultLayer(out, above: idx, nameSuffix: "filled"),
+           let nIdx = document.layers.firstIndex(where: { $0.id == newID }) {
+            document.layers[nIdx].transform = t
+            activeLayerID = newID
+        }
+        pen.clearBucketPreview()
+    }
+
+    /// Recompute the bucket's fill-region highlight for the hovered seed (downscaled), or
+    /// clear it. Region shown in the fill color. `force` recomputes when tolerance/color change.
+    @MainActor private func refreshBucketPreview(side: CGFloat, force: Bool = false) {
+        let c = fillColor.rgb8
+        let hi: (r: UInt8, g: UInt8, b: UInt8, a: UInt8) = (c.r, c.g, c.b, 255)
+        guard activeTool == .fill, let hp = bucketHover, let idx = activeIndex,
+              document.layers[idx].isVisible, document.layers[idx].backgroundRole == nil,
+              let id = activeLayerID, let png = activeImagePNG else {
+            pen.refreshBucketPreview(seed: nil, highlight: hi); return
+        }
+        pen.ensureBucketSource(png: png, layerKey: "\(id)-\(png.count)")
+        let t = document.layers[idx].transform
+        let seed = imagePixel(forCanvasPoint: hp, side: side, transform: t,
+                              imageW: pen.bucketSourceW, imageH: pen.bucketSourceH)
+        pen.refreshBucketPreview(seed: seed, highlight: hi, force: force)
     }
 
     /// Eyedropper: render the active layer and sample its color (averaged over the
@@ -1614,6 +1672,21 @@ struct CanvasView: View {
                         .opacity(0.5)
                         .allowsHitTesting(false)
                 }
+                // Paint Bucket LIVE PREVIEW: the region a tap would flood, in the fill color,
+                // over the active layer — so you see the area (bounded by lines) before pouring.
+                if activeTool == .fill, let idx = activeIndex,
+                   document.layers[idx].isVisible, let hi = pen.bucketPreview {
+                    let t = document.layers[idx].transform
+                    Image(decorative: hi, scale: 1)
+                        .interpolation(.low)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: side * t.scale, height: side * t.scale)
+                        .rotationEffect(.degrees(t.rotationDegrees))
+                        .position(x: t.center.x * side, y: t.center.y * side)
+                        .opacity(0.55)
+                        .allowsHitTesting(false)
+                }
                 if showTransformBox, let idx = activeIndex {
                     TransformBox(document: document, index: idx, side: side)
                 }
@@ -1672,7 +1745,7 @@ struct CanvasView: View {
                                 document.layers[i].setPixels(data)
                             }
                         case .fill:
-                            pourIfFilling()
+                            bucketFill(atNormalized: CGPoint(x: value.location.x / side, y: value.location.y / side), side: side)
                         case .eyedropper:
                             sampleEyedropper(at: CGPoint(x: value.location.x / side, y: value.location.y / side))
                         case .eraser:
@@ -1690,8 +1763,10 @@ struct CanvasView: View {
                 switch phase {
                 case .active(let loc):
                     if activeTool == .eraser, pen.eraserMode == .brush { brushHover = loc }
+                    if activeTool == .fill { bucketHover = loc; refreshBucketPreview(side: side) }
                 case .ended:
                     brushHover = nil
+                    if activeTool == .fill { bucketHover = nil; refreshBucketPreview(side: side) }
                 }
             }
             .onAppear {
@@ -1701,6 +1776,7 @@ struct CanvasView: View {
             .onChange(of: activeTool) {
                 if activeTool == .pen { pen.load(activePixelData) }
                 if activeTool != .eraser { pen.endEraseSession() }   // leaving the tool drops the copy session
+                if activeTool != .fill { bucketHover = nil; pen.clearBucketPreview() }
                 refreshEraserPreview()
             }
             .onChange(of: activeLayerID) {
@@ -1709,6 +1785,7 @@ struct CanvasView: View {
                 // is handled by eraseAt's "working != active → new copy" check on the next stroke.
                 if activeTool == .pen { pen.load(activePixelData) }
                 refreshEraserPreview()
+                refreshBucketPreview(side: side)
             }
             .onChange(of: pen.eraserMode) {
                 if pen.eraserMode != .brush { pen.endEraseSession() }
@@ -1716,7 +1793,11 @@ struct CanvasView: View {
             }
             .onChange(of: pen.eraseTolerance) { refreshEraserPreview() }
             .onChange(of: pen.eraseContiguous) { refreshEraserPreview() }
-            .onChange(of: fillColor) { if activeTool == .eraser { refreshEraserPreview() } }
+            .onChange(of: pen.bucketTolerance) { refreshBucketPreview(side: side, force: true) }
+            .onChange(of: fillColor) {
+                if activeTool == .eraser { refreshEraserPreview() }
+                if activeTool == .fill { refreshBucketPreview(side: side, force: true) }
+            }
             .onChange(of: pen.resolution) {
                 guard activeTool == .pen else { return }
                 // Resolution locks once a layer has pixels — changing it starts a NEW
@@ -2342,6 +2423,44 @@ final class PixelPen: ObservableObject {
     func endEraseSession() {
         eraserCtx = nil; eraserImage = nil; eraserWorkingLayerID = nil
         eraserLiveLayerID = nil; eraserImageW = 0; eraserImageH = 0
+    }
+
+    // MARK: Paint Bucket flood fill (live region preview)
+    /// How loose the fill match is — how different a pixel can be from the tapped color and
+    /// still flood. Higher = jumps softer edges; lower = stops at the faintest line ("wall").
+    @Published var bucketTolerance: Double = 16
+    /// Highlight of the region a tap would fill, over the active layer (downscaled). nil = none.
+    @Published private(set) var bucketPreview: CGImage?
+    private var bucketSource: CGImage?           // cached downscaled source
+    private var bucketKey: String?
+    private(set) var bucketSourceW = 0
+    private(set) var bucketSourceH = 0
+    private var bucketLastSeed: CGPoint?         // skip recompute when the seed pixel is unchanged
+
+    func clearBucketPreview() {
+        bucketPreview = nil; bucketSource = nil; bucketKey = nil
+        bucketSourceW = 0; bucketSourceH = 0; bucketLastSeed = nil
+    }
+
+    /// Decode + downscale the layer image once (keyed), so hover only re-runs the cheap flood.
+    func ensureBucketSource(png: Data, layerKey: String) {
+        if bucketKey == layerKey, bucketSource != nil { return }
+        bucketKey = layerKey; bucketLastSeed = nil
+        if let src = CGImageSourceCreateWithData(png as CFData, nil),
+           let cg = CGImageSourceCreateImageAtIndex(src, 0, nil),
+           let ds = downscaledCGImage(cg, maxDimension: 320) {
+            bucketSource = ds; bucketSourceW = ds.width; bucketSourceH = ds.height
+        } else { bucketSource = nil; bucketSourceW = 0; bucketSourceH = 0 }
+    }
+
+    /// Recompute the fill-region highlight for a downscaled seed (or clear it). `seed` is in
+    /// the DOWNSCALED source's pixel space. `force` recomputes even if the seed pixel is the
+    /// same (used when tolerance changes).
+    func refreshBucketPreview(seed: CGPoint?, highlight: (r: UInt8, g: UInt8, b: UInt8, a: UInt8), force: Bool = false) {
+        guard let cg = bucketSource, let seed else { bucketPreview = nil; bucketLastSeed = nil; return }
+        if !force, let last = bucketLastSeed, Int(last.x) == Int(seed.x), Int(last.y) == Int(seed.y) { return }
+        bucketLastSeed = seed
+        bucketPreview = floodHighlightImage(cg, seed: seed, tolerance: Int(bucketTolerance), highlight: highlight)
     }
 
     private var ctx: CGContext?
