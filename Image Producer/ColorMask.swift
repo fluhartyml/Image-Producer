@@ -252,19 +252,19 @@ func floodHighlightImage(_ cg: CGImage, seed: CGPoint, tolerance: Int,
 /// inverting the layer transform (center / rotation / scale) and the `scaledToFit` letterbox.
 /// Returns nil if the point falls outside the displayed image. Used by the manual brush
 /// eraser so a drag clears the right pixels even on a moved/rotated/scaled layer.
-func imagePixel(forCanvasPoint p: CGPoint, side: CGFloat, transform t: LayerTransform,
+func imagePixel(forCanvasPoint p: CGPoint, canvas: CGSize, transform t: LayerTransform,
                 imageW: Int, imageH: Int) -> CGPoint? {
     guard imageW > 0, imageH > 0 else { return nil }
-    // 1. relative to the layer's center
-    let dx = p.x - t.center.x * side
-    let dy = p.y - t.center.y * side
+    // 1. relative to the layer's center (x by canvas width, y by canvas height)
+    let dx = p.x - t.center.x * canvas.width
+    let dy = p.y - t.center.y * canvas.height
     // 2. un-rotate (inverse of the view's rotationEffect)
     let rad = -t.rotationDegrees * .pi / 180
     let cosA = cos(rad), sinA = sin(rad)
     let rx = dx * cosA - dy * sinA
     let ry = dx * sinA + dy * cosA
-    // 3. the image's displayed rect (scaledToFit inside a side*scale square)
-    let frame = side * t.scale
+    // 3. the image's displayed rect (scaledToFit inside a ref*scale square; ref = min edge)
+    let frame = min(canvas.width, canvas.height) * t.scale
     let a = Double(imageW) / Double(imageH)
     let dispW = a >= 1 ? frame : frame * a
     let dispH = a >= 1 ? frame / a : frame

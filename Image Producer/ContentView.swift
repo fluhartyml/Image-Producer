@@ -224,7 +224,7 @@ struct ContentView: View {
 
     /// Flatten the visible layers to a px×px PNG (1024 master; PNG per 2.5.1).
     @MainActor static func renderIconPNG(document: IconDocument, px: Int) -> Data? {
-        let renderer = ImageRenderer(content: IconCompositeView(document: document, side: CGFloat(px)))
+        let renderer = ImageRenderer(content: IconCompositeView(document: document, size: CGSize(width: px, height: px)))
         renderer.scale = 1
         guard let cg = renderer.cgImage else { return nil }
         // Non-destructive crop: render the full square, then trim the CGImage to the
@@ -564,6 +564,14 @@ enum CanvasUnit: String, CaseIterable, Identifiable {
     }
 }
 
+/// A standard canvas size preset (stored short × long inches; orientation applied on use).
+struct CanvasSizePreset: Identifiable {
+    var id: String { label }
+    let label: String
+    let shortIn: Double
+    let longIn: Double
+}
+
 // MARK: - Canvas inspector (Tool: Canvas — the open project's central hub)
 
 /// The Canvas tool is the CENTRAL HUB for the open project. SLICE A (2026-06-22):
@@ -603,7 +611,18 @@ struct CanvasInspector: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Dimensions & Resolution").font(.subheadline).bold()
 
-                attrRow("Pixels", "\(document.canvasSize) × \(document.canvasSize) px")
+                // Pixels — editable W × H. This is the explicit pixel-count change; existing
+                // art scales-to-fit the new shape, letterboxed on the background.
+                HStack(spacing: 6) {
+                    Text("Pixels").font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 76, alignment: .leading)
+                    TextField("W", value: $document.canvasWidth, format: .number)
+                        .textFieldStyle(.roundedBorder).frame(width: 60)
+                    Text("×").font(.caption)
+                    TextField("H", value: $document.canvasHeight, format: .number)
+                        .textFieldStyle(.roundedBorder).frame(width: 60)
+                    Text("px").font(.caption).foregroundStyle(.secondary)
+                }
 
                 Picker("Units", selection: $unitRaw) {
                     ForEach(CanvasUnit.allCases) { Text($0.label).tag($0.rawValue) }
@@ -621,38 +640,29 @@ struct CanvasInspector: View {
                     Text("PPI").font(.caption).foregroundStyle(.secondary)
                 }
                 Menu("Common resolutions") {
-                    Button("72 — Screen / web")          { document.ppi = 72 }
-                    Button("150 — Draft print")          { document.ppi = 150 }
-                    Button("300 — Standard print")       { document.ppi = 300 }
-                    Button("600 — Fine art / line art")  { document.ppi = 600 }
+                    Button("72 — Screen / web")                  { document.ppi = 72 }
+                    Button("150 — Draft print")                  { document.ppi = 150 }
+                    Button("300 — Standard print / photo labs")  { document.ppi = 300 }
+                    Button("360 — Epson photo inkjet")           { document.ppi = 360 }
+                    Button("600 — Fine art / line art")          { document.ppi = 600 }
                 }
                 .font(.caption2).fixedSize()
 
-                // Print size: manual field + square-size presets (these set PPI, lossless).
-                HStack(spacing: 8) {
-                    Text("Print size").font(.caption).foregroundStyle(.secondary)
-                        .frame(width: 76, alignment: .leading)
-                    if unit == .px {
-                        Text("\(document.canvasSize) px (square)").font(.caption)
-                    } else {
-                        TextField("size", value: printSizeBinding,
-                                  format: .number.precision(.fractionLength(0...3)))
-                            .textFieldStyle(.roundedBorder).frame(width: 72)
-                        Text("\(unit.label) (square)").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                if unit != .px {
-                    Menu("Common sizes (square)") {
-                        ForEach([1, 2, 3, 4, 5, 6, 8], id: \.self) { inches in
-                            Button("\(inches)\u{2033} square") {
-                                document.ppi = Double(document.canvasSize) / Double(inches)
-                            }
-                        }
-                    }
-                    .font(.caption2).fixedSize()
-                }
+                // Print size — derived readout (W × H) from pixels ÷ PPI.
+                attrRow("Print size", printSizeText)
 
-                Text("Presets set common values; type your own when you know them. Lossless — these change the final output only; pixels stay the same. Standard PAPER sizes (Letter, etc.) are non-square — those arrive with the canvas-resize engine (next).")
+                // Standard non-square shapes. A preset sets pixels = physical × current PPI.
+                Toggle("Landscape", isOn: $landscape).font(.caption).fixedSize()
+                Menu("Canvas size presets") {
+                    Section("Photo")          { presetButtons(Self.photoPresets) }
+                    Section("Paper")          { presetButtons(Self.paperPresets) }
+                    Section("Index card")     { presetButtons(Self.indexPresets) }
+                    Section("Business card")  { presetButtons(Self.businessPresets) }
+                    Section("Envelope")       { presetButtons(Self.envelopePresets) }
+                }
+                .font(.caption2).fixedSize()
+
+                Text("Resolution (PPI) changes the print size losslessly — pixels stay. Editing Pixels or applying a size preset changes the pixel count; existing art scales to fit, letterboxed on the background. Set Resolution first (300 for print), then pick a size.")
                     .font(.caption2).foregroundStyle(.tertiary)
             }
 
@@ -708,19 +718,55 @@ struct CanvasInspector: View {
     // MARK: B · Dimensions & Resolution
     @AppStorage("ip.canvasUnit") private var unitRaw = CanvasUnit.inch.rawValue
     private var unit: CanvasUnit { CanvasUnit(rawValue: unitRaw) ?? .inch }
+    @State private var landscape = false
 
-    /// Physical (square) print size in the chosen unit. Editing it changes ONLY the PPI —
-    /// the pixels are never touched (lossless): ppi = pixels ÷ inches.
-    private var printSizeBinding: Binding<Double> {
-        Binding(
-            get: { unit.fromInches(Double(document.canvasSize) / max(1, document.ppi)) },
-            set: { newValue in
-                let inches = unit.toInches(newValue)
-                guard inches > 0 else { return }
-                document.ppi = Double(document.canvasSize) / inches
-            }
-        )
+    /// Derived print size readout (W × H) in the chosen unit, from pixels ÷ PPI.
+    private var printSizeText: String {
+        if unit == .px { return "\(document.canvasWidth) × \(document.canvasHeight) px" }
+        let w = unit.fromInches(Double(document.canvasWidth) / max(1, document.ppi))
+        let h = unit.fromInches(Double(document.canvasHeight) / max(1, document.ppi))
+        return String(format: "%.2f × %.2f %@", w, h, unit.label)
     }
+
+    @ViewBuilder private func presetButtons(_ list: [CanvasSizePreset]) -> some View {
+        ForEach(list) { p in Button(p.label) { applyPreset(p) } }
+    }
+
+    /// Apply a size preset: pixels = physical × current PPI, respecting the orientation.
+    private func applyPreset(_ p: CanvasSizePreset) {
+        let pw = landscape ? p.longIn : p.shortIn       // portrait = taller (short side = width)
+        let ph = landscape ? p.shortIn : p.longIn
+        document.canvasWidth = max(1, Int((pw * document.ppi).rounded()))
+        document.canvasHeight = max(1, Int((ph * document.ppi).rounded()))
+    }
+
+    // Standard sizes (stored short × long inches; orientation applied on use).
+    static let photoPresets = [
+        CanvasSizePreset(label: "Wallet 2.5 × 3.5", shortIn: 2.5, longIn: 3.5),
+        CanvasSizePreset(label: "4 × 6",  shortIn: 4,  longIn: 6),
+        CanvasSizePreset(label: "5 × 7",  shortIn: 5,  longIn: 7),
+        CanvasSizePreset(label: "8 × 10", shortIn: 8,  longIn: 10),
+        CanvasSizePreset(label: "8 × 12", shortIn: 8,  longIn: 12),
+        CanvasSizePreset(label: "11 × 14", shortIn: 11, longIn: 14),
+        CanvasSizePreset(label: "16 × 20", shortIn: 16, longIn: 20),
+        CanvasSizePreset(label: "20 × 30", shortIn: 20, longIn: 30),
+        CanvasSizePreset(label: "24 × 36", shortIn: 24, longIn: 36),
+    ]
+    static let paperPresets = [
+        CanvasSizePreset(label: "Letter 8.5 × 11", shortIn: 8.5, longIn: 11),
+    ]
+    static let indexPresets = [
+        CanvasSizePreset(label: "3 × 5", shortIn: 3, longIn: 5),
+        CanvasSizePreset(label: "4 × 6", shortIn: 4, longIn: 6),
+        CanvasSizePreset(label: "5 × 8", shortIn: 5, longIn: 8),
+    ]
+    static let businessPresets = [
+        CanvasSizePreset(label: "Business card 3.5 × 2", shortIn: 2, longIn: 3.5),
+    ]
+    static let envelopePresets = [
+        CanvasSizePreset(label: "Letter #6¾ 3.625 × 6.5", shortIn: 3.625, longIn: 6.5),
+        CanvasSizePreset(label: "Business #10 4.125 × 9.5", shortIn: 4.125, longIn: 9.5),
+    ]
 
     // MARK: file attribute readouts (from the on-disk file)
     private var locationText: String {
@@ -1470,17 +1516,18 @@ struct MoveTransformInspector: View {
             DispatchQueue.main.async { document.cropRect = nil; cropAspect = .original }
             return
         }
-        let side = CGFloat(document.canvasSize)
+        let w = CGFloat(document.canvasWidth), h = CGFloat(document.canvasHeight)
         let layerID = document.layers[idx].id
         // Render JUST the active layer (with its current transform), then crop the
         // resulting bitmap to the kept region — yielding a tight crop-sized PNG.
-        let solo = IconDocument(name: document.name, canvasSize: document.canvasSize,
+        let solo = IconDocument(name: document.name, canvasWidth: document.canvasWidth,
+                                canvasHeight: document.canvasHeight,
                                 layers: [document.layers[idx]], palette: document.palette,
                                 cropRect: nil)
-        let renderer = ImageRenderer(content: IconCompositeView(document: solo, side: side))
+        let renderer = ImageRenderer(content: IconCompositeView(document: solo, size: document.canvasPixelSize))
         renderer.scale = 1
-        let px = CGRect(x: crop.minX * side, y: crop.minY * side,
-                        width: crop.width * side, height: crop.height * side).integral
+        let px = CGRect(x: crop.minX * w, y: crop.minY * h,
+                        width: crop.width * w, height: crop.height * h).integral
         guard px.width >= 1, px.height >= 1,
               let full = renderer.cgImage,
               let cropped = full.cropping(to: px),
@@ -1755,7 +1802,7 @@ struct CanvasView: View {
     /// Paint Bucket tap. BACKGROUND layer → solid fill (existing). CONTENT image layer →
     /// seeded FLOOD fill bounded by the lines, onto a NEW layer (non-destructive; original
     /// kept + hidden, same mantra as the other Applies — there's no undo).
-    @MainActor private func bucketFill(atNormalized n: CGPoint, side: CGFloat) {
+    @MainActor private func bucketFill(atNormalized n: CGPoint, canvas: CGSize) {
         guard activeTool == .fill, let idx = activeIndex else { return }
         if document.layers[idx].backgroundRole != nil {
             document.layers[idx].setBackgroundFill(fillColor.hexString())
@@ -1765,8 +1812,8 @@ struct CanvasView: View {
               let src = CGImageSourceCreateWithData(png as CFData, nil),
               let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return }
         let t = document.layers[idx].transform
-        let canvasPt = CGPoint(x: n.x * side, y: n.y * side)
-        guard let seed = imagePixel(forCanvasPoint: canvasPt, side: side, transform: t,
+        let canvasPt = CGPoint(x: n.x * canvas.width, y: n.y * canvas.height)
+        guard let seed = imagePixel(forCanvasPoint: canvasPt, canvas: canvas, transform: t,
                                     imageW: cg.width, imageH: cg.height) else { return }
         let fc = fillColor.rgb8
         guard let filled = floodFilledImage(cg, seed: seed, tolerance: Int(pen.bucketTolerance),
@@ -1782,7 +1829,7 @@ struct CanvasView: View {
 
     /// Recompute the bucket's fill-region highlight for the hovered seed (downscaled), or
     /// clear it. Region shown in the fill color. `force` recomputes when tolerance/color change.
-    @MainActor private func refreshBucketPreview(side: CGFloat, force: Bool = false) {
+    @MainActor private func refreshBucketPreview(canvas: CGSize, force: Bool = false) {
         let c = fillColor.rgb8
         let hi: (r: UInt8, g: UInt8, b: UInt8, a: UInt8) = (c.r, c.g, c.b, 255)
         guard activeTool == .fill, let hp = bucketHover, let idx = activeIndex,
@@ -1792,7 +1839,7 @@ struct CanvasView: View {
         }
         pen.ensureBucketSource(png: png, layerKey: "\(id)-\(png.count)")
         let t = document.layers[idx].transform
-        let seed = imagePixel(forCanvasPoint: hp, side: side, transform: t,
+        let seed = imagePixel(forCanvasPoint: hp, canvas: canvas, transform: t,
                               imageW: pen.bucketSourceW, imageH: pen.bucketSourceH)
         pen.refreshBucketPreview(seed: seed, highlight: hi, force: force)
     }
@@ -1801,10 +1848,10 @@ struct CanvasView: View {
     /// sample circle) at a normalized canvas point into fillColor.
     @MainActor private func sampleEyedropper(at n: CGPoint) {
         guard activeTool == .eyedropper, let idx = activeIndex else { return }
-        let s = CGFloat(document.canvasSize)
-        let solo = IconDocument(name: document.name, canvasSize: document.canvasSize,
+        let solo = IconDocument(name: document.name, canvasWidth: document.canvasWidth,
+                                canvasHeight: document.canvasHeight,
                                 layers: [document.layers[idx]], palette: document.palette, cropRect: nil)
-        let renderer = ImageRenderer(content: IconCompositeView(document: solo, side: s))
+        let renderer = ImageRenderer(content: IconCompositeView(document: solo, size: document.canvasPixelSize))
         renderer.scale = 1
         if let cg = renderer.cgImage,
            let color = averagedColor(in: cg, atNormalized: n, radiusPixels: pen.eyedropperRadius) {
@@ -1834,7 +1881,7 @@ struct CanvasView: View {
     /// Brush eraser (option b): the first stroke on a layer auto-duplicates it (original
     /// kept + hidden) and erases the COPY — with Cmd-Z off, the copy IS the undo. Maps the
     /// canvas point through the layer transform to the right image pixel, then clears a dab.
-    @MainActor private func eraseAt(_ n: CGPoint, side: CGFloat) {
+    @MainActor private func eraseAt(_ n: CGPoint, canvas: CGSize) {
         guard activeTool == .eraser, pen.eraserMode == .brush else { return }
         // Start a new erase session (a fresh copy) if we aren't already erasing the active layer.
         if pen.eraserWorkingLayerID != activeLayerID || !pen.hasEraseSession {
@@ -1850,8 +1897,8 @@ struct CanvasView: View {
               let widx = document.layers.firstIndex(where: { $0.id == wid }) else { return }
         pen.eraserLiveLayerID = wid
         let t = document.layers[widx].transform
-        let canvasPt = CGPoint(x: n.x * side, y: n.y * side)
-        guard let px = imagePixel(forCanvasPoint: canvasPt, side: side, transform: t,
+        let canvasPt = CGPoint(x: n.x * canvas.width, y: n.y * canvas.height)
+        guard let px = imagePixel(forCanvasPoint: canvasPt, canvas: canvas, transform: t,
                                   imageW: pen.eraserImageW, imageH: pen.eraserImageH) else { return }
         let a = pen.eraserImageH > 0 ? Double(pen.eraserImageW) / Double(pen.eraserImageH) : 1.0
         let widthFactor = a >= 1 ? 1.0 : a   // scaledToFit limits on width for portrait images
@@ -1870,35 +1917,41 @@ struct CanvasView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let side = min(geo.size.width, geo.size.height)
+            // The canvas can be non-square (B2). Fit its aspect inside the available square
+            // area → the on-screen display rect `disp`. `ref` = the shorter display edge, used
+            // for element sizing so a square canvas reduces to exactly the old `side` math.
+            let canvasAspect = CGFloat(document.canvasWidth) / CGFloat(max(1, document.canvasHeight))
+            let avail = min(geo.size.width, geo.size.height)
+            let disp = canvasAspect >= 1
+                ? CGSize(width: avail, height: avail / canvasAspect)
+                : CGSize(width: avail * canvasAspect, height: avail)
+            let ref = min(disp.width, disp.height)
             ZStack {
                 Checkerboard()
-                // Non-destructive canvas mask: content past the icon square is GHOSTED
-                // (dimmed, unclipped) so you can still see + position it; then drawn CRISP
-                // clipped to the square. What shows inside the square = what exports.
-                layerStack(side: side)
+                // Non-destructive canvas mask: content past the canvas is GHOSTED (dimmed,
+                // unclipped) so you can still see + position it; then drawn CRISP clipped to
+                // the canvas rect. What shows inside the rect = what exports.
+                layerStack(size: disp)
                     .opacity(0.25)
-                layerStack(side: side)
-                    .frame(width: side, height: side)
+                layerStack(size: disp)
+                    .frame(width: disp.width, height: disp.height)
                     .clipped()
                 // Live pen stroke (the active layer's in-progress raster), kept crisp.
                 if activeTool == .pen, let img = pen.image {
                     Image(decorative: img, scale: 1)
                         .interpolation(.none)
                         .resizable()
-                        .frame(width: side, height: side)
+                        .frame(width: disp.width, height: disp.height)
                         .allowsHitTesting(false)
                 }
                 // Pixel grid overlay for the active layer's resolution.
                 if activeTool == .pen, pen.showGrid {
                     PixelGrid(resolution: pen.resolution)
-                        .frame(width: side, height: side)
+                        .frame(width: disp.width, height: disp.height)
                         .allowsHitTesting(false)
                 }
                 // Magic Eraser LIVE PREVIEW: magenta over exactly the pixels an Erase would
-                // clear, drawn over the active (visible) layer at its transform — so tolerance
-                // is tuned by eye, not fired blind. Same frame/scaledToFit as the image element
-                // so it lands pixel-aligned.
+                // clear, over the active (visible) layer at its transform — tune by eye.
                 if activeTool == .eraser, let idx = activeIndex,
                    document.layers[idx].isVisible, let hi = pen.erasePreview {
                     let t = document.layers[idx].transform
@@ -1906,14 +1959,13 @@ struct CanvasView: View {
                         .interpolation(.low)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: side * t.scale, height: side * t.scale)
+                        .frame(width: ref * t.scale, height: ref * t.scale)
                         .rotationEffect(.degrees(t.rotationDegrees))
-                        .position(x: t.center.x * side, y: t.center.y * side)
+                        .position(x: t.center.x * disp.width, y: t.center.y * disp.height)
                         .opacity(0.5)
                         .allowsHitTesting(false)
                 }
-                // Paint Bucket LIVE PREVIEW: the region a tap would flood, in the fill color,
-                // over the active layer — so you see the area (bounded by lines) before pouring.
+                // Paint Bucket LIVE PREVIEW: the region a tap would flood, in the fill color.
                 if activeTool == .fill, let idx = activeIndex,
                    document.layers[idx].isVisible, let hi = pen.bucketPreview {
                     let t = document.layers[idx].transform
@@ -1921,29 +1973,29 @@ struct CanvasView: View {
                         .interpolation(.low)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: side * t.scale, height: side * t.scale)
+                        .frame(width: ref * t.scale, height: ref * t.scale)
                         .rotationEffect(.degrees(t.rotationDegrees))
-                        .position(x: t.center.x * side, y: t.center.y * side)
+                        .position(x: t.center.x * disp.width, y: t.center.y * disp.height)
                         .opacity(0.55)
                         .allowsHitTesting(false)
                 }
                 if showTransformBox, let idx = activeIndex {
-                    TransformBox(document: document, index: idx, side: side)
+                    TransformBox(document: document, index: idx, size: disp)
                 }
                 // Crop preview: dim everything outside the crop rect (Move tool only).
                 if activeTool == .move, let crop = document.cropRect {
-                    CropOverlay(crop: crop, side: side)
+                    CropOverlay(crop: crop, size: disp)
                         .allowsHitTesting(false)
                 }
                 // Brush eraser footprint ring — follows the cursor so you see WHICH pixels
                 // a stroke will clear before committing (no undo). Circle ring / square box.
                 if activeTool == .eraser, pen.eraserMode == .brush, let hp = brushHover {
-                    BrushCursor(diameter: pen.eraserBrushFraction * side, square: pen.eraserSquare)
+                    BrushCursor(diameter: pen.eraserBrushFraction * ref, square: pen.eraserSquare)
                         .position(hp)
                         .allowsHitTesting(false)
                 }
             }
-            .frame(width: side, height: side)
+            .frame(width: disp.width, height: disp.height)
             .coordinateSpace(name: "canvas")
             .overlay(Rectangle().stroke(Color.secondary.opacity(0.4), lineWidth: 1))
             .overlay {
@@ -1969,10 +2021,10 @@ struct CanvasView: View {
                 // TAP fires onChanged → a single pixel; a drag paints a trail.
                 DragGesture(minimumDistance: 0, coordinateSpace: .named("canvas"))
                     .onChanged { value in
-                        let n = CGPoint(x: value.location.x / side, y: value.location.y / side)
+                        let n = CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height)
                         if activeTool == .eraser, pen.eraserMode == .brush {
                             brushHover = value.location   // ring follows the finger/cursor mid-stroke too
-                            eraseAt(n, side: side); return
+                            eraseAt(n, canvas: disp); return
                         }
                         guard activeTool == .pen, activeIndex != nil else { return }
                         if pen.erasing { pen.erase(toNormalized: n) } else { pen.stroke(toNormalized: n) }
@@ -1985,9 +2037,9 @@ struct CanvasView: View {
                                 document.layers[i].setPixels(data)
                             }
                         case .fill:
-                            bucketFill(atNormalized: CGPoint(x: value.location.x / side, y: value.location.y / side), side: side)
+                            bucketFill(atNormalized: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height), canvas: disp)
                         case .eyedropper:
-                            sampleEyedropper(at: CGPoint(x: value.location.x / side, y: value.location.y / side))
+                            sampleEyedropper(at: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height))
                         case .eraser:
                             if pen.eraserMode == .brush { endEraseStroke() }
                         default:
@@ -2003,10 +2055,10 @@ struct CanvasView: View {
                 switch phase {
                 case .active(let loc):
                     if activeTool == .eraser, pen.eraserMode == .brush { brushHover = loc }
-                    if activeTool == .fill { bucketHover = loc; refreshBucketPreview(side: side) }
+                    if activeTool == .fill { bucketHover = loc; refreshBucketPreview(canvas: disp) }
                 case .ended:
                     brushHover = nil
-                    if activeTool == .fill { bucketHover = nil; refreshBucketPreview(side: side) }
+                    if activeTool == .fill { bucketHover = nil; refreshBucketPreview(canvas: disp) }
                 }
             }
             .onAppear {
@@ -2025,7 +2077,7 @@ struct CanvasView: View {
                 // is handled by eraseAt's "working != active → new copy" check on the next stroke.
                 if activeTool == .pen { pen.load(activePixelData) }
                 refreshEraserPreview()
-                refreshBucketPreview(side: side)
+                refreshBucketPreview(canvas: disp)
             }
             .onChange(of: pen.eraserMode) {
                 if pen.eraserMode != .brush { pen.endEraseSession() }
@@ -2033,10 +2085,10 @@ struct CanvasView: View {
             }
             .onChange(of: pen.eraseTolerance) { refreshEraserPreview() }
             .onChange(of: pen.eraseContiguous) { refreshEraserPreview() }
-            .onChange(of: pen.bucketTolerance) { refreshBucketPreview(side: side, force: true) }
+            .onChange(of: pen.bucketTolerance) { refreshBucketPreview(canvas: disp, force: true) }
             .onChange(of: fillColor) {
                 if activeTool == .eraser { refreshEraserPreview() }
-                if activeTool == .fill { refreshBucketPreview(side: side, force: true) }
+                if activeTool == .fill { refreshBucketPreview(canvas: disp, force: true) }
             }
             .onChange(of: pen.resolution) {
                 guard activeTool == .pen else { return }
@@ -2059,18 +2111,20 @@ struct CanvasView: View {
     /// shakedown star is visible for the Move/Transform tool.)
     /// All visible layers composited — used twice (ghosted bleed + clipped crisp icon).
     @ViewBuilder
-    private func layerStack(side: CGFloat) -> some View {
+    private func layerStack(size: CGSize) -> some View {
         ZStack {
             ForEach(document.layers) { layer in
-                if layer.isVisible { layerContent(layer, side: side) }
+                if layer.isVisible { layerContent(layer, size: size) }
             }
         }
     }
 
     @ViewBuilder
-    private func layerContent(_ layer: IconLayer, side: CGFloat) -> some View {
+    private func layerContent(_ layer: IconLayer, size: CGSize) -> some View {
         switch layer.role {
         case .background(_, let fillHex):
+            // A filled background fills the whole canvas rect — also the letterbox margin
+            // when the canvas is non-square and content scales-to-fit inside it.
             if let hex = fillHex, let color = Color(hex: hex) {
                 color
             }
@@ -2078,10 +2132,10 @@ struct CanvasView: View {
             // While a brush stroke is live on this layer, render its working bitmap (with the
             // erased holes) instead of the stored element, so transparency shows immediately.
             if layer.id == pen.eraserLiveLayerID, let live = pen.eraserImage {
-                liveImageView(live, transform: layer.transform, side: side)
+                liveImageView(live, transform: layer.transform, size: size)
             } else {
                 ForEach(layer.elements) { element in
-                    elementView(element, transform: layer.transform, side: side)
+                    elementView(element, transform: layer.transform, size: size)
                 }
             }
         }
@@ -2090,52 +2144,56 @@ struct CanvasView: View {
     /// The live brush-eraser bitmap drawn exactly like an image element (same frame /
     /// scaledToFit / rotation / position), so it sits over the layer pixel-aligned.
     @ViewBuilder
-    private func liveImageView(_ cg: CGImage, transform t: LayerTransform, side: CGFloat) -> some View {
+    private func liveImageView(_ cg: CGImage, transform t: LayerTransform, size: CGSize) -> some View {
+        let ref = min(size.width, size.height)
         Image(decorative: cg, scale: 1)
             .resizable()
             .scaledToFit()
-            .frame(width: side * t.scale, height: side * t.scale)
+            .frame(width: ref * t.scale, height: ref * t.scale)
             .rotationEffect(.degrees(t.rotationDegrees))
-            .position(x: t.center.x * side, y: t.center.y * side)
+            .position(x: t.center.x * size.width, y: t.center.y * size.height)
     }
 
     @ViewBuilder
     private func elementView(_ element: LayerElement,
                              transform t: LayerTransform,
-                             side: CGFloat) -> some View {
+                             size: CGSize) -> some View {
+        // Element sizing uses the shorter canvas edge (`ref`) so content scales-to-fit and
+        // letterboxes on a non-square canvas; positioning uses the full width/height.
+        let ref = min(size.width, size.height)
         switch element.content {
         case .symbol(let symbol):
             Image(systemName: symbol.systemName)
                 .resizable()
                 .scaledToFit()
                 .foregroundStyle(Color(hex: symbol.tintHex) ?? .primary)
-                .frame(width: side * t.scale, height: side * t.scale)
+                .frame(width: ref * t.scale, height: ref * t.scale)
                 .rotationEffect(.degrees(t.rotationDegrees))
-                .position(x: t.center.x * side, y: t.center.y * side)
+                .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .text(let text):
             Text(text.string)
-                .font(.custom(text.fontName, size: side * text.sizeFraction * t.scale))
+                .font(.custom(text.fontName, size: ref * text.sizeFraction * t.scale))
                 .bold(text.bold)
                 .italic(text.italic)
                 .underline(text.underline)
                 .foregroundStyle(Color(hex: text.colorHex) ?? .primary)
                 .rotationEffect(.degrees(t.rotationDegrees))
-                .position(x: t.center.x * side, y: t.center.y * side)
+                .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .image(let imageContent):
             if let platformImage = PlatformImage(data: imageContent.pngData) {
                 Image(platformImage: platformImage)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: side * t.scale, height: side * t.scale)
+                    .frame(width: ref * t.scale, height: ref * t.scale)
                     .rotationEffect(.degrees(t.rotationDegrees))
-                    .position(x: t.center.x * side, y: t.center.y * side)
+                    .position(x: t.center.x * size.width, y: t.center.y * size.height)
             }
         case .pixels(let pixels):
             if let platformImage = PlatformImage(data: pixels.pngData) {
                 Image(platformImage: platformImage)
                     .interpolation(.none)   // crisp blocks when a low-res layer scales up
                     .resizable()
-                    .frame(width: side, height: side)
+                    .frame(width: size.width, height: size.height)
             }
         }
     }
@@ -2149,7 +2207,7 @@ struct CanvasView: View {
 struct TransformBox: View {
     @ObservedObject var document: IconDocument
     let index: Int
-    let side: CGFloat
+    let size: CGSize
     @State private var startCenter: CGPoint?
 
     /// Unit offsets of the four corners from the box center.
@@ -2167,9 +2225,10 @@ struct TransformBox: View {
             // square) so the grabbers sit on the object, never orphaned at the canvas
             // corners. contentSize is square for legacy layers (no contentAspect).
             let cs = t.contentSize
-            let boxW = max(24, cs.width * side)
-            let boxH = max(24, cs.height * side)
-            let center = CGPoint(x: t.center.x * side, y: t.center.y * side)
+            let ref = min(size.width, size.height)
+            let boxW = max(24, cs.width * ref)
+            let boxH = max(24, cs.height * ref)
+            let center = CGPoint(x: t.center.x * size.width, y: t.center.y * size.height)
 
             // The movable box.
             Rectangle()
@@ -2185,8 +2244,8 @@ struct TransformBox: View {
                             guard index < document.layers.count else { return }
                             let start = startCenter ?? document.layers[index].transform.center
                             if startCenter == nil { startCenter = start }
-                            let nx = min(max(start.x + value.translation.width / side, 0), 1)
-                            let ny = min(max(start.y + value.translation.height / side, 0), 1)
+                            let nx = min(max(start.x + value.translation.width / size.width, 0), 1)
+                            let ny = min(max(start.y + value.translation.height / size.height, 0), 1)
                             document.layers[index].transform.center = CGPoint(x: nx, y: ny)
                         }
                         .onEnded { _ in startCenter = nil }
@@ -2205,7 +2264,7 @@ struct TransformBox: View {
                                 guard index < document.layers.count else { return }
                                 let half = max(abs(value.location.x - center.x),
                                                abs(value.location.y - center.y))
-                                let newScale = min(max((half * 2) / side, 0.1), 4.0)
+                                let newScale = min(max((half * 2) / ref, 0.1), 4.0)
                                 document.layers[index].transform.scale = newScale
                             }
                     )
@@ -2219,25 +2278,25 @@ struct TransformBox: View {
 /// aspect picker + size slider (draggable handles for Freeform = later).
 struct CropOverlay: View {
     let crop: CGRect    // normalized (0…1, top-left origin)
-    let side: CGFloat
+    let size: CGSize
 
     var body: some View {
-        let r = CGRect(x: crop.minX * side, y: crop.minY * side,
-                       width: crop.width * side, height: crop.height * side)
+        let r = CGRect(x: crop.minX * size.width, y: crop.minY * size.height,
+                       width: crop.width * size.width, height: crop.height * size.height)
         let dim = Color.black.opacity(0.45)
         ZStack(alignment: .topLeading) {
-            dim.frame(width: side, height: max(0, r.minY))                         // top band
-            dim.frame(width: side, height: max(0, side - r.maxY))                  // bottom band
+            dim.frame(width: size.width, height: max(0, r.minY))                       // top band
+            dim.frame(width: size.width, height: max(0, size.height - r.maxY))         // bottom band
                 .offset(y: r.maxY)
-            dim.frame(width: max(0, r.minX), height: r.height)                     // left band
+            dim.frame(width: max(0, r.minX), height: r.height)                         // left band
                 .offset(y: r.minY)
-            dim.frame(width: max(0, side - r.maxX), height: r.height)              // right band
+            dim.frame(width: max(0, size.width - r.maxX), height: r.height)            // right band
                 .offset(x: r.maxX, y: r.minY)
-            Rectangle().stroke(Color.white, lineWidth: 1.5)                        // crop border
+            Rectangle().stroke(Color.white, lineWidth: 1.5)                            // crop border
                 .frame(width: r.width, height: r.height)
                 .offset(x: r.minX, y: r.minY)
         }
-        .frame(width: side, height: side, alignment: .topLeading)
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
     }
 }
 
@@ -2776,7 +2835,7 @@ final class PixelPen: ObservableObject {
 /// what Export and Share rasterize. Transparent where no opaque background shows.
 struct IconCompositeView: View {
     let document: IconDocument
-    let side: CGFloat
+    let size: CGSize
 
     var body: some View {
         ZStack {
@@ -2784,7 +2843,7 @@ struct IconCompositeView: View {
                 if layer.isVisible { composited(layer) }
             }
         }
-        .frame(width: side, height: side)
+        .frame(width: size.width, height: size.height)
         .clipped()
     }
 
@@ -2802,39 +2861,40 @@ struct IconCompositeView: View {
 
     @ViewBuilder
     private func elementView(_ element: LayerElement, transform t: LayerTransform) -> some View {
+        let ref = min(size.width, size.height)
         switch element.content {
         case .symbol(let symbol):
             Image(systemName: symbol.systemName)
                 .resizable()
                 .scaledToFit()
                 .foregroundStyle(Color(hex: symbol.tintHex) ?? .primary)
-                .frame(width: side * t.scale, height: side * t.scale)
+                .frame(width: ref * t.scale, height: ref * t.scale)
                 .rotationEffect(.degrees(t.rotationDegrees))
-                .position(x: t.center.x * side, y: t.center.y * side)
+                .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .text(let text):
             Text(text.string)
-                .font(.custom(text.fontName, size: side * text.sizeFraction * t.scale))
+                .font(.custom(text.fontName, size: ref * text.sizeFraction * t.scale))
                 .bold(text.bold)
                 .italic(text.italic)
                 .underline(text.underline)
                 .foregroundStyle(Color(hex: text.colorHex) ?? .primary)
                 .rotationEffect(.degrees(t.rotationDegrees))
-                .position(x: t.center.x * side, y: t.center.y * side)
+                .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .image(let imageContent):
             if let platformImage = PlatformImage(data: imageContent.pngData) {
                 Image(platformImage: platformImage)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: side * t.scale, height: side * t.scale)
+                    .frame(width: ref * t.scale, height: ref * t.scale)
                     .rotationEffect(.degrees(t.rotationDegrees))
-                    .position(x: t.center.x * side, y: t.center.y * side)
+                    .position(x: t.center.x * size.width, y: t.center.y * size.height)
             }
         case .pixels(let pixels):
             if let platformImage = PlatformImage(data: pixels.pngData) {
                 Image(platformImage: platformImage)
                     .interpolation(.none)   // crisp blocks when a low-res layer scales up
                     .resizable()
-                    .frame(width: side, height: side)
+                    .frame(width: size.width, height: size.height)
             }
         }
     }

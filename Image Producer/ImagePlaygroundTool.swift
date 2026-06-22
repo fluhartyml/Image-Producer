@@ -154,10 +154,10 @@ struct ImagePlaygroundInspector: View {
     /// Filter — render the active layer to seed the source image, set the prompt, present.
     @MainActor private func startFilter() {
         guard let layer = activeFilterable else { return }
-        let side = CGFloat(document.canvasSize)
-        let solo = IconDocument(name: document.name, canvasSize: document.canvasSize,
+        let solo = IconDocument(name: document.name, canvasWidth: document.canvasWidth,
+                                canvasHeight: document.canvasHeight,
                                 layers: [layer], palette: document.palette, cropRect: nil)
-        let renderer = ImageRenderer(content: IconCompositeView(document: solo, side: side))
+        let renderer = ImageRenderer(content: IconCompositeView(document: solo, size: document.canvasPixelSize))
         renderer.scale = 1
         if let cg = renderer.cgImage, let png = pngData(from: cg),
            let platform = PlatformImage(data: png) {

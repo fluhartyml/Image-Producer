@@ -35,8 +35,13 @@ import UniformTypeIdentifiers
 /// (see the conformance below) — DocumentGroup owns it and saves it as a package.
 final class IconDocument: ObservableObject {
     @Published var name: String
-    /// Square master resolution. 1024 = the design's "draw small, render master big".
-    let canvasSize: Int
+    /// Canvas pixel dimensions. Was a single square `canvasSize`; B2 makes it W×H so the
+    /// canvas can take non-square print / photo / card shapes. Mutable — the Canvas tool
+    /// resizes it (pixels = physical size × ppi). 1024×1024 is the default square master.
+    @Published var canvasWidth: Int
+    @Published var canvasHeight: Int
+    /// Pixel size as a CGSize — the export / render reference.
+    var canvasPixelSize: CGSize { CGSize(width: canvasWidth, height: canvasHeight) }
     /// Bottom-to-top draw order.
     @Published var layers: [IconLayer]
     /// The 8-slot brand palette (hex), saved WITH the document so it travels per-project.
@@ -64,11 +69,12 @@ final class IconDocument: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: "IconProducer.lastUsedPalette") }
     }
 
-    init(name: String = "Untitled Image", canvasSize: Int = 1024, layers: [IconLayer] = [],
-         palette: [String] = IconDocument.lastUsedPalette, cropRect: CGRect? = nil,
-         ppi: Double = 72) {
+    init(name: String = "Untitled Image", canvasWidth: Int = 1024, canvasHeight: Int = 1024,
+         layers: [IconLayer] = [], palette: [String] = IconDocument.lastUsedPalette,
+         cropRect: CGRect? = nil, ppi: Double = 72) {
         self.name = name
-        self.canvasSize = canvasSize
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
         self.layers = layers
         self.palette = palette
         self.cropRect = cropRect
@@ -390,7 +396,11 @@ struct PaletteFileDocument: FileDocument {
 /// tools land — kept out of JSON to avoid base64 bloat.
 struct IconProjectManifest: Codable {
     var name: String
-    var canvasSize: Int
+    /// Legacy square size (files saved before non-square existed). Read-only fallback.
+    var canvasSize: Int? = nil
+    /// Non-square canvas pixel dimensions (B2). Absent in older files → fall back to canvasSize.
+    var canvasWidth: Int? = nil
+    var canvasHeight: Int? = nil
     var layers: [IconLayer]
     /// Optional for backward-compat with .iconproj files saved before palettes existed.
     var palette: [String]?
@@ -409,15 +419,17 @@ extension IconDocument: ReferenceFileDocument {
             throw CocoaError(.fileReadCorruptFile)
         }
         let manifest = try JSONDecoder().decode(IconProjectManifest.self, from: data)
-        self.init(name: manifest.name, canvasSize: manifest.canvasSize, layers: manifest.layers,
+        let w = manifest.canvasWidth ?? manifest.canvasSize ?? 1024
+        let h = manifest.canvasHeight ?? manifest.canvasSize ?? 1024
+        self.init(name: manifest.name, canvasWidth: w, canvasHeight: h, layers: manifest.layers,
                   palette: manifest.palette ?? IconDocument.lastUsedPalette, cropRect: manifest.cropRect,
                   ppi: manifest.ppi ?? 72)
     }
 
     /// Capture current state for writing (called off the main actor by SwiftUI).
     func snapshot(contentType: UTType) throws -> IconProjectManifest {
-        IconProjectManifest(name: name, canvasSize: canvasSize, layers: layers, palette: palette,
-                            cropRect: cropRect, ppi: ppi)
+        IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
+                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi)
     }
 
     /// Write the package: a directory wrapper holding `manifest.json`.
@@ -440,7 +452,7 @@ extension IconDocument {
     /// system's job, and we don't want the two to compete). Same `manifest.json` format
     /// as the official `fileWrapper(snapshot:)` writer, so the file stays interchangeable.
     func writePackage(to url: URL) throws {
-        let manifest = IconProjectManifest(name: name, canvasSize: canvasSize,
+        let manifest = IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
                                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi)
         let data = try JSONEncoder().encode(manifest)
         let mf = FileWrapper(regularFileWithContents: data)
