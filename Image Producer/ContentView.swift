@@ -595,25 +595,25 @@ struct CanvasInspector: View {
         ScrollView {
         VStack(alignment: .leading, spacing: 16) {
             // --- Project name ---
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Project name").font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Project name").font(.body).foregroundStyle(.secondary)
                 if fileURL == nil {
                     // Untitled: editable working name (becomes the manifest name on first save).
                     TextField("Project name", text: $draftName)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.roundedBorder).font(.body)
                         .onSubmit { commitName() }
                     Text("Working name for this untitled project.")
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.callout).foregroundStyle(.secondary)
                 } else {
                     // Saved: editing here renames the FILE on disk (one-stop — no trip to Finder).
                     TextField("Project name", text: $draftName)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.roundedBorder).font(.body)
                         .onSubmit { renameFile() }
                     Text("Renames the file on disk. Press Return to apply.")
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.callout).foregroundStyle(.secondary)
                     if renameError {
                         Text("Couldn't rename — a file with that name may already exist.")
-                            .font(.caption2).foregroundStyle(.red)
+                            .font(.callout).foregroundStyle(.red)
                     }
                 }
             }
@@ -621,20 +621,19 @@ struct CanvasInspector: View {
             Divider()
 
             // --- B · Dimensions & Resolution ---
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Dimensions & Resolution").font(.subheadline).bold()
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Dimensions & Resolution").font(.headline)
 
                 // Pixels — editable W × H. This is the explicit pixel-count change; existing
                 // art scales-to-fit the new shape, letterboxed on the background.
                 HStack(spacing: 6) {
-                    Text("Pixels").font(.caption).foregroundStyle(.secondary)
-                        .frame(width: 76, alignment: .leading)
+                    Text("Pixels").font(.body).frame(width: 92, alignment: .leading)
                     TextField("W", value: $document.canvasWidth, format: .number)
-                        .textFieldStyle(.roundedBorder).frame(width: 60)
-                    Text("×").font(.caption)
+                        .textFieldStyle(.roundedBorder).font(.body).frame(width: 64)
+                    Text("×").font(.body)
                     TextField("H", value: $document.canvasHeight, format: .number)
-                        .textFieldStyle(.roundedBorder).frame(width: 60)
-                    Text("px").font(.caption).foregroundStyle(.secondary)
+                        .textFieldStyle(.roundedBorder).font(.body).frame(width: 64)
+                    Text("px").font(.body).foregroundStyle(.secondary)
                 }
 
                 Picker("Units", selection: $unitRaw) {
@@ -645,12 +644,11 @@ struct CanvasInspector: View {
 
                 // Resolution: manual field + a preset menu for when you don't know the number.
                 HStack(spacing: 8) {
-                    Text("Resolution").font(.caption).foregroundStyle(.secondary)
-                        .frame(width: 76, alignment: .leading)
+                    Text("Resolution").font(.body).frame(width: 92, alignment: .leading)
                     TextField("PPI", value: $document.ppi, format: .number.precision(.fractionLength(0...2)))
-                        .textFieldStyle(.roundedBorder).frame(width: 72)
+                        .textFieldStyle(.roundedBorder).font(.body).frame(width: 76)
                         .onSubmit { if document.ppi < 1 { document.ppi = 1 } }
-                    Text("PPI").font(.caption).foregroundStyle(.secondary)
+                    Text("PPI").font(.body).foregroundStyle(.secondary)
                 }
                 Menu("Common resolutions") {
                     Button("72 — Screen / web")                  { document.ppi = 72 }
@@ -659,13 +657,13 @@ struct CanvasInspector: View {
                     Button("360 — Epson photo inkjet")           { document.ppi = 360 }
                     Button("600 — Fine art / line art")          { document.ppi = 600 }
                 }
-                .font(.caption2).fixedSize()
+                .font(.body).fixedSize()
 
                 // Print size — derived readout (W × H) from pixels ÷ PPI.
                 attrRow("Print size", printSizeText)
 
                 // Standard non-square shapes. A preset sets pixels = physical × current PPI.
-                Toggle("Landscape", isOn: $landscape).font(.caption).fixedSize()
+                Toggle("Landscape", isOn: $landscape).font(.body).fixedSize()
                 Menu("Canvas size presets") {
                     Section("Photo")          { presetButtons(Self.photoPresets) }
                     Section("Paper")          { presetButtons(Self.paperPresets) }
@@ -673,24 +671,24 @@ struct CanvasInspector: View {
                     Section("Business card")  { presetButtons(Self.businessPresets) }
                     Section("Envelope")       { presetButtons(Self.envelopePresets) }
                 }
-                .font(.caption2).fixedSize()
+                .font(.body).fixedSize()
 
                 Text("Resolution (PPI) changes the print size losslessly — pixels stay. Editing Pixels or applying a size preset changes the pixel count; existing art scales to fit, letterboxed on the background. Set Resolution first (300 for print), then pick a size.")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.callout).foregroundStyle(.secondary)
             }
 
             Divider()
 
             // --- File attributes ---
             VStack(alignment: .leading, spacing: 8) {
-                Text("File").font(.subheadline).bold()
+                Text("File").font(.headline)
                 attrRow("Location", locationText)
                 #if os(macOS)
                 if let url = fileURL {
                     Button { NSWorkspace.shared.activateFileViewerSelecting([url]) } label: {
-                        Label("Reveal in Finder", systemImage: "folder")
+                        Label("Reveal in Finder", systemImage: "folder").font(.body)
                     }
-                    .buttonStyle(.bordered).controlSize(.small)
+                    .buttonStyle(.bordered)
                 }
                 #endif
                 attrRow("Type", typeText)
@@ -702,30 +700,30 @@ struct CanvasInspector: View {
             Divider()
 
             // --- C · Print setup ---
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Print setup").font(.subheadline).bold()
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Print setup").font(.headline)
                 HStack(spacing: 8) {
-                    Text("Bleed").font(.caption).foregroundStyle(.secondary).frame(width: 76, alignment: .leading)
+                    Text("Bleed").font(.body).frame(width: 92, alignment: .leading)
                     TextField("in", value: $document.bleedInches, format: .number.precision(.fractionLength(0...3)))
-                        .textFieldStyle(.roundedBorder).frame(width: 64)
-                    Text("in").font(.caption).foregroundStyle(.secondary)
+                        .textFieldStyle(.roundedBorder).font(.body).frame(width: 64)
+                    Text("in").font(.body).foregroundStyle(.secondary)
                     Menu {
                         Button("None") { document.bleedInches = 0 }
                         Button("0.125 in (1/8\")") { document.bleedInches = 0.125 }
                         Button("3 mm") { document.bleedInches = 3.0 / 25.4 }
-                    } label: { Image(systemName: "chevron.down.circle").font(.caption) }
+                    } label: { Image(systemName: "chevron.down.circle").font(.body) }
                     .fixedSize()
                 }
                 HStack(spacing: 8) {
-                    Text("Safe margin").font(.caption).foregroundStyle(.secondary).frame(width: 76, alignment: .leading)
+                    Text("Safe margin").font(.body).frame(width: 92, alignment: .leading)
                     TextField("in", value: $document.safeMarginInches, format: .number.precision(.fractionLength(0...3)))
-                        .textFieldStyle(.roundedBorder).frame(width: 64)
-                    Text("in").font(.caption).foregroundStyle(.secondary)
+                        .textFieldStyle(.roundedBorder).font(.body).frame(width: 64)
+                    Text("in").font(.body).foregroundStyle(.secondary)
                 }
-                Toggle("Crop / trim marks", isOn: $document.cropMarks).font(.caption)
-                Toggle("Registration marks", isOn: $document.registrationMarks).font(.caption)
+                Toggle("Crop / trim marks", isOn: $document.cropMarks).font(.body)
+                Toggle("Registration marks", isOn: $document.registrationMarks).font(.body)
                 HStack(spacing: 8) {
-                    Text("Color").font(.caption).foregroundStyle(.secondary).frame(width: 76, alignment: .leading)
+                    Text("Color").font(.body).frame(width: 92, alignment: .leading)
                     Picker("Color", selection: $document.colorSpaceCMYK) {
                         Text("RGB").tag(false); Text("CMYK").tag(true)
                     }
@@ -733,36 +731,36 @@ struct CanvasInspector: View {
                 }
                 if document.colorSpaceCMYK {
                     Text("CMYK is saved on the project; the PDF currently exports RGB (a true ICC RGB→CMYK conversion is a later step).")
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
 
             Divider()
 
             // --- D · Export ---
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Export").font(.subheadline).bold()
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Export").font(.headline)
                 Button {
                     if let data = makePrintPDF(document) {
                         exportData = data; exportType = .pdf
                         exportFilename = displayName; showDataExporter = true
                     }
-                } label: { Label("Print PDF (bleed + marks)", systemImage: "doc.richtext").frame(maxWidth: .infinity) }
+                } label: { Label("Print PDF (bleed + marks)", systemImage: "doc.richtext").font(.body).frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent)
                 Button {
                     webBundle = IconExportBundle(files: makeWebFolder(document, baseName: displayName))
                     showWebExporter = true
-                } label: { Label("Web folder (PNG @1x/2x/3x)", systemImage: "globe").frame(maxWidth: .infinity) }
+                } label: { Label("Web folder (PNG @1x/2x/3x)", systemImage: "globe").font(.body).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
                 Button {
                     if let data = makeCanvasPNG(document) {
                         exportData = data; exportType = .png
                         exportFilename = displayName; showDataExporter = true
                     }
-                } label: { Label("PNG (full canvas)", systemImage: "photo").frame(maxWidth: .infinity) }
+                } label: { Label("PNG (full canvas)", systemImage: "photo").font(.body).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
                 Text("Print PDF = single file at trim + bleed. Web folder = a packaged folder of PNGs. (Icon PNG export lives on the toolbar.)")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.callout).foregroundStyle(.secondary)
             }
 
         }
@@ -784,9 +782,9 @@ struct CanvasInspector: View {
 
     @ViewBuilder private func attrRow(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-                .frame(width: 76, alignment: .leading)
-            Text(value).font(.caption).textSelection(.enabled)
+            Text(label).font(.body).foregroundStyle(.secondary)
+                .frame(width: 92, alignment: .leading)
+            Text(value).font(.body).foregroundStyle(.primary).textSelection(.enabled)
             Spacer(minLength: 0)
         }
     }
@@ -873,7 +871,11 @@ struct CanvasInspector: View {
         CanvasSizePreset(label: "24 × 36", shortIn: 24, longIn: 36),
     ]
     static let paperPresets = [
-        CanvasSizePreset(label: "Letter 8.5 × 11", shortIn: 8.5, longIn: 11),
+        CanvasSizePreset(label: "A — Letter 8.5 × 11", shortIn: 8.5, longIn: 11),
+        CanvasSizePreset(label: "B — Tabloid 11 × 17", shortIn: 11, longIn: 17),
+        CanvasSizePreset(label: "C — 17 × 22", shortIn: 17, longIn: 22),
+        CanvasSizePreset(label: "D — 22 × 34", shortIn: 22, longIn: 34),
+        CanvasSizePreset(label: "E — 34 × 44", shortIn: 34, longIn: 44),
     ]
     static let indexPresets = [
         CanvasSizePreset(label: "3 × 5", shortIn: 3, longIn: 5),
