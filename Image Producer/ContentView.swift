@@ -34,6 +34,9 @@ import AppKit
 
 struct ContentView: View {
     @ObservedObject var document: IconDocument
+    /// The open document's file on disk (from the DocumentGroup) — shown in the Canvas
+    /// hub's Project/File section. nil while the document is untitled / not yet saved.
+    var fileURL: URL? = nil
     @State private var activeTool: Tool = .move
     @State private var activeLayerID: IconLayer.ID?
     @State private var bottomPanel: BottomPanel = .layers
@@ -94,7 +97,7 @@ struct ContentView: View {
                 Divider()
                 BottomPanel.PanelView(document: document, activeTool: activeTool,
                                       activeLayerID: $activeLayerID, selection: $bottomPanel,
-                                      fillColor: $fillColor, compact: true)
+                                      fillColor: $fillColor, fileURL: fileURL, compact: true)
                     .frame(maxHeight: .infinity)
             }
         } else {
@@ -107,7 +110,7 @@ struct ContentView: View {
                     Divider()
                     BottomPanel.PanelView(document: document, activeTool: activeTool,
                                           activeLayerID: $activeLayerID, selection: $bottomPanel,
-                                          fillColor: $fillColor, compact: true)
+                                          fillColor: $fillColor, fileURL: fileURL, compact: true)
                 }
                 .frame(width: 300)
             }
@@ -135,7 +138,8 @@ struct ContentView: View {
                                           activeTool: activeTool,
                                           activeLayerID: $activeLayerID,
                                           selection: $bottomPanel,
-                                          fillColor: $fillColor)
+                                          fillColor: $fillColor,
+                                          fileURL: fileURL)
                 }
             } else {
                 // Landscape / wide: canvas | tool rail | inspector | layers — all
@@ -151,7 +155,8 @@ struct ContentView: View {
                     ToolInspector(document: document,
                                   activeTool: activeTool,
                                   activeLayerID: activeLayerID,
-                                  fillColor: $fillColor)
+                                  fillColor: $fillColor,
+                                  fileURL: fileURL)
                         .frame(width: 240)
                     Divider()
                     LayerPanel(document: document, activeLayerID: $activeLayerID)
@@ -392,6 +397,8 @@ struct ToolInspector: View {
     let activeTool: Tool
     let activeLayerID: IconLayer.ID?
     @Binding var fillColor: Color
+    /// Open document's file on disk — for the Canvas hub's Project/File section.
+    var fileURL: URL? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -429,6 +436,8 @@ struct ToolInspector: View {
     @ViewBuilder
     private var content: some View {
         switch activeTool {
+        case .canvas:
+            CanvasInspector(document: document, fileURL: fileURL)
         case .move:
             MoveTransformInspector(document: document, activeLayerID: activeLayerID)
         case .fill:
@@ -522,6 +531,111 @@ struct PaintBucketInspector: View {
     private func fillActiveBackground() {
         guard let i = activeIndex else { return }
         document.layers[i].setBackgroundFill(fillColor.hexString())
+    }
+}
+
+// MARK: - Canvas inspector (Tool: Canvas — the open project's central hub)
+
+/// The Canvas tool is the CENTRAL HUB for the open project. SLICE A (2026-06-22):
+/// Project / File — rename, disk location, type, last saved, size, save state. Later
+/// slices add B Dimensions/Resolution, C Print setup, D Export (see DeveloperNotes).
+struct CanvasInspector: View {
+    @ObservedObject var document: IconDocument
+    var fileURL: URL?
+
+    @State private var draftName = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // --- Project name (rename) ---
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Project name").font(.caption).foregroundStyle(.secondary)
+                TextField("Project name", text: $draftName)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { commitName() }
+                Text("Renames the project inside the file. (Renaming the file on disk is a later step.)")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+
+            Divider()
+
+            // --- File attributes ---
+            VStack(alignment: .leading, spacing: 8) {
+                Text("File").font(.subheadline).bold()
+                attrRow("Location", locationText)
+                #if os(macOS)
+                if let url = fileURL {
+                    Button { NSWorkspace.shared.activateFileViewerSelecting([url]) } label: {
+                        Label("Reveal in Finder", systemImage: "folder")
+                    }
+                    .buttonStyle(.bordered).controlSize(.small)
+                }
+                #endif
+                attrRow("Type", typeText)
+                attrRow("Last saved", savedText)
+                attrRow("Size", sizeText)
+                attrRow("State", stateText)
+            }
+            Spacer()
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear { draftName = document.name }
+        .onChange(of: document.name) { draftName = document.name }
+    }
+
+    @ViewBuilder private func attrRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+                .frame(width: 76, alignment: .leading)
+            Text(value).font(.caption).textSelection(.enabled)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func commitName() {
+        let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { draftName = document.name; return }
+        document.name = trimmed
+    }
+
+    // MARK: file attribute readouts (from the on-disk file)
+    private var locationText: String {
+        guard let url = fileURL else { return "Not saved yet (untitled)" }
+        return url.deletingLastPathComponent().path(percentEncoded: false)
+    }
+    private var typeText: String {
+        guard let ext = fileURL?.pathExtension, !ext.isEmpty else { return "—" }
+        return ".\(ext)"
+    }
+    private var savedText: String {
+        guard let url = fileURL,
+              let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        else { return "—" }
+        let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .short
+        return f.string(from: date)
+    }
+    private var sizeText: String {
+        guard let url = fileURL else { return "—" }
+        let bytes = packageSize(url)
+        guard bytes > 0 else { return "—" }
+        return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    }
+    private var stateText: String {
+        fileURL == nil ? "Untitled — not yet saved" : "Saved"
+    }
+
+    /// Sum bytes in the `.picprod` package (a directory); falls back to a single file.
+    private func packageSize(_ url: URL) -> Int {
+        let fm = FileManager.default
+        var total = 0
+        if let e = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) {
+            for case let f as URL in e {
+                total += (try? f.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            }
+        }
+        if total == 0 { total = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0 }
+        return total
     }
 }
 
@@ -1011,6 +1125,8 @@ enum BottomPanel: String, CaseIterable, Identifiable {
         @Binding var activeLayerID: IconLayer.ID?
         @Binding var selection: BottomPanel
         @Binding var fillColor: Color
+        /// The open document's file on disk — forwarded to the Canvas hub inspector.
+        var fileURL: URL? = nil
         /// iPhone passes true: hide the segmented pills and rely on swipe + page dots,
         /// reclaiming vertical room for the cramped inspector. iPad/Mac keep the pills
         /// (default false), so their layout is unchanged.
@@ -1053,7 +1169,8 @@ enum BottomPanel: String, CaseIterable, Identifiable {
             ToolInspector(document: document,
                           activeTool: activeTool,
                           activeLayerID: activeLayerID,
-                          fillColor: $fillColor)
+                          fillColor: $fillColor,
+                          fileURL: fileURL)
         }
 
         private var layersPage: some View {

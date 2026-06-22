@@ -18,6 +18,7 @@ import SwiftUI
 /// A tool in the toolbox. Order here = left-to-right order in the strip (which
 /// scrolls horizontally when there are more tools than fit — see DeveloperNotes).
 enum Tool: String, CaseIterable, Identifiable {
+    case canvas        // central hub for the open project (name/dimensions/print/export)
     case move
     case fill          // paint bucket
     case pen           // pixel painter
@@ -36,6 +37,7 @@ enum Tool: String, CaseIterable, Identifiable {
     /// Label shown in the tool's (placeholder) inspector.
     var title: String {
         switch self {
+        case .canvas:     "Canvas"
         case .move:       "Move / Transform"
         case .fill:       "Paint Bucket"
         case .pen:        "Pen (Pixels)"
@@ -54,6 +56,7 @@ enum Tool: String, CaseIterable, Identifiable {
     /// SF Symbol used for the tool's button in the strip.
     var systemImage: String {
         switch self {
+        case .canvas:     "photo.artframe"
         case .move:       "arrow.up.and.down.and.arrow.left.and.right"
         case .fill:       "drop.fill"
         case .pen:        "pencil.tip"
@@ -145,6 +148,7 @@ struct ToolGlyph: View {
     /// in place for any future tool added without art.
     private var assetName: String? {
         switch tool {
+        case .canvas:     "CanvasTool"
         case .move:       "MoveTool"
         case .fill:       "BucketTool"
         case .pen:        "PixelArtPenTool"

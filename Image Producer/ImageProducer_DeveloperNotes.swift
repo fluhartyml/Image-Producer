@@ -354,6 +354,45 @@
 //            Studio TM), Markwright/Tilesmith (maker-coinage), Pictorial Studio
 //            (off-voice "Studio"), Glyph (reads as font), Tessera, plus Pixel Press /
 //            Imprint / Seal Press / Vellum / Calque / Signum.
+//      • CANVAS TOOL — CENTRAL HUB FOR THE OPEN PROJECT (DESIGN LOCKED 2026-06-22).
+//        This is the consolidated, mapped design that REALIZES the rough "print +
+//        canvas sizes + DPI" sketch above. The Canvas tool is a SELECTABLE tool whose
+//        inspector is the one place for everything PROJECT-LEVEL (per-element editing
+//        stays in the other tools). Icon art: Michael's easel+blank-canvas renders
+//        (CanvasTool.imageset, light=gray bg / dark=black bg). Built in SLICES.
+//        FOUR SECTIONS:
+//          A · PROJECT / FILE — rename the project; disk location (+reveal); file
+//              type (.picprod); last saved; file size; save state.
+//          B · DIMENSIONS & RESOLUTION — units (px/in/mm/pt), PPI, physical size,
+//              orientation, aspect lock. *** PRIMARY BEHAVIOR LOCKED (Michael): ***
+//              changing print size only changes PPI / physical size in the FINAL
+//              PRODUCT — the master PIXELS ARE PRESERVED, lossless output metadata
+//              (pixels ÷ PPI = physical size). RESAMPLE (actually changing pixel
+//              count) = a SEPARATE EXPLICIT optional action, never the default.
+//              SCALE-TO-FIT (uniform, preserve proportions, NO stretch; margin on an
+//              aspect change) applies ONLY IF the pixel dimensions/aspect actually
+//              change — a plain PPI/size change reflows nothing. Works cleanly because
+//              layer transforms are already NORMALIZED (center 0..1, scale = fraction
+//              of canvas edge).
+//          C · PRINT SETUP (feeds the Print PDF) — trim size (= doc size); bleed
+//              (default 0.125in / 3mm, uniform or per-edge); safe margin; crop/trim +
+//              registration marks; COLOR SPACE = RGB / CMYK picker + ICC profile,
+//              SWITCHABLE ANYTIME (RGB working space; CMYK = export-time ICC
+//              conversion; on-screen editing stays RGB; soft-proof + true CMYK editing
+//              = later add-ons, flagged).
+//          D · EXPORT — three distinct shapes: PRINT -> a single PDF (bleed + crop/
+//              registration marks, color via C); WEB -> a PACKAGED FOLDER of assets
+//              (sRGB, screen PPI, PNG/JPEG/WebP, optional @1x/@2x/@3x — Michael: web
+//              is a FOLDER, NOT a pdf); ICON -> the existing PNG folder export.
+//        DECISIONS: the ZOOM/expand control STAYS on the canvas overlay (NOT moved
+//          into the hub — useful in every tool). The SLICER = its OWN separate tool
+//          later (interactive on-canvas region-drawing; reuses the web export per
+//          slice), NOT part of the Canvas hub.
+//        HONEST BUILD REALITY: today the project model = fixed 1024 RGB square, PNG
+//          layers, no width/height pair, units, PPI, color space, bleed, marks, or
+//          PDF. So the hub is a genuine multi-part build (model + PDF/print render +
+//          web-folder exporter). BUILD ORDER: A (quick win, gets the hub on screen)
+//          -> B (core model change) -> C (+Print PDF) -> D (web folder).
 //      • STATUS / HINT BAR (Michael 2026-06-11): a text bar BELOW THE CANVAS (both
 //        orientations) = the app's single VOICE to the user. PRIMARY PURPOSE: it
 //        solves the NO-HOVER problem on touch — desktop rollover/hover hints have
