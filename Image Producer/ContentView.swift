@@ -503,7 +503,7 @@ struct PaintBucketInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ColorPicker("Fill color", selection: $fillColor, supportsOpacity: false)
+            PaletteSwatchRow(document: document, color: $fillColor, label: "Fill color (from palette)")
 
             if activeIsBackground {
                 Button {
@@ -941,6 +941,33 @@ struct CanvasInspector: View {
     }
 }
 
+/// A palette swatch grid that sets a tool's color FROM the palette (the gatekeeper) — no
+/// free color picking in the tools. Tap a swatch → `color` becomes that palette color.
+/// Custom colors are added in the Color Palette tool.
+struct PaletteSwatchRow: View {
+    @ObservedObject var document: IconDocument
+    @Binding var color: Color
+    var label = "Color (from palette)"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.system(size: 18))
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
+                ForEach(document.palette.indices, id: \.self) { i in
+                    let c = Color(hex: document.palette[i]) ?? .black
+                    let isSel = c.hexString() == color.hexString()
+                    RoundedRectangle(cornerRadius: 6).fill(c).frame(height: 28)
+                        .overlay(RoundedRectangle(cornerRadius: 6)
+                            .stroke(isSel ? Color.accentColor : Color.gray.opacity(0.4), lineWidth: isSel ? 3 : 1))
+                        .onTapGesture { color = c }
+                }
+            }
+            Text("Colors come from the Color Palette tool.")
+                .font(.system(size: 18)).foregroundStyle(.secondary)
+        }
+    }
+}
+
 // MARK: - Color Palette inspector (Tool: Color Palette — the gatekeeper)
 
 /// The palette is the project's ENTIRE color set and the ONLY place colors are created or
@@ -1115,7 +1142,7 @@ struct SymbolPickerInspector: View {
     var body: some View {
         if activeIsContent {
             VStack(alignment: .leading, spacing: 12) {
-                ColorPicker("Tint", selection: $tint, supportsOpacity: false)
+                PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
                 TextField("Search symbols", text: $search)
                     .textFieldStyle(.roundedBorder)
                 ScrollView {
@@ -1218,7 +1245,7 @@ struct FontPickerInspector: View {
                 }
                 .frame(maxHeight: 150)
 
-                ColorPicker("Tint", selection: $tint, supportsOpacity: false)
+                PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
 
                 Text("Glyph").font(.system(size: 18)).foregroundStyle(.secondary)
                 ScrollView {
@@ -2112,7 +2139,14 @@ struct CanvasView: View {
         renderer.scale = 1
         if let cg = renderer.cgImage,
            let color = averagedColor(in: cg, atNormalized: n, radiusPixels: pen.eyedropperRadius) {
+            // Gatekeeper: a sampled color must live in the palette — write it into the active
+            // slot, which becomes the active color everywhere.
             fillColor = color
+            pen.color = color
+            if document.palette.indices.contains(pen.selectedSlot) {
+                document.palette[pen.selectedSlot] = color.hexString() ?? document.palette[pen.selectedSlot]
+                IconDocument.lastUsedPalette = document.palette
+            }
         }
     }
 
