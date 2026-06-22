@@ -427,7 +427,9 @@ struct ToolInspector: View {
             .padding(.top, 12)
             .padding(.bottom, 8)
             Divider()
-            content
+            // Every tool inspector scrolls if its content is taller than the panel
+            // (Michael 2026-06-22). Individual inspectors must NOT add their own ScrollView.
+            ScrollView { content }
         }
     }
 
@@ -596,7 +598,6 @@ struct CanvasInspector: View {
     @State private var folderFilename = "Export"
 
     var body: some View {
-        ScrollView {
         VStack(alignment: .leading, spacing: 16) {
             // --- Project name ---
             VStack(alignment: .leading, spacing: 6) {
@@ -775,7 +776,6 @@ struct CanvasInspector: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
         .fileExporter(isPresented: $showDataExporter,
                       document: CanvasDataDocument(exportData),
                       contentType: exportType,

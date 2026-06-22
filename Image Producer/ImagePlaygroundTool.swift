@@ -96,7 +96,6 @@ struct ImagePlaygroundInspector: View {
     }
 
     @ViewBuilder private var supported: some View {
-        ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Describe what Image Playground should make:")
                     .font(.system(size: 18))
@@ -140,7 +139,6 @@ struct ImagePlaygroundInspector: View {
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
     }
 
     // MARK: - Actions
