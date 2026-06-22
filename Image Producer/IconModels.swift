@@ -58,6 +58,20 @@ final class IconDocument: ObservableObject {
     /// resamples. Saved with the document (absent in older files → defaults to 72).
     @Published var ppi: Double
 
+    // MARK: Print setup (Canvas hub section C) — feeds the Print PDF. All persisted.
+    /// Bleed in inches — artwork extends this far past the trim so trimming leaves no white
+    /// sliver. Print standard is 0.125 in (3 mm).
+    @Published var bleedInches: Double = 0.125
+    /// Safe-margin inset in inches — keep important content this far inside the trim.
+    @Published var safeMarginInches: Double = 0
+    /// Draw crop / trim marks at the trim corners in the Print PDF.
+    @Published var cropMarks: Bool = true
+    /// Draw registration marks (for aligning color plates) in the Print PDF.
+    @Published var registrationMarks: Bool = false
+    /// Output color space for the Print PDF: false = RGB (default), true = CMYK. Switchable
+    /// anytime — editing stays RGB on screen; CMYK is an export-time conversion.
+    @Published var colorSpaceCMYK: Bool = false
+
     /// Crayon-box defaults — used for a new doc, or one saved before palettes existed.
     static let defaultPalette = ["#000000", "#FFFFFF", "#FF3B30", "#FF9500",
                                  "#FFCC00", "#34C759", "#007AFF", "#AF52DE"]
@@ -408,6 +422,12 @@ struct IconProjectManifest: Codable {
     var cropRect: CGRect?
     /// Output resolution (PPI); absent in files saved before it existed → defaults to 72.
     var ppi: Double?
+    // Print setup (section C); all optional for back-compat.
+    var bleedInches: Double? = nil
+    var safeMarginInches: Double? = nil
+    var cropMarks: Bool? = nil
+    var registrationMarks: Bool? = nil
+    var colorSpaceCMYK: Bool? = nil
 }
 
 extension IconDocument: ReferenceFileDocument {
@@ -424,12 +444,21 @@ extension IconDocument: ReferenceFileDocument {
         self.init(name: manifest.name, canvasWidth: w, canvasHeight: h, layers: manifest.layers,
                   palette: manifest.palette ?? IconDocument.lastUsedPalette, cropRect: manifest.cropRect,
                   ppi: manifest.ppi ?? 72)
+        // Print-setup fields (section C) — apply saved values over the defaults.
+        if let v = manifest.bleedInches { bleedInches = v }
+        if let v = manifest.safeMarginInches { safeMarginInches = v }
+        if let v = manifest.cropMarks { cropMarks = v }
+        if let v = manifest.registrationMarks { registrationMarks = v }
+        if let v = manifest.colorSpaceCMYK { colorSpaceCMYK = v }
     }
 
     /// Capture current state for writing (called off the main actor by SwiftUI).
     func snapshot(contentType: UTType) throws -> IconProjectManifest {
         IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi)
+                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
+                            bleedInches: bleedInches, safeMarginInches: safeMarginInches,
+                            cropMarks: cropMarks, registrationMarks: registrationMarks,
+                            colorSpaceCMYK: colorSpaceCMYK)
     }
 
     /// Write the package: a directory wrapper holding `manifest.json`.
@@ -453,7 +482,10 @@ extension IconDocument {
     /// as the official `fileWrapper(snapshot:)` writer, so the file stays interchangeable.
     func writePackage(to url: URL) throws {
         let manifest = IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-                                           layers: layers, palette: palette, cropRect: cropRect, ppi: ppi)
+                                           layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
+                                           bleedInches: bleedInches, safeMarginInches: safeMarginInches,
+                                           cropMarks: cropMarks, registrationMarks: registrationMarks,
+                                           colorSpaceCMYK: colorSpaceCMYK)
         let data = try JSONEncoder().encode(manifest)
         let mf = FileWrapper(regularFileWithContents: data)
         mf.preferredFilename = "manifest.json"

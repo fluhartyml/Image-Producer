@@ -582,6 +582,13 @@ struct CanvasInspector: View {
     var fileURL: URL?
 
     @State private var draftName = ""
+    // Export (sections C/D)
+    @State private var exportData = Data()
+    @State private var exportType: UTType = .pdf
+    @State private var exportFilename = "Export"
+    @State private var showDataExporter = false
+    @State private var webBundle = IconExportBundle(files: [:])
+    @State private var showWebExporter = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -685,10 +692,85 @@ struct CanvasInspector: View {
                 attrRow("Size", sizeText)
                 attrRow("State", stateText)
             }
+
+            Divider()
+
+            // --- C · Print setup ---
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Print setup").font(.subheadline).bold()
+                HStack(spacing: 8) {
+                    Text("Bleed").font(.caption).foregroundStyle(.secondary).frame(width: 76, alignment: .leading)
+                    TextField("in", value: $document.bleedInches, format: .number.precision(.fractionLength(0...3)))
+                        .textFieldStyle(.roundedBorder).frame(width: 64)
+                    Text("in").font(.caption).foregroundStyle(.secondary)
+                    Menu {
+                        Button("None") { document.bleedInches = 0 }
+                        Button("0.125 in (1/8\")") { document.bleedInches = 0.125 }
+                        Button("3 mm") { document.bleedInches = 3.0 / 25.4 }
+                    } label: { Image(systemName: "chevron.down.circle").font(.caption) }
+                    .fixedSize()
+                }
+                HStack(spacing: 8) {
+                    Text("Safe margin").font(.caption).foregroundStyle(.secondary).frame(width: 76, alignment: .leading)
+                    TextField("in", value: $document.safeMarginInches, format: .number.precision(.fractionLength(0...3)))
+                        .textFieldStyle(.roundedBorder).frame(width: 64)
+                    Text("in").font(.caption).foregroundStyle(.secondary)
+                }
+                Toggle("Crop / trim marks", isOn: $document.cropMarks).font(.caption)
+                Toggle("Registration marks", isOn: $document.registrationMarks).font(.caption)
+                HStack(spacing: 8) {
+                    Text("Color").font(.caption).foregroundStyle(.secondary).frame(width: 76, alignment: .leading)
+                    Picker("Color", selection: $document.colorSpaceCMYK) {
+                        Text("RGB").tag(false); Text("CMYK").tag(true)
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                }
+                if document.colorSpaceCMYK {
+                    Text("CMYK is saved on the project; the PDF currently exports RGB (a true ICC RGB→CMYK conversion is a later step).")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+
+            Divider()
+
+            // --- D · Export ---
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Export").font(.subheadline).bold()
+                Button {
+                    if let data = makePrintPDF(document) {
+                        exportData = data; exportType = .pdf
+                        exportFilename = displayName; showDataExporter = true
+                    }
+                } label: { Label("Print PDF (bleed + marks)", systemImage: "doc.richtext").frame(maxWidth: .infinity) }
+                .buttonStyle(.borderedProminent)
+                Button {
+                    webBundle = IconExportBundle(files: makeWebFolder(document, baseName: displayName))
+                    showWebExporter = true
+                } label: { Label("Web folder (PNG @1x/2x/3x)", systemImage: "globe").frame(maxWidth: .infinity) }
+                .buttonStyle(.bordered)
+                Button {
+                    if let data = makeCanvasPNG(document) {
+                        exportData = data; exportType = .png
+                        exportFilename = displayName; showDataExporter = true
+                    }
+                } label: { Label("PNG (full canvas)", systemImage: "photo").frame(maxWidth: .infinity) }
+                .buttonStyle(.bordered)
+                Text("Print PDF = single file at trim + bleed. Web folder = a packaged folder of PNGs. (Icon PNG export lives on the toolbar.)")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+
             Spacer()
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .fileExporter(isPresented: $showDataExporter,
+                      document: CanvasDataDocument(exportData),
+                      contentType: exportType,
+                      defaultFilename: exportFilename) { _ in }
+        .fileExporter(isPresented: $showWebExporter,
+                      document: webBundle,
+                      contentType: .folder,
+                      defaultFilename: "\(displayName) Web") { _ in }
         .onAppear { draftName = document.name }
         .onChange(of: document.name) { draftName = document.name }
     }
