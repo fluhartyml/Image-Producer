@@ -122,6 +122,18 @@ import UniformTypeIdentifiers
     return pngData(from: cg)
 }
 
+/// The app-icon PNG set as a packaged folder (icon_16.png … icon_1024.png) — the same
+/// output as the toolbar Export, surfaced in the Canvas hub so export is one-stop.
+@MainActor func makeIconFolder(_ document: IconDocument) -> [String: Data] {
+    var files: [String: Data] = [:]
+    for px in ContentView.exportPixelSizes {
+        if let data = ContentView.renderIconPNG(document: document, px: px) {
+            files["icon_\(px).png"] = data
+        }
+    }
+    return files
+}
+
 /// A plain data file (PDF or PNG) for SwiftUI's `.fileExporter`.
 struct CanvasDataDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.pdf, .png] }

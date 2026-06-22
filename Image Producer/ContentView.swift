@@ -593,6 +593,7 @@ struct CanvasInspector: View {
     @State private var showDataExporter = false
     @State private var webBundle = IconExportBundle(files: [:])
     @State private var showWebExporter = false
+    @State private var folderFilename = "Export"
 
     var body: some View {
         ScrollView {
@@ -752,8 +753,13 @@ struct CanvasInspector: View {
                 .buttonStyle(.borderedProminent)
                 Button {
                     webBundle = IconExportBundle(files: makeWebFolder(document, baseName: displayName))
-                    showWebExporter = true
+                    folderFilename = "\(displayName) Web"; showWebExporter = true
                 } label: { Label("Web folder (PNG @1x/2x/3x)", systemImage: "globe").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                .buttonStyle(.bordered)
+                Button {
+                    webBundle = IconExportBundle(files: makeIconFolder(document))
+                    folderFilename = "\(displayName) Icons"; showWebExporter = true
+                } label: { Label("Icon PNGs (folder)", systemImage: "square.and.arrow.up.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
                 Button {
                     if let data = makeCanvasPNG(document) {
@@ -762,7 +768,7 @@ struct CanvasInspector: View {
                     }
                 } label: { Label("PNG (full canvas)", systemImage: "photo").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
-                Text("Print PDF = single file at trim + bleed. Web folder = a packaged folder of PNGs. (Icon PNG export lives on the toolbar.)")
+                Text("Print PDF = single file at trim + bleed. Web / Icon = a packaged folder of PNGs. PNG = one full-canvas image.")
                     .font(.system(size: 18)).foregroundStyle(.primary)
             }
 
@@ -777,7 +783,7 @@ struct CanvasInspector: View {
         .fileExporter(isPresented: $showWebExporter,
                       document: webBundle,
                       contentType: .folder,
-                      defaultFilename: "\(displayName) Web") { _ in }
+                      defaultFilename: folderFilename) { _ in }
         .onAppear { draftName = displayName }
         .onChange(of: document.name) { draftName = displayName }
         .onChange(of: fileURL) { draftName = displayName; renameError = false }
