@@ -299,11 +299,11 @@ struct EyedropperInspector: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Tap the canvas to sample a color. The circle averages the pixels under it — grow it for a steadier read of a soft background.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.system(size: 18)).foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sample size  \(pen.eyedropperRadius == 0 ? "point" : "\(pen.eyedropperRadius * 2 + 1) px")")
-                    .font(.subheadline)
+                    .font(.system(size: 18))
                 Slider(value: Binding(get: { Double(pen.eyedropperRadius) },
                                       set: { pen.eyedropperRadius = Int($0.rounded()) }),
                        in: 0...24, step: 1)
@@ -314,7 +314,7 @@ struct EyedropperInspector: View {
                     .fill(fillColor)
                     .frame(width: 36, height: 36)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.secondary.opacity(0.4)))
-                Text("Picked color").font(.caption).foregroundStyle(.secondary)
+                Text("Picked color").font(.system(size: 18)).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
@@ -377,9 +377,9 @@ struct EraserInspector: View {
 
     /// Manual brush eraser — drag on the canvas; the first stroke auto-copies the layer.
     @ViewBuilder private var brushControls: some View {
-        Text("Manual eraser — wipe pixels to transparent").font(.subheadline).bold()
+        Text("Manual eraser — wipe pixels to transparent").font(.system(size: 18)).bold()
         Text("Drag on the canvas to erase. The first stroke automatically copies the layer and erases the copy — your original is kept (hidden), since there's no undo yet.")
-            .font(.caption).foregroundStyle(.secondary)
+            .font(.system(size: 18)).foregroundStyle(.secondary)
 
         Picker("Shape", selection: $pen.eraserSquare) {
             Text("Circle").tag(false)
@@ -388,32 +388,32 @@ struct EraserInspector: View {
         .pickerStyle(.segmented)
 
         VStack(alignment: .leading, spacing: 4) {
-            Text("Brush size  \(Int(pen.eraserBrushFraction * 1024)) px").font(.subheadline)
+            Text("Brush size  \(Int(pen.eraserBrushFraction * 1024)) px").font(.system(size: 18))
             Slider(value: $pen.eraserBrushFraction, in: 0.004...0.4)
         }
     }
 
     /// Magic Eraser — color mask, with the live magenta highlight on the canvas.
     @ViewBuilder private var magicControls: some View {
-        Text("Magic Eraser — color mask").font(.subheadline).bold()
+        Text("Magic Eraser — color mask").font(.system(size: 18)).bold()
         Text("Pick the background color with the Eyedropper first. Matching pixels light up magenta on the canvas — raise Tolerance until the whole background lights up, then erase.")
-            .font(.caption).foregroundStyle(.secondary)
+            .font(.system(size: 18)).foregroundStyle(.secondary)
 
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: 6)
                 .fill(fillColor)
                 .frame(width: 28, height: 28)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.secondary.opacity(0.4)))
-            Text("Color to erase").font(.caption).foregroundStyle(.secondary)
+            Text("Color to erase").font(.system(size: 18)).foregroundStyle(.secondary)
         }
 
         VStack(alignment: .leading, spacing: 4) {
-            Text("Tolerance  \(Int(pen.eraseTolerance))").font(.subheadline)
+            Text("Tolerance  \(Int(pen.eraseTolerance))").font(.system(size: 18))
             Slider(value: $pen.eraseTolerance, in: 0...160, step: 1)
         }
 
         Toggle("Contiguous (keep interior matches)", isOn: $pen.eraseContiguous)
-            .font(.caption)
+            .font(.system(size: 18))
 
         Button(role: .destructive) { apply() } label: {
             Label("Erase Color → Transparent", systemImage: "wand.and.stars.inverse")
@@ -422,7 +422,7 @@ struct EraserInspector: View {
         .buttonStyle(.borderedProminent)
 
         if failed {
-            Text("Couldn't read this layer's image.").font(.caption).foregroundStyle(.red)
+            Text("Couldn't read this layer's image.").font(.system(size: 18)).foregroundStyle(.red)
         }
     }
 

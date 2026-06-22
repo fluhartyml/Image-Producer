@@ -409,15 +409,15 @@ struct ToolInspector: View {
             // need hover to know which tool you're on (Michael 2026-06-11).
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: activeTool.systemImage)
-                    .font(.title3)
+                    .font(.system(size: 20, weight: .semibold))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(activeTool.title).font(.headline)
+                    Text(activeTool.title).font(.system(size: 20, weight: .semibold))
                     // "Duplicate with a purpose" (Michael 2026-06-11): the active
                     // layer is also highlighted in the list, but spelling it out
                     // here CONFIRMS which layer you're about to act on.
                     if let name = activeLayerName {
                         Text("Layer: \(name)")
-                            .font(.caption)
+                            .font(.system(size: 18))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -509,20 +509,20 @@ struct PaintBucketInspector: View {
                 }
                 .buttonStyle(.borderedProminent)
                 Text("Or tap the canvas to pour.")
-                    .font(.caption)
+                    .font(.system(size: 18))
                     .foregroundStyle(.secondary)
             } else if activeHasImage {
-                Text("Flood fill — pour color up to the lines").font(.subheadline).bold()
+                Text("Flood fill — pour color up to the lines").font(.system(size: 18)).bold()
                 Text("Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
-                    .font(.caption)
+                    .font(.system(size: 18))
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Tolerance  \(Int(pen.bucketTolerance))").font(.subheadline)
+                    Text("Tolerance  \(Int(pen.bucketTolerance))").font(.system(size: 18))
                     Slider(value: $pen.bucketTolerance, in: 0...160, step: 1)
                 }
             } else {
                 Text("Select a background layer (Light or Dark) to fill it, or an image layer to flood-fill areas up to the lines.")
-                    .font(.caption)
+                    .font(.system(size: 18))
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -1068,7 +1068,7 @@ struct FontPickerInspector: View {
                     styleToggle("character.textbox", "Outline", $outline)
                 }
 
-                Text("Font").font(.caption).foregroundStyle(.secondary)
+                Text("Font").font(.system(size: 18)).foregroundStyle(.secondary)
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(Self.families, id: \.self) { fam in
@@ -1088,7 +1088,7 @@ struct FontPickerInspector: View {
 
                 ColorPicker("Tint", selection: $tint, supportsOpacity: false)
 
-                Text("Glyph").font(.caption).foregroundStyle(.secondary)
+                Text("Glyph").font(.system(size: 18)).foregroundStyle(.secondary)
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 38), spacing: 6)], spacing: 6) {
                         ForEach(glyphs, id: \.self) { g in
@@ -1177,9 +1177,9 @@ struct ImageImportInspector: View {
                 }
                 .buttonStyle(.borderedProminent)
                 Text("Drops an image onto this layer at native resolution, scaled to fit the icon. Use Move to resize/position it.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
                 if failed {
-                    Text("Couldn't read that image.").font(.caption).foregroundStyle(.red)
+                    Text("Couldn't read that image.").font(.system(size: 18)).foregroundStyle(.red)
                 }
                 Spacer()
             }
@@ -1279,7 +1279,7 @@ struct PenInspector: View {
             // simply doesn't scroll — the content fits — so this is safe for both.
             ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Colors").font(.subheadline)
+                Text("Colors").font(.system(size: 18))
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
                     ForEach(document.palette.indices, id: \.self) { i in
                         RoundedRectangle(cornerRadius: 6)
@@ -1300,7 +1300,7 @@ struct PenInspector: View {
                         .padding().frame(minWidth: 220)
                 }
                 Text("Tap to use · right-click (long-press) to change. Saved with the file; new docs inherit it.")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
 
                 VStack(spacing: 6) {
                     Button {
@@ -1319,17 +1319,17 @@ struct PenInspector: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
-                .font(.caption2)
+                .font(.system(size: 18))
                 .buttonStyle(.bordered)
                 Text("Save these 8 colors as a reusable brand palette, or load one into this icon.")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
                 if paletteLoadFailed {
-                    Text("Couldn't read that palette file.").font(.caption2).foregroundStyle(.red)
+                    Text("Couldn't read that palette file.").font(.system(size: 18)).foregroundStyle(.red)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("This layer's resolution — \(pen.resolution)\(pen.resolution == 2 ? " (control)" : "") px")
-                        .font(.subheadline)
+                        .font(.system(size: 18))
                     Slider(value: Binding(
                         get: { Double(resolutionRungs.firstIndex(of: pen.resolution) ?? 4) },
                         set: { pen.resolution = resolutionRungs[min(max(Int($0.rounded()), 0), resolutionRungs.count - 1)] }
@@ -1344,20 +1344,20 @@ struct PenInspector: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, -2)
                     Text("Per-layer resolution; the grid matches. Lower = blockier.")
-                        .font(.caption2).foregroundStyle(.secondary)
+                        .font(.system(size: 18)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Toggle("Show grid", isOn: $pen.showGrid)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Brush  \(pen.brush) cell\(pen.brush == 1 ? "" : "s")").font(.subheadline)
+                    Text("Brush  \(pen.brush) cell\(pen.brush == 1 ? "" : "s")").font(.system(size: 18))
                     Slider(value: Binding(get: { Double(pen.brush) },
                                           set: { pen.brush = Int($0) }), in: 1...8, step: 1)
                 }
 
                 Text("Drag on the canvas to drop pixels into the grid cells.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -1491,7 +1491,7 @@ struct ToolInspectorPlaceholder: View {
                 .font(.system(size: 34))
                 .foregroundStyle(.secondary)
             Text("Inspector — coming soon")
-                .font(.caption)
+                .font(.system(size: 18))
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1510,8 +1510,8 @@ struct PanelPlaceholder: View {
             Image(systemName: systemImage)
                 .font(.system(size: 34))
                 .foregroundStyle(.secondary)
-            Text(title).font(.headline)
-            Text(subtitle).font(.caption).foregroundStyle(.tertiary)
+            Text(title).font(.system(size: 20, weight: .semibold))
+            Text(subtitle).font(.system(size: 18)).foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
@@ -1561,8 +1561,8 @@ struct MoveTransformInspector: View {
     // MARK: Crop (document-level, non-destructive, centered — Photos-style presets)
     @ViewBuilder private var cropSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Crop").font(.subheadline).bold()
-            Text("Aspect ratio").font(.caption).foregroundStyle(.secondary)
+            Text("Crop").font(.system(size: 18)).bold()
+            Text("Aspect ratio").font(.system(size: 18)).foregroundStyle(.secondary)
             Picker("Aspect", selection: $cropAspect) {
                 Text("Original").tag(CropAspect.original)
                 Text("Freeform").tag(CropAspect.freeform)
@@ -1587,7 +1587,7 @@ struct MoveTransformInspector: View {
                 cropSizeControls
 
                 Text("Live preview is non-destructive (Export/Share trim to it). Apply Crop makes a new cropped layer and hides the original (kept).")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
             }
         }
         .onChange(of: cropAspect) { applyCrop() }
@@ -1603,20 +1603,20 @@ struct MoveTransformInspector: View {
     @ViewBuilder private var cropSizeControls: some View {
         switch cropAspect {
         case .freeform:
-            Text("Width  \(Int(freeWidth * 100))%").font(.caption)
+            Text("Width  \(Int(freeWidth * 100))%").font(.system(size: 18))
             Slider(value: $freeWidth, in: 0.1...1.0)
-            Text("Height  \(Int(freeHeight * 100))%").font(.caption)
+            Text("Height  \(Int(freeHeight * 100))%").font(.system(size: 18))
             Slider(value: $freeHeight, in: 0.1...1.0)
         case .custom:
             HStack {
                 Stepper("W \(customW)", value: $customW, in: 1...32)
                 Stepper("H \(customH)", value: $customH, in: 1...32)
             }
-            .font(.caption)
-            Text("Crop size  \(Int(cropSize * 100))%").font(.caption)
+            .font(.system(size: 18))
+            Text("Crop size  \(Int(cropSize * 100))%").font(.system(size: 18))
             Slider(value: $cropSize, in: 0.1...1.0)
         default:
-            Text("Crop size  \(Int(cropSize * 100))%").font(.caption)
+            Text("Crop size  \(Int(cropSize * 100))%").font(.system(size: 18))
             Slider(value: $cropSize, in: 0.1...1.0)
         }
     }
@@ -1740,24 +1740,24 @@ struct MoveTransformInspector: View {
                 if case .content = document.layers[idx].role,
                    !document.layers[idx].elements.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Snap to Canvas").font(.subheadline)
+                        Text("Snap to Canvas").font(.system(size: 18))
                         HStack {
                             Button("Fit")  { applyFitFill(.fit,  idx) }
                             Button("Fill") { applyFitFill(.fill, idx) }
                         }
                         .buttonStyle(.bordered)
                         Text("Fit insets the object inside the canvas (letterbox if it isn't square). Fill covers the canvas and clips the overflow.")
-                            .font(.caption2).foregroundStyle(.secondary)
+                            .font(.system(size: 18)).foregroundStyle(.secondary)
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Scale  \(Int(document.layers[idx].transform.scale * 100))%")
-                        .font(.subheadline)
+                        .font(.system(size: 18))
                     Slider(value: transformBinding(\.scale, idx), in: 0.1...4.0)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Rotation  \(Int(document.layers[idx].transform.rotationDegrees))°")
-                        .font(.subheadline)
+                        .font(.system(size: 18))
                     Slider(value: transformBinding(\.rotationDegrees, idx), in: -180...180)
                 }
                 HStack {

@@ -99,7 +99,7 @@ struct ImagePlaygroundInspector: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Describe what Image Playground should make:")
-                    .font(.subheadline)
+                    .font(.system(size: 18))
 
                 // Plain text box on a LIGHTER fill so it stands out against the dark
                 // inspector (Michael 2026-06-21). Autocomplete off.
@@ -130,11 +130,11 @@ struct ImagePlaygroundInspector: View {
                 Text(activeFilterable == nil
                      ? "New Layer drops the result on a fresh layer. Restyle needs a content layer with art selected."
                      : "New Layer = fresh layer · Restyle = redo the selected layer's art with your prompt.")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
 
                 if failed {
                     Text("Couldn't place the generated image.")
-                        .font(.caption).foregroundStyle(.red)
+                        .font(.system(size: 18)).foregroundStyle(.red)
                 }
                 Spacer(minLength: 0)
             }
