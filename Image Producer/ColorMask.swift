@@ -182,6 +182,34 @@ func matchHighlightImage(_ cg: CGImage, target: (r: UInt8, g: UInt8, b: UInt8),
     return cgImage(fromRGBA: out, w: w, h: h)
 }
 
+/// Map a canvas point (in canvas points, 0…side) to a pixel in a layer's image element,
+/// inverting the layer transform (center / rotation / scale) and the `scaledToFit` letterbox.
+/// Returns nil if the point falls outside the displayed image. Used by the manual brush
+/// eraser so a drag clears the right pixels even on a moved/rotated/scaled layer.
+func imagePixel(forCanvasPoint p: CGPoint, side: CGFloat, transform t: LayerTransform,
+                imageW: Int, imageH: Int) -> CGPoint? {
+    guard imageW > 0, imageH > 0 else { return nil }
+    // 1. relative to the layer's center
+    let dx = p.x - t.center.x * side
+    let dy = p.y - t.center.y * side
+    // 2. un-rotate (inverse of the view's rotationEffect)
+    let rad = -t.rotationDegrees * .pi / 180
+    let cosA = cos(rad), sinA = sin(rad)
+    let rx = dx * cosA - dy * sinA
+    let ry = dx * sinA + dy * cosA
+    // 3. the image's displayed rect (scaledToFit inside a side*scale square)
+    let frame = side * t.scale
+    let a = Double(imageW) / Double(imageH)
+    let dispW = a >= 1 ? frame : frame * a
+    let dispH = a >= 1 ? frame / a : frame
+    guard dispW > 0, dispH > 0 else { return nil }
+    // 4. local (origin at center) → normalized 0…1 → image pixels
+    let u = (Double(rx) + dispW / 2) / dispW
+    let v = (Double(ry) + dispH / 2) / dispH
+    guard u >= 0, u <= 1, v >= 0, v <= 1 else { return nil }
+    return CGPoint(x: u * Double(imageW), y: v * Double(imageH))
+}
+
 extension Color {
     /// 0–255 RGB for pixel comparison (best-effort via the platform CGColor).
     var rgb8: (r: UInt8, g: UInt8, b: UInt8) {
@@ -261,35 +289,15 @@ struct EraserInspector: View {
     var body: some View {
         if activeImage != nil {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Magic Eraser — color mask").font(.subheadline).bold()
-                Text("Pick the background color with the Eyedropper first. Matching pixels light up magenta on the canvas — raise Tolerance until the whole background lights up, then erase.")
-                    .font(.caption).foregroundStyle(.secondary)
-
-                HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(fillColor)
-                        .frame(width: 28, height: 28)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.secondary.opacity(0.4)))
-                    Text("Color to erase").font(.caption).foregroundStyle(.secondary)
+                Picker("Eraser mode", selection: $pen.eraserMode) {
+                    Text("Brush").tag(EraserMode.brush)
+                    Text("Magic").tag(EraserMode.magic)
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Tolerance  \(Int(pen.eraseTolerance))").font(.subheadline)
-                    Slider(value: $pen.eraseTolerance, in: 0...160, step: 1)
-                }
+                if pen.eraserMode == .brush { brushControls } else { magicControls }
 
-                Toggle("Contiguous (keep interior matches)", isOn: $pen.eraseContiguous)
-                    .font(.caption)
-
-                Button(role: .destructive) { apply() } label: {
-                    Label("Erase Color → Transparent", systemImage: "wand.and.stars.inverse")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-
-                if failed {
-                    Text("Couldn't read this layer's image.").font(.caption).foregroundStyle(.red)
-                }
                 Spacer(minLength: 0)
             }
             .padding()
@@ -297,7 +305,58 @@ struct EraserInspector: View {
         } else {
             PanelPlaceholder(systemImage: "eraser",
                              title: "Eraser",
-                             subtitle: "Select a layer that holds an image, then the Magic Eraser can knock its background color out to transparent.")
+                             subtitle: "Select a layer that holds an image, then erase it — Brush wipes pixels by hand, Magic knocks a background color out to transparent.")
+        }
+    }
+
+    /// Manual brush eraser — drag on the canvas; the first stroke auto-copies the layer.
+    @ViewBuilder private var brushControls: some View {
+        Text("Manual eraser — wipe pixels to transparent").font(.subheadline).bold()
+        Text("Drag on the canvas to erase. The first stroke automatically copies the layer and erases the copy — your original is kept (hidden), since there's no undo yet.")
+            .font(.caption).foregroundStyle(.secondary)
+
+        Picker("Shape", selection: $pen.eraserSquare) {
+            Text("Circle").tag(false)
+            Text("Square").tag(true)
+        }
+        .pickerStyle(.segmented)
+
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Brush size  \(Int(pen.eraserBrushFraction * 1024)) px").font(.subheadline)
+            Slider(value: $pen.eraserBrushFraction, in: 0.004...0.4)
+        }
+    }
+
+    /// Magic Eraser — color mask, with the live magenta highlight on the canvas.
+    @ViewBuilder private var magicControls: some View {
+        Text("Magic Eraser — color mask").font(.subheadline).bold()
+        Text("Pick the background color with the Eyedropper first. Matching pixels light up magenta on the canvas — raise Tolerance until the whole background lights up, then erase.")
+            .font(.caption).foregroundStyle(.secondary)
+
+        HStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(fillColor)
+                .frame(width: 28, height: 28)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.secondary.opacity(0.4)))
+            Text("Color to erase").font(.caption).foregroundStyle(.secondary)
+        }
+
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Tolerance  \(Int(pen.eraseTolerance))").font(.subheadline)
+            Slider(value: $pen.eraseTolerance, in: 0...160, step: 1)
+        }
+
+        Toggle("Contiguous (keep interior matches)", isOn: $pen.eraseContiguous)
+            .font(.caption)
+
+        Button(role: .destructive) { apply() } label: {
+            Label("Erase Color → Transparent", systemImage: "wand.and.stars.inverse")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+
+        if failed {
+            Text("Couldn't read this layer's image.").font(.caption).foregroundStyle(.red)
         }
     }
 

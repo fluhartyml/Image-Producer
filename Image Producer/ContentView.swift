@@ -1506,12 +1506,50 @@ struct CanvasView: View {
     }
 
     /// Refresh the Magic Eraser's live highlight for the current tolerance/color/layer
-    /// (or clear it when the Eraser isn't active on an image layer).
+    /// (or clear it when the Eraser isn't active on an image layer in MAGIC mode).
     @MainActor private func refreshEraserPreview() {
-        guard activeTool == .eraser, let id = activeLayerID, let png = activeImagePNG else {
+        guard activeTool == .eraser, pen.eraserMode == .magic,
+              let id = activeLayerID, let png = activeImagePNG else {
             pen.clearErasePreview(); return
         }
         pen.refreshErasePreview(png: png, layerKey: "\(id)-\(png.count)", target: fillColor.rgb8)
+    }
+
+    /// Brush eraser (option b): the first stroke on a layer auto-duplicates it (original
+    /// kept + hidden) and erases the COPY — with Cmd-Z off, the copy IS the undo. Maps the
+    /// canvas point through the layer transform to the right image pixel, then clears a dab.
+    @MainActor private func eraseAt(_ n: CGPoint, side: CGFloat) {
+        guard activeTool == .eraser, pen.eraserMode == .brush else { return }
+        // Start a new erase session (a fresh copy) if we aren't already erasing the active layer.
+        if pen.eraserWorkingLayerID != activeLayerID || !pen.hasEraseSession {
+            guard let idx = activeIndex, let png = activeImagePNG else { return }
+            let srcTransform = document.layers[idx].transform
+            guard let newID = document.addResultLayer(png, above: idx, nameSuffix: "erased"),
+                  let nIdx = document.layers.firstIndex(where: { $0.id == newID }) else { return }
+            document.layers[nIdx].transform = srcTransform   // copy sits exactly over the original
+            activeLayerID = newID
+            pen.startEraseSession(workingID: newID, png: png)
+        }
+        guard let wid = pen.eraserWorkingLayerID,
+              let widx = document.layers.firstIndex(where: { $0.id == wid }) else { return }
+        pen.eraserLiveLayerID = wid
+        let t = document.layers[widx].transform
+        let canvasPt = CGPoint(x: n.x * side, y: n.y * side)
+        guard let px = imagePixel(forCanvasPoint: canvasPt, side: side, transform: t,
+                                  imageW: pen.eraserImageW, imageH: pen.eraserImageH) else { return }
+        let a = pen.eraserImageH > 0 ? Double(pen.eraserImageW) / Double(pen.eraserImageH) : 1.0
+        let widthFactor = a >= 1 ? 1.0 : a   // scaledToFit limits on width for portrait images
+        let radius = (pen.eraserBrushFraction * Double(pen.eraserImageW)) / (2 * max(0.01, t.scale) * widthFactor)
+        pen.eraseBrush(atImagePixel: px, radius: radius, square: pen.eraserSquare)
+    }
+
+    /// Commit the live brush stroke back to the working copy's image element.
+    @MainActor private func endEraseStroke() {
+        guard pen.eraserMode == .brush, let wid = pen.eraserWorkingLayerID,
+              let widx = document.layers.firstIndex(where: { $0.id == wid }),
+              let png = pen.endEraseStroke() else { pen.eraserLiveLayerID = nil; return }
+        document.layers[widx].setImage(png)
+        pen.eraserLiveLayerID = nil
     }
 
     var body: some View {
@@ -1593,8 +1631,11 @@ struct CanvasView: View {
                 // TAP fires onChanged → a single pixel; a drag paints a trail.
                 DragGesture(minimumDistance: 0, coordinateSpace: .named("canvas"))
                     .onChanged { value in
-                        guard activeTool == .pen, activeIndex != nil else { return }
                         let n = CGPoint(x: value.location.x / side, y: value.location.y / side)
+                        if activeTool == .eraser, pen.eraserMode == .brush {
+                            eraseAt(n, side: side); return
+                        }
+                        guard activeTool == .pen, activeIndex != nil else { return }
                         if pen.erasing { pen.erase(toNormalized: n) } else { pen.stroke(toNormalized: n) }
                     }
                     .onEnded { value in
@@ -1608,11 +1649,14 @@ struct CanvasView: View {
                             pourIfFilling()
                         case .eyedropper:
                             sampleEyedropper(at: CGPoint(x: value.location.x / side, y: value.location.y / side))
+                        case .eraser:
+                            if pen.eraserMode == .brush { endEraseStroke() }
                         default:
                             break
                         }
                     },
-                including: (activeTool == .pen || activeTool == .fill || activeTool == .eyedropper) ? .all : .subviews
+                including: (activeTool == .pen || activeTool == .fill || activeTool == .eyedropper
+                            || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
             .onAppear {
                 if activeTool == .pen { pen.load(activePixelData) }
@@ -1620,10 +1664,18 @@ struct CanvasView: View {
             }
             .onChange(of: activeTool) {
                 if activeTool == .pen { pen.load(activePixelData) }
+                if activeTool != .eraser { pen.endEraseSession() }   // leaving the tool drops the copy session
                 refreshEraserPreview()
             }
             .onChange(of: activeLayerID) {
+                // NB: don't end the brush session here — eraseAt() sets activeLayerID itself when it
+                // makes the copy, which would wipe the session we just started. A manual layer switch
+                // is handled by eraseAt's "working != active → new copy" check on the next stroke.
                 if activeTool == .pen { pen.load(activePixelData) }
+                refreshEraserPreview()
+            }
+            .onChange(of: pen.eraserMode) {
+                if pen.eraserMode != .brush { pen.endEraseSession() }
                 refreshEraserPreview()
             }
             .onChange(of: pen.eraseTolerance) { refreshEraserPreview() }
@@ -1666,10 +1718,28 @@ struct CanvasView: View {
                 color
             }
         case .content:
-            ForEach(layer.elements) { element in
-                elementView(element, transform: layer.transform, side: side)
+            // While a brush stroke is live on this layer, render its working bitmap (with the
+            // erased holes) instead of the stored element, so transparency shows immediately.
+            if layer.id == pen.eraserLiveLayerID, let live = pen.eraserImage {
+                liveImageView(live, transform: layer.transform, side: side)
+            } else {
+                ForEach(layer.elements) { element in
+                    elementView(element, transform: layer.transform, side: side)
+                }
             }
         }
+    }
+
+    /// The live brush-eraser bitmap drawn exactly like an image element (same frame /
+    /// scaledToFit / rotation / position), so it sits over the layer pixel-aligned.
+    @ViewBuilder
+    private func liveImageView(_ cg: CGImage, transform t: LayerTransform, side: CGFloat) -> some View {
+        Image(decorative: cg, scale: 1)
+            .resizable()
+            .scaledToFit()
+            .frame(width: side * t.scale, height: side * t.scale)
+            .rotationEffect(.degrees(t.rotationDegrees))
+            .position(x: t.center.x * side, y: t.center.y * side)
     }
 
     @ViewBuilder
@@ -2115,6 +2185,10 @@ extension Color {
 /// strokes into it on drag and commits the PNG to the active layer on release; it is
 /// seeded from the layer's existing pixels so drawing accumulates rather than wipes.
 @MainActor
+/// The Eraser tool's two modes: a manual BRUSH (drag to erase to transparent) and the
+/// MAGIC color-mask (sample a color → clear matching pixels).
+enum EraserMode: Hashable { case brush, magic }
+
 final class PixelPen: ObservableObject {
     /// The active paint color (the chosen palette slot). The palette itself lives in the
     /// document (saved per-project); the pen just holds the current color + which slot.
@@ -2167,6 +2241,71 @@ final class PixelPen: ObservableObject {
         erasePreview = matchHighlightImage(cg, target: target,
                                            tolerance: Int(eraseTolerance), contiguous: eraseContiguous,
                                            highlight: (255, 0, 255, 255))
+    }
+
+    // MARK: Manual brush eraser (Eraser tool, Brush mode)
+    /// Which eraser mode the inspector is showing. Brush = drag on the canvas to erase.
+    @Published var eraserMode: EraserMode = .magic
+    /// Brush footprint: false = circle, true = square.
+    @Published var eraserSquare = false
+    /// Brush diameter as a fraction of the canvas edge (resolution-independent).
+    @Published var eraserBrushFraction: Double = 0.06
+    /// The auto-made working COPY we erase into (option b — original kept + hidden). A new
+    /// session (new copy) starts when the active layer isn't this one. nil = no session yet.
+    @Published var eraserWorkingLayerID: UUID?
+    /// While a stroke is live, the canvas renders THIS layer from `eraserImage` instead of its
+    /// stored element (so erased holes show transparent, not the un-erased pixels underneath).
+    @Published var eraserLiveLayerID: UUID?
+    @Published private(set) var eraserImage: CGImage?
+    private(set) var eraserImageW = 0
+    private(set) var eraserImageH = 0
+    private var eraserCtx: CGContext?
+
+    /// True once a working bitmap is seeded for the current copy.
+    var hasEraseSession: Bool { eraserCtx != nil }
+
+    /// Begin erasing a copy: seed a working bitmap at the image's native resolution.
+    func startEraseSession(workingID: UUID, png: Data) {
+        eraserWorkingLayerID = workingID
+        guard let src = CGImageSourceCreateWithData(png as CFData, nil),
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
+            eraserCtx = nil; eraserImage = nil; eraserImageW = 0; eraserImageH = 0; return
+        }
+        let w = cg.width, h = cg.height
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                            space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        ctx?.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        eraserCtx = ctx; eraserImageW = w; eraserImageH = h
+        eraserImage = ctx?.makeImage()
+    }
+
+    /// Clear a brush dab (circle or square) at an image-pixel point. CG is y-up → flip.
+    func eraseBrush(atImagePixel p: CGPoint, radius: Double, square: Bool) {
+        guard let ctx = eraserCtx else { return }
+        let r = max(0.5, radius)
+        let cx = p.x, cy = Double(ctx.height) - p.y
+        let rect = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+        if square {
+            ctx.clear(rect)                 // hard square
+        } else {
+            ctx.setBlendMode(.clear)
+            ctx.fillEllipse(in: rect)       // soft-edged circle
+            ctx.setBlendMode(.normal)
+        }
+        eraserImage = ctx.makeImage()
+    }
+
+    /// PNG of the erased bitmap to write back to the layer at stroke end.
+    func endEraseStroke() -> Data? {
+        guard let cg = eraserCtx?.makeImage() else { return nil }
+        return pngData(from: cg)
+    }
+
+    /// Drop the session (tool/layer left the brush eraser) so a fresh copy is made next time.
+    func endEraseSession() {
+        eraserCtx = nil; eraserImage = nil; eraserWorkingLayerID = nil
+        eraserLiveLayerID = nil; eraserImageW = 0; eraserImageH = 0
     }
 
     private var ctx: CGContext?
