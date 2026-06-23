@@ -1202,101 +1202,93 @@ struct FontPickerInspector: View {
     @State private var outline = false
     @State private var textInput: String = ""
     @State private var glyphs: [String] = []
+    /// The live text layer this inspector is creating/editing (its name == its text).
+    @State private var currentTextLayerID: IconLayer.ID?
 
     /// Installed font family names (Core Text — cross-platform), sorted.
     static let families: [String] =
         ((CTFontManagerCopyAvailableFontFamilyNames() as? [String]) ?? []).sorted()
 
-    private var activeIndex: Int? {
-        guard let id = activeLayerID else { return nil }
-        return document.layers.firstIndex(where: { $0.id == id })
-    }
-    private var activeIsContent: Bool {
-        guard let i = activeIndex else { return false }
-        if case .content = document.layers[i].role { return true }
-        return false
-    }
-
     private func styled(_ text: Text) -> Text {
         text.bold(bold).italic(italic).underline(underline)
     }
 
+    /// User-edit binding: typing in the field updates the live text layer. (Programmatic
+    /// sets — adopt/new — assign `textInput` directly, NOT through this, so they don't
+    /// re-style an adopted layer.)
+    private var textBinding: Binding<String> {
+        Binding(get: { textInput }, set: { v in textInput = v; syncText() })
+    }
+
     var body: some View {
-        if activeIsContent {
-            VStack(alignment: .leading, spacing: 12) {
-                // Type with the keyboard (Michael 2026-06-22 — the glyph grid was replaced).
-                Text("Text").font(.system(size: 18)).foregroundStyle(.secondary)
-                TextField("Type your text…", text: $textInput, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 18))
-                    .lineLimit(1...4)
-                    .autocorrectionDisabled()
-                    .onSubmit { placeText() }
+        VStack(alignment: .leading, spacing: 12) {
+            // Type with the keyboard — a new text layer is created LIVE, centered, named
+            // after the text (Michael 2026-06-22). Reposition with Move; rename to edit.
+            Text("Text").font(.system(size: 18)).foregroundStyle(.secondary)
+            TextField("Type your text…", text: textBinding, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 18))
+                .lineLimit(1...4)
+                .autocorrectionDisabled()
 
-                HStack(spacing: 8) {
-                    styleToggle("bold", "Bold", $bold)
-                    styleToggle("italic", "Italic", $italic)
-                    styleToggle("underline", "Underline", $underline)
-                    styleToggle("character.textbox", "Outline", $outline)
-                }
-
-                Text("Font").font(.system(size: 18)).foregroundStyle(.secondary)
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(Self.families, id: \.self) { fam in
-                            Button { family = fam; recomputeGlyphs() } label: {
-                                styled(Text(fam).font(.custom(fam, size: 16)))
-                                    .lineLimit(1)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 4).padding(.horizontal, 6)
-                                    .background(RoundedRectangle(cornerRadius: 6)
-                                        .fill(fam == family ? Color.accentColor.opacity(0.2) : Color.clear))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .frame(maxHeight: 150)
-
-                // Glyph browser (a real FontBook for the chosen font) — tapping a glyph
-                // APPENDS it to the text above, so you can build a string from the keyboard
-                // AND the font's repertoire (Michael 2026-06-22).
-                Text("Insert glyph — tap to add to your text").font(.system(size: 18)).foregroundStyle(.secondary)
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 38), spacing: 6)], spacing: 6) {
-                        ForEach(glyphs, id: \.self) { g in
-                            Button { textInput += g } label: {
-                                styled(Text(g).font(.custom(family, size: 20)))
-                                    .frame(width: 38, height: 38)
-                                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.12)))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Glyph \(g)")
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .frame(maxHeight: 200)
-
-                PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
-
-                Button { placeText() } label: {
-                    Label("Place Text", systemImage: "text.cursor").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(textInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                Text("Type with the keyboard and/or tap glyphs to build your text. Pick a font + palette tint, then Place Text. A dingbat font (e.g. Wingdings) shows its symbol glyphs to tap.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                styleToggle("bold", "Bold", $bold)
+                styleToggle("italic", "Italic", $italic)
+                styleToggle("underline", "Underline", $underline)
+                styleToggle("character.textbox", "Outline", $outline)
             }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .onAppear { tint = pen.color; if glyphs.isEmpty { recomputeGlyphs() } }
-        } else {
-            PanelPlaceholder(systemImage: "character.book.closed",
-                             title: "Text",
-                             subtitle: "Select the Icon layer (a content layer) to type text")
+
+            Text("Font").font(.system(size: 18)).foregroundStyle(.secondary)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(Self.families, id: \.self) { fam in
+                        Button { family = fam; recomputeGlyphs() } label: {
+                            styled(Text(fam).font(.custom(fam, size: 16)))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4).padding(.horizontal, 6)
+                                .background(RoundedRectangle(cornerRadius: 6)
+                                    .fill(fam == family ? Color.accentColor.opacity(0.2) : Color.clear))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(maxHeight: 150)
+
+            // Glyph browser (a real FontBook for the chosen font) — tapping a glyph APPENDS
+            // it to the text, building a string from the keyboard AND the font's repertoire.
+            Text("Insert glyph — tap to add to your text").font(.system(size: 18)).foregroundStyle(.secondary)
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 38), spacing: 6)], spacing: 6) {
+                    ForEach(glyphs, id: \.self) { g in
+                        Button { textInput += g; syncText() } label: {
+                            styled(Text(g).font(.custom(family, size: 20)))
+                                .frame(width: 38, height: 38)
+                                .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.12)))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Glyph \(g)")
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .frame(maxHeight: 200)
+
+            PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
+
+            Button { newText() } label: {
+                Label("New Text Layer", systemImage: "plus").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            Text("Type or tap glyphs — a new text layer appears live, centered, named after the text. Reposition with the Move tool; rename the layer (Layers panel) to edit the text. \"New Text Layer\" starts a fresh one.")
+                .font(.system(size: 18)).foregroundStyle(.secondary)
         }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear { tint = pen.color; if glyphs.isEmpty { recomputeGlyphs() }; adoptActiveLayer() }
+        .onChange(of: activeLayerID) { adoptActiveLayer() }
     }
 
     @ViewBuilder
@@ -1325,11 +1317,39 @@ struct FontPickerInspector: View {
         glyphs = out
     }
 
-    private func placeText() {
-        let s = textInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let i = activeIndex, !s.isEmpty else { return }
-        document.layers[i].setText(s, fontName: family, tintHex: tint.hexString() ?? "#000000",
-                                   bold: bold, italic: italic, underline: underline, outline: outline)
+    /// Create the live text layer on the first character, then keep it + its NAME in sync
+    /// with the typed text. Centered (default transform) — reposition with Move afterward.
+    private func syncText() {
+        if let id = currentTextLayerID, let i = document.layers.firstIndex(where: { $0.id == id }) {
+            document.layers[i].setText(textInput, fontName: family, tintHex: tint.hexString() ?? "#000000",
+                                       bold: bold, italic: italic, underline: underline, outline: outline)
+            document.layers[i].name = textInput.isEmpty ? "Text" : textInput
+        } else if !textInput.isEmpty {
+            var layer = IconLayer(name: textInput, role: .content)
+            layer.setText(textInput, fontName: family, tintHex: tint.hexString() ?? "#000000",
+                          bold: bold, italic: italic, underline: underline, outline: outline)
+            document.layers.append(layer)
+            currentTextLayerID = layer.id
+        }
+    }
+
+    /// Selecting a text layer (in the Layers panel) loads it here for editing; selecting a
+    /// non-text layer starts fresh. Assigns `textInput` directly so it doesn't re-style it.
+    private func adoptActiveLayer() {
+        if let id = activeLayerID, let i = document.layers.firstIndex(where: { $0.id == id }),
+           let s = document.layers[i].textString {
+            currentTextLayerID = id
+            textInput = s
+        } else {
+            currentTextLayerID = nil
+            textInput = ""
+        }
+    }
+
+    /// Start a fresh text layer — the next character creates a new one.
+    private func newText() {
+        currentTextLayerID = nil
+        textInput = ""
     }
 }
 
@@ -2708,7 +2728,14 @@ struct LayerPanel: View {
         guard let id = renamingID,
               let index = document.layers.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty { document.layers[index].name = trimmed }
+        if !trimmed.isEmpty {
+            document.layers[index].name = trimmed
+            // Two-way link: renaming a TEXT layer rewrites its on-canvas text to match
+            // (Michael 2026-06-22 — the layer title IS the text).
+            if document.layers[index].textString != nil {
+                document.layers[index].setTextString(trimmed)
+            }
+        }
     }
 
     private func toggleVisibility(_ id: IconLayer.ID) {

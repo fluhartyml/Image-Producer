@@ -244,6 +244,27 @@ struct IconLayer: Identifiable, Codable {
         return nil
     }
 
+    /// The text string currently on this layer, if any (for the live Text tool + the
+    /// layer-name⇄text two-way link).
+    var textString: String? {
+        for element in elements {
+            if case .text(let t) = element.content { return t.string }
+        }
+        return nil
+    }
+
+    /// Rewrite just the text element's string (keeps font/style/color), for the layer-name
+    /// → text link. No-op if the layer has no text element.
+    mutating func setTextString(_ string: String) {
+        for i in elements.indices {
+            if case .text(var t) = elements[i].content {
+                t.string = string
+                elements[i] = LayerElement(content: .text(t))
+                return
+            }
+        }
+    }
+
     /// The SF Symbol currently on this layer, if any (for picker highlighting).
     var symbolElementName: String? {
         for element in elements {
