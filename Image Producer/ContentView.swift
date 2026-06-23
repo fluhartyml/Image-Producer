@@ -59,12 +59,18 @@ struct ContentView: View {
     @State private var canvasZoom: CGFloat = 1
     /// Focus mode: hide the tool strip + panel so the canvas fills the whole editor.
     @State private var canvasFocused = false
+    /// Fit Width: fill the working area's WIDTH and scroll vertically for any overflow,
+    /// re-fitting as the window resizes — without entering full-screen focus. Sticky
+    /// toggle; turns itself off on manual zoom or on an incompatible tool (Michael
+    /// 2026-06-23). Works for any canvas aspect (portrait scrolls, landscape just fills).
+    @State private var fitWidth = false
 
     private let minZoom: CGFloat = 1
     private let maxZoom: CGFloat = 8
     private let zoomStep: CGFloat = 1
 
     private func setZoom(_ z: CGFloat) {
+        fitWidth = false                       // manual zoom leaves Fit Width
         withAnimation(.easeOut(duration: 0.15)) {
             canvasZoom = min(max(z, minZoom), maxZoom)
         }
@@ -249,17 +255,44 @@ struct ContentView: View {
         // is unchanged, so it doesn't refight that battle, and the "canvas" named
         // coordinate space lives inside CanvasView so pen/move math is unaffected.
         // Pan is the next step (center-anchored for now).
-        CanvasView(document: document,
-                   activeLayerID: $activeLayerID,
-                   showTransformBox: activeTool == .move,
-                   activeTool: activeTool,
-                   fillColor: $fillColor)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .scaleEffect(canvasZoom)
-            .padding()
-            .background(Color(white: 0.5).opacity(0.12))
-            .clipped()                                   // zoomed canvas stays inside its area
-            .overlay(alignment: .bottomTrailing) { canvasControls }
+        Group {
+            if fitWidth {
+                // Fit Width: frame the canvas to the area's WIDTH at its true aspect (any
+                // shape — B2 removed the square constraint), inside a vertical ScrollView so
+                // a taller-than-area canvas (portrait) scrolls; a landscape one just fills
+                // the width. Re-fits automatically as the window/area is resized.
+                GeometryReader { geo in
+                    let aspect = CGFloat(document.canvasWidth) / CGFloat(max(1, document.canvasHeight))
+                    let fittedHeight = geo.size.width / max(aspect, 0.0001)
+                    ScrollView(.vertical) {
+                        CanvasView(document: document,
+                                   activeLayerID: $activeLayerID,
+                                   showTransformBox: activeTool == .move,
+                                   activeTool: activeTool,
+                                   fillColor: $fillColor,
+                                   fillFrame: true)
+                            .frame(width: geo.size.width, height: fittedHeight)
+                    }
+                }
+            } else {
+                CanvasView(document: document,
+                           activeLayerID: $activeLayerID,
+                           showTransformBox: activeTool == .move,
+                           activeTool: activeTool,
+                           fillColor: $fillColor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .scaleEffect(canvasZoom)
+            }
+        }
+        .padding()
+        .background(Color(white: 0.5).opacity(0.12))
+        .clipped()                                   // zoomed canvas stays inside its area
+        .overlay(alignment: .bottomTrailing) { canvasControls }
+        // Safeguard: if a tool is marked incompatible with Fit Width, picking it drops
+        // back to the normal fitted view so the tool can't break (Michael 2026-06-23).
+        .onChange(of: activeTool) { _, newTool in
+            if fitWidth && !newTool.fitWidthCompatible { fitWidth = false }
+        }
     }
 
     /// Floating control cluster on the canvas: full-screen toggle + zoom +/−.
@@ -273,6 +306,16 @@ struct ContentView: View {
             }
             .help(canvasFocused ? "Exit full screen" : "Full-screen canvas")
             .accessibilityLabel(canvasFocused ? "Exit full screen" : "Full-screen canvas")
+
+            Divider().frame(width: 26)
+
+            // Fit Width: fill the area width + scroll vertically, within the resizable
+            // window (NOT full-screen). Sticky toggle; tinted when on.
+            Button { fitWidth.toggle() } label: { Image(systemName: "arrow.left.and.right") }
+                .help(fitWidth ? "Fit width: on (tap to turn off)"
+                               : "Fit width — fill the width, scroll vertically")
+                .accessibilityLabel("Fit width")
+                .foregroundStyle(fitWidth ? Color.accentColor : Color.primary)
 
             Divider().frame(width: 26)
 
@@ -2128,6 +2171,11 @@ struct CanvasView: View {
     var showTransformBox: Bool = false
     var activeTool: Tool = .move
     @Binding var fillColor: Color
+    /// Fit Width view: fill the given frame exactly (the frame is already shaped to the
+    /// canvas aspect) instead of letterboxing the canvas inside a square area. The host
+    /// frame supplies the aspect; here we just fill it so it can run taller than the
+    /// viewport and scroll vertically.
+    var fillFrame: Bool = false
     @EnvironmentObject var pen: PixelPen
     /// Live cursor position (in canvas space) for the brush-eraser footprint ring.
     @State private var brushHover: CGPoint?
@@ -2285,11 +2333,7 @@ struct CanvasView: View {
             // The canvas can be non-square (B2). Fit its aspect inside the available square
             // area → the on-screen display rect `disp`. `ref` = the shorter display edge, used
             // for element sizing so a square canvas reduces to exactly the old `side` math.
-            let canvasAspect = CGFloat(document.canvasWidth) / CGFloat(max(1, document.canvasHeight))
-            let avail = min(geo.size.width, geo.size.height)
-            let disp = canvasAspect >= 1
-                ? CGSize(width: avail, height: avail / canvasAspect)
-                : CGSize(width: avail * canvasAspect, height: avail)
+            let disp = displayRect(in: geo.size)
             let ref = min(disp.width, disp.height)
             ZStack {
                 Checkerboard()
@@ -2471,6 +2515,18 @@ struct CanvasView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity) // center in the area
         }
+    }
+
+    /// The on-screen canvas rect for the available area. Fit Width (`fillFrame`) fills the
+    /// frame, which the host already shaped to the canvas aspect; otherwise the canvas is
+    /// letterboxed to fit inside the square area (a square canvas reduces to the old math).
+    private func displayRect(in size: CGSize) -> CGSize {
+        if fillFrame { return size }
+        let aspect = CGFloat(document.canvasWidth) / CGFloat(max(1, document.canvasHeight))
+        let avail = min(size.width, size.height)
+        return aspect >= 1
+            ? CGSize(width: avail, height: avail / aspect)
+            : CGSize(width: avail * aspect, height: avail)
     }
 
     /// What a layer draws on the canvas. A filled background renders its colour;

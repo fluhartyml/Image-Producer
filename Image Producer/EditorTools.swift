@@ -74,6 +74,18 @@ enum Tool: String, CaseIterable, Identifiable {
         case .zoom:       "magnifyingglass"
         }
     }
+
+    /// Whether this tool works in the canvas's Fit Width view (fills the area width,
+    /// scrolls vertically). All tools work today — the canvas's pen/move/crop math is
+    /// derived from the display rect, so Fit Width doesn't change it. This flag is the
+    /// safeguard Michael asked for (2026-06-23): if device testing ever turns up a tool
+    /// that misbehaves in Fit Width, return false for it here and selecting that tool
+    /// auto-toggles Fit Width off.
+    var fitWidthCompatible: Bool {
+        switch self {
+        default: return true
+        }
+    }
 }
 
 // MARK: - Paint Bucket glyph (style B — solid bucket, colored pour)
