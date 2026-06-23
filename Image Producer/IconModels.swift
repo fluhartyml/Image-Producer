@@ -606,7 +606,15 @@ extension IconDocument {
     @MainActor static func writeNewProject(at url: URL) -> Bool {
         let doc = newDefault()
         doc.name = url.deletingPathExtension().lastPathComponent
-        do { try doc.writePackage(to: url); return true }
-        catch { return false }
+        do {
+            try doc.writePackage(to: url)
+            pendingNewProjectURL = url      // so the editor opens it on the Canvas hub
+            return true
+        } catch { return false }
     }
+
+    /// The just-created project's URL. New projects are real files now (not "Untitled"),
+    /// so the editor can't use "no file" to know it's new — it matches this instead to open
+    /// a fresh project on the Canvas hub (name + extents up front). Consumed on first appear.
+    static var pendingNewProjectURL: URL?
 }
