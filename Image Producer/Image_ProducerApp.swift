@@ -7,9 +7,6 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
-#if canImport(AppKit)
-import AppKit
-#endif
 
 @main
 struct Image_ProducerApp: App {
@@ -47,22 +44,8 @@ struct Image_ProducerApp: App {
             // document's history. The History tab/page already exists as a placeholder
             // (ContentView.historyPage); only the engine is missing ("no engine yet").
             CommandGroup(replacing: .undoRedo) { }
-
-            // ⌘N creates a new project AS A REAL FILE (never "Untitled"): write
-            // ImageProducerNNNN.imgprd to disk, then open it so the window tracks it.
-            // macOS only — iOS/iPadOS create new docs through the document browser, which
-            // already names + places the file (the "Untitled" gap was Mac-specific).
-            #if os(macOS)
-            CommandGroup(replacing: .newItem) {
-                Button("New Image") {
-                    if let url = IconDocument.createNewProjectFile() {
-                        NSDocumentController.shared.openDocument(withContentsOf: url,
-                                                                 display: true) { _, _, _ in }
-                    }
-                }
-                .keyboardShortcut("n", modifiers: .command)
-            }
-            #endif
+            // ⌘N override (write-then-open) reverted with the Welcome button while the
+            // never-untitled path is re-done off the main thread — back to default New.
         }
         // macOS: suppress the default open-panel on launch so the custom Welcome window
         // (below) is the front door instead. .defaultLaunchBehavior is macOS 15+/visionOS

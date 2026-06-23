@@ -40,18 +40,11 @@ struct WelcomeView: View {
             }
 
             Button {
-                Task {
-                    // Never "Untitled": write the new project to disk first (as
-                    // ImageProducerNNNN.imgprd) and OPEN that real file, so the window
-                    // tracks it and the Canvas name field renames it in place. Falls back
-                    // to an in-memory untitled doc only if the disk write fails.
-                    if let url = IconDocument.createNewProjectFile() {
-                        try? await openDocument(at: url)
-                    } else {
-                        newDocument(contentType: .iconProject)
-                    }
-                    dismissWindow(id: "welcome")
-                }
+                // TEMP (2026-06-23): reverted to the in-memory untitled doc while the
+                // never-untitled write-then-open path is re-done OFF the main thread —
+                // its iCloud container lookup on the main thread is the suspected crash.
+                newDocument(contentType: .iconProject)
+                dismissWindow(id: "welcome")
             } label: {
                 Label("New Image", systemImage: "plus")
                     .frame(maxWidth: .infinity)
