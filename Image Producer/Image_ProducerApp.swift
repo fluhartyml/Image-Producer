@@ -7,6 +7,9 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+#if canImport(AppKit)
+import AppKit
+#endif
 
 @main
 struct Image_ProducerApp: App {
@@ -44,8 +47,32 @@ struct Image_ProducerApp: App {
             // document's history. The History tab/page already exists as a placeholder
             // (ContentView.historyPage); only the engine is missing ("no engine yet").
             CommandGroup(replacing: .undoRedo) { }
-            // ⌘N override (write-then-open) reverted with the Welcome button while the
-            // never-untitled path is re-done off the main thread — back to default New.
+
+            #if os(macOS)
+            // ⌘N: new project as a REAL file (never "Untitled"). URL resolved OFF the main
+            // thread (the iCloud lookup can block); create + open on main, fall back to a
+            // default untitled doc on any failure.
+            CommandGroup(replacing: .newItem) {
+                Button("New Image") {
+                    Task {
+                        let url = await Task.detached { IconDocument.nextProjectURL() }.value
+                        if let url, IconDocument.writeNewProject(at: url) {
+                            NSDocumentController.shared.openDocument(withContentsOf: url,
+                                                                     display: true) { doc, _, err in
+                                if doc == nil {
+                                    NSLog("ImageProducer ⌘N: open failed for %@ — %@",
+                                          url.path, String(describing: err))
+                                    NSDocumentController.shared.newDocument(nil)   // always a window
+                                }
+                            }
+                        } else {
+                            NSDocumentController.shared.newDocument(nil)
+                        }
+                    }
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            }
+            #endif
         }
         // macOS: suppress the default open-panel on launch so the custom Welcome window
         // (below) is the front door instead. .defaultLaunchBehavior is macOS 15+/visionOS

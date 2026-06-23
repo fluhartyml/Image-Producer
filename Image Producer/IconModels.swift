@@ -548,15 +548,18 @@ extension IconDocument {
 // MARK: - New project files (never "Untitled")
 
 extension IconDocument {
-    /// New documents save as `.imgprd` (the Image Producer document package). Older
-    /// `.picprod` / `.iconproj` files still open — same exported type identifier; the new
-    /// extension is ADDITIVE (declared first in Info.plist so it's the one new saves use).
-    static let projectExtension = "imgprd"
+    /// New documents save as `.picprod` — the already-registered project package that opens
+    /// reliably. (`.imgprd` is declared too, but the old "Icon Producer" app still claims the
+    /// same type identifier with only the old extensions, so LaunchServices doesn't recognize
+    /// a fresh `.imgprd` as our PACKAGE — it sees a plain folder and won't open it. Switching
+    /// the app to its own type identifier is the follow-up that lets `.imgprd` work; until
+    /// then new files use `.picprod`. Either way old `.picprod`/`.iconproj` files open.)
+    static let projectExtension = "picprod"
 
     /// Where new projects are written immediately so a canvas is never an unnamed
     /// "Untitled": the app's iCloud Documents folder (syncs across devices, shows in
     /// Files), falling back to the local Documents container when iCloud is unavailable.
-    static func projectsDirectory() -> URL? {
+    nonisolated static func projectsDirectory() -> URL? {
         let fm = FileManager.default
         let dir: URL
         if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.image-producer") {
@@ -579,7 +582,7 @@ extension IconDocument {
     /// Reserve the next lifetime project number and return a fresh, non-colliding URL
     /// `<projects>/ImageProducerNNNN.imgprd` (4-digit zero-padded, no space). Bumps the
     /// persisted counter; if that name somehow already exists, keeps bumping so it's unique.
-    static func nextProjectURL() -> URL? {
+    nonisolated static func nextProjectURL() -> URL? {
         guard let dir = projectsDirectory() else { return nil }
         let defaults = UserDefaults.standard
         let fm = FileManager.default
@@ -594,14 +597,16 @@ extension IconDocument {
         return candidate
     }
 
-    /// Create a brand-new project AS A REAL FILE on disk and return its URL — so a new
-    /// document is never "Untitled". The Canvas inspector's Project name field then renames
-    /// the file in place. Writes the default layer stack; the file name IS the project name.
-    static func createNewProjectFile() -> URL? {
-        guard let url = nextProjectURL() else { return nil }
+    /// Write a brand-new default project to `url` (which the caller resolved OFF the main
+    /// thread via `nextProjectURL` — the slow iCloud-container lookup lives there). This
+    /// stays on the main actor because IconDocument is main-actor-isolated; the write is a
+    /// quick local package write. Returns true on success; the Canvas name field then
+    /// renames the file in place. Split from the old one-shot `createNewProjectFile` so the
+    /// blocking lookup no longer runs on the main thread (the suspected New-crash, 2026-06-23).
+    @MainActor static func writeNewProject(at url: URL) -> Bool {
         let doc = newDefault()
         doc.name = url.deletingPathExtension().lastPathComponent
-        do { try doc.writePackage(to: url); return url }
-        catch { return nil }
+        do { try doc.writePackage(to: url); return true }
+        catch { return false }
     }
 }

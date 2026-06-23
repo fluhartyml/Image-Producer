@@ -40,11 +40,26 @@ struct WelcomeView: View {
             }
 
             Button {
-                // TEMP (2026-06-23): reverted to the in-memory untitled doc while the
-                // never-untitled write-then-open path is re-done OFF the main thread —
-                // its iCloud container lookup on the main thread is the suspected crash.
-                newDocument(contentType: .iconProject)
-                dismissWindow(id: "welcome")
+                Task {
+                    // Resolve the new file's URL OFF the main thread (the iCloud lookup can
+                    // block). Create + open on the main actor. ALWAYS end with a visible
+                    // window: if open fails, log why and fall back to an untitled doc — so we
+                    // can never land in "welcome gone, no document window, app still running."
+                    let url = await Task.detached { IconDocument.nextProjectURL() }.value
+                    var opened = false
+                    if let url, IconDocument.writeNewProject(at: url) {
+                        do { try await openDocument(at: url); opened = true }
+                        catch {
+                            NSLog("ImageProducer New: openDocument failed for %@ — %@",
+                                  url.path, String(describing: error))
+                        }
+                    } else {
+                        NSLog("ImageProducer New: could not create project file (url=%@)",
+                              String(describing: url))
+                    }
+                    if !opened { newDocument(contentType: .iconProject) }
+                    dismissWindow(id: "welcome")
+                }
             } label: {
                 Label("New Image", systemImage: "plus")
                     .frame(maxWidth: .infinity)

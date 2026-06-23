@@ -19,8 +19,8 @@
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>imgprd</string>
 					<string>picprod</string>
+					<string>imgprd</string>
 					<string>iconproj</string>
 				</array>
 			</dict>
