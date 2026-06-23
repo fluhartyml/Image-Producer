@@ -532,7 +532,7 @@ struct PaintBucketInspector: View {
             Spacer()
         }
         .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private func fillActiveBackground() {
@@ -1183,7 +1183,7 @@ struct SymbolPickerInspector: View {
                 .frame(maxHeight: 240)
             }
             .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             .onAppear { tint = pen.color }   // default the tint to the active palette color
         } else {
             PanelPlaceholder(systemImage: "star",
@@ -1304,7 +1304,7 @@ struct FontPickerInspector: View {
                 .font(.system(size: 18)).foregroundStyle(.secondary)
         }
         .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .onAppear { tint = pen.color; if glyphs.isEmpty { recomputeGlyphs() }; adoptActiveLayer() }
         .onChange(of: activeLayerID) { adoptActiveLayer() }
     }
@@ -1412,7 +1412,7 @@ struct ImageImportInspector: View {
                 Spacer()
             }
             .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             .fileImporter(isPresented: $importing, allowedContentTypes: [.image]) { result in
                 failed = false
                 guard case .success(let url) = result else { return }
