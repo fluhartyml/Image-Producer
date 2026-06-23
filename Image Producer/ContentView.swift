@@ -577,6 +577,9 @@ struct CanvasSizePreset: Identifiable {
     let label: String
     let shortIn: Double
     let longIn: Double
+    /// The conventional orientation when this preset is applied (business cards / envelopes
+    /// are landscape by convention; most else portrait). The live Landscape toggle flips it.
+    var defaultLandscape = false
 }
 
 // MARK: - Canvas inspector (Tool: Canvas — the open project's central hub)
@@ -670,7 +673,7 @@ struct CanvasInspector: View {
                 attrRow("Print size", printSizeText)
 
                 // Standard non-square shapes. A preset sets pixels = physical × current PPI.
-                Toggle("Landscape", isOn: $landscape).font(.system(size: 18)).fixedSize()
+                Toggle("Landscape", isOn: landscapeBinding).font(.system(size: 18)).fixedSize()
                 Menu("Canvas size presets") {
                     Section("Photo")          { presetButtons(Self.photoPresets) }
                     Section("Paper")          { presetButtons(Self.paperPresets) }
@@ -847,7 +850,18 @@ struct CanvasInspector: View {
     // MARK: B · Dimensions & Resolution
     @AppStorage("ip.canvasUnit") private var unitRaw = CanvasUnit.inch.rawValue
     private var unit: CanvasUnit { CanvasUnit(rawValue: unitRaw) ?? .inch }
-    @State private var landscape = false
+
+    /// Live orientation of the CURRENT canvas. Toggling swaps width/height immediately, so
+    /// you can flip any canvas between landscape and portrait (Michael 2026-06-22).
+    private var isLandscape: Bool { document.canvasWidth > document.canvasHeight }
+    private var landscapeBinding: Binding<Bool> {
+        Binding(get: { isLandscape }, set: { want in
+            guard want != isLandscape else { return }
+            let w = document.canvasWidth
+            document.canvasWidth = document.canvasHeight
+            document.canvasHeight = w
+        })
+    }
 
     /// Derived print size readout (W × H) in the chosen unit, from pixels ÷ PPI.
     private var printSizeText: String {
@@ -863,8 +877,9 @@ struct CanvasInspector: View {
 
     /// Apply a size preset: pixels = physical × current PPI, respecting the orientation.
     private func applyPreset(_ p: CanvasSizePreset) {
-        let pw = landscape ? p.longIn : p.shortIn       // portrait = taller (short side = width)
-        let ph = landscape ? p.shortIn : p.longIn
+        let land = p.defaultLandscape                   // each preset's conventional orientation
+        let pw = land ? p.longIn : p.shortIn
+        let ph = land ? p.shortIn : p.longIn
         document.canvasWidth = max(1, Int((pw * document.ppi).rounded()))
         document.canvasHeight = max(1, Int((ph * document.ppi).rounded()))
     }
@@ -894,11 +909,11 @@ struct CanvasInspector: View {
         CanvasSizePreset(label: "5 × 8", shortIn: 5, longIn: 8),
     ]
     static let businessPresets = [
-        CanvasSizePreset(label: "Business card 3.5 × 2", shortIn: 2, longIn: 3.5),
+        CanvasSizePreset(label: "Business card 3.5 × 2", shortIn: 2, longIn: 3.5, defaultLandscape: true),
     ]
     static let envelopePresets = [
-        CanvasSizePreset(label: "Letter #6¾ 3.625 × 6.5", shortIn: 3.625, longIn: 6.5),
-        CanvasSizePreset(label: "Business #10 4.125 × 9.5", shortIn: 4.125, longIn: 9.5),
+        CanvasSizePreset(label: "Letter #6¾ 3.625 × 6.5", shortIn: 3.625, longIn: 6.5, defaultLandscape: true),
+        CanvasSizePreset(label: "Business #10 4.125 × 9.5", shortIn: 4.125, longIn: 9.5, defaultLandscape: true),
     ]
 
     // MARK: file attribute readouts (from the on-disk file)
@@ -1222,8 +1237,16 @@ struct FontPickerInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Type with the keyboard — a new text layer is created LIVE, centered, named
-            // after the text (Michael 2026-06-22). Reposition with Move; rename to edit.
+            // Starting text is unusual, so the initiator is line #1 and prominent (Michael
+            // 2026-06-22). Primary way: tap the canvas to start text there; this button is the
+            // explicit alternative and always creates a fresh layer.
+            Button { newText() } label: {
+                Label("New Text Layer", systemImage: "plus.rectangle").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            Text("Tap the canvas to start text there — or tap this. Then type below.")
+                .font(.system(size: 18)).foregroundStyle(.secondary)
+
             Text("Text").font(.system(size: 18)).foregroundStyle(.secondary)
             TextField("Type your text…", text: textBinding, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
@@ -1277,12 +1300,7 @@ struct FontPickerInspector: View {
 
             PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
 
-            Button { newText() } label: {
-                Label("New Text Layer", systemImage: "plus").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-
-            Text("Type or tap glyphs — a new text layer appears live, centered, named after the text. Reposition with the Move tool; rename the layer (Layers panel) to edit the text. \"New Text Layer\" starts a fresh one.")
+            Text("The text layer updates live, named after the text. Reposition with the Move tool; rename the layer (Layers panel) to edit it later.")
                 .font(.system(size: 18)).foregroundStyle(.secondary)
         }
         .padding()
@@ -1346,9 +1364,13 @@ struct FontPickerInspector: View {
         }
     }
 
-    /// Start a fresh text layer — the next character creates a new one.
+    /// Start a fresh text layer NOW — eagerly create an empty, centered text layer and adopt
+    /// it, so the button always produces a visible new layer (it was a dead button before).
     private func newText() {
-        currentTextLayerID = nil
+        var layer = IconLayer(name: "Text", role: .content)
+        layer.setText("", fontName: family, tintHex: tint.hexString() ?? "#000000")
+        document.layers.append(layer)
+        currentTextLayerID = layer.id
         textInput = ""
     }
 }
@@ -2246,6 +2268,18 @@ struct CanvasView: View {
         pen.eraserLiveLayerID = nil
     }
 
+    /// Text tool: tap the canvas to start a new text layer AT that spot (approximate is fine).
+    /// Creates an empty text layer there and selects it; the Text inspector adopts it so what
+    /// you type fills it. (Michael 2026-06-22: tap gives the natural starting point.)
+    @MainActor private func startTextAt(_ n: CGPoint) {
+        guard activeTool == .text else { return }
+        var layer = IconLayer(name: "Text", role: .content)
+        layer.setText("", fontName: "Helvetica", tintHex: pen.color.hexString() ?? "#000000")
+        layer.transform.center = CGPoint(x: min(max(n.x, 0), 1), y: min(max(n.y, 0), 1))
+        document.layers.append(layer)
+        activeLayerID = layer.id
+    }
+
     var body: some View {
         GeometryReader { geo in
             // The canvas can be non-square (B2). Fit its aspect inside the available square
@@ -2373,11 +2407,14 @@ struct CanvasView: View {
                             sampleEyedropper(at: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height))
                         case .eraser:
                             if pen.eraserMode == .brush { endEraseStroke() }
+                        case .text:
+                            startTextAt(CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height))
                         default:
                             break
                         }
                     },
                 including: (activeTool == .pen || activeTool == .fill || activeTool == .eyedropper
+                            || activeTool == .text
                             || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
             .onContinuousHover(coordinateSpace: .named("canvas")) { phase in
