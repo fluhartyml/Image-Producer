@@ -3391,25 +3391,19 @@ struct AutosaveModifier: ViewModifier {
         }
     }
 
-    /// The next free "Image Producer N.picprod" in the app's iCloud Documents folder
-    /// (findable in Files, syncs); falls back to the local Documents container.
+    /// A crash-safety recovery file for a genuinely UNTITLED document (rare now that new
+    /// docs are materialized as real files): the next free "Recovered Image N.imgprd" in
+    /// the shared projects folder. Distinct name from the ImageProducerNNNN lifetime files
+    /// so it never consumes a lifetime number or collides with a real project.
     private func makeRecoveryURL() -> URL? {
+        guard let dir = IconDocument.projectsDirectory() else { return nil }
         let fm = FileManager.default
-        let dir: URL
-        if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.image-producer") {
-            dir = icloud.appendingPathComponent("Documents", isDirectory: true)
-        } else if let local = try? fm.url(for: .documentDirectory, in: .userDomainMask,
-                                          appropriateFor: nil, create: true) {
-            dir = local
-        } else {
-            return nil
-        }
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let ext = IconDocument.projectExtension
         var n = 1
-        var url = dir.appendingPathComponent("Image Producer \(n).picprod")
+        var url = dir.appendingPathComponent("Recovered Image \(n)").appendingPathExtension(ext)
         while fm.fileExists(atPath: url.path) {
             n += 1
-            url = dir.appendingPathComponent("Image Producer \(n).picprod")
+            url = dir.appendingPathComponent("Recovered Image \(n)").appendingPathExtension(ext)
         }
         return url
     }

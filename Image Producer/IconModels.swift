@@ -544,3 +544,64 @@ extension IconDocument {
         if let coordError { throw coordError }
     }
 }
+
+// MARK: - New project files (never "Untitled")
+
+extension IconDocument {
+    /// New documents save as `.imgprd` (the Image Producer document package). Older
+    /// `.picprod` / `.iconproj` files still open — same exported type identifier; the new
+    /// extension is ADDITIVE (declared first in Info.plist so it's the one new saves use).
+    static let projectExtension = "imgprd"
+
+    /// Where new projects are written immediately so a canvas is never an unnamed
+    /// "Untitled": the app's iCloud Documents folder (syncs across devices, shows in
+    /// Files), falling back to the local Documents container when iCloud is unavailable.
+    static func projectsDirectory() -> URL? {
+        let fm = FileManager.default
+        let dir: URL
+        if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.image-producer") {
+            dir = icloud.appendingPathComponent("Documents", isDirectory: true)
+        } else if let local = try? fm.url(for: .documentDirectory, in: .userDomainMask,
+                                          appropriateFor: nil, create: true) {
+            dir = local
+        } else {
+            return nil
+        }
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Persisted count of every project ever created in the app's lifetime. The auto-name
+    /// `ImageProducerNNNN` uses THIS, not the count of files on disk — so the number is a
+    /// running total and a deleted project's number is never reused (Michael 2026-06-23).
+    private static let lifetimeCountKey = "ip.lifetimeProjectCount"
+
+    /// Reserve the next lifetime project number and return a fresh, non-colliding URL
+    /// `<projects>/ImageProducerNNNN.imgprd` (4-digit zero-padded, no space). Bumps the
+    /// persisted counter; if that name somehow already exists, keeps bumping so it's unique.
+    static func nextProjectURL() -> URL? {
+        guard let dir = projectsDirectory() else { return nil }
+        let defaults = UserDefaults.standard
+        let fm = FileManager.default
+        var n = defaults.integer(forKey: lifetimeCountKey) + 1
+        func url(_ k: Int) -> URL {
+            dir.appendingPathComponent(String(format: "ImageProducer%04d", k))
+               .appendingPathExtension(projectExtension)
+        }
+        var candidate = url(n)
+        while fm.fileExists(atPath: candidate.path) { n += 1; candidate = url(n) }
+        defaults.set(n, forKey: lifetimeCountKey)
+        return candidate
+    }
+
+    /// Create a brand-new project AS A REAL FILE on disk and return its URL — so a new
+    /// document is never "Untitled". The Canvas inspector's Project name field then renames
+    /// the file in place. Writes the default layer stack; the file name IS the project name.
+    static func createNewProjectFile() -> URL? {
+        guard let url = nextProjectURL() else { return nil }
+        let doc = newDefault()
+        doc.name = url.deletingPathExtension().lastPathComponent
+        do { try doc.writePackage(to: url); return url }
+        catch { return nil }
+    }
+}

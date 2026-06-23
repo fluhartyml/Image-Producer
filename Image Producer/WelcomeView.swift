@@ -40,8 +40,18 @@ struct WelcomeView: View {
             }
 
             Button {
-                newDocument(contentType: .iconProject)
-                dismissWindow(id: "welcome")
+                Task {
+                    // Never "Untitled": write the new project to disk first (as
+                    // ImageProducerNNNN.imgprd) and OPEN that real file, so the window
+                    // tracks it and the Canvas name field renames it in place. Falls back
+                    // to an in-memory untitled doc only if the disk write fails.
+                    if let url = IconDocument.createNewProjectFile() {
+                        try? await openDocument(at: url)
+                    } else {
+                        newDocument(contentType: .iconProject)
+                    }
+                    dismissWindow(id: "welcome")
+                }
             } label: {
                 Label("New Image", systemImage: "plus")
                     .frame(maxWidth: .infinity)
