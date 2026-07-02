@@ -2397,6 +2397,36 @@ struct BrushCursor: View {
     }
 }
 
+/// Makes the mouse pointer reflect the active tool while it's over the canvas — a paint
+/// bucket for Fill, a pencil tip for Pen, etc. (macOS 15+ `.pointerStyle`; a no-op on iOS,
+/// which has no pointer). Tools with no drawing action (Move / Zoom / Symbol / Image) fall
+/// back to the system arrow (nil). Hot spots put the "business end" of each glyph on the
+/// actual click point (the drip of the drop, the tip of the pencil/dropper).
+private struct ToolPointer: ViewModifier {
+    let tool: Tool
+
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        content.pointerStyle(Self.style(for: tool))
+        #else
+        content
+        #endif
+    }
+
+    #if os(macOS)
+    static func style(for tool: Tool) -> PointerStyle? {
+        switch tool {
+        case .fill:       .image(Image(systemName: "drop.fill"),   hotSpot: UnitPoint(x: 0.5, y: 1.0))
+        case .pen:        .image(Image(systemName: "pencil.tip"),  hotSpot: UnitPoint(x: 0.2, y: 0.9))
+        case .eraser:     .image(Image(systemName: "eraser.fill"), hotSpot: UnitPoint(x: 0.5, y: 0.6))
+        case .eyedropper: .image(Image(systemName: "eyedropper"),  hotSpot: UnitPoint(x: 0.15, y: 0.9))
+        case .text:       .horizontalText
+        default:          nil   // Move / Zoom / Symbol / Image / etc. → system arrow
+        }
+    }
+    #endif
+}
+
 struct CanvasView: View {
     @ObservedObject var document: IconDocument
     @Binding var activeLayerID: IconLayer.ID?
@@ -2722,6 +2752,7 @@ struct CanvasView: View {
                             || activeTool == .text
                             || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
+            .modifier(ToolPointer(tool: activeTool))   // cursor reflects the active tool (macOS)
             .onContinuousHover(coordinateSpace: .named("canvas")) { phase in
                 // Trackpad/pointer hover (no press) → position the footprint ring so you can
                 // aim before committing. Touch has no hover; the mid-stroke update covers that.
