@@ -17,6 +17,18 @@ struct WelcomeView: View {
     @Environment(\.newDocument) private var newDocument
     @Environment(\.openDocument) private var openDocument
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// Neutral background gradient that follows the system appearance: a light gray
+    /// in Light Mode, a dark charcoal in Dark Mode. The text uses semantic inks, so
+    /// it stays legible against either. (Kept lighter than the icon tile.)
+    private var backgroundColors: [Color] {
+        colorScheme == .dark
+            ? [Color(red: 0.20, green: 0.20, blue: 0.21),
+               Color(red: 0.13, green: 0.13, blue: 0.14)]
+            : [Color(red: 0.97, green: 0.97, blue: 0.98),
+               Color(red: 0.90, green: 0.90, blue: 0.92)]
+    }
 
     /// Recent .iconproj documents, newest first (AppKit's recents list).
     private var recents: [URL] { NSDocumentController.shared.recentDocumentURLs }
@@ -28,6 +40,12 @@ struct WelcomeView: View {
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable()
                     .frame(width: 96, height: 96)
+                    .padding(18)
+                    .background(
+                        // Soft light-gray tile behind the icon (white 0.89, tuned live).
+                        RoundedRectangle(cornerRadius: 26, style: .continuous)
+                            .fill(Color(white: 0.89))
+                    )
                 Text("Image Producer")
                     .font(.system(size: 40, weight: .semibold, design: .serif))
                 Text("GRAPHIC ARTS")
@@ -97,16 +115,11 @@ struct WelcomeView: View {
         .frame(width: 440, height: 520)
         .background(
             LinearGradient(
-                colors: [Color(red: 0.11, green: 0.14, blue: 0.22),
-                         Color(red: 0.05, green: 0.06, blue: 0.10)],
+                colors: backgroundColors,
                 startPoint: .top,
                 endPoint: .bottom
             )
         )
-        // The background is an intentionally dark branded gradient, so pin the
-        // content to the dark color scheme — otherwise in Light Mode the semantic
-        // text inks (.primary/.secondary/.tertiary) resolve dark and vanish against it.
-        .environment(\.colorScheme, .dark)
     }
 }
 #endif
