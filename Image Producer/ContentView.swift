@@ -165,7 +165,10 @@ struct ContentView: View {
                                   fileURL: fileURL)
                         .frame(width: 240)
                     Divider()
-                    LayerPanel(document: document, activeLayerID: $activeLayerID)
+                    // Right column: Layers with History "behind" it (spec: undo is the History
+                    // panel sitting behind the layer list). The wide/Mac layout used to hardcode
+                    // only LayerPanel, so History was unreachable on Mac — this restores it.
+                    LayersHistoryColumn(document: document, activeLayerID: $activeLayerID)
                         .frame(width: 240)
                 }
             }
@@ -1822,6 +1825,38 @@ struct PanelPlaceholder: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+    }
+}
+
+// MARK: - Layers + History column (wide / Mac layout)
+
+/// The right-hand column in the landscape/Mac layout: a segmented Layers / History switch,
+/// so History (the app's undo) is reachable there — it "sits behind the layer list" per the
+/// spec. Portrait / iPhone reach the same two via the bottom swipe panel's picker instead.
+struct LayersHistoryColumn: View {
+    @ObservedObject var document: IconDocument
+    @Binding var activeLayerID: IconLayer.ID?
+
+    private enum Tab: String, CaseIterable, Identifiable {
+        case layers = "Layers", history = "History"
+        var id: String { rawValue }
+    }
+    @State private var tab: Tab = .layers
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $tab) {
+                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(8)
+            Divider()
+            switch tab {
+            case .layers:  LayerPanel(document: document, activeLayerID: $activeLayerID)
+            case .history: HistoryPanel(document: document, activeLayerID: $activeLayerID)
+            }
+        }
     }
 }
 
