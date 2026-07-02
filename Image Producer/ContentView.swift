@@ -587,7 +587,10 @@ struct PaintBucketInspector: View {
 
     private func fillActiveBackground() {
         guard let i = activeIndex else { return }
+        document.captureHistoryBaselineIfNeeded()
         document.layers[i].setBackgroundFill(fillColor.hexString())
+        document.recordHistory(toolID: Tool.fill.rawValue, groupTitle: Tool.fill.title,
+                               actionLabel: "Fill Background", layerID: document.layers[i].id)
     }
 }
 
@@ -1264,7 +1267,10 @@ struct SymbolPickerInspector: View {
 
     private func place(_ name: String) {
         guard let i = activeIndex else { return }
+        document.captureHistoryBaselineIfNeeded()
         document.layers[i].setSymbol(name, tintHex: tint.hexString() ?? "#000000")
+        document.recordHistory(toolID: Tool.symbol.rawValue, groupTitle: Tool.symbol.title,
+                               actionLabel: "Place Symbol", layerID: document.layers[i].id)
     }
 }
 
@@ -1409,15 +1415,22 @@ struct FontPickerInspector: View {
     /// with the typed text. Centered (default transform) — reposition with Move afterward.
     private func syncText() {
         if let id = currentTextLayerID, let i = document.layers.firstIndex(where: { $0.id == id }) {
+            document.captureHistoryBaselineIfNeeded()
             document.layers[i].setText(textInput, fontName: family, tintHex: tint.hexString() ?? "#000000",
                                        bold: bold, italic: italic, underline: underline, outline: outline)
             document.layers[i].name = textInput.isEmpty ? "Text" : textInput
+            // Coalesce a typing session into one "Text" step (not one per keystroke).
+            document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
+                                   actionLabel: "Text", layerID: id, coalesce: true)
         } else if !textInput.isEmpty {
+            document.captureHistoryBaselineIfNeeded()
             var layer = IconLayer(name: textInput, role: .content)
             layer.setText(textInput, fontName: family, tintHex: tint.hexString() ?? "#000000",
                           bold: bold, italic: italic, underline: underline, outline: outline)
             document.layers.append(layer)
             currentTextLayerID = layer.id
+            document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
+                                   actionLabel: "Text", layerID: layer.id, coalesce: true)
         }
     }
 
@@ -1501,7 +1514,10 @@ struct ImageImportInspector: View {
         guard let raw = try? Data(contentsOf: url),
               let png = pngData(fromImageData: raw),
               let i = activeIndex else { failed = true; return }
+        document.captureHistoryBaselineIfNeeded()
         document.layers[i].setImage(png)
+        document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
+                               actionLabel: "Import Image", layerID: document.layers[i].id)
     }
 }
 
@@ -2105,6 +2121,7 @@ struct MoveTransformInspector: View {
             // Non-destructive: the cropped image becomes a NEW layer above; the original
             // is hidden (kept), not overwritten — there's no undo. Then give the new layer
             // the centered/scaled/aspect transform so the Move box hugs it (ready for Fit/Fill).
+            document.captureHistoryBaselineIfNeeded()
             if let newID = document.addResultLayer(png, above: i, nameSuffix: "cropped"),
                let ni = document.layers.firstIndex(where: { $0.id == newID }) {
                 document.layers[ni].transform = LayerTransform(
@@ -2112,6 +2129,9 @@ struct MoveTransformInspector: View {
                     scale: max(crop.width, crop.height),
                     rotationDegrees: 0,
                     contentAspect: crop.height > 0 ? crop.width / crop.height : 1)
+                // Crop is a destructive Apply (new layer, source hidden) → one history step.
+                document.recordHistory(toolID: Tool.move.rawValue, groupTitle: "Crop",
+                                       actionLabel: "Crop", layerID: newID)
             }
             document.cropRect = nil
             cropAspect = .original
@@ -2477,6 +2497,7 @@ struct CanvasView: View {
         // Start a new erase session (a fresh copy) if we aren't already erasing the active layer.
         if pen.eraserWorkingLayerID != activeLayerID || !pen.hasEraseSession {
             guard let idx = activeIndex, let png = activeImagePNG else { return }
+            document.captureHistoryBaselineIfNeeded()   // before the layer copy is made
             let srcTransform = document.layers[idx].transform
             guard let newID = document.addResultLayer(png, above: idx, nameSuffix: "erased"),
                   let nIdx = document.layers.firstIndex(where: { $0.id == newID }) else { return }
@@ -2503,6 +2524,9 @@ struct CanvasView: View {
               let widx = document.layers.firstIndex(where: { $0.id == wid }),
               let png = pen.endEraseStroke() else { pen.eraserLiveLayerID = nil; return }
         document.layers[widx].setImage(png)
+        // History: each committed brush-erase stroke = one "Erase" step under the Eraser group.
+        document.recordHistory(toolID: Tool.eraser.rawValue, groupTitle: Tool.eraser.title,
+                               actionLabel: "Erase", layerID: document.layers[widx].id)
         pen.eraserLiveLayerID = nil
     }
 

@@ -181,16 +181,24 @@ extension IconDocument {
     /// matching the "grouped by tool" design. Non-destructive tools (zoom / pan / eyedropper)
     /// never call this. `toolID`/`groupTitle` come from the caller's `Tool` (rawValue / title);
     /// the model stays free of the editor's Tool enum.
+    /// `coalesce` (used by continuous edits like typing): if the current tool run's LAST
+    /// action already has this label, update ITS snapshot in place instead of appending a
+    /// new row — so a whole typing session is one "Text" step, not one per keystroke.
     func recordHistory(toolID: String, groupTitle: String, actionLabel: String,
-                       layerID: IconLayer.ID?) {
-        let action = HistoryAction(label: actionLabel, layerID: layerID, snapshot: encodedSnapshot())
+                       layerID: IconLayer.ID?, coalesce: Bool = false) {
+        let snapshot = encodedSnapshot()
         let n = history.entries.count
         if n > 0, history.entries[n - 1].toolID == toolID {
-            history.entries[n - 1].actions.append(action)   // continue the current run
+            let m = history.entries[n - 1].actions.count
+            if coalesce, m > 0, history.entries[n - 1].actions[m - 1].label == actionLabel {
+                history.entries[n - 1].actions[m - 1].snapshot = snapshot   // fold into the current row
+                return
+            }
+            history.entries[n - 1].actions.append(
+                HistoryAction(label: actionLabel, layerID: layerID, snapshot: snapshot))
         } else {
-            history.entries.append(HistoryEntry(toolID: toolID,
-                                                title: groupTitle,
-                                                actions: [action]))
+            history.entries.append(HistoryEntry(toolID: toolID, title: groupTitle,
+                actions: [HistoryAction(label: actionLabel, layerID: layerID, snapshot: snapshot)]))
         }
     }
 
