@@ -47,6 +47,11 @@ final class IconDocument: ObservableObject {
     /// The 8-slot brand palette (hex), saved WITH the document so it travels per-project.
     @Published var palette: [String]
 
+    /// Linear, tool-grouped edit history — the app's undo (a byproduct of stepping
+    /// back through this list; there is NO ⌘Z / UndoManager). Saved in the package,
+    /// persistent per-project. Empty until the recording hooks land (step 2).
+    @Published var history: IconHistory = IconHistory()
+
     /// Optional crop region — a normalized rectangle (0…1, origin top-left) in canvas
     /// space marking the KEPT area. `nil` = no crop (full square). Non-destructive:
     /// stored here and applied at export/share; the source layers are never trimmed.
@@ -104,7 +109,7 @@ final class IconDocument: ObservableObject {
 
     init(name: String = "Untitled Image", canvasWidth: Int = 1024, canvasHeight: Int = 1024,
          layers: [IconLayer] = [], palette: [String] = IconDocument.lastUsedPalette,
-         cropRect: CGRect? = nil, ppi: Double = 72) {
+         cropRect: CGRect? = nil, ppi: Double = 72, history: IconHistory = IconHistory()) {
         self.name = name
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
@@ -112,6 +117,7 @@ final class IconDocument: ObservableObject {
         self.palette = palette
         self.cropRect = cropRect
         self.ppi = ppi
+        self.history = history
     }
 
     /// A brand-new icon's default stack (bottom → top): two background floors —
@@ -447,6 +453,54 @@ struct PaletteFileDocument: FileDocument {
     }
 }
 
+// MARK: - History (linear, tool-grouped timeline — the app's undo)
+//
+// Step 1 (2026-07-02): DATA MODEL + PERSISTENCE only. No UI, no recording yet.
+// Design per DeveloperNotes "HISTORY — DECIDED 2026-06-10":
+//   • Linear, Photoshop-style. Undo is a BYPRODUCT of this list — no ⌘Z, no
+//     app-wide UndoManager (that snapshot-the-whole-store undo is the crash class
+//     that killed Shelf-Ready; deliberately avoided).
+//   • Grouped by tool (reveal carats); each group holds that run's nested actions.
+//     Only destructive/edit tools are parents — never zoom/pan.
+//   • Per-stroke granularity lives in a group's `actions` (each pen stroke = one).
+//   • Linear step-back: pick an entry → everything forward is dropped.
+//   • Persistent from icon creation across close/reopen; cleared ONLY by Purge.
+
+/// One nested action under a tool group — the granular, step-back-able unit
+/// (e.g. a single pen stroke, one bucket fill).
+struct HistoryAction: Identifiable, Codable {
+    var id = UUID()
+    /// Row label, e.g. "Stroke", "Fill", "Erase".
+    var label: String
+    /// The layer this action modified (for display + step-back targeting). Optional
+    /// so document-wide actions (e.g. a crop) can omit it.
+    var layerID: IconLayer.ID? = nil
+    /// Filename of the PNG snapshot (a sibling file in the package) capturing the
+    /// affected layer AFTER this action, so step-back can restore pixels. `nil` until
+    /// the recording hooks populate it (step 2) — icons are tiny, so per-action
+    /// snapshots are affordable ("storage is a non-issue" — Michael).
+    var snapshotAsset: String? = nil
+}
+
+/// A tool group in the timeline (the reveal-carat parent) — one continuous run of a
+/// tool's actions. Only destructive/edit tools create groups.
+struct HistoryEntry: Identifiable, Codable {
+    var id = UUID()
+    /// Owning tool's raw id (`Tool.rawValue`, e.g. "pen", "fill", "eraser").
+    var toolID: String
+    /// Group header, e.g. "Pen (Pixels)", "Paint Bucket".
+    var title: String
+    /// Nested actions; per-stroke granularity lives here.
+    var actions: [HistoryAction] = []
+}
+
+/// The document's linear edit history. Persistent per-project (saved in the package),
+/// cleared only by Purge History. Undo = stepping back through `entries`, which
+/// truncates everything after the chosen point.
+struct IconHistory: Codable {
+    var entries: [HistoryEntry] = []
+}
+
 /// The serializable shape written into a saved package's `manifest.json`.
 /// Binary assets (pixel/image PNGs) become sibling files in the wrapper when those
 /// tools land — kept out of JSON to avoid base64 bloat.
@@ -470,6 +524,9 @@ struct IconProjectManifest: Codable {
     var cropMarks: Bool? = nil
     var registrationMarks: Bool? = nil
     var colorSpaceCMYK: Bool? = nil
+    /// Linear edit history; optional/absent in files saved before History existed → an
+    /// empty history. (Snapshot PNGs referenced by entries live as sibling files.)
+    var history: IconHistory? = nil
 }
 
 extension IconDocument: ReferenceFileDocument {
@@ -485,7 +542,7 @@ extension IconDocument: ReferenceFileDocument {
         let h = manifest.canvasHeight ?? manifest.canvasSize ?? 1024
         self.init(name: manifest.name, canvasWidth: w, canvasHeight: h, layers: manifest.layers,
                   palette: manifest.palette ?? IconDocument.lastUsedPalette, cropRect: manifest.cropRect,
-                  ppi: manifest.ppi ?? 72)
+                  ppi: manifest.ppi ?? 72, history: manifest.history ?? IconHistory())
         // Print-setup fields (section C) — apply saved values over the defaults.
         if let v = manifest.bleedInches { bleedInches = v }
         if let v = manifest.safeMarginInches { safeMarginInches = v }
@@ -500,7 +557,7 @@ extension IconDocument: ReferenceFileDocument {
                             layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
                             bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                             cropMarks: cropMarks, registrationMarks: registrationMarks,
-                            colorSpaceCMYK: colorSpaceCMYK)
+                            colorSpaceCMYK: colorSpaceCMYK, history: history)
     }
 
     /// Write the package: a directory wrapper holding `manifest.json`.
@@ -527,7 +584,7 @@ extension IconDocument {
                                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
                                            bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                                            cropMarks: cropMarks, registrationMarks: registrationMarks,
-                                           colorSpaceCMYK: colorSpaceCMYK)
+                                           colorSpaceCMYK: colorSpaceCMYK, history: history)
         let data = try JSONEncoder().encode(manifest)
         let mf = FileWrapper(regularFileWithContents: data)
         mf.preferredFilename = "manifest.json"
