@@ -1876,12 +1876,33 @@ struct HistoryPanel: View {
     @State private var expanded: Set<UUID> = []
     @State private var confirmingPurge = false
 
-    /// After a step-back the active layer may have been dropped (e.g. a fill result layer);
-    /// fall back to the top layer so the editor keeps a valid selection.
+    /// After viewing/deleting a history point the active layer may no longer exist (e.g. a
+    /// fill result layer); fall back to the top layer so the editor keeps a valid selection.
     private func clampActiveLayer() {
         if !document.layers.contains(where: { $0.id == activeLayerID }) {
             activeLayerID = document.layers.last?.id
         }
+    }
+
+    /// Total recorded actions across all groups (baseline excluded).
+    private var totalActions: Int {
+        document.history.entries.reduce(0) { $0 + $1.actions.count }
+    }
+
+    /// Flat ordinal of the currently-viewed point: baseline = -1, otherwise the count of
+    /// actions before it. Used to highlight the current row and dim the steps "ahead."
+    private var cursorOrdinal: Int {
+        switch document.historyCursor {
+        case .baseline: return -1
+        case .latest:   return totalActions - 1
+        case .at(let e, let a):
+            return document.history.entries.prefix(e).reduce(0) { $0 + $1.actions.count } + a
+        }
+    }
+
+    /// Actions before entry `e` — the ordinal of that entry's first action.
+    private func baseOrdinal(_ e: Int) -> Int {
+        document.history.entries.prefix(e).reduce(0) { $0 + $1.actions.count }
     }
 
     var body: some View {
@@ -1908,28 +1929,45 @@ struct HistoryPanel: View {
             if document.history.entries.isEmpty && document.history.baseline == nil {
                 PanelPlaceholder(systemImage: "clock.arrow.circlepath",
                                  title: "History",
-                                 subtitle: "Your edits appear here. Tap any step to go back to it.")
+                                 subtitle: "Your edits appear here. Tap a step to view it — nothing is removed. Right-click (or long-press) a step to delete it and everything after.")
             } else {
                 List {
                     if document.history.baseline != nil {
+                        let isCurrent = cursorOrdinal < 0
                         Button {
-                            document.stepBackToBaseline(); clampActiveLayer()
+                            document.jumpToBaseline(); clampActiveLayer()
                         } label: {
                             Label("Original", systemImage: "photo")
-                                .font(.system(size: 16))
+                                .font(.system(size: 16, weight: isCurrent ? .semibold : .regular))
                         }
                         .buttonStyle(.plain)
+                        .listRowBackground(isCurrent ? Color.accentColor.opacity(0.15) : Color.clear)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                document.deleteHistoryFromBaseline(); clampActiveLayer()
+                            } label: { Label("Delete Everything After", systemImage: "trash") }
+                        }
                     }
                     ForEach(Array(document.history.entries.enumerated()), id: \.element.id) { eIdx, entry in
                         HistoryEntryRow(entry: entry,
+                                        baseOrdinal: baseOrdinal(eIdx),
+                                        cursorOrdinal: cursorOrdinal,
                                         expanded: expanded.contains(entry.id),
                                         toggle: { toggle(entry.id) },
-                                        stepToEntry: {
-                                            document.stepBack(toEntry: eIdx, action: entry.actions.count - 1)
+                                        viewEntry: {
+                                            document.jump(toEntry: eIdx, action: entry.actions.count - 1)
                                             clampActiveLayer()
                                         },
-                                        stepToAction: { aIdx in
-                                            document.stepBack(toEntry: eIdx, action: aIdx)
+                                        viewAction: { aIdx in
+                                            document.jump(toEntry: eIdx, action: aIdx)
+                                            clampActiveLayer()
+                                        },
+                                        deleteEntry: {
+                                            document.deleteHistory(fromEntry: eIdx, action: 0)
+                                            clampActiveLayer()
+                                        },
+                                        deleteAction: { aIdx in
+                                            document.deleteHistory(fromEntry: eIdx, action: aIdx)
                                             clampActiveLayer()
                                         })
                     }
@@ -1956,16 +1994,26 @@ struct HistoryPanel: View {
 }
 
 /// One tool-group row in the History panel: a chevron to reveal the nested actions, the
-/// group title + action count (tap = step back to the whole group), and, when expanded,
-/// each nested action (tap = step back to that single action).
+/// group title + action count, and (when expanded) each nested action. TAP a group or an
+/// action to VIEW that state (non-destructive). RIGHT-CLICK / LONG-PRESS to delete it and
+/// everything after. The current point is highlighted; steps "ahead" of it are dimmed.
 private struct HistoryEntryRow: View {
     let entry: HistoryEntry
+    let baseOrdinal: Int          // ordinal of this entry's first action
+    let cursorOrdinal: Int        // currently-viewed ordinal (baseline = -1)
     let expanded: Bool
     let toggle: () -> Void
-    let stepToEntry: () -> Void
-    let stepToAction: (Int) -> Void
+    let viewEntry: () -> Void
+    let viewAction: (Int) -> Void
+    let deleteEntry: () -> Void
+    let deleteAction: (Int) -> Void
 
     private var toolSymbol: String { Tool(rawValue: entry.toolID)?.systemImage ?? "square.dashed" }
+    private var lastOrdinal: Int { baseOrdinal + entry.actions.count - 1 }
+    /// The viewed point falls inside this group.
+    private var groupHoldsCursor: Bool { cursorOrdinal >= baseOrdinal && cursorOrdinal <= lastOrdinal }
+    /// The whole group is ahead of the viewed point (dimmed — dropped if you edit/delete).
+    private var groupAhead: Bool { baseOrdinal > cursorOrdinal }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1977,7 +2025,7 @@ private struct HistoryEntryRow: View {
                         .frame(width: 16)
                 }
                 .buttonStyle(.plain)
-                Button(action: stepToEntry) {
+                Button(action: viewEntry) {
                     HStack {
                         Image(systemName: toolSymbol)
                         Text(entry.title)
@@ -1990,22 +2038,39 @@ private struct HistoryEntryRow: View {
                 }
                 .buttonStyle(.plain)
             }
-            .font(.system(size: 16))
+            .font(.system(size: 16, weight: groupHoldsCursor ? .semibold : .regular))
+            .opacity(groupAhead ? 0.4 : 1)
+            .contextMenu {
+                Button(role: .destructive, action: deleteEntry) {
+                    Label("Delete This and Everything After", systemImage: "trash")
+                }
+            }
 
             if expanded {
                 ForEach(Array(entry.actions.enumerated()), id: \.element.id) { aIdx, action in
-                    Button { stepToAction(aIdx) } label: {
+                    let ord = baseOrdinal + aIdx
+                    let isCurrent = ord == cursorOrdinal
+                    Button { viewAction(aIdx) } label: {
                         HStack {
                             Text(action.label)
                             Spacer()
+                            if isCurrent {
+                                Image(systemName: "eye.fill").font(.system(size: 11))
+                            }
                         }
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14, weight: isCurrent ? .semibold : .regular))
+                        .foregroundStyle(isCurrent ? Color.accentColor : Color.secondary)
                         .padding(.leading, 30)
                         .padding(.vertical, 1)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .opacity(ord > cursorOrdinal ? 0.4 : 1)
+                    .contextMenu {
+                        Button(role: .destructive) { deleteAction(aIdx) } label: {
+                            Label("Delete This and Everything After", systemImage: "trash")
+                        }
+                    }
                 }
             }
         }

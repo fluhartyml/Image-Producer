@@ -52,6 +52,14 @@ final class IconDocument: ObservableObject {
     /// persistent per-project. Empty until the recording hooks land (step 2).
     @Published var history: IconHistory = IconHistory()
 
+    /// Where the History panel is currently VIEWING. Tapping a history point moves this
+    /// (non-destructively) and shows that state on the canvas; the list is never trimmed
+    /// by viewing. `.latest` = the newest committed state (the default, and what the file
+    /// always saves — a preview is transient, never persisted). The forward tail is only
+    /// dropped when the user COMMITS by making a new edit from a past point. Transient
+    /// (not saved); a reopened document always starts at `.latest`.
+    @Published var historyCursor: HistoryCursor = .latest
+
     /// Optional crop region — a normalized rectangle (0…1, origin top-left) in canvas
     /// space marking the KEPT area. `nil` = no crop (full square). Non-destructive:
     /// stored here and applied at export/share; the source layers are never trimmed.
@@ -186,6 +194,7 @@ extension IconDocument {
     /// new row — so a whole typing session is one "Text" step, not one per keystroke.
     func recordHistory(toolID: String, groupTitle: String, actionLabel: String,
                        layerID: IconLayer.ID?, coalesce: Bool = false) {
+        commitCursorIfNeeded()   // a new edit while viewing the past commits at the cursor
         let snapshot = encodedSnapshot()
         let n = history.entries.count
         if n > 0, history.entries[n - 1].toolID == toolID {
@@ -202,6 +211,26 @@ extension IconDocument {
         }
     }
 
+    /// If a NEW edit is recorded while VIEWING a past state, that's the implicit commit:
+    /// keep everything up to the cursor, drop the abandoned "future" after it, then the new
+    /// action appends on top. (You can't edit a past state and keep divergent futures — the
+    /// spec rejected branching.) A no-op when already at `.latest`.
+    private func commitCursorIfNeeded() {
+        switch historyCursor {
+        case .latest:
+            break
+        case .baseline:
+            history.entries.removeAll()                 // editing from Original discards the old future
+        case .at(let e, let a):
+            if history.entries.indices.contains(e) {
+                var entry = history.entries[e]
+                entry.actions = Array(entry.actions.prefix(a + 1))
+                history.entries = Array(history.entries.prefix(e)) + [entry]
+            }
+        }
+        historyCursor = .latest
+    }
+
     /// Restore a snapshot's layer stack onto the live document (leaves non-history state —
     /// name, canvas size, palette, crop, ppi, print setup — untouched).
     private func restore(_ data: Data?) {
@@ -209,26 +238,57 @@ extension IconDocument {
         layers = snap.layers
     }
 
-    /// Linear step-back to a chosen action: restore its layer-stack snapshot and DROP every
-    /// action/entry after it (the picked action's effect is kept — "resume from there").
-    /// This IS the app's undo (no ⌘Z / UndoManager). Returns true if it stepped back.
-    @discardableResult
-    func stepBack(toEntry entryIndex: Int, action actionIndex: Int) -> Bool {
-        guard history.entries.indices.contains(entryIndex),
-              history.entries[entryIndex].actions.indices.contains(actionIndex) else { return false }
-        restore(history.entries[entryIndex].actions[actionIndex].snapshot)
-        // Trim the target entry to the picked action, drop all entries after it.
-        var entry = history.entries[entryIndex]
-        entry.actions = Array(entry.actions.prefix(actionIndex + 1))
-        history.entries = Array(history.entries.prefix(entryIndex)) + [entry]
-        return true
+    /// The layer stack the FILE should persist. While viewing a past state (`historyCursor`
+    /// ≠ `.latest`), the on-screen `layers` hold that transient preview — but the saved file
+    /// must keep the newest COMMITTED state, so viewing-then-closing can never lose work.
+    /// At `.latest` (or with no entries) this is just `layers`.
+    var canonicalLayers: [IconLayer] {
+        if case .latest = historyCursor { return layers }
+        if let data = history.entries.last?.actions.last?.snapshot,
+           let snap = try? JSONDecoder().decode(DocumentSnapshot.self, from: data) {
+            return snap.layers
+        }
+        return layers
     }
 
-    /// Step back to the original (pre-first-edit) layer stack — the "Original" row. Restores
-    /// the baseline and clears every recorded entry (the baseline itself is kept).
-    func stepBackToBaseline() {
+    /// TAP a history point: NON-DESTRUCTIVELY view that state (restore it to the canvas) and
+    /// move the cursor there. The list is never trimmed by viewing — the user can move around
+    /// freely and return. Landing on the newest action is treated as `.latest`.
+    func jump(toEntry e: Int, action a: Int) {
+        guard history.entries.indices.contains(e),
+              history.entries[e].actions.indices.contains(a) else { return }
+        restore(history.entries[e].actions[a].snapshot)
+        let lastE = history.entries.count - 1
+        let lastA = history.entries[lastE].actions.count - 1
+        historyCursor = (e == lastE && a == lastA) ? .latest : .at(entry: e, action: a)
+    }
+
+    /// TAP the "Original" row: view the pre-first-edit state (non-destructive).
+    func jumpToBaseline() {
         restore(history.baseline)
+        historyCursor = history.entries.isEmpty ? .latest : .baseline
+    }
+
+    /// COMMIT via long-press / right-click: delete the chosen action AND every action/entry
+    /// after it, reverting the canvas to the state just before it (or Original if nothing
+    /// remains). This is the deliberate, destructive prune — tapping only ever views.
+    func deleteHistory(fromEntry e: Int, action a: Int) {
+        guard history.entries.indices.contains(e),
+              history.entries[e].actions.indices.contains(a) else { return }
+        var kept = Array(history.entries.prefix(e))
+        var entry = history.entries[e]
+        entry.actions = Array(entry.actions.prefix(a))     // drop action `a` and everything after
+        if !entry.actions.isEmpty { kept.append(entry) }
+        history.entries = kept
+        restore(history.entries.last?.actions.last?.snapshot ?? history.baseline)
+        historyCursor = .latest
+    }
+
+    /// COMMIT from the "Original" row: drop every recorded entry, back to the pre-edit state.
+    func deleteHistoryFromBaseline() {
         history.entries.removeAll()
+        restore(history.baseline)
+        historyCursor = .latest
     }
 
     /// Purge History (the ONLY thing that clears the trail): keep the CURRENT image, drop the
@@ -236,6 +296,7 @@ extension IconDocument {
     func purgeHistory() {
         history.entries.removeAll()
         history.baseline = nil
+        historyCursor = .latest
     }
 }
 
@@ -603,6 +664,17 @@ struct DocumentSnapshot: Codable {
     var layers: [IconLayer]
 }
 
+/// Where the History panel is currently VIEWING (see `IconDocument.historyCursor`).
+/// Viewing is non-destructive; only an explicit "delete from here" or a new edit prunes.
+enum HistoryCursor: Equatable {
+    /// The newest committed state (default) — what the file always saves.
+    case latest
+    /// The pre-first-edit "Original".
+    case baseline
+    /// A specific past action being previewed.
+    case at(entry: Int, action: Int)
+}
+
 /// The serializable shape written into a saved package's `manifest.json`.
 /// Binary assets (pixel/image PNGs) become sibling files in the wrapper when those
 /// tools land — kept out of JSON to avoid base64 bloat.
@@ -656,7 +728,7 @@ extension IconDocument: ReferenceFileDocument {
     /// Capture current state for writing (called off the main actor by SwiftUI).
     func snapshot(contentType: UTType) throws -> IconProjectManifest {
         IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
+                            layers: canonicalLayers, palette: palette, cropRect: cropRect, ppi: ppi,
                             bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                             cropMarks: cropMarks, registrationMarks: registrationMarks,
                             colorSpaceCMYK: colorSpaceCMYK, history: history)
@@ -683,7 +755,7 @@ extension IconDocument {
     /// as the official `fileWrapper(snapshot:)` writer, so the file stays interchangeable.
     func writePackage(to url: URL) throws {
         let manifest = IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-                                           layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
+                                           layers: canonicalLayers, palette: palette, cropRect: cropRect, ppi: ppi,
                                            bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                                            cropMarks: cropMarks, registrationMarks: registrationMarks,
                                            colorSpaceCMYK: colorSpaceCMYK, history: history)
