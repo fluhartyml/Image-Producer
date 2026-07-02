@@ -159,19 +159,31 @@ extension IconDocument {
     }
 }
 
-// MARK: - History recording (step 2)
+// MARK: - History recording + step-back (steps 2–3)
 
 extension IconDocument {
-    /// Append one edit to the linear history. Consecutive actions from the SAME tool
-    /// nest under one group (a continuous "tool run"); a different tool starts a new
-    /// group — matching the "grouped by tool" design. `snapshot` is the affected
-    /// layer's PNG AFTER the edit (inline, for later step-back). Non-destructive tools
-    /// (zoom / pan / eyedropper) never call this — they don't create groups.
-    /// `toolID`/`groupTitle` come from the caller's `Tool` (rawValue / title); the model
-    /// stays free of the editor's Tool enum.
+    /// Encode the current layer stack as a `DocumentSnapshot`.
+    private func encodedSnapshot() -> Data? {
+        try? JSONEncoder().encode(DocumentSnapshot(layers: layers))
+    }
+
+    /// Capture the pre-edit layer stack as the history baseline the FIRST time an edit is
+    /// recorded, so step-back can return to the original. No-op once set. MUST be called
+    /// BEFORE the edit mutates the layers.
+    func captureHistoryBaselineIfNeeded() {
+        guard history.baseline == nil, history.entries.isEmpty else { return }
+        history.baseline = encodedSnapshot()
+    }
+
+    /// Append one edit to the linear history, AFTER it has been applied to `layers` (so the
+    /// snapshot captures the post-edit state). Consecutive actions from the SAME tool nest
+    /// under one group (a continuous "tool run"); a different tool starts a new group —
+    /// matching the "grouped by tool" design. Non-destructive tools (zoom / pan / eyedropper)
+    /// never call this. `toolID`/`groupTitle` come from the caller's `Tool` (rawValue / title);
+    /// the model stays free of the editor's Tool enum.
     func recordHistory(toolID: String, groupTitle: String, actionLabel: String,
-                       layerID: IconLayer.ID?, snapshot: Data?) {
-        let action = HistoryAction(label: actionLabel, layerID: layerID, snapshot: snapshot)
+                       layerID: IconLayer.ID?) {
+        let action = HistoryAction(label: actionLabel, layerID: layerID, snapshot: encodedSnapshot())
         let n = history.entries.count
         if n > 0, history.entries[n - 1].toolID == toolID {
             history.entries[n - 1].actions.append(action)   // continue the current run
@@ -180,6 +192,42 @@ extension IconDocument {
                                                 title: groupTitle,
                                                 actions: [action]))
         }
+    }
+
+    /// Restore a snapshot's layer stack onto the live document (leaves non-history state —
+    /// name, canvas size, palette, crop, ppi, print setup — untouched).
+    private func restore(_ data: Data?) {
+        guard let data, let snap = try? JSONDecoder().decode(DocumentSnapshot.self, from: data) else { return }
+        layers = snap.layers
+    }
+
+    /// Linear step-back to a chosen action: restore its layer-stack snapshot and DROP every
+    /// action/entry after it (the picked action's effect is kept — "resume from there").
+    /// This IS the app's undo (no ⌘Z / UndoManager). Returns true if it stepped back.
+    @discardableResult
+    func stepBack(toEntry entryIndex: Int, action actionIndex: Int) -> Bool {
+        guard history.entries.indices.contains(entryIndex),
+              history.entries[entryIndex].actions.indices.contains(actionIndex) else { return false }
+        restore(history.entries[entryIndex].actions[actionIndex].snapshot)
+        // Trim the target entry to the picked action, drop all entries after it.
+        var entry = history.entries[entryIndex]
+        entry.actions = Array(entry.actions.prefix(actionIndex + 1))
+        history.entries = Array(history.entries.prefix(entryIndex)) + [entry]
+        return true
+    }
+
+    /// Step back to the original (pre-first-edit) layer stack — the "Original" row. Restores
+    /// the baseline and clears every recorded entry (the baseline itself is kept).
+    func stepBackToBaseline() {
+        restore(history.baseline)
+        history.entries.removeAll()
+    }
+
+    /// Purge History (the ONLY thing that clears the trail): keep the CURRENT image, drop the
+    /// entire history — entries AND the baseline. The live `layers` are never touched.
+    func purgeHistory() {
+        history.entries.removeAll()
+        history.baseline = nil
     }
 }
 
@@ -481,8 +529,11 @@ struct PaletteFileDocument: FileDocument {
 //
 // Step 1 (2026-07-02): DATA MODEL + PERSISTENCE only. No UI, no recording yet.
 // Step 2 (2026-07-02): RECORDING HOOKS. Pen strokes + Paint Bucket fills append to
-//   the timeline via IconDocument.recordHistory (below); each captures the affected
-//   layer's post-edit PNG for later step-back. No UI / step-back yet (step 3).
+//   the timeline via IconDocument.recordHistory (below).
+// Step 3 (2026-07-02): PANEL UI + LINEAR STEP-BACK. Each action snapshots the whole
+//   LAYER STACK (DocumentSnapshot) post-edit; step-back restores it and drops everything
+//   forward. Baseline captures the pre-first-edit stack → an "Original" row. Undo is a
+//   byproduct of the History panel — NO ⌘Z / UndoManager (spec + Shelf-Ready crash class).
 // Design per DeveloperNotes "HISTORY — DECIDED 2026-06-10":
 //   • Linear, Photoshop-style. Undo is a BYPRODUCT of this list — no ⌘Z, no
 //     app-wide UndoManager (that snapshot-the-whole-store undo is the crash class
@@ -499,15 +550,16 @@ struct HistoryAction: Identifiable, Codable {
     var id = UUID()
     /// Row label, e.g. "Stroke", "Fill", "Erase".
     var label: String
-    /// The layer this action modified (for display + step-back targeting). Optional
-    /// so document-wide actions (e.g. a crop) can omit it.
+    /// The layer this action modified — for display (which layer a row touched). Optional
+    /// so document-wide actions can omit it. Not used for restore (the snapshot below is
+    /// a full layer-stack capture, which reverses layer add/hide too).
     var layerID: IconLayer.ID? = nil
-    /// PNG snapshot of the affected layer AFTER this action, so step-back (step 3) can
-    /// restore its pixels. Stored INLINE (base64 in the manifest) to match how layer
-    /// pixels are already persisted today — icons are tiny, so per-action snapshots are
-    /// affordable ("storage is a non-issue" — Michael). Sibling-file storage is the
-    /// later optimization once layer pixels move out of the JSON too. `nil` for actions
-    /// with no restorable raster.
+    /// A `DocumentSnapshot` (encoded JSON) of the whole LAYER STACK AFTER this action —
+    /// step-back decodes it and replaces `document.layers` wholesale, so picking any point
+    /// restores exactly that state (including fill's added/hidden layers, which a single
+    /// layer PNG could not reverse). Stored INLINE, matching how layer pixels are already
+    /// persisted; icons are tiny + "storage is a non-issue" (Michael). Sibling-file storage
+    /// is the later optimization once layer pixels move out of the JSON too.
     var snapshot: Data? = nil
 }
 
@@ -528,6 +580,19 @@ struct HistoryEntry: Identifiable, Codable {
 /// truncates everything after the chosen point.
 struct IconHistory: Codable {
     var entries: [HistoryEntry] = []
+    /// The layer stack BEFORE the first recorded edit (encoded `DocumentSnapshot`), so
+    /// step-back can return all the way to the original — the "Original" row in the panel.
+    /// Captured once, on the first edit; `nil` until then.
+    var baseline: Data? = nil
+}
+
+/// A restorable capture of just the LAYER STACK at one history point. History governs
+/// only the destructive layer edits (pen / fill / eraser…), so a snapshot captures only
+/// `layers` — deliberately NOT canvas size, name, palette, crop, ppi or print setup, which
+/// aren't history-tracked and must survive a step-back untouched (no silent rename/resize
+/// reverts). Reversing an action = replacing `document.layers` with this.
+struct DocumentSnapshot: Codable {
+    var layers: [IconLayer]
 }
 
 /// The serializable shape written into a saved package's `manifest.json`.

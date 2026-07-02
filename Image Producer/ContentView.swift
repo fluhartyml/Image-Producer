@@ -1767,9 +1767,7 @@ enum BottomPanel: String, CaseIterable, Identifiable {
         }
 
         private var historyPage: some View {
-            PanelPlaceholder(systemImage: "clock.arrow.circlepath",
-                             title: "History",
-                             subtitle: "Tool-grouped step-back — coming soon")
+            HistoryPanel(document: document, activeLayerID: $activeLayerID, showsHeader: compact)
         }
     }
 }
@@ -1808,6 +1806,158 @@ struct PanelPlaceholder: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+    }
+}
+
+// MARK: - History panel (step 3)
+
+/// The linear, tool-grouped edit timeline — the app's undo (there is NO ⌘Z / UndoManager;
+/// undo is a byproduct of picking a point here). Newest at the bottom; the last row is the
+/// current state. Tap any tool group (its whole run) or a nested action to STEP BACK to that
+/// point — everything after it is dropped. The "Original" row returns to the pre-edit state.
+/// Purge History (behind the ⋯ menu, confirmed) clears the trail but keeps the current image.
+struct HistoryPanel: View {
+    @ObservedObject var document: IconDocument
+    @Binding var activeLayerID: IconLayer.ID?
+    /// iPhone (no pills) shows a "History" header so the swiped-to page is labeled.
+    var showsHeader: Bool = false
+
+    @State private var expanded: Set<UUID> = []
+    @State private var confirmingPurge = false
+
+    /// After a step-back the active layer may have been dropped (e.g. a fill result layer);
+    /// fall back to the top layer so the editor keeps a valid selection.
+    private func clampActiveLayer() {
+        if !document.layers.contains(where: { $0.id == activeLayerID }) {
+            activeLayerID = document.layers.last?.id
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                if showsHeader {
+                    Text("History").font(.system(size: 20, weight: .semibold))
+                }
+                Spacer()
+                Menu {
+                    Button(role: .destructive) { confirmingPurge = true } label: {
+                        Label("Purge History…", systemImage: "trash")
+                    }
+                    .disabled(document.history.entries.isEmpty && document.history.baseline == nil)
+                } label: {
+                    Image(systemName: "ellipsis.circle").font(.system(size: 18))
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            if document.history.entries.isEmpty && document.history.baseline == nil {
+                PanelPlaceholder(systemImage: "clock.arrow.circlepath",
+                                 title: "History",
+                                 subtitle: "Your edits appear here. Tap any step to go back to it.")
+            } else {
+                List {
+                    if document.history.baseline != nil {
+                        Button {
+                            document.stepBackToBaseline(); clampActiveLayer()
+                        } label: {
+                            Label("Original", systemImage: "photo")
+                                .font(.system(size: 16))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    ForEach(Array(document.history.entries.enumerated()), id: \.element.id) { eIdx, entry in
+                        HistoryEntryRow(entry: entry,
+                                        expanded: expanded.contains(entry.id),
+                                        toggle: { toggle(entry.id) },
+                                        stepToEntry: {
+                                            document.stepBack(toEntry: eIdx, action: entry.actions.count - 1)
+                                            clampActiveLayer()
+                                        },
+                                        stepToAction: { aIdx in
+                                            document.stepBack(toEntry: eIdx, action: aIdx)
+                                            clampActiveLayer()
+                                        })
+                    }
+                }
+                #if os(macOS)
+                .listStyle(.inset)
+                #else
+                .listStyle(.plain)
+                #endif
+            }
+        }
+        .confirmationDialog("Purge all history?",
+                            isPresented: $confirmingPurge, titleVisibility: .visible) {
+            Button("Purge History", role: .destructive) { document.purgeHistory() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Keeps the current image and clears the entire edit trail. This can't be undone.")
+        }
+    }
+
+    private func toggle(_ id: UUID) {
+        if expanded.contains(id) { expanded.remove(id) } else { expanded.insert(id) }
+    }
+}
+
+/// One tool-group row in the History panel: a chevron to reveal the nested actions, the
+/// group title + action count (tap = step back to the whole group), and, when expanded,
+/// each nested action (tap = step back to that single action).
+private struct HistoryEntryRow: View {
+    let entry: HistoryEntry
+    let expanded: Bool
+    let toggle: () -> Void
+    let stepToEntry: () -> Void
+    let stepToAction: (Int) -> Void
+
+    private var toolSymbol: String { Tool(rawValue: entry.toolID)?.systemImage ?? "square.dashed" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Button(action: toggle) {
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16)
+                }
+                .buttonStyle(.plain)
+                Button(action: stepToEntry) {
+                    HStack {
+                        Image(systemName: toolSymbol)
+                        Text(entry.title)
+                        Spacer()
+                        Text("\(entry.actions.count)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .font(.system(size: 16))
+
+            if expanded {
+                ForEach(Array(entry.actions.enumerated()), id: \.element.id) { aIdx, action in
+                    Button { stepToAction(aIdx) } label: {
+                        HStack {
+                            Text(action.label)
+                            Spacer()
+                        }
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 30)
+                        .padding(.vertical, 1)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 }
 
@@ -2226,14 +2376,13 @@ struct CanvasView: View {
     @MainActor private func bucketFill(atNormalized n: CGPoint, canvas: CGSize) {
         guard activeTool == .fill, let idx = activeIndex else { return }
         if document.layers[idx].backgroundRole != nil {
+            document.captureHistoryBaselineIfNeeded()   // before the edit
             document.layers[idx].setBackgroundFill(fillColor.hexString())
-            // History (step 2): solid background fill — no raster to snapshot (the fill is
-            // a hex color on the layer role); step-back restores that in step 3.
+            // History: solid background fill (the snapshot captures the layer's new fillHex).
             document.recordHistory(toolID: Tool.fill.rawValue,
                                    groupTitle: Tool.fill.title,
                                    actionLabel: "Fill Background",
-                                   layerID: document.layers[idx].id,
-                                   snapshot: nil)
+                                   layerID: document.layers[idx].id)
             return
         }
         guard let png = activeImagePNG,
@@ -2247,17 +2396,17 @@ struct CanvasView: View {
         guard let filled = floodFilledImage(cg, seed: seed, tolerance: Int(pen.bucketTolerance),
                                             fill: (fc.r, fc.g, fc.b, 255)),
               let out = pngData(from: filled) else { return }
+        document.captureHistoryBaselineIfNeeded()   // before the edit
         if let newID = document.addResultLayer(out, above: idx, nameSuffix: "filled"),
            let nIdx = document.layers.firstIndex(where: { $0.id == newID }) {
             document.layers[nIdx].transform = t
             activeLayerID = newID
-            // History (step 2): flood fill lands on a new result layer; snapshot is that
-            // layer's filled raster. (Step-back in step 3 removes the result + re-shows source.)
+            // History: flood fill adds a result layer + hides the source. The layer-stack
+            // snapshot captures both, so step-back removes the result and re-shows the source.
             document.recordHistory(toolID: Tool.fill.rawValue,
                                    groupTitle: Tool.fill.title,
                                    actionLabel: "Fill",
-                                   layerID: newID,
-                                   snapshot: out)
+                                   layerID: newID)
         }
         pen.clearBucketPreview()
     }
@@ -2458,13 +2607,13 @@ struct CanvasView: View {
                         onEnded: {
                             pen.endStroke()
                             if let i = activeIndex, let data = pen.currentPNG() {
+                                document.captureHistoryBaselineIfNeeded()   // before the edit
                                 document.layers[i].setPixels(data)
-                                // History (step 2): right-click erase is a Pen-group Erase action.
+                                // History: right-click erase is a Pen-group Erase action.
                                 document.recordHistory(toolID: Tool.pen.rawValue,
                                                        groupTitle: Tool.pen.title,
                                                        actionLabel: "Erase",
-                                                       layerID: document.layers[i].id,
-                                                       snapshot: data)
+                                                       layerID: document.layers[i].id)
                             }
                         }
                     )
@@ -2490,13 +2639,13 @@ struct CanvasView: View {
                         case .pen:
                             pen.endStroke()
                             if let i = activeIndex, let data = pen.currentPNG() {
+                                document.captureHistoryBaselineIfNeeded()   // before the edit
                                 document.layers[i].setPixels(data)
-                                // History (step 2): one stroke = one action under the Pen group.
+                                // History: one stroke = one action under the Pen group.
                                 document.recordHistory(toolID: Tool.pen.rawValue,
                                                        groupTitle: Tool.pen.title,
                                                        actionLabel: pen.erasing ? "Erase" : "Stroke",
-                                                       layerID: document.layers[i].id,
-                                                       snapshot: data)
+                                                       layerID: document.layers[i].id)
                             }
                         case .fill:
                             bucketFill(atNormalized: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height), canvas: disp)
