@@ -1182,6 +1182,19 @@ struct SymbolPickerInspector: View {
         "bicycle", "figure.walk", "pawprint.fill", "fish.fill", "bird.fill", "hand.thumbsup.fill",
     ]
 
+    /// The COMPLETE SF Symbols name catalog, bundled as SFSymbolNames.json (generated
+    /// from the system CoreGlyphs name_availability.plist, ~9,476 names). Search covers
+    /// ALL of these; the curated `symbols` above is only the starting view shown when the
+    /// search box is empty. Falls back to the curated set if the resource is missing.
+    static let allSymbols: [String] = {
+        guard let url = Bundle.main.url(forResource: "SFSymbolNames", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let names = try? JSONDecoder().decode([String].self, from: data),
+              !names.isEmpty
+        else { return symbols }
+        return names
+    }()
+
     private var activeIndex: Int? {
         guard let id = activeLayerID else { return nil }
         return document.layers.firstIndex(where: { $0.id == id })
@@ -1200,7 +1213,8 @@ struct SymbolPickerInspector: View {
 
     private var filtered: [String] {
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        return q.isEmpty ? Self.symbols : Self.symbols.filter { $0.contains(q) }
+        // Empty box → the curated starter set; typing searches the FULL catalog.
+        return q.isEmpty ? Self.symbols : Self.allSymbols.filter { $0.contains(q) }
     }
 
     private let columns = [GridItem(.adaptive(minimum: 44), spacing: 8)]
@@ -1209,8 +1223,13 @@ struct SymbolPickerInspector: View {
         if activeIsContent {
             VStack(alignment: .leading, spacing: 12) {
                 PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
-                TextField("Search symbols", text: $search)
+                TextField("Search all SF Symbols", text: $search)
                     .textFieldStyle(.roundedBorder)
+                if filtered.isEmpty {
+                    Text("No SF Symbols match “\(search.trimmingCharacters(in: .whitespaces))”.")
+                        .font(.system(size: 16)).foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 8) {
                         ForEach(filtered, id: \.self) { name in
@@ -1231,6 +1250,7 @@ struct SymbolPickerInspector: View {
                     .padding(.vertical, 4)
                 }
                 .frame(maxHeight: 240)
+                }
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -2784,32 +2804,46 @@ struct LayerPanel: View {
             .padding(.horizontal)
             .padding(.vertical, showsHeader ? 10 : 6)
             Divider()
-            List {
-                ForEach(Array(document.layers.reversed())) { layer in
-                    LayerRow(
-                        layer: layer,
-                        isActive: layer.id == activeLayerID,
-                        onActivate: { activeLayerID = layer.id },
-                        onToggleVisibility: { toggleVisibility(layer.id) },
-                        onRename: { beginRename(layer) },
-                        onDuplicate: { duplicate(layer.id) },
-                        onDelete: { delete(layer.id) }
-                    )
-                    .listRowBackground(layer.id == activeLayerID
-                                       ? Color.accentColor.opacity(0.15) : nil)
-                }
-                .onMove(perform: move)
-                .onDelete(perform: deleteAt)
+            #if os(macOS)
+            // macOS: List selection = click-to-activate; .onMove = drag-to-reorder.
+            // You just drag a row (no edit-mode handles on macOS). The row must NOT be a
+            // Button, or it would swallow the drag before .onMove sees it.
+            List(selection: $activeLayerID) {
+                layerRows().onMove(perform: move).onDelete(perform: deleteAt)
             }
             .listStyle(.plain)
-            #if os(iOS)
-            .environment(\.editMode, .constant(.active)) // always-on reorder handles (iOS only)
+            #else
+            // iOS: always-on edit mode gives explicit drag handles; the row Button activates.
+            List {
+                layerRows().onMove(perform: move).onDelete(perform: deleteAt)
+            }
+            .listStyle(.plain)
+            .environment(\.editMode, .constant(.active))
             #endif
         }
         .alert("Rename Layer", isPresented: isRenaming) {
             TextField("Name", text: $draftName)
             Button("Cancel", role: .cancel) { renamingID = nil }
             Button("Rename") { commitRename() }
+        }
+    }
+
+    /// The layer rows (reversed = top-of-stack first). Returns DynamicViewContent so
+    /// `.onMove`/`.onDelete` attach; `.tag` wires each row to List selection on macOS.
+    private func layerRows() -> some DynamicViewContent {
+        ForEach(Array(document.layers.reversed())) { layer in
+            LayerRow(
+                layer: layer,
+                isActive: layer.id == activeLayerID,
+                onActivate: { activeLayerID = layer.id },
+                onToggleVisibility: { toggleVisibility(layer.id) },
+                onRename: { beginRename(layer) },
+                onDuplicate: { duplicate(layer.id) },
+                onDelete: { delete(layer.id) }
+            )
+            .tag(layer.id)
+            .listRowBackground(layer.id == activeLayerID
+                               ? Color.accentColor.opacity(0.15) : nil)
         }
     }
 
@@ -2897,7 +2931,20 @@ struct LayerRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Tapping the badge/name area selects (activates) the layer.
+            #if os(macOS)
+            // macOS: plain label — List selection handles click-to-activate and .onMove
+            // handles drag-to-reorder. A row-wide Button would eat the drag.
+            HStack(spacing: 10) {
+                Image(systemName: layer.displaySymbolName)
+                    .frame(width: 18)
+                    .foregroundStyle(.secondary)
+                Text(layer.name)
+                    .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            #else
+            // iOS: tapping the badge/name area selects (activates) the layer.
             Button(action: onActivate) {
                 HStack(spacing: 10) {
                     Image(systemName: layer.displaySymbolName)
@@ -2910,6 +2957,7 @@ struct LayerRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            #endif
 
             Button(action: onToggleVisibility) {
                 Image(systemName: layer.isVisible ? "eye" : "eye.slash")

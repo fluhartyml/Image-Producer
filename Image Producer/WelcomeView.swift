@@ -30,8 +30,14 @@ struct WelcomeView: View {
                Color(red: 0.90, green: 0.90, blue: 0.92)]
     }
 
-    /// Recent .iconproj documents, newest first (AppKit's recents list).
-    private var recents: [URL] { NSDocumentController.shared.recentDocumentURLs }
+    /// Recent documents, newest first (AppKit's recents list). Held in @State and
+    /// refreshed on appear / when the app reactivates, so newly-created or -opened
+    /// projects appear without the view needing to be rebuilt.
+    @State private var recents: [URL] = []
+
+    private func refreshRecents() {
+        recents = NSDocumentController.shared.recentDocumentURLs
+    }
 
     var body: some View {
         VStack(spacing: 28) {
@@ -66,6 +72,9 @@ struct WelcomeView: View {
                     let url = await Task.detached { IconDocument.nextProjectURL() }.value
                     var opened = false
                     if let url, IconDocument.writeNewProject(at: url) {
+                        // Register in the recent-documents list (SwiftUI's openDocument
+                        // doesn't always record it), then open.
+                        NSDocumentController.shared.noteNewRecentDocumentURL(url)
                         do { try await openDocument(at: url); opened = true }
                         catch {
                             NSLog("ImageProducer New: openDocument failed for %@ — %@",
@@ -107,9 +116,15 @@ struct WelcomeView: View {
             }
 
             Spacer(minLength: 0)
-            Text("Open other files from the File menu.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            // Link that pops open the app's File menu at the cursor, so "open other
+            // files" is one click instead of a hunt up in the menu bar.
+            Button("Open other files from the File menu.") {
+                if let fileMenu = NSApplication.shared.mainMenu?.item(withTitle: "File")?.submenu {
+                    fileMenu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+                }
+            }
+            .buttonStyle(.link)
+            .font(.caption)
         }
         .padding(40)
         .frame(width: 440, height: 520)
@@ -120,6 +135,12 @@ struct WelcomeView: View {
                 endPoint: .bottom
             )
         )
+        .onAppear { refreshRecents() }
+        // Refresh when the app reactivates (e.g. returning to the Welcome window after
+        // closing a document) so the recents list reflects the latest projects.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshRecents()
+        }
     }
 }
 #endif

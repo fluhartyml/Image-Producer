@@ -78,7 +78,13 @@ struct Image_ProducerApp: App {
         // (below) is the front door instead. .defaultLaunchBehavior is macOS 15+/visionOS
         // only, so gate to macOS — iOS/visionOS keep their DocumentGroupLaunchScene path.
         #if os(macOS)
+        // macOS: suppress the default open-panel on launch so the custom Welcome window
+        // (below) is the front door instead.
         .defaultLaunchBehavior(.suppressed)
+        // New document windows open centered at a consistent size (first launch / no
+        // persisted frame); once moved/resized, state restoration owns the frame.
+        .defaultSize(width: 1223, height: 680)
+        .defaultPosition(.center)
         #endif
 
         // Branded launch experience (option B) — iPhone / iPad / Vision only.
@@ -119,6 +125,8 @@ struct Image_ProducerApp: App {
         // makes it the window shown at launch (paired with .suppressed on the DocumentGroup
         // above). WelcomeView has the wordmark, a New Image button, and recent documents.
         #if os(macOS)
+        // macOS branded launch — the Welcome window is presented at launch (paired with
+        // .suppressed on the DocumentGroup above).
         Window("Welcome to Image Producer", id: "welcome") {
             WelcomeView()
         }
