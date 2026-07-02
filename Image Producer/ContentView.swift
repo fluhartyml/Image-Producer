@@ -3821,6 +3821,11 @@ struct AutosaveModifier: ViewModifier {
 
     private func save() {
         guard isEditable else { return }                      // read-only → nothing to do
+        // Viewing a past history point is non-destructive: writing the previewed state (or
+        // letting the coordinated write reload the doc) would snap the canvas back. Skip the
+        // save entirely while viewing — every state is preserved in the history snapshots, and
+        // the newest committed state is already on disk from its own edit.
+        guard !document.isViewingHistory else { return }
         if let url = fileURL {
             try? document.writePackage(to: url)               // saved doc: write in place
         } else {

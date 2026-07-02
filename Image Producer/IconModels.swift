@@ -238,17 +238,13 @@ extension IconDocument {
         layers = snap.layers
     }
 
-    /// The layer stack the FILE should persist. While viewing a past state (`historyCursor`
-    /// ≠ `.latest`), the on-screen `layers` hold that transient preview — but the saved file
-    /// must keep the newest COMMITTED state, so viewing-then-closing can never lose work.
-    /// At `.latest` (or with no entries) this is just `layers`.
-    var canonicalLayers: [IconLayer] {
-        if case .latest = historyCursor { return layers }
-        if let data = history.entries.last?.actions.last?.snapshot,
-           let snap = try? JSONDecoder().decode(DocumentSnapshot.self, from: data) {
-            return snap.layers
-        }
-        return layers
+    /// True while VIEWING a past state (not at the newest committed point). Autosave is
+    /// suppressed in this state so a preview is never written to disk (and so the file's own
+    /// coordinated write can't trigger a reload that snaps the canvas back). Every state is
+    /// still preserved in the persisted history snapshots regardless.
+    var isViewingHistory: Bool {
+        if case .latest = historyCursor { return false }
+        return true
     }
 
     /// TAP a history point: NON-DESTRUCTIVELY view that state (restore it to the canvas) and
@@ -728,7 +724,7 @@ extension IconDocument: ReferenceFileDocument {
     /// Capture current state for writing (called off the main actor by SwiftUI).
     func snapshot(contentType: UTType) throws -> IconProjectManifest {
         IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-                            layers: canonicalLayers, palette: palette, cropRect: cropRect, ppi: ppi,
+                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
                             bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                             cropMarks: cropMarks, registrationMarks: registrationMarks,
                             colorSpaceCMYK: colorSpaceCMYK, history: history)
@@ -755,7 +751,7 @@ extension IconDocument {
     /// as the official `fileWrapper(snapshot:)` writer, so the file stays interchangeable.
     func writePackage(to url: URL) throws {
         let manifest = IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-                                           layers: canonicalLayers, palette: palette, cropRect: cropRect, ppi: ppi,
+                                           layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
                                            bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                                            cropMarks: cropMarks, registrationMarks: registrationMarks,
                                            colorSpaceCMYK: colorSpaceCMYK, history: history)
