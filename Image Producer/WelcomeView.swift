@@ -103,6 +103,10 @@ struct WelcomeView: View {
                 endPoint: .bottom
             )
         )
+        // The background is an intentionally dark branded gradient, so pin the
+        // content to the dark color scheme — otherwise in Light Mode the semantic
+        // text inks (.primary/.secondary/.tertiary) resolve dark and vanish against it.
+        .environment(\.colorScheme, .dark)
     }
 }
 #endif
