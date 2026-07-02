@@ -2227,6 +2227,13 @@ struct CanvasView: View {
         guard activeTool == .fill, let idx = activeIndex else { return }
         if document.layers[idx].backgroundRole != nil {
             document.layers[idx].setBackgroundFill(fillColor.hexString())
+            // History (step 2): solid background fill — no raster to snapshot (the fill is
+            // a hex color on the layer role); step-back restores that in step 3.
+            document.recordHistory(toolID: Tool.fill.rawValue,
+                                   groupTitle: Tool.fill.title,
+                                   actionLabel: "Fill Background",
+                                   layerID: document.layers[idx].id,
+                                   snapshot: nil)
             return
         }
         guard let png = activeImagePNG,
@@ -2244,6 +2251,13 @@ struct CanvasView: View {
            let nIdx = document.layers.firstIndex(where: { $0.id == newID }) {
             document.layers[nIdx].transform = t
             activeLayerID = newID
+            // History (step 2): flood fill lands on a new result layer; snapshot is that
+            // layer's filled raster. (Step-back in step 3 removes the result + re-shows source.)
+            document.recordHistory(toolID: Tool.fill.rawValue,
+                                   groupTitle: Tool.fill.title,
+                                   actionLabel: "Fill",
+                                   layerID: newID,
+                                   snapshot: out)
         }
         pen.clearBucketPreview()
     }
@@ -2445,6 +2459,12 @@ struct CanvasView: View {
                             pen.endStroke()
                             if let i = activeIndex, let data = pen.currentPNG() {
                                 document.layers[i].setPixels(data)
+                                // History (step 2): right-click erase is a Pen-group Erase action.
+                                document.recordHistory(toolID: Tool.pen.rawValue,
+                                                       groupTitle: Tool.pen.title,
+                                                       actionLabel: "Erase",
+                                                       layerID: document.layers[i].id,
+                                                       snapshot: data)
                             }
                         }
                     )
@@ -2471,6 +2491,12 @@ struct CanvasView: View {
                             pen.endStroke()
                             if let i = activeIndex, let data = pen.currentPNG() {
                                 document.layers[i].setPixels(data)
+                                // History (step 2): one stroke = one action under the Pen group.
+                                document.recordHistory(toolID: Tool.pen.rawValue,
+                                                       groupTitle: Tool.pen.title,
+                                                       actionLabel: pen.erasing ? "Erase" : "Stroke",
+                                                       layerID: document.layers[i].id,
+                                                       snapshot: data)
                             }
                         case .fill:
                             bucketFill(atNormalized: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height), canvas: disp)

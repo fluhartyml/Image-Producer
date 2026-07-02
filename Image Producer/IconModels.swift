@@ -159,6 +159,30 @@ extension IconDocument {
     }
 }
 
+// MARK: - History recording (step 2)
+
+extension IconDocument {
+    /// Append one edit to the linear history. Consecutive actions from the SAME tool
+    /// nest under one group (a continuous "tool run"); a different tool starts a new
+    /// group — matching the "grouped by tool" design. `snapshot` is the affected
+    /// layer's PNG AFTER the edit (inline, for later step-back). Non-destructive tools
+    /// (zoom / pan / eyedropper) never call this — they don't create groups.
+    /// `toolID`/`groupTitle` come from the caller's `Tool` (rawValue / title); the model
+    /// stays free of the editor's Tool enum.
+    func recordHistory(toolID: String, groupTitle: String, actionLabel: String,
+                       layerID: IconLayer.ID?, snapshot: Data?) {
+        let action = HistoryAction(label: actionLabel, layerID: layerID, snapshot: snapshot)
+        let n = history.entries.count
+        if n > 0, history.entries[n - 1].toolID == toolID {
+            history.entries[n - 1].actions.append(action)   // continue the current run
+        } else {
+            history.entries.append(HistoryEntry(toolID: toolID,
+                                                title: groupTitle,
+                                                actions: [action]))
+        }
+    }
+}
+
 // MARK: - Layer
 
 /// One layer in the stack.
@@ -456,6 +480,9 @@ struct PaletteFileDocument: FileDocument {
 // MARK: - History (linear, tool-grouped timeline — the app's undo)
 //
 // Step 1 (2026-07-02): DATA MODEL + PERSISTENCE only. No UI, no recording yet.
+// Step 2 (2026-07-02): RECORDING HOOKS. Pen strokes + Paint Bucket fills append to
+//   the timeline via IconDocument.recordHistory (below); each captures the affected
+//   layer's post-edit PNG for later step-back. No UI / step-back yet (step 3).
 // Design per DeveloperNotes "HISTORY — DECIDED 2026-06-10":
 //   • Linear, Photoshop-style. Undo is a BYPRODUCT of this list — no ⌘Z, no
 //     app-wide UndoManager (that snapshot-the-whole-store undo is the crash class
@@ -475,11 +502,13 @@ struct HistoryAction: Identifiable, Codable {
     /// The layer this action modified (for display + step-back targeting). Optional
     /// so document-wide actions (e.g. a crop) can omit it.
     var layerID: IconLayer.ID? = nil
-    /// Filename of the PNG snapshot (a sibling file in the package) capturing the
-    /// affected layer AFTER this action, so step-back can restore pixels. `nil` until
-    /// the recording hooks populate it (step 2) — icons are tiny, so per-action
-    /// snapshots are affordable ("storage is a non-issue" — Michael).
-    var snapshotAsset: String? = nil
+    /// PNG snapshot of the affected layer AFTER this action, so step-back (step 3) can
+    /// restore its pixels. Stored INLINE (base64 in the manifest) to match how layer
+    /// pixels are already persisted today — icons are tiny, so per-action snapshots are
+    /// affordable ("storage is a non-issue" — Michael). Sibling-file storage is the
+    /// later optimization once layer pixels move out of the JSON too. `nil` for actions
+    /// with no restorable raster.
+    var snapshot: Data? = nil
 }
 
 /// A tool group in the timeline (the reveal-carat parent) — one continuous run of a
