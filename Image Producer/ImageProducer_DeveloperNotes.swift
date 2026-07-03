@@ -712,6 +712,18 @@
 //      EVERYTHING FORWARD OF IT IS DROPPED, resume from there. NO surgical
 //      mid-delete (can't pull one stroke from the middle and keep later ones) —
 //      rejected for the dependent-edit problem. Picking an entry = the step-back.
+//      ⚠️ REVISED 2026-07-02 (Michael: the above was "too sensitive and
+//      destructive"). SHIPPED behavior now separates VIEW from COMMIT:
+//        - TAP a group/action = VIEW that state (non-destructive; the list is
+//          NOT trimmed; you can move around freely and return). Autosave is
+//          suppressed while viewing (isViewingHistory) so a preview is never
+//          written / can't reload-snap back; every state stays in the snapshots.
+//        - RIGHT-CLICK / LONG-PRESS (SwiftUI .contextMenu) = "Delete This and
+//          Everything After" — the deliberate destructive prune (reverts to the
+//          state before it). This is the ONLY way steps disappear (besides Purge).
+//        - Editing while viewing a past state commits at the cursor (drops the
+//          abandoned future) — still no branching. Model: HistoryCursor +
+//          jump()/deleteHistory() in IconModels; panel in ContentView.HistoryPanel.
 //    • PERSISTENT from icon creation, across close/reopen; never auto-resets.
 //    • PURGE HISTORY = the ONLY thing that clears it; KEEPS the current image,
 //      drops only the trail. Tuck behind a menu + confirm, not a prominent
