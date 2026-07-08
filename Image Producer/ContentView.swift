@@ -211,6 +211,11 @@ struct ContentView: View {
                       defaultFilename: exportFilename) { _ in }
         .sheet(isPresented: $showAbout) { AboutView() }
         .environmentObject(pen)
+        #if os(macOS)
+        // Expose this document's Export action so File > Export… (⌘E) drives the
+        // SAME flow as the toolbar Export button, targeting the focused document.
+        .focusedSceneValue(\.exportAction, prepareExport)
+        #endif
     }
 
     private var exportFilename: String {

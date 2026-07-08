@@ -11,6 +11,37 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
+// MARK: - Export menu command (macOS)
+
+/// Focused-document Export action, published by the frontmost ContentView so the
+/// File menu can invoke it. A closure keyed off the focused scene — `nil` when no
+/// document window is frontmost, which disables the menu item.
+struct ExportActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+extension FocusedValues {
+    var exportAction: (() -> Void)? {
+        get { self[ExportActionKey.self] }
+        set { self[ExportActionKey.self] = newValue }
+    }
+}
+
+#if os(macOS)
+/// Adds File > Export… (⌘E) driving the focused document's Export flow.
+struct ExportCommands: Commands {
+    @FocusedValue(\.exportAction) private var exportAction
+
+    var body: some Commands {
+        CommandGroup(after: .saveItem) {
+            Button("Export…") { exportAction?() }
+                .keyboardShortcut("e", modifiers: .command)
+                .disabled(exportAction == nil)
+        }
+    }
+}
+#endif
+
 @main
 struct Image_ProducerApp: App {
     var body: some Scene {
@@ -47,6 +78,14 @@ struct Image_ProducerApp: App {
             // document's history. The History tab/page already exists as a placeholder
             // (ContentView.historyPage); only the engine is missing ("no engine yet").
             CommandGroup(replacing: .undoRedo) { }
+
+            #if os(macOS)
+            // File > Export… (⌘E) — placed after Save, but distinct from it: Save
+            // writes the editable project package; Export renders the finished icon
+            // out. Drives the focused document's Export action (nil-disabled when no
+            // document is frontmost).
+            ExportCommands()
+            #endif
 
             #if os(macOS)
             // ⌘N: new project as a REAL file (never "Untitled"). URL resolved OFF the main
