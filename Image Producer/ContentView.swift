@@ -662,6 +662,10 @@ struct CanvasInspector: View {
     @State private var webBundle = IconExportBundle(files: [:])
     @State private var showWebExporter = false
     @State private var folderFilename = "Export"
+    // Layer PDF (one page per layer) + inverse import
+    @State private var flattenLayerPDF = false
+    @State private var layerMatte: Color = .white
+    @State private var importingPDF = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -839,6 +843,35 @@ struct CanvasInspector: View {
                     .font(.system(size: 18)).foregroundStyle(.primary)
             }
 
+            Divider()
+
+            // --- E · Layer PDF (round-trips with the importer below) ---
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Layer PDF").font(.system(size: 20, weight: .semibold))
+                Button {
+                    let matte = flattenLayerPDF ? layerMatte.cgColorResolved : nil
+                    if let data = makeLayerPDF(document, matte: matte) {
+                        exportData = data; exportType = .pdf
+                        exportFilename = "\(displayName) Layers"; showDataExporter = true
+                    }
+                } label: { Label("Export layers → PDF (one page each)", systemImage: "square.stack.3d.up").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                .buttonStyle(.borderedProminent)
+                Toggle(isOn: $flattenLayerPDF) {
+                    Text("Flatten transparency onto a matte").font(.system(size: 18))
+                }
+                if flattenLayerPDF {
+                    ColorPicker(selection: $layerMatte, supportsOpacity: false) {
+                        Text("Matte colour").font(.system(size: 18))
+                    }
+                }
+                Button {
+                    importingPDF = true
+                } label: { Label("Import PDF as layers…", systemImage: "square.and.arrow.down.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                .buttonStyle(.bordered)
+                Text("Export writes page 1 = the composite, then one page per layer — transparency preserved (flatten only for print). Import brings each page in as its own editable image layer.")
+                    .font(.system(size: 18)).foregroundStyle(.primary)
+            }
+
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -850,6 +883,12 @@ struct CanvasInspector: View {
                       document: webBundle,
                       contentType: .folder,
                       defaultFilename: folderFilename) { _ in }
+        .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf]) { result in
+            guard case .success(let url) = result else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            _ = importPDFAsLayers(url, into: document)
+        }
         .onAppear { draftName = displayName }
         .onChange(of: document.name) { draftName = displayName }
         .onChange(of: fileURL) { draftName = displayName; renameError = false }

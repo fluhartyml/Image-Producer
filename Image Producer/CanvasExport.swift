@@ -18,6 +18,26 @@
 import SwiftUI
 import CoreGraphics
 import UniformTypeIdentifiers
+import PDFKit
+#if canImport(AppKit)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
+
+/// A concrete CGColor for the SwiftUI Color, cross-platform (ColorPicker gives a
+/// resolvable colour, so this is safe for the matte fill).
+extension Color {
+    var cgColorResolved: CGColor {
+        #if canImport(AppKit)
+        return NSColor(self).cgColor
+        #elseif canImport(UIKit)
+        return UIColor(self).cgColor
+        #else
+        return cgColor ?? CGColor(gray: 1, alpha: 1)
+        #endif
+    }
+}
 
 /// Render the document's visible layers to a CGImage at canvasPixelSize × `scale`.
 @MainActor func renderCanvasImage(_ document: IconDocument, scale: CGFloat = 1) -> CGImage? {
@@ -132,6 +152,114 @@ import UniformTypeIdentifiers
         }
     }
     return files
+}
+
+// MARK: - Layer PDF (one page per layer) + inverse import
+
+/// Render a single layer alone (over transparency) at the canvas pixel size, using the
+/// same compositor as the full render. `forceVisible` shows even a hidden layer so the
+/// breakdown is complete. Returns a CGImage that carries alpha for transparent layers.
+@MainActor private func renderLayerImage(_ layer: IconLayer, in document: IconDocument) -> CGImage? {
+    var solo = layer
+    solo.isVisible = true
+    let soloDoc = IconDocument(name: document.name,
+                               canvasWidth: document.canvasWidth,
+                               canvasHeight: document.canvasHeight,
+                               layers: [solo], palette: document.palette,
+                               cropRect: nil)
+    let renderer = ImageRenderer(content: IconCompositeView(document: soloDoc, size: document.canvasPixelSize))
+    renderer.scale = 1
+    return renderer.cgImage
+}
+
+/// A multi-page PDF: page 1 = the composited icon as seen, then ONE PAGE PER LAYER
+/// (bottom-to-top), each rendered on its own. Transparency is PRESERVED by default —
+/// PDF has a native alpha model, so transparent layers stay transparent and re-import
+/// cleanly (no white-matte halo). Pass a `matte` CGColor to FLATTEN each page onto that
+/// colour instead — for print/CMYK handoff where live transparency is unwanted.
+@MainActor func makeLayerPDF(_ document: IconDocument, matte: CGColor? = nil) -> Data? {
+    let size = document.canvasPixelSize
+    guard size.width > 0, size.height > 0 else { return nil }
+
+    let data = NSMutableData()
+    guard let consumer = CGDataConsumer(data: data as CFMutableData) else { return nil }
+    var mediaBox = CGRect(origin: .zero, size: size)
+    guard let ctx = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else { return nil }
+
+    func drawPage(_ cg: CGImage?) {
+        ctx.beginPDFPage(nil)
+        if let matte {                       // flatten: paint the matte, then the art over it
+            ctx.setFillColor(matte)
+            ctx.fill(mediaBox)
+        }
+        if let cg { ctx.draw(cg, in: mediaBox) }   // alpha preserved when matte == nil
+        ctx.endPDFPage()
+    }
+
+    drawPage(renderCanvasImage(document))                        // cover: the composite
+    for layer in document.layers {                               // one page per layer
+        drawPage(renderLayerImage(layer, in: document))
+    }
+
+    ctx.closePDF()
+    return data as Data
+}
+
+/// Rasterize one PDF page to a CGImage at `pixelSize`, PRESERVING transparency (the
+/// bitmap starts clear, so a page with alpha keeps it — no forced white background).
+private func rasterizePDFPage(_ page: PDFPage, pixelSize: CGSize) -> CGImage? {
+    let box = PDFDisplayBox.mediaBox
+    let bounds = page.bounds(for: box)
+    guard bounds.width > 0, bounds.height > 0,
+          Int(pixelSize.width) > 0, Int(pixelSize.height) > 0,
+          let ctx = CGContext(data: nil,
+                              width: Int(pixelSize.width),
+                              height: Int(pixelSize.height),
+                              bitsPerComponent: 8, bytesPerRow: 0,
+                              space: CGColorSpaceCreateDeviceRGB(),
+                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return nil }
+    // Fill the page to the pixel bounds (aspect is normalized to the square canvas on
+    // import; the layer transform can be adjusted afterward like any imported image).
+    ctx.saveGState()
+    ctx.scaleBy(x: pixelSize.width / bounds.width, y: pixelSize.height / bounds.height)
+    ctx.translateBy(x: -bounds.minX, y: -bounds.minY)
+    page.draw(with: box, to: ctx)
+    ctx.restoreGState()
+    return ctx.makeImage()
+}
+
+/// Import every page of a PDF as its own editable IMAGE layer (top of the stack,
+/// bottom-page first so page order reads bottom-to-top). Named from the file (and page
+/// number for multi-page). Transparent pages stay transparent. Returns pages added.
+///
+/// NOTE (by design): pages import as IMAGE layers — a flattened page is artwork, so this
+/// does NOT reconstruct the original text/pixel/symbol layers. Editable = move/scale/etc.
+@MainActor func importPDFAsLayers(_ url: URL, into document: IconDocument) -> Int {
+    guard let pdf = PDFDocument(url: url), pdf.pageCount > 0 else { return 0 }
+    let size = document.canvasPixelSize
+    let baseName = url.deletingPathExtension().lastPathComponent
+    let multi = pdf.pageCount > 1
+
+    document.captureHistoryBaselineIfNeeded()
+    var added = 0
+    var lastID: IconLayer.ID?
+    for i in 0..<pdf.pageCount {
+        guard let page = pdf.page(at: i),
+              let cg = rasterizePDFPage(page, pixelSize: size),
+              let png = pngData(from: cg) else { continue }
+        var layer = IconLayer(name: multi ? "\(baseName) — Page \(i + 1)" : baseName, role: .content)
+        layer.setImage(png)
+        document.layers.append(layer)      // append = top of the visual stack
+        lastID = layer.id
+        added += 1
+    }
+    if added > 0, let lastID {
+        document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
+                               actionLabel: multi ? "Import PDF (\(added) pages)" : "Import PDF",
+                               layerID: lastID)
+    }
+    return added
 }
 
 /// A plain data file (PDF or PNG) for SwiftUI's `.fileExporter`.
