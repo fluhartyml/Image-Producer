@@ -1536,6 +1536,8 @@ struct ImageImportInspector: View {
                 .buttonStyle(.borderedProminent)
                 Text("Drops an image onto this layer at native resolution, scaled to fit the icon. Use Move to resize/position it.")
                     .font(.system(size: 18)).foregroundStyle(.secondary)
+                Text("Opens PNG, JPEG, HEIC, TIFF, GIF, BMP — and PSD on Mac (imported flattened).")
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
                 if failed {
                     Text("Couldn't read that image.").font(.system(size: 18)).foregroundStyle(.red)
                 }
@@ -1543,7 +1545,7 @@ struct ImageImportInspector: View {
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .fileImporter(isPresented: $importing, allowedContentTypes: [.image]) { result in
+            .fileImporter(isPresented: $importing, allowedContentTypes: importableImageTypes) { result in
                 failed = false
                 guard case .success(let url) = result else { return }
                 load(url)
@@ -3777,6 +3779,16 @@ func pngData(fromImageData data: Data) -> Data? {
     guard let source = CGImageSourceCreateWithData(data as CFData, nil),
           let cg = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
     return pngData(from: cg)
+}
+
+/// Every image UTType the RUNNING platform can actually decode (queried from ImageIO), so
+/// the import picker only ever offers formats we can truly open. On macOS this includes
+/// PSD (imported flattened) and BMP; the list auto-narrows on iOS where the system decoder
+/// is smaller (e.g. PSD isn't offered there). Falls back to the abstract image type.
+var importableImageTypes: [UTType] {
+    let ids = (CGImageSourceCopyTypeIdentifiers() as? [String]) ?? []
+    let types = ids.compactMap { UTType($0) }
+    return types.isEmpty ? [.image] : types
 }
 
 /// Cross-platform image type + a SwiftUI Image bridge, for rendering imported PNGs.
