@@ -8,7 +8,7 @@
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.nightgard.Icon-Producer.project</string>
+			<string>com.nightgard.Image-Producer.project</string>
 			<key>UTTypeDescription</key>
 			<string>Image Producer Project</string>
 			<key>UTTypeConformsTo</key>
@@ -27,7 +27,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.nightgard.Icon-Producer.palette</string>
+			<string>com.nightgard.Image-Producer.palette</string>
 			<key>UTTypeDescription</key>
 			<string>Image Producer Palette</string>
 			<key>UTTypeConformsTo</key>
@@ -50,7 +50,7 @@
 			<string>Image Producer Project</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.nightgard.Icon-Producer.project</string>
+				<string>com.nightgard.Image-Producer.project</string>
 			</array>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
@@ -60,7 +60,7 @@
 	</array>
 	<key>NSUbiquitousContainers</key>
 	<dict>
-		<key>iCloud.com.nightgard.image-producer</key>
+		<key>iCloud.com.nightgard.Image-Producer</key>
 		<dict>
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>

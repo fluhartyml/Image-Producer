@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
-		<string>iCloud.com.nightgard.image-producer</string>
+		<string>iCloud.com.nightgard.Image-Producer</string>
 	</array>
 	<key>com.apple.developer.icloud-services</key>
 	<array>
@@ -12,7 +12,7 @@
 	</array>
 	<key>com.apple.developer.ubiquity-container-identifiers</key>
 	<array>
-		<string>iCloud.com.nightgard.image-producer</string>
+		<string>iCloud.com.nightgard.Image-Producer</string>
 	</array>
 </dict>
 </plist>

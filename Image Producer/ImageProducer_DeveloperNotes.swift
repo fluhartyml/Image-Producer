@@ -22,7 +22,7 @@
 //  - SHIPPED & BUILDING GREEN. Document-based multiplatform app (DocumentGroup /
 //    IconDocument; SwiftData dropped). Repo github.com/fluhartyml/Image-Producer,
 //    bundle id com.nightgard.Image-Producer, iCloud container
-//    iCloud.com.nightgard.image-producer (Files folder "Image Producer").
+//    iCloud.com.nightgard.Image-Producer (Files folder "Image Producer").
 //  - Built: layered editor + canvas; Move/Transform (crop now bakes a selectable
 //    object the box hugs, centered, with Fit/Fill snap-to-canvas); paint bucket
 //    (backgrounds); pixel pen + erase; tool strip + custom tool icons; branded
@@ -343,7 +343,7 @@
 //            App Store Connect at reservation (it blocks identical names).
 //          - ⚠️ BUNDLE ID CHANGED (2026-06-20): this is now a FRESH project with a
 //            clean bundle id **com.nightgard.Image-Producer** + iCloud container
-//            iCloud.com.nightgard.image-producer (Files folder "Image Producer").
+//            iCloud.com.nightgard.Image-Producer (Files folder "Image Producer").
 //            The OLD "Icon Producer" project (com.nightgard.Icon-Producer) is kept
 //            intact as a backup; its existing iCloud docs do NOT auto-migrate.
 //            (SUPERSEDES the earlier "rename is display-name only, do NOT touch the

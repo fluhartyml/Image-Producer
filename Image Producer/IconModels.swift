@@ -520,16 +520,16 @@ struct SymbolContent: Codable {
 // MARK: - Saved package format (roadmap 2.4)
 
 extension UTType {
-    /// Icon Producer's editable project package — a file wrapper (directory) the
+    /// Image Producer's editable project package — a file wrapper (directory) the
     /// user saves to iCloud Drive / Files. Holds a `manifest.json` (layers +, later,
     /// edit history) alongside binary assets. Declared in Info.plist to match.
-    static let iconProject = UTType(exportedAs: "com.nightgard.Icon-Producer.project")
+    static let iconProject = UTType(exportedAs: "com.nightgard.Image-Producer.project")
 
     /// A standalone brand palette (`.iconpalette`) — plain JSON, saved/loaded
     /// independent of any project so one color set can seed many icons. Declared in
     /// Info.plist as an exported type (identity only; the app opens it via its own
     /// in-app importer, NOT the DocumentGroup, so it is not a CFBundleDocumentTypes entry).
-    static let iconPalette = UTType(exportedAs: "com.nightgard.Icon-Producer.palette")
+    static let iconPalette = UTType(exportedAs: "com.nightgard.Image-Producer.palette")
 }
 
 // MARK: - Standalone palette file (roadmap: brand-asset palettes)
@@ -775,12 +775,13 @@ extension IconDocument {
 // MARK: - New project files (never "Untitled")
 
 extension IconDocument {
-    /// New documents save as `.picprod` — the already-registered project package that opens
-    /// reliably. (`.imgprd` is declared too, but the old "Icon Producer" app still claims the
-    /// same type identifier with only the old extensions, so LaunchServices doesn't recognize
-    /// a fresh `.imgprd` as our PACKAGE — it sees a plain folder and won't open it. Switching
-    /// the app to its own type identifier is the follow-up that lets `.imgprd` work; until
-    /// then new files use `.picprod`. Either way old `.picprod`/`.iconproj` files open.)
+    /// New documents save as `.picprod` — a project package extension that opens reliably
+    /// and matches every existing project already on disk. (`.imgprd` and `.iconproj` are
+    /// also declared for this type. The app now owns its own type identifier
+    /// `com.nightgard.Image-Producer.project` — no longer shared with the retired
+    /// "Icon Producer" app — so the old LaunchServices collision is resolved and a fresh
+    /// `.imgprd` is recognized too; `.picprod` is kept as the default so new and existing
+    /// files share one extension. Any of `.picprod`/`.imgprd`/`.iconproj` open.)
     static let projectExtension = "picprod"
 
     /// Where new projects are written immediately so a canvas is never an unnamed
@@ -789,7 +790,7 @@ extension IconDocument {
     nonisolated static func projectsDirectory() -> URL? {
         let fm = FileManager.default
         let dir: URL
-        if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.image-producer") {
+        if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.Image-Producer") {
             dir = icloud.appendingPathComponent("Documents", isDirectory: true)
         } else if let local = try? fm.url(for: .documentDirectory, in: .userDomainMask,
                                           appropriateFor: nil, create: true) {

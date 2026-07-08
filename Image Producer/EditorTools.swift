@@ -35,6 +35,13 @@ enum Tool: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Tools that appear in the selectable strip for v1. Shape, Path, and Zoom are
+    /// part of the locked vocabulary but their inspectors are still placeholders,
+    /// so they're withheld from the strip until built — App Store review rejects
+    /// visible "coming soon" controls (Guideline 2.1). Re-add a case here the moment
+    /// its inspector ships. Order is preserved from the enum declaration.
+    static let shipping: [Tool] = allCases.filter { ![.shape, .path, .zoom].contains($0) }
+
     /// Label shown in the tool's (placeholder) inspector.
     var title: String {
         switch self {
