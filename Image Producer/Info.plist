@@ -62,7 +62,7 @@
 	</array>
 	<key>NSUbiquitousContainers</key>
 	<dict>
-		<key>iCloud.com.nightgard.Image-Producer</key>
+		<key>iCloud.com.nightgard.image-producer</key>
 		<dict>
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>

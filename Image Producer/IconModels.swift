@@ -790,7 +790,7 @@ extension IconDocument {
     nonisolated static func projectsDirectory() -> URL? {
         let fm = FileManager.default
         let dir: URL
-        if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.Image-Producer") {
+        if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.image-producer") {
             dir = icloud.appendingPathComponent("Documents", isDirectory: true)
         } else if let local = try? fm.url(for: .documentDirectory, in: .userDomainMask,
                                           appropriateFor: nil, create: true) {
