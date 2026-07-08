@@ -156,6 +156,58 @@ extension Color {
 
 // MARK: - Layer PDF (one page per layer) + inverse import
 
+/// Tag written into (and read from) the PDF's Subject metadata so Image Producer
+/// recognizes its OWN layer PDFs and can round-trip pure-text layers back to editable
+/// text layers. Foreign PDFs (no tag) import every page as a picture.
+private let layerPDFTag = "IMGPRD-LAYERS-v1:"
+
+/// Per-page record in the manifest. For a "verbatim" page (a lightweight, non-bitmap
+/// layer) `layer` holds the whole layer so it round-trips to its exact editable kind; a
+/// "raster" page (bitmap-heavy layer) stores just a name and is rasterized on import.
+private struct LayerPDFPage: Codable {
+    var kind: String            // "cover" | "verbatim" | "raster"
+    var name: String
+    var layer: IconLayer?
+}
+
+private struct LayerPDFManifest: Codable {
+    var version = 1
+    var pages: [LayerPDFPage]
+}
+
+extension IconLayer {
+    /// True when the layer carries NO raster bitmap — a background (a fill colour) or a
+    /// content layer whose elements are all text/symbol (or empty). These are tiny, so
+    /// Image Producer stores them verbatim in its own layer PDFs and restores them to
+    /// their exact editable kind ("home court advantage"). Image/pixel layers are
+    /// bitmap-heavy and come back as pictures instead — their page already IS the data,
+    /// and embedding the bitmap would just duplicate the project inside the PDF.
+    var isLightweightForPDFTag: Bool {
+        switch role {
+        case .background:
+            return true
+        case .content:
+            for el in elements {
+                switch el.content {
+                case .image, .pixels: return false
+                case .text, .symbol:  continue
+                }
+            }
+            return true            // empty, or all text/symbol
+        }
+    }
+}
+
+/// Decode Image Producer's layer manifest from a PDF's Subject, or nil for a foreign PDF.
+private func layerPDFManifest(from pdf: PDFDocument) -> LayerPDFManifest? {
+    guard let subject = pdf.documentAttributes?[PDFDocumentAttribute.subjectAttribute] as? String,
+          subject.hasPrefix(layerPDFTag),
+          let data = Data(base64Encoded: String(subject.dropFirst(layerPDFTag.count))),
+          let manifest = try? JSONDecoder().decode(LayerPDFManifest.self, from: data)
+    else { return nil }
+    return manifest
+}
+
 /// Render a single layer alone (over transparency) at the canvas pixel size, using the
 /// same compositor as the full render. `forceVisible` shows even a hidden layer so the
 /// breakdown is complete. Returns a CGImage that carries alpha for transparent layers.
@@ -181,10 +233,26 @@ extension Color {
     let size = document.canvasPixelSize
     guard size.width > 0, size.height > 0 else { return nil }
 
+    // Home-court manifest: page 0 = the cover composite, then one entry per layer in order.
+    // Lightweight layers (text/symbol/background) are stored verbatim so a re-import restores
+    // them to their exact editable kind; bitmap layers are marked "raster" (rasterized back).
+    var pages: [LayerPDFPage] = [LayerPDFPage(kind: "cover", name: "Composite", layer: nil)]
+    for layer in document.layers {
+        if layer.isLightweightForPDFTag {
+            pages.append(LayerPDFPage(kind: "verbatim", name: layer.name, layer: layer))
+        } else {
+            pages.append(LayerPDFPage(kind: "raster", name: layer.name, layer: nil))
+        }
+    }
+    var auxInfo: [CFString: Any] = [kCGPDFContextCreator: "Image Producer"]
+    if let manifestData = try? JSONEncoder().encode(LayerPDFManifest(pages: pages)) {
+        auxInfo[kCGPDFContextSubject] = layerPDFTag + manifestData.base64EncodedString()
+    }
+
     let data = NSMutableData()
     guard let consumer = CGDataConsumer(data: data as CFMutableData) else { return nil }
     var mediaBox = CGRect(origin: .zero, size: size)
-    guard let ctx = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else { return nil }
+    guard let ctx = CGContext(consumer: consumer, mediaBox: &mediaBox, auxInfo as CFDictionary) else { return nil }
 
     func drawPage(_ cg: CGImage?) {
         ctx.beginPDFPage(nil)
@@ -229,26 +297,42 @@ private func rasterizePDFPage(_ page: PDFPage, pixelSize: CGSize) -> CGImage? {
     return ctx.makeImage()
 }
 
-/// Import every page of a PDF as its own editable IMAGE layer (top of the stack,
-/// bottom-page first so page order reads bottom-to-top). Named from the file (and page
-/// number for multi-page). Transparent pages stay transparent. Returns pages added.
+/// Import a PDF's pages as layers (appended top-of-stack, in page order).
 ///
-/// NOTE (by design): pages import as IMAGE layers — a flattened page is artwork, so this
-/// does NOT reconstruct the original text/pixel/symbol layers. Editable = move/scale/etc.
+/// HOME COURT: a PDF that Image Producer exported carries a manifest, so this restores
+/// lightweight layers (text/symbol/background) to their EXACT editable kind, skips the
+/// composite cover page, and rasterizes only the bitmap-heavy pages. A FOREIGN PDF (no
+/// manifest) imports every page as a picture (image layer) — a flattened page is just
+/// artwork, so "editable" there means move/scale/opacity, not native-kind reconstruction.
+/// Returns layers added.
 @MainActor func importPDFAsLayers(_ url: URL, into document: IconDocument) -> Int {
     guard let pdf = PDFDocument(url: url), pdf.pageCount > 0 else { return 0 }
     let size = document.canvasPixelSize
     let baseName = url.deletingPathExtension().lastPathComponent
     let multi = pdf.pageCount > 1
+    let manifest = layerPDFManifest(from: pdf)   // non-nil only for our own tagged PDFs
 
     document.captureHistoryBaselineIfNeeded()
     var added = 0
     var lastID: IconLayer.ID?
     for i in 0..<pdf.pageCount {
-        guard let page = pdf.page(at: i),
-              let cg = rasterizePDFPage(page, pixelSize: size),
+        let mpage: LayerPDFPage? = (manifest != nil && i < manifest!.pages.count) ? manifest!.pages[i] : nil
+        if let mpage {
+            if mpage.kind == "cover" { continue }                 // drop the composite
+            if mpage.kind == "verbatim", var layer = mpage.layer {
+                layer.id = UUID()                                 // fresh id, avoid collisions
+                document.layers.append(layer)                     // restored to its exact kind
+                lastID = layer.id
+                added += 1
+                continue
+            }
+            // "raster" falls through to the picture path below.
+        }
+        guard let pdfPage = pdf.page(at: i),
+              let cg = rasterizePDFPage(pdfPage, pixelSize: size),
               let png = pngData(from: cg) else { continue }
-        var layer = IconLayer(name: multi ? "\(baseName) — Page \(i + 1)" : baseName, role: .content)
+        let name = mpage?.name ?? (multi ? "\(baseName) — Page \(i + 1)" : baseName)
+        var layer = IconLayer(name: name, role: .content)
         layer.setImage(png)
         document.layers.append(layer)      // append = top of the visual stack
         lastID = layer.id
