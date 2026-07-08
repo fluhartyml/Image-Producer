@@ -346,10 +346,74 @@ private func rasterizePDFPage(_ page: PDFPage, pixelSize: CGSize) -> CGImage? {
     return added
 }
 
-/// A plain data file (PDF or PNG) for SwiftUI's `.fileExporter`.
+// MARK: - Unified export (format dropdown)
+
+/// Encode a CGImage to any ImageIO-writable format (PNG/JPEG/TIFF/HEIC/GIF/BMP).
+func encodedImageData(_ cg: CGImage, as type: UTType) -> Data? {
+    let out = NSMutableData()
+    guard let dest = CGImageDestinationCreateWithData(out, type.identifier as CFString, 1, nil) else { return nil }
+    CGImageDestinationAddImage(dest, cg, nil)
+    guard CGImageDestinationFinalize(dest) else { return nil }
+    return out as Data
+}
+
+/// A single-page PDF of the flattened composite — the plain "flat PDF" (no bleed/marks;
+/// that's the separate Print PDF). Transparency preserved.
+@MainActor func makeFlatPDF(_ document: IconDocument) -> Data? {
+    guard let cg = renderCanvasImage(document) else { return nil }
+    let data = NSMutableData()
+    guard let consumer = CGDataConsumer(data: data as CFMutableData) else { return nil }
+    var box = CGRect(origin: .zero, size: document.canvasPixelSize)
+    guard let ctx = CGContext(consumer: consumer, mediaBox: &box, nil) else { return nil }
+    ctx.beginPDFPage(nil); ctx.draw(cg, in: box); ctx.endPDFPage(); ctx.closePDF()
+    return data as Data
+}
+
+/// Formats the unified Export sheet (⌘E) offers — the project rendered out to a file.
+/// No legacy multi-size app-icon PNG set (deprecated: modern Xcode takes a single 1024
+/// PNG or an Icon Composer .icon, both covered by "PNG" / the layer PDF here).
+enum ExportFormat: String, CaseIterable, Identifiable {
+    case png = "PNG"
+    case jpeg = "JPEG"
+    case tiff = "TIFF"
+    case heic = "HEIC"
+    case gif = "GIF"
+    case bmp = "BMP"
+    case pdfFlat = "PDF (flat)"
+    case pdfLayers = "PDF (one page per layer)"
+
+    var id: String { rawValue }
+
+    var utType: UTType {
+        switch self {
+        case .png:  return .png
+        case .jpeg: return .jpeg
+        case .tiff: return .tiff
+        case .heic: return UTType("public.heic") ?? .png
+        case .gif:  return .gif
+        case .bmp:  return .bmp
+        case .pdfFlat, .pdfLayers: return .pdf
+        }
+    }
+
+    /// Render the project to this format. `matte` only applies to the layer PDF (flatten).
+    @MainActor func data(from document: IconDocument, matte: CGColor? = nil) -> Data? {
+        switch self {
+        case .pdfFlat:   return makeFlatPDF(document)
+        case .pdfLayers: return makeLayerPDF(document, matte: matte)
+        default:
+            guard let cg = renderCanvasImage(document) else { return nil }
+            return encodedImageData(cg, as: utType)
+        }
+    }
+}
+
+/// A plain data file for SwiftUI's `.fileExporter` — any format the Export sheet writes.
 struct CanvasDataDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.pdf, .png] }
-    static var writableContentTypes: [UTType] { [.pdf, .png] }
+    static var readableContentTypes: [UTType] {
+        [.png, .jpeg, .tiff, .gif, .bmp, .pdf, UTType("public.heic") ?? .png]
+    }
+    static var writableContentTypes: [UTType] { readableContentTypes }
     var data: Data
     init(_ data: Data) { self.data = data }
     init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }

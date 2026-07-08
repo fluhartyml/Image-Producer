@@ -42,9 +42,8 @@ struct ContentView: View {
     @State private var bottomPanel: BottomPanel = .layers
     /// Paint Bucket's current colour (roadmap 2.1) — the user's own light/dark choice.
     @State private var fillColor: Color = .white
-    /// Export (roadmap 2.3): the rendered PNG folder + the exporter sheet flag.
-    @State private var exportBundle: IconExportBundle?
-    @State private var showExporter = false
+    /// Export (⌘E): the unified export sheet with a format dropdown.
+    @State private var showExportSheet = false
     /// Share (roadmap 2.5): a flat 1024 PNG of the visible layers, snapshot at tap.
     /// About / wordmark sheet — shows the "Image Producer / Graphic Arts" brand inside the app
     /// (the home-screen + App Store name can't carry the subheading).
@@ -185,10 +184,10 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { prepareExport() } label: {
-                    Label("Export", systemImage: "square.and.arrow.up.on.square")
+                Button { showExportSheet = true } label: {
+                    Label("Export", systemImage: "arrow.up.doc")
                 }
-                .help("Export the icon as a folder of PNG sizes")
+                .help("Export the project to a file (⌘E) — pick the format")
             }
             ToolbarItem(placement: .secondaryAction) {
                 // Native ShareLink (replaces the old render→custom-sheet path that came
@@ -205,22 +204,19 @@ struct ContentView: View {
                 .help("About Image Producer — Graphic Arts")
             }
         }
-        .fileExporter(isPresented: $showExporter,
-                      document: exportBundle,
-                      contentType: .folder,
-                      defaultFilename: exportFilename) { _ in }
+        .sheet(isPresented: $showExportSheet) { ExportSheet(document: document) }
         .sheet(isPresented: $showAbout) { AboutView() }
         .environmentObject(pen)
         #if os(macOS)
-        // Expose this document's Export action so File > Export… (⌘E) drives the
-        // SAME flow as the toolbar Export button, targeting the focused document.
-        .focusedSceneValue(\.exportAction, prepareExport)
+        // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
+        // targeting the focused document.
+        .focusedSceneValue(\.exportAction, { showExportSheet = true })
         #endif
     }
 
     private var exportFilename: String {
         let base = document.name.trimmingCharacters(in: .whitespaces)
-        return (base.isEmpty ? "Untitled Icon" : base) + " AppIcon"
+        return base.isEmpty ? "Untitled" : base
     }
 
     /// On-demand flat PNG of the visible layers (crop-trimmed) for the native ShareLink.
@@ -229,20 +225,7 @@ struct ContentView: View {
                   filename: exportFilename)
     }
 
-    /// Render every required size to PNG and present the folder exporter (roadmap 2.3).
-    private func prepareExport() {
-        var files: [String: Data] = [:]
-        for px in Self.exportPixelSizes {
-            if let data = ContentView.renderIconPNG(document: document, px: px) {
-                files["icon_\(px).png"] = data
-            }
-        }
-        exportBundle = IconExportBundle(files: files)
-        showExporter = true
-    }
-
-    /// iOS + macOS app-icon pixel sizes, unioned + de-duplicated (roadmap 2.3.2).
-    /// No Contents.json (2.3.1): the user drags the size Xcode asks for into its well.
+    /// Pixel sizes still used by the Canvas hub's Web-folder export.
     static let exportPixelSizes: [Int] =
         [16, 20, 29, 32, 40, 58, 60, 64, 76, 80, 87, 120, 128, 152, 167, 180, 256, 512, 1024]
 
@@ -830,16 +813,9 @@ struct CanvasInspector: View {
                 Button {
                     webBundle = IconExportBundle(files: makeIconFolder(document))
                     folderFilename = "\(displayName) Icons"; showWebExporter = true
-                } label: { Label("Icon PNGs (folder)", systemImage: "square.and.arrow.up.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                } label: { Label("Icon — all sizes (PNG folder)", systemImage: "square.and.arrow.up.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
-                Button {
-                    if let data = makeCanvasPNG(document) {
-                        exportData = data; exportType = .png
-                        exportFilename = displayName; showDataExporter = true
-                    }
-                } label: { Label("PNG (full canvas)", systemImage: "photo").font(.system(size: 18)).frame(maxWidth: .infinity) }
-                .buttonStyle(.bordered)
-                Text("Print PDF = single file at trim + bleed. Web / Icon = a packaged folder of PNGs. PNG = one full-canvas image.")
+                Text("Print PDF = trim + bleed. Web = PNGs @1x/2x/3x. Icon — all sizes = every app-icon size (16→1024) as a PNG folder. For a single PNG/JPEG/TIFF/PDF, use Export (⌘E) and pick the format.")
                     .font(.system(size: 18)).foregroundStyle(.primary)
             }
 
@@ -3695,6 +3671,60 @@ final class PixelPen: ObservableObject {
 
 /// The visible layers composited with NO editor chrome (no checkerboard / box) —
 /// what Export and Share rasterize. Transparent where no opaque background shows.
+// MARK: - Unified Export sheet (⌘E)
+
+/// One export window: pick a format from the dropdown and save. The primary export path
+/// (⌘E / the toolbar Export button). The all-sizes icon PNG folder lives on separately in
+/// the Canvas hub; this sheet covers single-file formats.
+struct ExportSheet: View {
+    @ObservedObject var document: IconDocument
+    @Environment(\.dismiss) private var dismiss
+    @State private var format: ExportFormat = .png
+    @State private var flattenMatte = false
+    @State private var matte: Color = .white
+    @State private var payload = Data()
+    @State private var exporting = false
+
+    private var baseName: String {
+        let n = document.name.trimmingCharacters(in: .whitespaces)
+        return n.isEmpty ? "Untitled" : n
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Export").font(.system(size: 22, weight: .semibold))
+            Picker("Format", selection: $format) {
+                ForEach(ExportFormat.allCases) { f in Text(f.rawValue).tag(f) }
+            }
+            .pickerStyle(.menu)
+            if format == .pdfLayers {
+                Toggle("Flatten transparency onto a matte", isOn: $flattenMatte)
+                if flattenMatte {
+                    ColorPicker("Matte colour", selection: $matte, supportsOpacity: false)
+                }
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Export…") {
+                    let m = (format == .pdfLayers && flattenMatte) ? matte.cgColorResolved : nil
+                    if let d = format.data(from: document, matte: m) {
+                        payload = d
+                        exporting = true
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 380)
+        .fileExporter(isPresented: $exporting,
+                      document: CanvasDataDocument(payload),
+                      contentType: format.utType,
+                      defaultFilename: baseName) { _ in dismiss() }
+    }
+}
+
 struct IconCompositeView: View {
     let document: IconDocument
     let size: CGSize
