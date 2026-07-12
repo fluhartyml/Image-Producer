@@ -1303,9 +1303,7 @@ struct SymbolPickerInspector: View {
                 }
                 .pickerStyle(.segmented)
                 PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
-                TextField(source == .sfSymbols
-                          ? "Search all SF Symbols"
-                          : "Search Unicode by name (knight, star, arrow…)", text: $search)
+                TextField("Search all SF and Unicode symbols", text: $search)
                     .textFieldStyle(.roundedBorder)
                 switch source {
                 case .sfSymbols: sfGrid
@@ -1325,7 +1323,7 @@ struct SymbolPickerInspector: View {
     /// SF Symbols grid — searches the full ~9,476-name catalog, places an editable symbol.
     @ViewBuilder private var sfGrid: some View {
         if filtered.isEmpty {
-            Text("No SF Symbols match “\(search.trimmingCharacters(in: .whitespaces))”.")
+            Text("Can't find an SF or Unicode symbol matching “\(search.trimmingCharacters(in: .whitespaces))”.")
                 .font(.system(size: 16)).foregroundStyle(.secondary).padding(.vertical, 8)
         } else {
             ScrollView {
@@ -1354,7 +1352,7 @@ struct SymbolPickerInspector: View {
     /// default font lacks (e.g. emoji → Apple Color Emoji).
     @ViewBuilder private var unicodeGrid: some View {
         if filteredUnicode.isEmpty {
-            Text("No characters match “\(search.trimmingCharacters(in: .whitespaces))”.")
+            Text("Can't find an SF or Unicode symbol matching “\(search.trimmingCharacters(in: .whitespaces))”.")
                 .font(.system(size: 16)).foregroundStyle(.secondary).padding(.vertical, 8)
         } else {
             ScrollView {
