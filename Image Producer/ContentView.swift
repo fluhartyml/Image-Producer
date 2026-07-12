@@ -1303,7 +1303,7 @@ struct SymbolPickerInspector: View {
                 }
                 .pickerStyle(.segmented)
                 PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
-                TextField("Search all SF and Unicode symbols", text: $search)
+                TextField("Search SF & Unicode", text: $search)
                     .textFieldStyle(.roundedBorder)
                 switch source {
                 case .sfSymbols: sfGrid
