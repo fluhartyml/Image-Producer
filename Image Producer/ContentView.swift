@@ -3126,8 +3126,12 @@ struct TransformBox: View {
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(center)
                 .contentShape(Rectangle())
+                // minimumDistance:6 (was 0) so a touch that lands on a corner grabber
+                // isn't stolen by this move gesture on touch-down — the frontmost handle
+                // gets first claim, fixing the top-left corner that used to move instead
+                // of resize.
                 .gesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .named("canvas"))
+                    DragGesture(minimumDistance: 6, coordinateSpace: .named("canvas"))
                         .onChanged { value in
                             guard index < document.layers.count else { return }
                             let start = startCenter ?? document.layers[index].transform.center
@@ -3146,7 +3150,7 @@ struct TransformBox: View {
                     .frame(width: 14, height: 14)
                     .position(x: center.x + off.width * boxW / 2,
                               y: center.y + off.height * boxH / 2)
-                    .gesture(
+                    .highPriorityGesture(
                         DragGesture(minimumDistance: 1, coordinateSpace: .named("canvas"))
                             .onChanged { value in
                                 guard index < document.layers.count else { return }
