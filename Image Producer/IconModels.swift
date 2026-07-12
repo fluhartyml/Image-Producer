@@ -841,6 +841,26 @@ extension IconDocument {
         } catch { return false }
     }
 
+    /// ⇧⌘N "New from Import": like `writeNewProject`, but the document is seeded from an
+    /// imported PDF instead of the default template — the PDF IS the template. Starts from
+    /// an EMPTY IconDocument (no `newDefault()` scaffold), so the Light/Dark background
+    /// floors only appear if the PDF itself carries them; they never spawn out of nowhere.
+    /// The PDF's layers/pages come in via the same additive `importPDFAsLayers` path.
+    /// Returns true only if at least one layer was imported.
+    @MainActor static func writeNewProjectFromPDF(at url: URL, pdf pdfURL: URL) -> Bool {
+        let doc = IconDocument(layers: [])          // empty — the import provides the template
+        let scoped = pdfURL.startAccessingSecurityScopedResource()
+        let added = importPDFAsLayers(pdfURL, into: doc)
+        if scoped { pdfURL.stopAccessingSecurityScopedResource() }
+        guard added > 0 else { return false }
+        doc.name = url.deletingPathExtension().lastPathComponent
+        do {
+            try doc.writePackage(to: url)
+            pendingNewProjectURL = url      // so the editor opens it on the Canvas hub
+            return true
+        } catch { return false }
+    }
+
     /// The just-created project's URL. New projects are real files now (not "Untitled"),
     /// so the editor can't use "no file" to know it's new — it matches this instead to open
     /// a fresh project on the Canvas hub (name + extents up front). Consumed on first appear.

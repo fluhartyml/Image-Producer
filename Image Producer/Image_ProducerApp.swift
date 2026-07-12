@@ -110,6 +110,32 @@ struct Image_ProducerApp: App {
                     }
                 }
                 .keyboardShortcut("n", modifiers: .command)
+
+                // ⇧⌘N: New from Import — the picked PDF IS the template. Seeds an EMPTY
+                // document (NOT newDefault), so the Light/Dark floors appear only if the
+                // PDF carries them — they never spawn out of nowhere.
+                Button("New from Import…") {
+                    let panel = NSOpenPanel()
+                    panel.allowedContentTypes = [.pdf]
+                    panel.allowsMultipleSelection = false
+                    panel.canChooseDirectories = false
+                    panel.prompt = "Import"
+                    panel.message = "Choose a PDF to open as a new document."
+                    guard panel.runModal() == .OK, let pdfURL = panel.url else { return }
+                    Task {
+                        let url = await Task.detached { IconDocument.nextProjectURL() }.value
+                        if let url, IconDocument.writeNewProjectFromPDF(at: url, pdf: pdfURL) {
+                            NSDocumentController.shared.openDocument(withContentsOf: url,
+                                                                     display: true) { doc, _, err in
+                                if doc == nil {
+                                    NSLog("ImageProducer ⇧⌘N: open failed for %@ — %@",
+                                          url.path, String(describing: err))
+                                }
+                            }
+                        }
+                    }
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
             }
             #endif
         }
