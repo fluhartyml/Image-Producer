@@ -94,6 +94,40 @@ struct WelcomeView: View {
             .controlSize(.large)
             .buttonStyle(.borderedProminent)
 
+            // New from Import — the launch surface IS the "no document open" state, so the
+            // import-as-new-document path belongs right here next to New Image (not only in
+            // the ⇧⌘N File-menu command). The picked PDF becomes the template: an empty doc
+            // seeded from the PDF, so the Light/Dark floors appear only if the PDF has them.
+            Button {
+                let panel = NSOpenPanel()
+                panel.allowedContentTypes = [.pdf]
+                panel.allowsMultipleSelection = false
+                panel.canChooseDirectories = false
+                panel.prompt = "Import"
+                panel.message = "Choose a PDF to open as a new document."
+                guard panel.runModal() == .OK, let pdfURL = panel.url else { return }
+                Task {
+                    let url = await Task.detached { IconDocument.nextProjectURL() }.value
+                    var opened = false
+                    if let url, IconDocument.writeNewProjectFromPDF(at: url, pdf: pdfURL) {
+                        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+                        do { try await openDocument(at: url); opened = true }
+                        catch {
+                            NSLog("ImageProducer New from Import: openDocument failed for %@ — %@",
+                                  url.path, String(describing: error))
+                        }
+                    } else {
+                        NSLog("ImageProducer New from Import: could not create project from the chosen PDF")
+                    }
+                    if opened { dismissWindow(id: "welcome") }
+                }
+            } label: {
+                Label("New from Import…", systemImage: "square.and.arrow.down")
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.large)
+            .buttonStyle(.bordered)
+
             if !recents.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Recent")
