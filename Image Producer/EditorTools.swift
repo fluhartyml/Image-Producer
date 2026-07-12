@@ -55,7 +55,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .shape:      "Shape"
         case .path:       "Path (Vector)"
         case .text:       "Text"
-        case .symbol:     "Symbol (SF Symbols)"
+        case .symbol:     "Symbol"
         case .image:      "Image"
         case .imagePlayground: "Image Playground"
         case .zoom:       "Zoom"
