@@ -3058,6 +3058,13 @@ struct CanvasView: View {
                 .italic(text.italic)
                 .underline(text.underline)
                 .foregroundStyle(Color(hex: text.colorHex) ?? .primary)
+                // Shrink-to-fit: a single glyph fills at full size; a long string wraps to
+                // a second line and then scales down to fit the canvas, instead of
+                // truncating to "…". Bounded to the canvas so the fit target is the icon.
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.05)
+                .frame(width: size.width, height: size.height)
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .image(let imageContent):
@@ -3852,6 +3859,13 @@ struct IconCompositeView: View {
                 .italic(text.italic)
                 .underline(text.underline)
                 .foregroundStyle(Color(hex: text.colorHex) ?? .primary)
+                // Shrink-to-fit: a single glyph fills at full size; a long string wraps to
+                // a second line and then scales down to fit the canvas, instead of
+                // truncating to "…". Bounded to the canvas so the fit target is the icon.
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.05)
+                .frame(width: size.width, height: size.height)
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .image(let imageContent):
