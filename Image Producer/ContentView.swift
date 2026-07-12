@@ -1396,6 +1396,8 @@ struct FontPickerInspector: View {
     @State private var glyphs: [String] = []
     /// The live text layer this inspector is creating/editing (its name == its text).
     @State private var currentTextLayerID: IconLayer.ID?
+    /// Center of the line just finished with Enter, so the next line spawns offset below it.
+    @State private var lastLineCenter: CGPoint?
 
     /// Installed font family names (Core Text — cross-platform), sorted.
     static let families: [String] =
@@ -1409,7 +1411,24 @@ struct FontPickerInspector: View {
     /// sets — adopt/new — assign `textInput` directly, NOT through this, so they don't
     /// re-style an adopted layer.)
     private var textBinding: Binding<String> {
-        Binding(get: { textInput }, set: { v in textInput = v; syncText() })
+        Binding(get: { textInput }, set: { v in
+            if v.contains("\n") {
+                // Enter finishes this line and ARMS a new layer — it does NOT insert a
+                // newline (each line is its own independent layer). Lazy: the armed layer is
+                // created only when the next character is typed; double-Enter / stop = done,
+                // nothing empty left behind. Remember the current line's center so the next
+                // line spawns offset below it.
+                if let id = currentTextLayerID,
+                   let i = document.layers.firstIndex(where: { $0.id == id }) {
+                    lastLineCenter = document.layers[i].transform.center
+                }
+                textInput = ""
+                currentTextLayerID = nil
+                return
+            }
+            textInput = v
+            syncText()
+        })
     }
 
     var body: some View {
@@ -1528,6 +1547,12 @@ struct FontPickerInspector: View {
             var layer = IconLayer(name: textInput, role: .content)
             layer.setText(textInput, fontName: family, tintHex: tint.hexString() ?? "#000000",
                           bold: bold, italic: italic, underline: underline, outline: outline)
+            // A new Enter-made line spawns slightly BELOW the previous one so stacked lines
+            // are visible/separable instead of piling up dead-center.
+            if let prev = lastLineCenter {
+                layer.transform.center = CGPoint(x: prev.x, y: min(prev.y + 0.18, 0.95))
+                lastLineCenter = nil
+            }
             document.layers.append(layer)
             currentTextLayerID = layer.id
             document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
