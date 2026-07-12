@@ -1538,7 +1538,12 @@ struct FontPickerInspector: View {
             document.captureHistoryBaselineIfNeeded()
             document.layers[i].setText(textInput, fontName: family, tintHex: tint.hexString() ?? "#000000",
                                        bold: bold, italic: italic, underline: underline, outline: outline)
-            document.layers[i].name = textInput.isEmpty ? "Text" : textInput
+            // Canvas → name mirror, ONE-WAY and only while the link is intact. A manual
+            // rename severs it (see commitRename), after which typed text no longer
+            // renames the layer.
+            if document.layers[i].isNameLinkedToText {
+                document.layers[i].name = textInput.isEmpty ? "Text" : textInput
+            }
             // Coalesce a typing session into one "Text" step (not one per keystroke).
             document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
                                    actionLabel: "Text", layerID: id, coalesce: true)
@@ -3356,16 +3361,13 @@ struct LayerPanel: View {
               let index = document.layers.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
-            // Two-way link: renaming a TEXT layer rewrites its on-canvas text to match
-            // (Michael 2026-06-22 — the layer title IS the text). But ONLY when the title
-            // already mirrors the text (how the Text tool keeps name == text). A single
-            // glyph placed by the Symbol tool is also a .text element, yet its name is
-            // independent ("Layer 6" vs "🍕") — renaming it must NOT overwrite the glyph.
-            let mirrorsText = document.layers[index].textString == document.layers[index].name
+            // ONE-WAY (Michael 2026-07-12, supersedes the 2026-06-22 two-way link): a
+            // manual rename only sets the label and NEVER writes back to the canvas text.
+            // It also SEVERS the text→name auto-mirror, so from now on this layer's name is
+            // frozen and independent — typing new text won't rename it. (This is why
+            // renaming an emoji/text layer can no longer corrupt its glyph.)
             document.layers[index].name = trimmed
-            if mirrorsText, document.layers[index].textString != nil {
-                document.layers[index].setTextString(trimmed)
-            }
+            document.layers[index].nameLinkedToText = false
         }
     }
 

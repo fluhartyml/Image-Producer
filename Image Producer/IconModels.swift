@@ -307,6 +307,15 @@ struct IconLayer: Identifiable, Codable {
     var id = UUID()
     /// User-editable; auto-named from its content ("content names the layer").
     var name: String
+    /// Text→name link (one-way: content names the layer, NEVER the reverse). While
+    /// intact, editing a text layer with the Text tool keeps `name` mirrored to the
+    /// typed text. A MANUAL rename severs the link — after that the name is frozen and
+    /// independent, and renaming never writes back to the canvas text. Optional so old
+    /// documents (no key) decode as still-linked. Read it via `isNameLinkedToText`.
+    var nameLinkedToText: Bool?
+
+    /// Whether the text→name auto-mirror is still active (nil legacy value = linked).
+    var isNameLinkedToText: Bool { nameLinkedToText ?? true }
     /// The eyeball toggle. For the two background layers this also serves as the
     /// light/dark preview control (hide Dark Background to preview the light look).
     var isVisible = true
