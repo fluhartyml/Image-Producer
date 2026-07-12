@@ -1194,21 +1194,26 @@ struct SymbolPickerInspector: View {
     let activeLayerID: IconLayer.ID?
     @State private var search = ""
     @State private var tint: Color = .black
-    @State private var source: GlyphSource = .sfSymbols
-
-    /// Which repertoire the picker is searching: Apple's SF Symbols, or the OS's Unicode
-    /// character catalog (chess, cards, arrows, math, dingbats, emoji…).
-    enum GlyphSource: String, CaseIterable, Identifiable {
-        case sfSymbols = "SF Symbols"
-        case unicode = "Unicode"
-        var id: String { rawValue }
-    }
 
     /// One searchable Unicode character: the glyph plus its lowercased Unicode name.
     struct UnicodeGlyph: Identifiable, Hashable {
         let char: String
         let name: String
         var id: String { char }
+    }
+
+    /// One entry in the blended result grid — an SF Symbol or a Unicode character. The
+    /// search covers BOTH repertoires at once (no segment toggle); each tile keeps its own
+    /// placement behavior (SF → editable symbol, Unicode → single-glyph text).
+    enum GlyphResult: Identifiable, Hashable {
+        case sf(String)
+        case unicode(UnicodeGlyph)
+        var id: String {
+            switch self {
+            case .sf(let name):   return "sf:" + name
+            case .unicode(let g): return "u:" + g.char
+            }
+        }
     }
 
     /// A curated starter set of long-standing SF Symbols (safe across OS versions).
@@ -1253,10 +1258,15 @@ struct SymbolPickerInspector: View {
         return document.layers[i].symbolElementName
     }
 
-    private var filtered: [String] {
+    /// The blended result list — SF Symbols first, then Unicode. Empty search shows the
+    /// curated SF starter set as a browse default; typing searches BOTH full catalogs.
+    private var combinedResults: [GlyphResult] {
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        // Empty box → the curated starter set; typing searches the FULL catalog.
-        return q.isEmpty ? Self.symbols : Self.allSymbols.filter { $0.contains(q) }
+        if q.isEmpty { return Self.symbols.map { .sf($0) } }
+        let sf = Self.allSymbols.filter { $0.contains(q) }.map { GlyphResult.sf($0) }
+        let uni = Self.unicodeGlyphs.filter { $0.name.contains(q) || $0.char == q }
+            .map { GlyphResult.unicode($0) }
+        return sf + uni
     }
 
     /// The currently-placed Unicode character on the active layer (for the highlight).
@@ -1287,27 +1297,25 @@ struct SymbolPickerInspector: View {
         return out
     }()
 
-    private var filteredUnicode: [UnicodeGlyph] {
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        if q.isEmpty { return Array(Self.unicodeGlyphs.prefix(120)) }
-        return Self.unicodeGlyphs.filter { $0.name.contains(q) || $0.char == q }
-    }
-
     private let columns = [GridItem(.adaptive(minimum: 44), spacing: 8)]
 
     var body: some View {
         if activeIsContent {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("", selection: $source) {
-                    ForEach(GlyphSource.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
                 PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
                 TextField("Search SF & Unicode", text: $search)
                     .textFieldStyle(.roundedBorder)
-                switch source {
-                case .sfSymbols: sfGrid
-                case .unicode:   unicodeGrid
+                if combinedResults.isEmpty {
+                    Text("Can't find an SF or Unicode symbol matching “\(search.trimmingCharacters(in: .whitespaces))”.")
+                        .font(.system(size: 16)).foregroundStyle(.secondary).padding(.vertical, 8)
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 8) {
+                            ForEach(combinedResults) { resultTile($0) }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(maxHeight: 240)
                 }
             }
             .padding()
@@ -1320,59 +1328,28 @@ struct SymbolPickerInspector: View {
         }
     }
 
-    /// SF Symbols grid — searches the full ~9,476-name catalog, places an editable symbol.
-    @ViewBuilder private var sfGrid: some View {
-        if filtered.isEmpty {
-            Text("Can't find an SF or Unicode symbol matching “\(search.trimmingCharacters(in: .whitespaces))”.")
-                .font(.system(size: 16)).foregroundStyle(.secondary).padding(.vertical, 8)
-        } else {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(filtered, id: \.self) { name in
-                        Button { place(name) } label: {
-                            Image(systemName: name)
-                                .font(.system(size: 20))
-                                .frame(width: 44, height: 44)
-                                .background(RoundedRectangle(cornerRadius: 8)
-                                    .fill(name == currentSymbol
-                                          ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(name)
-                    }
-                }
-                .padding(.vertical, 4)
+    /// One tile in the blended grid — an SF Symbol (Image) or a Unicode character (Text),
+    /// each with its own place action and current-selection highlight.
+    @ViewBuilder private func resultTile(_ result: GlyphResult) -> some View {
+        switch result {
+        case .sf(let name):
+            Button { place(name) } label: {
+                Image(systemName: name)
+                    .font(.system(size: 20))
+                    .frame(width: 44, height: 44)
+                    .background(RoundedRectangle(cornerRadius: 8)
+                        .fill(name == currentSymbol ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
             }
-            .frame(maxHeight: 240)
-        }
-    }
-
-    /// Unicode grid — search any symbol/emoji by name (chess, cards, arrows…) and place it
-    /// as a single-glyph text element. Core Text glyph fallback renders characters the
-    /// default font lacks (e.g. emoji → Apple Color Emoji).
-    @ViewBuilder private var unicodeGrid: some View {
-        if filteredUnicode.isEmpty {
-            Text("Can't find an SF or Unicode symbol matching “\(search.trimmingCharacters(in: .whitespaces))”.")
-                .font(.system(size: 16)).foregroundStyle(.secondary).padding(.vertical, 8)
-        } else {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(filteredUnicode) { g in
-                        Button { placeUnicode(g.char) } label: {
-                            Text(g.char)
-                                .font(.system(size: 22))
-                                .frame(width: 44, height: 44)
-                                .background(RoundedRectangle(cornerRadius: 8)
-                                    .fill(g.char == currentText
-                                          ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(g.name)
-                    }
-                }
-                .padding(.vertical, 4)
+            .buttonStyle(.plain).accessibilityLabel(name)
+        case .unicode(let g):
+            Button { placeUnicode(g.char) } label: {
+                Text(g.char)
+                    .font(.system(size: 22))
+                    .frame(width: 44, height: 44)
+                    .background(RoundedRectangle(cornerRadius: 8)
+                        .fill(g.char == currentText ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
             }
-            .frame(maxHeight: 240)
+            .buttonStyle(.plain).accessibilityLabel(g.name)
         }
     }
 
