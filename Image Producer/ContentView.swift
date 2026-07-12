@@ -3053,18 +3053,20 @@ struct CanvasView: View {
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .text(let text):
             Text(text.string)
-                .font(.custom(text.fontName, size: ref * text.sizeFraction * t.scale))
+                // Model B: text FILLS its box (the Move transform box = center + contentSize).
+                // Font starts at the box height; the text wraps to the box WIDTH and scales
+                // down (minimumScaleFactor) so the whole string fits the rectangle. Reshape
+                // the box → text re-wraps AND re-sizes. Box defaults to the full canvas.
+                .font(.custom(text.fontName, size: max(1, t.contentSize.height * ref)))
                 .bold(text.bold)
                 .italic(text.italic)
                 .underline(text.underline)
                 .foregroundStyle(Color(hex: text.colorHex) ?? .primary)
-                // Shrink-to-fit: a single glyph fills at full size; a long string wraps to
-                // a second line and then scales down to fit the canvas, instead of
-                // truncating to "…". Bounded to the canvas so the fit target is the icon.
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.05)
-                .frame(width: size.width, height: size.height)
+                .lineLimit(nil)
+                .minimumScaleFactor(0.01)
+                .frame(width: max(1, t.contentSize.width * ref),
+                       height: max(1, t.contentSize.height * ref))
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .image(let imageContent):
@@ -3097,6 +3099,7 @@ struct TransformBox: View {
     let index: Int
     let size: CGSize
     @State private var startCenter: CGPoint?
+    @State private var startAnchor: CGPoint?
 
     /// Unit offsets of the four corners from the box center.
     private let corners: [CGSize] = [
@@ -3109,6 +3112,7 @@ struct TransformBox: View {
         // leaving `index` pointing past the end of the array for one update pass.
         if index >= 0, index < document.layers.count {
             let t = document.layers[index].transform
+            let isText = document.layers[index].textString != nil
             // Hug the content's true shape (a cropped image is a rectangle, not a
             // square) so the grabbers sit on the object, never orphaned at the canvas
             // corners. contentSize is square for legacy layers (no contentAspect).
@@ -3154,11 +3158,34 @@ struct TransformBox: View {
                         DragGesture(minimumDistance: 1, coordinateSpace: .named("canvas"))
                             .onChanged { value in
                                 guard index < document.layers.count else { return }
-                                let half = max(abs(value.location.x - center.x),
-                                               abs(value.location.y - center.y))
-                                let newScale = min(max((half * 2) / ref, 0.1), 4.0)
-                                document.layers[index].transform.scale = newScale
+                                if isText {
+                                    // Text = RECT-RESIZE: the OPPOSITE corner is the anchor,
+                                    // the dragged corner follows the finger. Sets the box's
+                                    // center + width + height (via scale + contentAspect) — so
+                                    // width drives wrap and height drives the fit area.
+                                    let anchor = startAnchor ?? CGPoint(x: center.x - off.width * boxW / 2,
+                                                                        y: center.y - off.height * boxH / 2)
+                                    if startAnchor == nil { startAnchor = anchor }
+                                    let dx = min(max(value.location.x, 0), size.width)
+                                    let dy = min(max(value.location.y, 0), size.height)
+                                    let wPts = max(abs(dx - anchor.x), 12)
+                                    let hPts = max(abs(dy - anchor.y), 12)
+                                    let nW = Double(wPts / ref)
+                                    let nH = Double(hPts / ref)
+                                    document.layers[index].transform.center = CGPoint(
+                                        x: min(max((anchor.x + dx) / 2 / size.width, 0), 1),
+                                        y: min(max((anchor.y + dy) / 2 / size.height, 0), 1))
+                                    document.layers[index].transform.scale = min(max(max(nW, nH), 0.05), 4.0)
+                                    document.layers[index].transform.contentAspect = min(max(nW / nH, 0.05), 20)
+                                } else {
+                                    // Non-text = uniform aspect-locked scale from center.
+                                    let half = max(abs(value.location.x - center.x),
+                                                   abs(value.location.y - center.y))
+                                    let newScale = min(max((half * 2) / ref, 0.1), 4.0)
+                                    document.layers[index].transform.scale = newScale
+                                }
                             }
+                            .onEnded { _ in startAnchor = nil }
                     )
             }
         }
@@ -3858,18 +3885,20 @@ struct IconCompositeView: View {
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .text(let text):
             Text(text.string)
-                .font(.custom(text.fontName, size: ref * text.sizeFraction * t.scale))
+                // Model B: text FILLS its box (the Move transform box = center + contentSize).
+                // Font starts at the box height; the text wraps to the box WIDTH and scales
+                // down (minimumScaleFactor) so the whole string fits the rectangle. Reshape
+                // the box → text re-wraps AND re-sizes. Box defaults to the full canvas.
+                .font(.custom(text.fontName, size: max(1, t.contentSize.height * ref)))
                 .bold(text.bold)
                 .italic(text.italic)
                 .underline(text.underline)
                 .foregroundStyle(Color(hex: text.colorHex) ?? .primary)
-                // Shrink-to-fit: a single glyph fills at full size; a long string wraps to
-                // a second line and then scales down to fit the canvas, instead of
-                // truncating to "…". Bounded to the canvas so the fit target is the icon.
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.05)
-                .frame(width: size.width, height: size.height)
+                .lineLimit(nil)
+                .minimumScaleFactor(0.01)
+                .frame(width: max(1, t.contentSize.width * ref),
+                       height: max(1, t.contentSize.height * ref))
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .image(let imageContent):
