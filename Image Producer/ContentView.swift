@@ -3293,10 +3293,14 @@ struct LayerPanel: View {
               let index = document.layers.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
-            document.layers[index].name = trimmed
             // Two-way link: renaming a TEXT layer rewrites its on-canvas text to match
-            // (Michael 2026-06-22 — the layer title IS the text).
-            if document.layers[index].textString != nil {
+            // (Michael 2026-06-22 — the layer title IS the text). But ONLY when the title
+            // already mirrors the text (how the Text tool keeps name == text). A single
+            // glyph placed by the Symbol tool is also a .text element, yet its name is
+            // independent ("Layer 6" vs "🍕") — renaming it must NOT overwrite the glyph.
+            let mirrorsText = document.layers[index].textString == document.layers[index].name
+            document.layers[index].name = trimmed
+            if mirrorsText, document.layers[index].textString != nil {
                 document.layers[index].setTextString(trimmed)
             }
         }
