@@ -1302,7 +1302,7 @@ struct SymbolPickerInspector: View {
     var body: some View {
         if activeIsContent {
             VStack(alignment: .leading, spacing: 12) {
-                PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
+                PaletteSwatchRow(document: document, color: $tint, label: "Color")
                 TextField("Search SF & Unicode", text: $search)
                     .textFieldStyle(.roundedBorder)
                 if combinedResults.isEmpty {
