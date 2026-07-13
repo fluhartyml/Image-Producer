@@ -3853,6 +3853,8 @@ struct ExportSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
                 Button("Export…") {
                     let m = (format == .pdfLayers && flattenMatte) ? matte.cgColorResolved : nil
                     if let d = format.data(from: document, matte: m) {
@@ -3861,6 +3863,8 @@ struct ExportSheet: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
             }
         }
         .padding(20)
