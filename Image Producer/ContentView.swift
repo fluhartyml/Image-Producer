@@ -3840,10 +3840,15 @@ struct ExportSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Export").font(.system(size: 22, weight: .semibold))
-            Picker("Format", selection: $format) {
-                ForEach(ExportFormat.allCases) { f in Text(f.rawValue).tag(f) }
+            HStack(spacing: 10) {
+                Text("Format").font(.system(size: 18)).foregroundStyle(.secondary)
+                Picker("Format", selection: $format) {
+                    ForEach(ExportFormat.allCases) { f in Text(f.rawValue).tag(f) }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                Spacer()
             }
-            .pickerStyle(.menu)
             if format == .pdfLayers {
                 Toggle("Flatten transparency onto a matte", isOn: $flattenMatte)
                 if flattenMatte {
@@ -3868,7 +3873,13 @@ struct ExportSheet: View {
             }
         }
         .padding(20)
+        #if os(iOS)
+        // iPad: size the sheet to its content so it doesn't float in an empty box.
+        .presentationSizing(.fitted)
+        .presentationDragIndicator(.visible)
+        #else
         .frame(minWidth: 380)
+        #endif
         .fileExporter(isPresented: $exporting,
                       document: CanvasDataDocument(payload),
                       contentType: format.utType,
