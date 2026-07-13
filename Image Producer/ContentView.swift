@@ -840,11 +840,13 @@ struct CanvasInspector: View {
                         Text("Matte colour").font(.system(size: 18))
                     }
                 }
+                Text("Export writes page 1 = the composite, then one page per layer — transparency preserved (flatten only for print).")
+                    .font(.system(size: 18)).foregroundStyle(.primary)
                 Button {
                     importingPDF = true
                 } label: { Label("Import PDF as layers…", systemImage: "square.and.arrow.down.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
-                Text("Export writes page 1 = the composite, then one page per layer — transparency preserved (flatten only for print). Import brings each page in as its own editable image layer.")
+                Text("Import brings each page in as its own editable image layer.")
                     .font(.system(size: 18)).foregroundStyle(.primary)
             }
 
