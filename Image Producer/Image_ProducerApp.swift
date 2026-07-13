@@ -171,11 +171,18 @@ struct Image_ProducerApp: App {
                 endPoint: .bottom
             )
         } overlayAccessoryView: { _ in
-            // The launch scene shows only the "Image Producer" title (no GRAPHIC ARTS
-            // subtitle like the Mac Welcome window / About sheet), so the version line
-            // sits at the bottom — the conventional spot for a build stamp on a launch
-            // screen. Same appVersionLine text as the other platforms.
+            // Hero app icon above the wordmark — mirrors the Mac Welcome window, which
+            // shows the app icon over the title. The 1024 icon art (LaunchHeroIcon,
+            // light/dark) is clipped to the iOS app-icon superellipse so it reads as the
+            // home-screen icon. The version line stays pinned at the bottom — the
+            // conventional spot for a build stamp on a launch screen.
             VStack {
+                Image("LaunchHeroIcon")
+                    .resizable()
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .shadow(radius: 8, y: 3)
+                    .padding(.top, 44)
                 Spacer()
                 Text(appVersionLine)
                     .font(.footnote)
