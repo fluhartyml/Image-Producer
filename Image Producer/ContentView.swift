@@ -162,13 +162,13 @@ struct ContentView: View {
                                   activeLayerID: activeLayerID,
                                   fillColor: $fillColor,
                                   fileURL: fileURL)
-                        .frame(width: 240)
+                        .frame(width: 300)
                     Divider()
                     // Right column: Layers with History "behind" it (spec: undo is the History
                     // panel sitting behind the layer list). The wide/Mac layout used to hardcode
                     // only LayerPanel, so History was unreachable on Mac — this restores it.
                     LayersHistoryColumn(document: document, activeLayerID: $activeLayerID)
-                        .frame(width: 240)
+                        .frame(width: 320)
                 }
             }
         }
@@ -1135,13 +1135,13 @@ struct ColorPaletteInspector: View {
                         }
                 }
             }
-            HStack(spacing: 8) {
+            VStack(spacing: 8) {
                 Button { if let n = document.addPaletteColor() { pen.selectedSlot = n; applyActive() } } label: {
-                    Label("Add color", systemImage: "plus").lineLimit(1).minimumScaleFactor(0.7).frame(maxWidth: .infinity)
+                    Label("Add color", systemImage: "plus").frame(maxWidth: .infinity)
                 }
                 .disabled(document.palette.count >= ImageDocument.maxPaletteSlots)
                 Button(role: .destructive) { document.removePaletteColor(at: selected) } label: {
-                    Label("Remove", systemImage: "minus").lineLimit(1).minimumScaleFactor(0.7).frame(maxWidth: .infinity)
+                    Label("Remove", systemImage: "minus").frame(maxWidth: .infinity)
                 }
                 .disabled(document.palette.count <= 8)
             }
@@ -3442,7 +3442,6 @@ struct LayerRow: View {
                 Text(layer.name)
                     .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
                     .lineLimit(2)
-                    .minimumScaleFactor(0.7)   // shrink a long single word rather than hyphenate it
                 Spacer()
             }
             .contentShape(Rectangle())
@@ -3456,7 +3455,6 @@ struct LayerRow: View {
                     Text(layer.name)
                         .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.7)   // shrink a long single word rather than hyphenate it
                     Spacer()
                 }
                 .contentShape(Rectangle())
