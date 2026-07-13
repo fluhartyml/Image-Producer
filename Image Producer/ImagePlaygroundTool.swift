@@ -37,8 +37,8 @@ import ImagePlayground
 
 /// Tool #11's inspector — a prompt box + Make/Restyle buttons that seed Apple's sheet.
 struct ImagePlaygroundInspector: View {
-    @ObservedObject var document: IconDocument
-    let activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    let activeLayerID: ImageLayer.ID?
 
     /// Cross-platform Apple-Intelligence capability check (no UIKit needed).
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
@@ -57,7 +57,7 @@ struct ImagePlaygroundInspector: View {
 
     /// The active layer iff it's a CONTENT layer that actually has art on it —
     /// Filter needs something to restyle.
-    private var activeFilterable: IconLayer? {
+    private var activeFilterable: ImageLayer? {
         guard let i = activeIndex, case .content = document.layers[i].role,
               !document.layers[i].elements.isEmpty else { return nil }
         return document.layers[i]
@@ -152,10 +152,10 @@ struct ImagePlaygroundInspector: View {
     /// Filter — render the active layer to seed the source image, set the prompt, present.
     @MainActor private func startFilter() {
         guard let layer = activeFilterable else { return }
-        let solo = IconDocument(name: document.name, canvasWidth: document.canvasWidth,
+        let solo = ImageDocument(name: document.name, canvasWidth: document.canvasWidth,
                                 canvasHeight: document.canvasHeight,
                                 layers: [layer], palette: document.palette, cropRect: nil)
-        let renderer = ImageRenderer(content: IconCompositeView(document: solo, size: document.canvasPixelSize))
+        let renderer = ImageRenderer(content: ImageCompositeView(document: solo, size: document.canvasPixelSize))
         renderer.scale = 1
         if let cg = renderer.cgImage, let png = pngData(from: cg),
            let platform = PlatformImage(data: png) {
@@ -171,7 +171,7 @@ struct ImagePlaygroundInspector: View {
     private func placeNewLayer(from url: URL) {
         guard let png = loadPNG(from: url) else { failed = true; return }
         failed = false
-        var layer = IconLayer(name: layerName(from: prompt), role: .content)
+        var layer = ImageLayer(name: layerName(from: prompt), role: .content)
         layer.setImage(png)
         document.layers.append(layer)   // end of array = top of the visual stack
     }

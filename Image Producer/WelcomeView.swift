@@ -69,9 +69,9 @@ struct WelcomeView: View {
                     // block). Create + open on the main actor. ALWAYS end with a visible
                     // window: if open fails, log why and fall back to an untitled doc — so we
                     // can never land in "welcome gone, no document window, app still running."
-                    let url = await Task.detached { IconDocument.nextProjectURL() }.value
+                    let url = await Task.detached { ImageDocument.nextProjectURL() }.value
                     var opened = false
-                    if let url, IconDocument.writeNewProject(at: url) {
+                    if let url, ImageDocument.writeNewProject(at: url) {
                         // Register in the recent-documents list (SwiftUI's openDocument
                         // doesn't always record it), then open.
                         NSDocumentController.shared.noteNewRecentDocumentURL(url)
@@ -84,7 +84,7 @@ struct WelcomeView: View {
                         NSLog("ImageProducer New: could not create project file (url=%@)",
                               String(describing: url))
                     }
-                    if !opened { newDocument(contentType: .iconProject) }
+                    if !opened { newDocument(contentType: .imageProject) }
                     dismissWindow(id: "welcome")
                 }
             } label: {
@@ -107,9 +107,9 @@ struct WelcomeView: View {
                 panel.message = "Choose a PDF to open as a new document."
                 guard panel.runModal() == .OK, let pdfURL = panel.url else { return }
                 Task {
-                    let url = await Task.detached { IconDocument.nextProjectURL() }.value
+                    let url = await Task.detached { ImageDocument.nextProjectURL() }.value
                     var opened = false
-                    if let url, IconDocument.writeNewProjectFromPDF(at: url, pdf: pdfURL) {
+                    if let url, ImageDocument.writeNewProjectFromPDF(at: url, pdf: pdfURL) {
                         NSDocumentController.shared.noteNewRecentDocumentURL(url)
                         do { try await openDocument(at: url); opened = true }
                         catch {

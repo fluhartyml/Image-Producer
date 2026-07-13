@@ -20,7 +20,7 @@
 //  CURRENT STATE OF THE PROJECT (as of 2026-06-21)
 //  -----------------------------------------------
 //  - SHIPPED & BUILDING GREEN. Document-based multiplatform app (DocumentGroup /
-//    IconDocument; SwiftData dropped). Repo github.com/fluhartyml/Image-Producer,
+//    ImageDocument; SwiftData dropped). Repo github.com/fluhartyml/Image-Producer,
 //    bundle id com.nightgard.Image-Producer, iCloud container
 //    iCloud.com.nightgard.image-producer (Files folder "Image Producer").
 //  - Built: layered editor + canvas; Move/Transform (crop now bakes a selectable
@@ -573,7 +573,7 @@
 //    a reusable COOKIE-CUTTER: draw a flower path once, stamp it on a texture
 //    layer (Cmd+C/V) for a textured flower, re-activate the SAME path on a
 //    gradient layer for a gradient flower, etc. One shape, any layer's content.
-//    Impl: store paths/selections on the IconDocument (not on a layer); copy =
+//    Impl: store paths/selections on the ImageDocument (not on a layer); copy =
 //    clip the active layer's CGImage to the selection CGPath -> new layer.
 //
 //  REGENERATE A SELECTION FROM A LAYER'S ALPHA (Michael 2026-06-11):

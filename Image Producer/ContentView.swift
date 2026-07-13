@@ -33,12 +33,12 @@ import AppKit
 #endif
 
 struct ContentView: View {
-    @ObservedObject var document: IconDocument
+    @ObservedObject var document: ImageDocument
     /// The open document's file on disk (from the DocumentGroup) — shown in the Canvas
     /// hub's Project/File section. nil while the document is untitled / not yet saved.
     var fileURL: URL? = nil
     @State private var activeTool: Tool = .move
-    @State private var activeLayerID: IconLayer.ID?
+    @State private var activeLayerID: ImageLayer.ID?
     @State private var bottomPanel: BottomPanel = .layers
     /// Paint Bucket's current colour (roadmap 2.1) — the user's own light/dark choice.
     @State private var fillColor: Color = .white
@@ -177,9 +177,9 @@ struct ContentView: View {
         // New projects are real files now, so match the just-created URL (by name) too.
         .onAppear {
             if fileURL == nil
-                || fileURL?.lastPathComponent == IconDocument.pendingNewProjectURL?.lastPathComponent {
+                || fileURL?.lastPathComponent == ImageDocument.pendingNewProjectURL?.lastPathComponent {
                 activeTool = .canvas
-                IconDocument.pendingNewProjectURL = nil
+                ImageDocument.pendingNewProjectURL = nil
             }
         }
         .toolbar {
@@ -220,8 +220,8 @@ struct ContentView: View {
     }
 
     /// On-demand flat PNG of the visible layers (crop-trimmed) for the native ShareLink.
-    private var shareItem: IconShare {
-        IconShare(pngData: ContentView.renderIconPNG(document: document, px: 1024) ?? Data(),
+    private var shareItem: ImageShare {
+        ImageShare(pngData: ContentView.renderIconPNG(document: document, px: 1024) ?? Data(),
                   filename: exportFilename)
     }
 
@@ -230,8 +230,8 @@ struct ContentView: View {
         [16, 20, 29, 32, 40, 58, 60, 64, 76, 80, 87, 120, 128, 152, 167, 180, 256, 512, 1024]
 
     /// Flatten the visible layers to a px×px PNG (1024 master; PNG per 2.5.1).
-    @MainActor static func renderIconPNG(document: IconDocument, px: Int) -> Data? {
-        let renderer = ImageRenderer(content: IconCompositeView(document: document, size: CGSize(width: px, height: px)))
+    @MainActor static func renderIconPNG(document: ImageDocument, px: Int) -> Data? {
+        let renderer = ImageRenderer(content: ImageCompositeView(document: document, size: CGSize(width: px, height: px)))
         renderer.scale = 1
         guard let cg = renderer.cgImage else { return nil }
         // Non-destructive crop: render the full square, then trim the CGImage to the
@@ -437,9 +437,9 @@ struct ToolRail: View {
 /// The active tool's inspector — Move's controls, or a placeholder for tools not
 /// built yet. Reused by BOTH the portrait swipe panel and the landscape column.
 struct ToolInspector: View {
-    @ObservedObject var document: IconDocument
+    @ObservedObject var document: ImageDocument
     let activeTool: Tool
-    let activeLayerID: IconLayer.ID?
+    let activeLayerID: ImageLayer.ID?
     @Binding var fillColor: Color
     /// Open document's file on disk — for the Canvas hub's Project/File section.
     var fileURL: URL? = nil
@@ -518,8 +518,8 @@ struct ToolInspector: View {
 /// canvas to fill it — the user makes their own Light and Dark backgrounds. The
 /// "Fill" button applies without a canvas tap (and works on Mac / for VoiceOver).
 struct PaintBucketInspector: View {
-    @ObservedObject var document: IconDocument
-    let activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    let activeLayerID: ImageLayer.ID?
     @Binding var fillColor: Color
     /// Flood tolerance lives on the pen so the canvas can draw the live region preview.
     @EnvironmentObject var pen: PixelPen
@@ -632,7 +632,7 @@ struct CanvasSizePreset: Identifiable {
 /// Project / File — rename, disk location, type, last saved, size, save state. Later
 /// slices add B Dimensions/Resolution, C Print setup, D Export (see DeveloperNotes).
 struct CanvasInspector: View {
-    @ObservedObject var document: IconDocument
+    @ObservedObject var document: ImageDocument
     var fileURL: URL?
 
     @State private var draftName = ""
@@ -642,7 +642,7 @@ struct CanvasInspector: View {
     @State private var exportType: UTType = .pdf
     @State private var exportFilename = "Export"
     @State private var showDataExporter = false
-    @State private var webBundle = IconExportBundle(files: [:])
+    @State private var webBundle = ImageExportBundle(files: [:])
     @State private var showWebExporter = false
     @State private var folderFilename = "Export"
     // Layer PDF (one page per layer) + inverse import
@@ -806,12 +806,12 @@ struct CanvasInspector: View {
                 } label: { Label("Print PDF (bleed + marks)", systemImage: "doc.richtext").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent)
                 Button {
-                    webBundle = IconExportBundle(files: makeWebFolder(document, baseName: displayName))
+                    webBundle = ImageExportBundle(files: makeWebFolder(document, baseName: displayName))
                     folderFilename = "\(displayName) Web"; showWebExporter = true
                 } label: { Label("Web folder (PNG @1x/2x/3x)", systemImage: "globe").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
                 Button {
-                    webBundle = IconExportBundle(files: makeIconFolder(document))
+                    webBundle = ImageExportBundle(files: makeIconFolder(document))
                     folderFilename = "\(displayName) Icons"; showWebExporter = true
                 } label: { Label("Icon — all sizes (PNG folder)", systemImage: "square.and.arrow.up.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
@@ -1036,7 +1036,7 @@ struct CanvasInspector: View {
 /// free color picking in the tools. Tap a swatch → `color` becomes that palette color.
 /// Custom colors are added in the Color Palette tool.
 struct PaletteSwatchRow: View {
-    @ObservedObject var document: IconDocument
+    @ObservedObject var document: ImageDocument
     @Binding var color: Color
     var label = "Color (from palette)"
 
@@ -1068,7 +1068,7 @@ struct PaletteSwatchRow: View {
 /// → 24 max; the 8 base can't be removed). Save/Load reuses the .iconpalette brand file.
 struct ColorPaletteInspector: View {
     @EnvironmentObject var pen: PixelPen
-    @ObservedObject var document: IconDocument
+    @ObservedObject var document: ImageDocument
     @Binding var fillColor: Color
 
     @State private var savingPalette = false
@@ -1084,7 +1084,7 @@ struct ColorPaletteInspector: View {
                 set: { c in
                     guard document.palette.indices.contains(selected) else { return }
                     document.palette[selected] = c.hexString() ?? "#000000"
-                    IconDocument.lastUsedPalette = document.palette
+                    ImageDocument.lastUsedPalette = document.palette
                     applyActive()
                 })
     }
@@ -1137,7 +1137,7 @@ struct ColorPaletteInspector: View {
                 Button { if let n = document.addPaletteColor() { pen.selectedSlot = n; applyActive() } } label: {
                     Label("Add color", systemImage: "plus").frame(maxWidth: .infinity)
                 }
-                .disabled(document.palette.count >= IconDocument.maxPaletteSlots)
+                .disabled(document.palette.count >= ImageDocument.maxPaletteSlots)
                 Button(role: .destructive) { document.removePaletteColor(at: selected) } label: {
                     Label("Remove", systemImage: "minus").frame(maxWidth: .infinity)
                 }
@@ -1176,7 +1176,7 @@ struct ColorPaletteInspector: View {
             guard let data = try? Data(contentsOf: url),
                   let file = try? JSONDecoder().decode(PaletteFile.self, from: data) else { loadFailed = true; return }
             document.palette = file.normalizedColors
-            IconDocument.lastUsedPalette = document.palette
+            ImageDocument.lastUsedPalette = document.palette
             if !document.palette.indices.contains(pen.selectedSlot) { pen.selectedSlot = 0 }
             applyActive()
         }
@@ -1190,8 +1190,8 @@ struct ColorPaletteInspector: View {
 /// the user can change their mind. Scale/position via the Move tool.
 struct SymbolPickerInspector: View {
     @EnvironmentObject var pen: PixelPen
-    @ObservedObject var document: IconDocument
-    let activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    let activeLayerID: ImageLayer.ID?
     @State private var search = ""
     @State private var tint: Color = .black
 
@@ -1383,8 +1383,8 @@ struct SymbolPickerInspector: View {
 /// is stored but its rendering is a follow-up (no stock SwiftUI text-outline).
 struct FontPickerInspector: View {
     @EnvironmentObject var pen: PixelPen
-    @ObservedObject var document: IconDocument
-    let activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    let activeLayerID: ImageLayer.ID?
 
     @State private var family: String = FontPickerInspector.families.first ?? "Helvetica"
     @State private var tint: Color = .black
@@ -1395,7 +1395,7 @@ struct FontPickerInspector: View {
     @State private var textInput: String = ""
     @State private var glyphs: [String] = []
     /// The live text layer this inspector is creating/editing (its name == its text).
-    @State private var currentTextLayerID: IconLayer.ID?
+    @State private var currentTextLayerID: ImageLayer.ID?
     /// Center of the line just finished with Enter, so the next line spawns offset below it.
     @State private var lastLineCenter: CGPoint?
 
@@ -1549,7 +1549,7 @@ struct FontPickerInspector: View {
                                    actionLabel: "Text", layerID: id, coalesce: true)
         } else if !textInput.isEmpty {
             document.captureHistoryBaselineIfNeeded()
-            var layer = IconLayer(name: textInput, role: .content)
+            var layer = ImageLayer(name: textInput, role: .content)
             layer.setText(textInput, fontName: family, tintHex: tint.hexString() ?? "#000000",
                           bold: bold, italic: italic, underline: underline, outline: outline)
             // A new Enter-made line spawns slightly BELOW the previous one so stacked lines
@@ -1581,7 +1581,7 @@ struct FontPickerInspector: View {
     /// Start a fresh text layer NOW — eagerly create an empty, centered text layer and adopt
     /// it, so the button always produces a visible new layer (it was a dead button before).
     private func newText() {
-        var layer = IconLayer(name: "Text", role: .content)
+        var layer = ImageLayer(name: "Text", role: .content)
         layer.setText("", fontName: family, tintHex: tint.hexString() ?? "#000000")
         document.layers.append(layer)
         currentTextLayerID = layer.id
@@ -1596,8 +1596,8 @@ struct FontPickerInspector: View {
 /// v1 stores the bytes in the manifest; sibling-file storage in the package is a
 /// follow-up. (Seatrial: the resolution/scaling behaviour is the part to shake down.)
 struct ImageImportInspector: View {
-    @ObservedObject var document: IconDocument
-    let activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    let activeLayerID: ImageLayer.ID?
     @State private var importing = false
     @State private var failed = false
 
@@ -1684,8 +1684,8 @@ struct PixelGrid: View {
 /// toggle, and brush size. Drawing happens on the canvas; this configures the pen.
 struct PenInspector: View {
     @EnvironmentObject var pen: PixelPen
-    @ObservedObject var document: IconDocument
-    let activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    let activeLayerID: ImageLayer.ID?
 
     /// Resolution rungs for the graduated slider — 2 is the control.
     private let resolutionRungs = [2, 4, 6, 8, 16, 32, 64, 128, 256, 512, 1024]
@@ -1715,7 +1715,7 @@ struct PenInspector: View {
                 set: { c in
                     document.palette[i] = c.hexString() ?? "#000000"
                     if i == pen.selectedSlot { pen.color = c }
-                    IconDocument.lastUsedPalette = document.palette
+                    ImageDocument.lastUsedPalette = document.palette
                 })
     }
 
@@ -1836,7 +1836,7 @@ struct PenInspector: View {
             return
         }
         document.palette = file.normalizedColors
-        IconDocument.lastUsedPalette = document.palette
+        ImageDocument.lastUsedPalette = document.palette
         if document.palette.indices.contains(pen.selectedSlot) {
             pen.color = Color(hex: document.palette[pen.selectedSlot]) ?? pen.color
         }
@@ -1855,10 +1855,10 @@ enum BottomPanel: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     struct PanelView: View {
-        @ObservedObject var document: IconDocument
+        @ObservedObject var document: ImageDocument
         let activeTool: Tool
         // (PanelView is the bottom swipe panel; it observes the document too.)
-        @Binding var activeLayerID: IconLayer.ID?
+        @Binding var activeLayerID: ImageLayer.ID?
         @Binding var selection: BottomPanel
         @Binding var fillColor: Color
         /// The open document's file on disk — forwarded to the Canvas hub inspector.
@@ -1964,8 +1964,8 @@ struct PanelPlaceholder: View {
 /// so History (the app's undo) is reachable there — it "sits behind the layer list" per the
 /// spec. Portrait / iPhone reach the same two via the bottom swipe panel's picker instead.
 struct LayersHistoryColumn: View {
-    @ObservedObject var document: IconDocument
-    @Binding var activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    @Binding var activeLayerID: ImageLayer.ID?
 
     private enum Tab: String, CaseIterable, Identifiable {
         case layers = "Layers", history = "History"
@@ -1998,8 +1998,8 @@ struct LayersHistoryColumn: View {
 /// point — everything after it is dropped. The "Original" row returns to the pre-edit state.
 /// Purge History (behind the ⋯ menu, confirmed) clears the trail but keeps the current image.
 struct HistoryPanel: View {
-    @ObservedObject var document: IconDocument
-    @Binding var activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    @Binding var activeLayerID: ImageLayer.ID?
     /// iPhone (no pills) shows a "History" header so the swiped-to page is labeled.
     var showsHeader: Bool = false
 
@@ -2212,8 +2212,8 @@ private struct HistoryEntryRow: View {
 /// Tool #1's inspector: a document-level CROP section (aspect + size, non-destructive,
 /// shrink-only — v1) plus scale / rotation / center / reset on the ACTIVE layer.
 struct MoveTransformInspector: View {
-    @ObservedObject var document: IconDocument
-    let activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    let activeLayerID: ImageLayer.ID?
 
     @State private var cropAspect: CropAspect = .original
     @State private var cropSize: Double = 0.8       // limiting-dimension fraction for a locked ratio
@@ -2332,11 +2332,11 @@ struct MoveTransformInspector: View {
         let layerID = document.layers[idx].id
         // Render JUST the active layer (with its current transform), then crop the
         // resulting bitmap to the kept region — yielding a tight crop-sized PNG.
-        let solo = IconDocument(name: document.name, canvasWidth: document.canvasWidth,
+        let solo = ImageDocument(name: document.name, canvasWidth: document.canvasWidth,
                                 canvasHeight: document.canvasHeight,
                                 layers: [document.layers[idx]], palette: document.palette,
                                 cropRect: nil)
-        let renderer = ImageRenderer(content: IconCompositeView(document: solo, size: document.canvasPixelSize))
+        let renderer = ImageRenderer(content: ImageCompositeView(document: solo, size: document.canvasPixelSize))
         renderer.scale = 1
         let px = CGRect(x: crop.minX * w, y: crop.minY * h,
                         width: crop.width * w, height: crop.height * h).integral
@@ -2518,7 +2518,7 @@ enum CropAspect: Hashable {
 
 /// A flat PNG of the icon, shareable via the native `ShareLink`. Holds already-rendered
 /// `Data` (Sendable); the render happens on the main actor before this is constructed.
-struct IconShare: Transferable {
+struct ImageShare: Transferable {
     let pngData: Data
     let filename: String
     static var transferRepresentation: some TransferRepresentation {
@@ -2623,8 +2623,8 @@ private struct ToolPointer: ViewModifier {
 }
 
 struct CanvasView: View {
-    @ObservedObject var document: IconDocument
-    @Binding var activeLayerID: IconLayer.ID?
+    @ObservedObject var document: ImageDocument
+    @Binding var activeLayerID: ImageLayer.ID?
     var showTransformBox: Bool = false
     var activeTool: Tool = .move
     @Binding var fillColor: Color
@@ -2712,10 +2712,10 @@ struct CanvasView: View {
     /// sample circle) at a normalized canvas point into fillColor.
     @MainActor private func sampleEyedropper(at n: CGPoint) {
         guard activeTool == .eyedropper, let idx = activeIndex else { return }
-        let solo = IconDocument(name: document.name, canvasWidth: document.canvasWidth,
+        let solo = ImageDocument(name: document.name, canvasWidth: document.canvasWidth,
                                 canvasHeight: document.canvasHeight,
                                 layers: [document.layers[idx]], palette: document.palette, cropRect: nil)
-        let renderer = ImageRenderer(content: IconCompositeView(document: solo, size: document.canvasPixelSize))
+        let renderer = ImageRenderer(content: ImageCompositeView(document: solo, size: document.canvasPixelSize))
         renderer.scale = 1
         if let cg = renderer.cgImage,
            let color = averagedColor(in: cg, atNormalized: n, radiusPixels: pen.eyedropperRadius) {
@@ -2725,7 +2725,7 @@ struct CanvasView: View {
             pen.color = color
             if document.palette.indices.contains(pen.selectedSlot) {
                 document.palette[pen.selectedSlot] = color.hexString() ?? document.palette[pen.selectedSlot]
-                IconDocument.lastUsedPalette = document.palette
+                ImageDocument.lastUsedPalette = document.palette
             }
         }
     }
@@ -2795,7 +2795,7 @@ struct CanvasView: View {
     /// you type fills it. (Michael 2026-06-22: tap gives the natural starting point.)
     @MainActor private func startTextAt(_ n: CGPoint) {
         guard activeTool == .text else { return }
-        var layer = IconLayer(name: "Text", role: .content)
+        var layer = ImageLayer(name: "Text", role: .content)
         layer.setText("", fontName: "Helvetica", tintHex: pen.color.hexString() ?? "#000000")
         layer.transform.center = CGPoint(x: min(max(n.x, 0), 1), y: min(max(n.y, 0), 1))
         document.layers.append(layer)
@@ -2994,7 +2994,7 @@ struct CanvasView: View {
                 // Resolution locks once a layer has pixels — changing it starts a NEW
                 // pixel layer at the chosen resolution rather than altering the old art.
                 if let i = activeIndex, document.layers[i].pixelData != nil {
-                    let layer = IconLayer(name: "Pixels @\(pen.resolution)", role: .content)
+                    let layer = ImageLayer(name: "Pixels @\(pen.resolution)", role: .content)
                     document.layers.append(layer)
                     activeLayerID = layer.id
                 }
@@ -3031,7 +3031,7 @@ struct CanvasView: View {
     }
 
     @ViewBuilder
-    private func layerContent(_ layer: IconLayer, size: CGSize) -> some View {
+    private func layerContent(_ layer: ImageLayer, size: CGSize) -> some View {
         switch layer.role {
         case .background(_, let fillHex):
             // A filled background fills the whole canvas rect — also the letterbox margin
@@ -3125,7 +3125,7 @@ struct CanvasView: View {
 /// to the start, so a tap doesn't jump the layer — only a real drag moves it
 /// (Michael 2026-06-11: "it moves when touched").
 struct TransformBox: View {
-    @ObservedObject var document: IconDocument
+    @ObservedObject var document: ImageDocument
     let index: Int
     let size: CGSize
     @State private var startCenter: CGPoint?
@@ -3278,10 +3278,10 @@ struct Checkerboard: View {
 /// rename is via the row's context menu. `showsHeader` is false inside the
 /// portrait swipe panel (the segmented control already labels it "Layers").
 struct LayerPanel: View {
-    @ObservedObject var document: IconDocument
+    @ObservedObject var document: ImageDocument
     var showsHeader: Bool = true
-    @Binding var activeLayerID: IconLayer.ID?
-    @State private var renamingID: IconLayer.ID?
+    @Binding var activeLayerID: ImageLayer.ID?
+    @State private var renamingID: ImageLayer.ID?
     @State private var draftName = ""
 
     var body: some View {
@@ -3350,7 +3350,7 @@ struct LayerPanel: View {
                 set: { if !$0 { renamingID = nil } })
     }
 
-    private func beginRename(_ layer: IconLayer) {
+    private func beginRename(_ layer: ImageLayer) {
         draftName = layer.name
         renamingID = layer.id
     }
@@ -3371,7 +3371,7 @@ struct LayerPanel: View {
         }
     }
 
-    private func toggleVisibility(_ id: IconLayer.ID) {
+    private func toggleVisibility(_ id: ImageLayer.ID) {
         if let index = document.layers.firstIndex(where: { $0.id == id }) {
             document.layers[index].isVisible.toggle()
         }
@@ -3379,14 +3379,14 @@ struct LayerPanel: View {
 
     /// L3 — add a new blank content layer on TOP of the stack, and select it.
     private func addLayer() {
-        let layer = IconLayer(name: "Layer \(document.layers.count + 1)", role: .content)
+        let layer = ImageLayer(name: "Layer \(document.layers.count + 1)", role: .content)
         document.layers.append(layer)          // end of array = top of the visual stack
         activeLayerID = layer.id
     }
 
     /// L4.1 — exact copy (fill/elements, transform, opacity, visibility), named
     /// "<name> copy," new UUID, inserted directly ABOVE the original, selected.
-    private func duplicate(_ id: IconLayer.ID) {
+    private func duplicate(_ id: ImageLayer.ID) {
         guard let i = document.layers.firstIndex(where: { $0.id == id }) else { return }
         var copy = document.layers[i]
         copy.id = UUID()
@@ -3396,7 +3396,7 @@ struct LayerPanel: View {
     }
 
     /// L4/L5 — delete a layer (context menu).
-    private func delete(_ id: IconLayer.ID) {
+    private func delete(_ id: ImageLayer.ID) {
         document.layers.removeAll { $0.id == id }
         if activeLayerID == id { activeLayerID = nil }
     }
@@ -3420,7 +3420,7 @@ struct LayerPanel: View {
 }
 
 struct LayerRow: View {
-    let layer: IconLayer
+    let layer: ImageLayer
     let isActive: Bool
     let onActivate: () -> Void
     let onToggleVisibility: () -> Void
@@ -3824,7 +3824,7 @@ final class PixelPen: ObservableObject {
 /// (⌘E / the toolbar Export button). The all-sizes icon PNG folder lives on separately in
 /// the Canvas hub; this sheet covers single-file formats.
 struct ExportSheet: View {
-    @ObservedObject var document: IconDocument
+    @ObservedObject var document: ImageDocument
     @Environment(\.dismiss) private var dismiss
     @State private var format: ExportFormat = .png
     @State private var flattenMatte = false
@@ -3887,8 +3887,8 @@ struct ExportSheet: View {
     }
 }
 
-struct IconCompositeView: View {
-    let document: IconDocument
+struct ImageCompositeView: View {
+    let document: ImageDocument
     let size: CGSize
 
     var body: some View {
@@ -3902,7 +3902,7 @@ struct IconCompositeView: View {
     }
 
     @ViewBuilder
-    private func composited(_ layer: IconLayer) -> some View {
+    private func composited(_ layer: ImageLayer) -> some View {
         switch layer.role {
         case .background(_, let fillHex):
             if let hex = fillHex, let color = Color(hex: hex) { color }
@@ -4003,7 +4003,7 @@ extension Image { init(platformImage: NSImage) { self.init(nsImage: platformImag
 
 /// Export deliverable (roadmap 2.3): a FOLDER of named PNG sizes, no Contents.json.
 /// Write-only; the user drags the PNGs into Xcode's AppIcon wells themselves.
-struct IconExportBundle: FileDocument {
+struct ImageExportBundle: FileDocument {
     static var readableContentTypes: [UTType] { [.folder] }
     static var writableContentTypes: [UTType] { [.folder] }
 
@@ -4043,7 +4043,7 @@ struct ActivityView: UIViewControllerRepresentable {
 /// UndoManager (undo/redo belongs to the future History system, and we don't want them to
 /// compete), so without this the document is never marked dirty and edits are lost on close.
 struct AutosaveModifier: ViewModifier {
-    @ObservedObject var document: IconDocument
+    @ObservedObject var document: ImageDocument
     let fileURL: URL?
     let isEditable: Bool
     @Environment(\.scenePhase) private var scenePhase
@@ -4099,9 +4099,9 @@ struct AutosaveModifier: ViewModifier {
     /// the shared projects folder. Distinct name from the ImageProducerNNNN lifetime files
     /// so it never consumes a lifetime number or collides with a real project.
     private func makeRecoveryURL() -> URL? {
-        guard let dir = IconDocument.projectsDirectory() else { return nil }
+        guard let dir = ImageDocument.projectsDirectory() else { return nil }
         let fm = FileManager.default
-        let ext = IconDocument.projectExtension
+        let ext = ImageDocument.projectExtension
         var n = 1
         var url = dir.appendingPathComponent("Recovered Image \(n)").appendingPathExtension(ext)
         while fm.fileExists(atPath: url.path) {
@@ -4113,7 +4113,7 @@ struct AutosaveModifier: ViewModifier {
 }
 
 extension View {
-    func autosave(document: IconDocument, fileURL: URL?, isEditable: Bool) -> some View {
+    func autosave(document: ImageDocument, fileURL: URL?, isEditable: Bool) -> some View {
         modifier(AutosaveModifier(document: document, fileURL: fileURL, isEditable: isEditable))
     }
 }

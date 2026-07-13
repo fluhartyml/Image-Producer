@@ -1,5 +1,5 @@
 //
-//  IconModels.swift
+//  ImageModels.swift
 //  Icon Producer
 //
 //  Created by Michael Fluharty on 6/10/26.
@@ -33,7 +33,7 @@ import UniformTypeIdentifiers
 ///
 /// Reference type + `ObservableObject` because it is the app's `ReferenceFileDocument`
 /// (see the conformance below) — DocumentGroup owns it and saves it as a package.
-final class IconDocument: ObservableObject {
+final class ImageDocument: ObservableObject {
     @Published var name: String
     /// Canvas pixel dimensions. Was a single square `canvasSize`; B2 makes it W×H so the
     /// canvas can take non-square print / photo / card shapes. Mutable — the Canvas tool
@@ -43,14 +43,14 @@ final class IconDocument: ObservableObject {
     /// Pixel size as a CGSize — the export / render reference.
     var canvasPixelSize: CGSize { CGSize(width: canvasWidth, height: canvasHeight) }
     /// Bottom-to-top draw order.
-    @Published var layers: [IconLayer]
+    @Published var layers: [ImageLayer]
     /// The 8-slot brand palette (hex), saved WITH the document so it travels per-project.
     @Published var palette: [String]
 
     /// Linear, tool-grouped edit history — the app's undo (a byproduct of stepping
     /// back through this list; there is NO ⌘Z / UndoManager). Saved in the package,
     /// persistent per-project. Empty until the recording hooks land (step 2).
-    @Published var history: IconHistory = IconHistory()
+    @Published var history: ImageHistory = ImageHistory()
 
     /// Where the History panel is currently VIEWING. Tapping a history point moves this
     /// (non-destructively) and shows that state on the canvas; the list is never trimmed
@@ -97,7 +97,7 @@ final class IconDocument: ObservableObject {
     func addPaletteColor() -> Int? {
         guard palette.count < Self.maxPaletteSlots else { return nil }
         palette.append(palette.last ?? "#000000")
-        IconDocument.lastUsedPalette = palette
+        ImageDocument.lastUsedPalette = palette
         return palette.count - 1
     }
 
@@ -105,7 +105,7 @@ final class IconDocument: ObservableObject {
     func removePaletteColor(at i: Int) {
         guard palette.count > 8, palette.indices.contains(i) else { return }
         palette.remove(at: i)
-        IconDocument.lastUsedPalette = palette
+        ImageDocument.lastUsedPalette = palette
     }
 
     /// The last palette the user worked with — persists app-wide so a NEW document (or
@@ -116,8 +116,8 @@ final class IconDocument: ObservableObject {
     }
 
     init(name: String = "Untitled Image", canvasWidth: Int = 1024, canvasHeight: Int = 1024,
-         layers: [IconLayer] = [], palette: [String] = IconDocument.lastUsedPalette,
-         cropRect: CGRect? = nil, ppi: Double = 72, history: IconHistory = IconHistory()) {
+         layers: [ImageLayer] = [], palette: [String] = ImageDocument.lastUsedPalette,
+         cropRect: CGRect? = nil, ppi: Double = 72, history: ImageHistory = ImageHistory()) {
         self.name = name
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
@@ -138,18 +138,18 @@ final class IconDocument: ObservableObject {
     /// "background within a background"). Light vs dark is previewed by toggling a
     /// floor's `isVisible` (the eyeball); there are no light/dark mode buttons. More
     /// layers can be added/deleted freely.
-    static func newDefault() -> IconDocument {
-        IconDocument(layers: [
-            IconLayer(name: "Light",      role: .background(.light, fillHex: nil)),
-            IconLayer(name: "Dark",       role: .background(.dark,  fillHex: nil)),
-            IconLayer(name: "Background", role: .content),
-            IconLayer(name: "Midground",  role: .content),
-            IconLayer(name: "Foreground", role: .content),
+    static func newDefault() -> ImageDocument {
+        ImageDocument(layers: [
+            ImageLayer(name: "Light",      role: .background(.light, fillHex: nil)),
+            ImageLayer(name: "Dark",       role: .background(.dark,  fillHex: nil)),
+            ImageLayer(name: "Background", role: .content),
+            ImageLayer(name: "Midground",  role: .content),
+            ImageLayer(name: "Foreground", role: .content),
         ])
     }
 }
 
-extension IconDocument {
+extension ImageDocument {
     /// Non-destructive "Apply": put the result of a destructive edit on a NEW content
     /// layer directly ABOVE the source, and HIDE the source (kept, re-showable) so the
     /// result composites correctly. The original is never overwritten — there's no undo
@@ -157,9 +157,9 @@ extension IconDocument {
     /// (Crop / AI Filter / Magic Eraser) preserves the source this way. Returns the new
     /// layer's id (e.g. so the caller can set its transform).
     @discardableResult
-    func addResultLayer(_ png: Data, above sourceIndex: Int, nameSuffix: String) -> IconLayer.ID? {
+    func addResultLayer(_ png: Data, above sourceIndex: Int, nameSuffix: String) -> ImageLayer.ID? {
         guard layers.indices.contains(sourceIndex) else { return nil }
-        var layer = IconLayer(name: "\(layers[sourceIndex].name) (\(nameSuffix))", role: .content)
+        var layer = ImageLayer(name: "\(layers[sourceIndex].name) (\(nameSuffix))", role: .content)
         layer.setImage(png)
         layers[sourceIndex].isVisible = false        // keep the original, just hidden
         layers.insert(layer, at: sourceIndex + 1)    // directly above the source
@@ -169,7 +169,7 @@ extension IconDocument {
 
 // MARK: - History recording + step-back (steps 2–3)
 
-extension IconDocument {
+extension ImageDocument {
     /// Encode the current layer stack as a `DocumentSnapshot`.
     private func encodedSnapshot() -> Data? {
         try? JSONEncoder().encode(DocumentSnapshot(layers: layers))
@@ -193,7 +193,7 @@ extension IconDocument {
     /// action already has this label, update ITS snapshot in place instead of appending a
     /// new row — so a whole typing session is one "Text" step, not one per keystroke.
     func recordHistory(toolID: String, groupTitle: String, actionLabel: String,
-                       layerID: IconLayer.ID?, coalesce: Bool = false) {
+                       layerID: ImageLayer.ID?, coalesce: Bool = false) {
         commitCursorIfNeeded()   // a new edit while viewing the past commits at the cursor
         let snapshot = encodedSnapshot()
         let n = history.entries.count
@@ -303,7 +303,7 @@ extension IconDocument {
 /// layers below — that hold a MIX of content `elements`. BACKGROUND layers are a
 /// fillable solid colour (the floor that removes any clear background from the
 /// final icon); they start blank (no fill) until the user paints them.
-struct IconLayer: Identifiable, Codable {
+struct ImageLayer: Identifiable, Codable {
     var id = UUID()
     /// User-editable; auto-named from its content ("content names the layer").
     var name: String
@@ -532,7 +532,7 @@ extension UTType {
     /// Image Producer's editable project package — a file wrapper (directory) the
     /// user saves to iCloud Drive / Files. Holds a `manifest.json` (layers +, later,
     /// edit history) alongside binary assets. Declared in Info.plist to match.
-    static let iconProject = UTType(exportedAs: "com.nightgard.Image-Producer.project")
+    static let imageProject = UTType(exportedAs: "com.nightgard.Image-Producer.project")
 
     /// A standalone brand palette (`.iconpalette`) — plain JSON, saved/loaded
     /// independent of any project so one color set can seed many icons. Declared in
@@ -556,11 +556,11 @@ struct PaletteFile: Codable {
     /// pads up to the 8-color minimum with the crayon-box defaults, and caps at 24 — so a
     /// hand-edited or foreign file can never corrupt the document's palette (the gatekeeper).
     var normalizedColors: [String] {
-        let defaults = IconDocument.defaultPalette                 // 8
+        let defaults = ImageDocument.defaultPalette                 // 8
         var out = colors.compactMap { PaletteFile.normalizeHex($0) }
         if out.count < 8 { out += Array(defaults[out.count..<8]) } // pad to the 8 minimum
-        if out.count > IconDocument.maxPaletteSlots {              // cap at 24
-            out = Array(out.prefix(IconDocument.maxPaletteSlots))
+        if out.count > ImageDocument.maxPaletteSlots {              // cap at 24
+            out = Array(out.prefix(ImageDocument.maxPaletteSlots))
         }
         return out
     }
@@ -603,7 +603,7 @@ struct PaletteFileDocument: FileDocument {
 //
 // Step 1 (2026-07-02): DATA MODEL + PERSISTENCE only. No UI, no recording yet.
 // Step 2 (2026-07-02): RECORDING HOOKS. Pen strokes + Paint Bucket fills append to
-//   the timeline via IconDocument.recordHistory (below).
+//   the timeline via ImageDocument.recordHistory (below).
 // Step 3 (2026-07-02): PANEL UI + LINEAR STEP-BACK. Each action snapshots the whole
 //   LAYER STACK (DocumentSnapshot) post-edit; step-back restores it and drops everything
 //   forward. Baseline captures the pre-first-edit stack → an "Original" row. Undo is a
@@ -627,7 +627,7 @@ struct HistoryAction: Identifiable, Codable {
     /// The layer this action modified — for display (which layer a row touched). Optional
     /// so document-wide actions can omit it. Not used for restore (the snapshot below is
     /// a full layer-stack capture, which reverses layer add/hide too).
-    var layerID: IconLayer.ID? = nil
+    var layerID: ImageLayer.ID? = nil
     /// A `DocumentSnapshot` (encoded JSON) of the whole LAYER STACK AFTER this action —
     /// step-back decodes it and replaces `document.layers` wholesale, so picking any point
     /// restores exactly that state (including fill's added/hidden layers, which a single
@@ -652,7 +652,7 @@ struct HistoryEntry: Identifiable, Codable {
 /// The document's linear edit history. Persistent per-project (saved in the package),
 /// cleared only by Purge History. Undo = stepping back through `entries`, which
 /// truncates everything after the chosen point.
-struct IconHistory: Codable {
+struct ImageHistory: Codable {
     var entries: [HistoryEntry] = []
     /// The layer stack BEFORE the first recorded edit (encoded `DocumentSnapshot`), so
     /// step-back can return all the way to the original — the "Original" row in the panel.
@@ -666,10 +666,10 @@ struct IconHistory: Codable {
 /// aren't history-tracked and must survive a step-back untouched (no silent rename/resize
 /// reverts). Reversing an action = replacing `document.layers` with this.
 struct DocumentSnapshot: Codable {
-    var layers: [IconLayer]
+    var layers: [ImageLayer]
 }
 
-/// Where the History panel is currently VIEWING (see `IconDocument.historyCursor`).
+/// Where the History panel is currently VIEWING (see `ImageDocument.historyCursor`).
 /// Viewing is non-destructive; only an explicit "delete from here" or a new edit prunes.
 enum HistoryCursor: Equatable {
     /// The newest committed state (default) — what the file always saves.
@@ -683,14 +683,14 @@ enum HistoryCursor: Equatable {
 /// The serializable shape written into a saved package's `manifest.json`.
 /// Binary assets (pixel/image PNGs) become sibling files in the wrapper when those
 /// tools land — kept out of JSON to avoid base64 bloat.
-struct IconProjectManifest: Codable {
+struct ImageProjectManifest: Codable {
     var name: String
     /// Legacy square size (files saved before non-square existed). Read-only fallback.
     var canvasSize: Int? = nil
     /// Non-square canvas pixel dimensions (B2). Absent in older files → fall back to canvasSize.
     var canvasWidth: Int? = nil
     var canvasHeight: Int? = nil
-    var layers: [IconLayer]
+    var layers: [ImageLayer]
     /// Optional for backward-compat with .iconproj files saved before palettes existed.
     var palette: [String]?
     /// Optional crop region (normalized); absent in files saved before crop existed.
@@ -705,23 +705,23 @@ struct IconProjectManifest: Codable {
     var colorSpaceCMYK: Bool? = nil
     /// Linear edit history; optional/absent in files saved before History existed → an
     /// empty history. (Snapshot PNGs referenced by entries live as sibling files.)
-    var history: IconHistory? = nil
+    var history: ImageHistory? = nil
 }
 
-extension IconDocument: ReferenceFileDocument {
-    static var readableContentTypes: [UTType] { [.iconProject] }
+extension ImageDocument: ReferenceFileDocument {
+    static var readableContentTypes: [UTType] { [.imageProject] }
 
     /// Open a saved package: pull `manifest.json` out of the directory wrapper.
     convenience init(configuration: ReadConfiguration) throws {
         guard let data = configuration.file.fileWrappers?["manifest.json"]?.regularFileContents else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        let manifest = try JSONDecoder().decode(IconProjectManifest.self, from: data)
+        let manifest = try JSONDecoder().decode(ImageProjectManifest.self, from: data)
         let w = manifest.canvasWidth ?? manifest.canvasSize ?? 1024
         let h = manifest.canvasHeight ?? manifest.canvasSize ?? 1024
         self.init(name: manifest.name, canvasWidth: w, canvasHeight: h, layers: manifest.layers,
-                  palette: manifest.palette ?? IconDocument.lastUsedPalette, cropRect: manifest.cropRect,
-                  ppi: manifest.ppi ?? 72, history: manifest.history ?? IconHistory())
+                  palette: manifest.palette ?? ImageDocument.lastUsedPalette, cropRect: manifest.cropRect,
+                  ppi: manifest.ppi ?? 72, history: manifest.history ?? ImageHistory())
         // Print-setup fields (section C) — apply saved values over the defaults.
         if let v = manifest.bleedInches { bleedInches = v }
         if let v = manifest.safeMarginInches { safeMarginInches = v }
@@ -731,8 +731,8 @@ extension IconDocument: ReferenceFileDocument {
     }
 
     /// Capture current state for writing (called off the main actor by SwiftUI).
-    func snapshot(contentType: UTType) throws -> IconProjectManifest {
-        IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
+    func snapshot(contentType: UTType) throws -> ImageProjectManifest {
+        ImageProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
                             layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
                             bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                             cropMarks: cropMarks, registrationMarks: registrationMarks,
@@ -740,7 +740,7 @@ extension IconDocument: ReferenceFileDocument {
     }
 
     /// Write the package: a directory wrapper holding `manifest.json`.
-    func fileWrapper(snapshot: IconProjectManifest,
+    func fileWrapper(snapshot: ImageProjectManifest,
                      configuration: WriteConfiguration) throws -> FileWrapper {
         let data = try JSONEncoder().encode(snapshot)
         let manifest = FileWrapper(regularFileWithContents: data)
@@ -751,7 +751,7 @@ extension IconDocument: ReferenceFileDocument {
 
 // MARK: - Self-driven autosave
 
-extension IconDocument {
+extension ImageDocument {
     /// Write the `.picprod` package straight to `url` (older `.iconproj` files still
     /// open — same type identifier), file-coordinated for iCloud
     /// safety. This is the app's autosave path — it does NOT go through SwiftUI's
@@ -759,7 +759,7 @@ extension IconDocument {
     /// system's job, and we don't want the two to compete). Same `manifest.json` format
     /// as the official `fileWrapper(snapshot:)` writer, so the file stays interchangeable.
     func writePackage(to url: URL) throws {
-        let manifest = IconProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
+        let manifest = ImageProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
                                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
                                            bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                                            cropMarks: cropMarks, registrationMarks: registrationMarks,
@@ -783,7 +783,7 @@ extension IconDocument {
 
 // MARK: - New project files (never "Untitled")
 
-extension IconDocument {
+extension ImageDocument {
     /// New documents save as `.picprod` — a project package extension that opens reliably
     /// and matches every existing project already on disk. (`.imgprd` and `.iconproj` are
     /// also declared for this type. The app now owns its own type identifier
@@ -836,7 +836,7 @@ extension IconDocument {
 
     /// Write a brand-new default project to `url` (which the caller resolved OFF the main
     /// thread via `nextProjectURL` — the slow iCloud-container lookup lives there). This
-    /// stays on the main actor because IconDocument is main-actor-isolated; the write is a
+    /// stays on the main actor because ImageDocument is main-actor-isolated; the write is a
     /// quick local package write. Returns true on success; the Canvas name field then
     /// renames the file in place. Split from the old one-shot `createNewProjectFile` so the
     /// blocking lookup no longer runs on the main thread (the suspected New-crash, 2026-06-23).
@@ -852,12 +852,12 @@ extension IconDocument {
 
     /// ⇧⌘N "New from Import": like `writeNewProject`, but the document is seeded from an
     /// imported PDF instead of the default template — the PDF IS the template. Starts from
-    /// an EMPTY IconDocument (no `newDefault()` scaffold), so the Light/Dark background
+    /// an EMPTY ImageDocument (no `newDefault()` scaffold), so the Light/Dark background
     /// floors only appear if the PDF itself carries them; they never spawn out of nowhere.
     /// The PDF's layers/pages come in via the same additive `importPDFAsLayers` path.
     /// Returns true only if at least one layer was imported.
     @MainActor static func writeNewProjectFromPDF(at url: URL, pdf pdfURL: URL) -> Bool {
-        let doc = IconDocument(layers: [])          // empty — the import provides the template
+        let doc = ImageDocument(layers: [])          // empty — the import provides the template
         let scoped = pdfURL.startAccessingSecurityScopedResource()
         let added = importPDFAsLayers(pdfURL, into: doc)
         if scoped { pdfURL.stopAccessingSecurityScopedResource() }

@@ -40,15 +40,15 @@ extension Color {
 }
 
 /// Render the document's visible layers to a CGImage at canvasPixelSize × `scale`.
-@MainActor func renderCanvasImage(_ document: IconDocument, scale: CGFloat = 1) -> CGImage? {
-    let renderer = ImageRenderer(content: IconCompositeView(document: document, size: document.canvasPixelSize))
+@MainActor func renderCanvasImage(_ document: ImageDocument, scale: CGFloat = 1) -> CGImage? {
+    let renderer = ImageRenderer(content: ImageCompositeView(document: document, size: document.canvasPixelSize))
     renderer.scale = scale
     return renderer.cgImage
 }
 
 /// A press-ready PDF: page = trim + bleed (points, 72/in). The art fills the full page so it
 /// bleeds to the edge; crop marks mark the trim; registration marks optional.
-@MainActor func makePrintPDF(_ document: IconDocument) -> Data? {
+@MainActor func makePrintPDF(_ document: ImageDocument) -> Data? {
     guard let art = renderCanvasImage(document) else { return nil }
     let ppi = max(1, document.ppi)
     let trimW = Double(document.canvasWidth) / ppi * 72.0
@@ -125,7 +125,7 @@ extension Color {
 }
 
 /// A web-ready packaged folder: PNG @1x/@2x/@3x (sRGB), named from the project.
-@MainActor func makeWebFolder(_ document: IconDocument, baseName: String) -> [String: Data] {
+@MainActor func makeWebFolder(_ document: ImageDocument, baseName: String) -> [String: Data] {
     var files: [String: Data] = [:]
     for scale in [1, 2, 3] {
         if let cg = renderCanvasImage(document, scale: CGFloat(scale)), let png = pngData(from: cg) {
@@ -137,14 +137,14 @@ extension Color {
 }
 
 /// A single non-square PNG of the whole canvas at its pixel size.
-@MainActor func makeCanvasPNG(_ document: IconDocument) -> Data? {
+@MainActor func makeCanvasPNG(_ document: ImageDocument) -> Data? {
     guard let cg = renderCanvasImage(document) else { return nil }
     return pngData(from: cg)
 }
 
 /// The app-icon PNG set as a packaged folder (icon_16.png … icon_1024.png) — the same
 /// output as the toolbar Export, surfaced in the Canvas hub so export is one-stop.
-@MainActor func makeIconFolder(_ document: IconDocument) -> [String: Data] {
+@MainActor func makeIconFolder(_ document: ImageDocument) -> [String: Data] {
     var files: [String: Data] = [:]
     for px in ContentView.exportPixelSizes {
         if let data = ContentView.renderIconPNG(document: document, px: px) {
@@ -167,7 +167,7 @@ private let layerPDFTag = "IMGPRD-LAYERS-v1:"
 private struct LayerPDFPage: Codable {
     var kind: String            // "cover" | "verbatim" | "raster"
     var name: String
-    var layer: IconLayer?
+    var layer: ImageLayer?
 }
 
 private struct LayerPDFManifest: Codable {
@@ -175,7 +175,7 @@ private struct LayerPDFManifest: Codable {
     var pages: [LayerPDFPage]
 }
 
-extension IconLayer {
+extension ImageLayer {
     /// True when the layer carries NO raster bitmap — a background (a fill colour) or a
     /// content layer whose elements are all text/symbol (or empty). These are tiny, so
     /// Image Producer stores them verbatim in its own layer PDFs and restores them to
@@ -211,15 +211,15 @@ private func layerPDFManifest(from pdf: PDFDocument) -> LayerPDFManifest? {
 /// Render a single layer alone (over transparency) at the canvas pixel size, using the
 /// same compositor as the full render. `forceVisible` shows even a hidden layer so the
 /// breakdown is complete. Returns a CGImage that carries alpha for transparent layers.
-@MainActor private func renderLayerImage(_ layer: IconLayer, in document: IconDocument) -> CGImage? {
+@MainActor private func renderLayerImage(_ layer: ImageLayer, in document: ImageDocument) -> CGImage? {
     var solo = layer
     solo.isVisible = true
-    let soloDoc = IconDocument(name: document.name,
+    let soloDoc = ImageDocument(name: document.name,
                                canvasWidth: document.canvasWidth,
                                canvasHeight: document.canvasHeight,
                                layers: [solo], palette: document.palette,
                                cropRect: nil)
-    let renderer = ImageRenderer(content: IconCompositeView(document: soloDoc, size: document.canvasPixelSize))
+    let renderer = ImageRenderer(content: ImageCompositeView(document: soloDoc, size: document.canvasPixelSize))
     renderer.scale = 1
     return renderer.cgImage
 }
@@ -229,7 +229,7 @@ private func layerPDFManifest(from pdf: PDFDocument) -> LayerPDFManifest? {
 /// PDF has a native alpha model, so transparent layers stay transparent and re-import
 /// cleanly (no white-matte halo). Pass a `matte` CGColor to FLATTEN each page onto that
 /// colour instead — for print/CMYK handoff where live transparency is unwanted.
-@MainActor func makeLayerPDF(_ document: IconDocument, matte: CGColor? = nil) -> Data? {
+@MainActor func makeLayerPDF(_ document: ImageDocument, matte: CGColor? = nil) -> Data? {
     let size = document.canvasPixelSize
     guard size.width > 0, size.height > 0 else { return nil }
 
@@ -305,7 +305,7 @@ private func rasterizePDFPage(_ page: PDFPage, pixelSize: CGSize) -> CGImage? {
 /// manifest) imports every page as a picture (image layer) — a flattened page is just
 /// artwork, so "editable" there means move/scale/opacity, not native-kind reconstruction.
 /// Returns layers added.
-@MainActor func importPDFAsLayers(_ url: URL, into document: IconDocument) -> Int {
+@MainActor func importPDFAsLayers(_ url: URL, into document: ImageDocument) -> Int {
     guard let pdf = PDFDocument(url: url), pdf.pageCount > 0 else { return 0 }
     let size = document.canvasPixelSize
     let baseName = url.deletingPathExtension().lastPathComponent
@@ -314,7 +314,7 @@ private func rasterizePDFPage(_ page: PDFPage, pixelSize: CGSize) -> CGImage? {
 
     document.captureHistoryBaselineIfNeeded()
     var added = 0
-    var lastID: IconLayer.ID?
+    var lastID: ImageLayer.ID?
     for i in 0..<pdf.pageCount {
         let mpage: LayerPDFPage? = (manifest != nil && i < manifest!.pages.count) ? manifest!.pages[i] : nil
         if let mpage {
@@ -332,7 +332,7 @@ private func rasterizePDFPage(_ page: PDFPage, pixelSize: CGSize) -> CGImage? {
               let cg = rasterizePDFPage(pdfPage, pixelSize: size),
               let png = pngData(from: cg) else { continue }
         let name = mpage?.name ?? (multi ? "\(baseName) — Page \(i + 1)" : baseName)
-        var layer = IconLayer(name: name, role: .content)
+        var layer = ImageLayer(name: name, role: .content)
         layer.setImage(png)
         document.layers.append(layer)      // append = top of the visual stack
         lastID = layer.id
@@ -359,7 +359,7 @@ func encodedImageData(_ cg: CGImage, as type: UTType) -> Data? {
 
 /// A single-page PDF of the flattened composite — the plain "flat PDF" (no bleed/marks;
 /// that's the separate Print PDF). Transparency preserved.
-@MainActor func makeFlatPDF(_ document: IconDocument) -> Data? {
+@MainActor func makeFlatPDF(_ document: ImageDocument) -> Data? {
     guard let cg = renderCanvasImage(document) else { return nil }
     let data = NSMutableData()
     guard let consumer = CGDataConsumer(data: data as CFMutableData) else { return nil }
@@ -397,7 +397,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     }
 
     /// Render the project to this format. `matte` only applies to the layer PDF (flatten).
-    @MainActor func data(from document: IconDocument, matte: CGColor? = nil) -> Data? {
+    @MainActor func data(from document: ImageDocument, matte: CGColor? = nil) -> Data? {
         switch self {
         case .pdfFlat:   return makeFlatPDF(document)
         case .pdfLayers: return makeLayerPDF(document, matte: matte)

@@ -47,7 +47,7 @@ struct Image_ProducerApp: App {
     var body: some Scene {
         // Document-based (roadmap 2.4.1): each icon is a saved package the user owns
         // in Files / iCloud Drive. New documents open with the default layer stack.
-        DocumentGroup(newDocument: { IconDocument.newDefault() }) { configuration in
+        DocumentGroup(newDocument: { ImageDocument.newDefault() }) { configuration in
             ContentView(document: configuration.document, fileURL: configuration.fileURL)
                 // Self-driven autosave — the app has no UndoManager (undo/redo is the
                 // future History system's job), so SwiftUI's undo-based autosave never
@@ -56,7 +56,7 @@ struct Image_ProducerApp: App {
                           fileURL: configuration.fileURL,
                           isEditable: configuration.isEditable)
         }
-        // Turn off undo/redo. IconDocument is a ReferenceFileDocument that never registers
+        // Turn off undo/redo. ImageDocument is a ReferenceFileDocument that never registers
         // undo actions — undo/redo belongs to the future linear History system, not the
         // system UndoManager (an app-wide UndoManager is what crashed Shelf-Ready on
         // deletes). Replacing the Undo/Redo command group with nothing drops Cmd+Z and the
@@ -94,8 +94,8 @@ struct Image_ProducerApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("New Image") {
                     Task {
-                        let url = await Task.detached { IconDocument.nextProjectURL() }.value
-                        if let url, IconDocument.writeNewProject(at: url) {
+                        let url = await Task.detached { ImageDocument.nextProjectURL() }.value
+                        if let url, ImageDocument.writeNewProject(at: url) {
                             NSDocumentController.shared.openDocument(withContentsOf: url,
                                                                      display: true) { doc, _, err in
                                 if doc == nil {
@@ -123,8 +123,8 @@ struct Image_ProducerApp: App {
                     panel.message = "Choose a PDF to open as a new document."
                     guard panel.runModal() == .OK, let pdfURL = panel.url else { return }
                     Task {
-                        let url = await Task.detached { IconDocument.nextProjectURL() }.value
-                        if let url, IconDocument.writeNewProjectFromPDF(at: url, pdf: pdfURL) {
+                        let url = await Task.detached { ImageDocument.nextProjectURL() }.value
+                        if let url, ImageDocument.writeNewProjectFromPDF(at: url, pdf: pdfURL) {
                             NSDocumentController.shared.openDocument(withContentsOf: url,
                                                                      display: true) { doc, _, err in
                                 if doc == nil {
@@ -159,10 +159,10 @@ struct Image_ProducerApp: App {
         //
         // Replaces the bare document browser with a branded screen: the wordmark/title,
         // a prominent "New Image" button, and the recent-documents browser (free). New
-        // docs are created as .iconProject (the first writable content type).
+        // docs are created as .imageProject (the first writable content type).
         #if !os(macOS)
         DocumentGroupLaunchScene("Image Producer") {
-            NewDocumentButton("New Image", contentType: .iconProject)
+            NewDocumentButton("New Image", contentType: .imageProject)
         } background: {
             LinearGradient(
                 colors: [Color(red: 0.11, green: 0.14, blue: 0.22),
