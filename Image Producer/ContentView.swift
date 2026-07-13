@@ -1154,9 +1154,9 @@ struct ColorPaletteInspector: View {
                 Button {
                     paletteDoc = PaletteFileDocument(palette: PaletteFile(name: document.name, colors: document.palette))
                     savingPalette = true
-                } label: { Label("Save Palette…", systemImage: "plus.rectangle.on.folder").frame(maxWidth: .infinity) }
+                } label: { Label("Save Palette", systemImage: "plus.rectangle.on.folder").frame(maxWidth: .infinity) }
                 Button { loadFailed = false; loadingPalette = true } label: {
-                    Label("Load Palette…", systemImage: "paintpalette").frame(maxWidth: .infinity)
+                    Label("Load Palette", systemImage: "paintpalette").frame(maxWidth: .infinity)
                 }
             }
             .font(.system(size: 18)).buttonStyle(.bordered)
@@ -1751,14 +1751,14 @@ struct PenInspector: View {
                             palette: PaletteFile(name: document.name, colors: document.palette))
                         savingPalette = true
                     } label: {
-                        Label("Save Palette…", systemImage: "plus.rectangle.on.folder")
+                        Label("Save Palette", systemImage: "plus.rectangle.on.folder")
                             .frame(maxWidth: .infinity)
                     }
                     Button {
                         paletteLoadFailed = false
                         loadingPalette = true
                     } label: {
-                        Label("Load Palette…", systemImage: "paintpalette")
+                        Label("Load Palette", systemImage: "paintpalette")
                             .frame(maxWidth: .infinity)
                     }
                 }
