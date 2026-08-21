@@ -32,6 +32,7 @@ enum Tool: String, CaseIterable, Identifiable {
     case image         // import: File / Photo / paste / AI
     case imagePlayground   // Apple Image Playground — Maker (new layer) / Filter (restyle active layer)
     case cutout        // Remove Background — Vision subject lift, keeps the subject, drops the scene
+    case magicLasso    // Magic Lasso — click a region, it selects the matching area and clears it
     case zoom          // navigation only (not history)
 
     var id: String { rawValue }
@@ -60,6 +61,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .image:      "Image"
         case .imagePlayground: "Image Playground"
         case .cutout:     "Remove Background"
+        case .magicLasso: "Magic Lasso"
         case .zoom:       "Zoom"
         }
     }
@@ -81,6 +83,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .image:      "photo"
         case .imagePlayground: "apple.image.playground"
         case .cutout:     "person.and.background.dotted"
+        case .magicLasso: "lasso.badge.sparkles"
         case .zoom:       "magnifyingglass"
         }
     }
@@ -189,6 +192,7 @@ struct ToolGlyph: View {
         // No custom art yet — deliberately nil so it uses the SF Symbol Michael picked
         // (person.and.background.dotted). This is the documented fallback above.
         case .cutout:     nil
+        case .magicLasso: nil
         case .zoom:       "MagnefyingGlass"
         }
     }

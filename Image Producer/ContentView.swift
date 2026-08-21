@@ -502,6 +502,8 @@ struct ToolInspector: View {
             ImagePlaygroundInspector(document: document, activeLayerID: activeLayerID)
         case .cutout:
             RemoveBackgroundInspector(document: document, activeLayerID: activeLayerID)
+        case .magicLasso:
+            MagicLassoInspector(document: document, activeLayerID: activeLayerID)
         case .eyedropper:
             EyedropperInspector(fillColor: $fillColor)
         case .eraser:
@@ -2620,9 +2622,9 @@ private struct ToolPointer: ViewModifier {
         case .eraser:     .image(Image(systemName: "eraser.fill"), hotSpot: UnitPoint(x: 0.5, y: 0.6))
         case .eyedropper: .image(Image(systemName: "eyedropper"),  hotSpot: UnitPoint(x: 0.15, y: 0.9))
         case .text:       .horizontalText
-        // Michael's call: the toolbar button is the subject-on-a-dotted-background symbol,
-        // but the CURSOR is the magic lasso — the pointer should say what the click will do.
-        case .cutout:     .image(Image(systemName: "lasso.badge.sparkles"),
+        // The magic lasso pointer went to the tool you actually click the canvas with.
+        // Remove Background is a button — it never needs a canvas cursor.
+        case .magicLasso: .image(Image(systemName: "lasso.badge.sparkles"),
                                  hotSpot: UnitPoint(x: 0.5, y: 0.55))
         default:          nil   // Move / Zoom / Symbol / Image / etc. → system arrow
         }
@@ -2646,6 +2648,9 @@ struct CanvasView: View {
     @State private var brushHover: CGPoint?
     /// Live cursor position (canvas space) for the paint-bucket fill-region preview.
     @State private var bucketHover: CGPoint?
+    /// The layer the Magic Lasso made on its first click, so later clicks keep editing it
+    /// instead of stacking a new hidden layer per click.
+    @State private var lassoLayerID: ImageLayer.ID?
 
     private var activeIndex: Int? {
         guard let id = activeLayerID else { return nil }
@@ -2699,12 +2704,65 @@ struct CanvasView: View {
         pen.clearBucketPreview()
     }
 
+    /// **Magic Lasso** — click a region and the matching contiguous area is CLEARED, so the
+    /// layer below shows through. Same seeded flood as the Paint Bucket, bounded by the same
+    /// colour edges; it writes transparent instead of paint.
+    ///
+    /// Michael, 2026-08-20: this is the tool that finishes what Remove Background starts.
+    /// Vision hands back the lighthouse *and the cliff it stands on* as one subject, because
+    /// to the model they are one connected object. The lasso is how the cliff comes off.
+    ///
+    /// **Repeat clicks edit the SAME cutout layer.** Knocking out a sky, then an ocean, then a
+    /// rock is three clicks, and the bucket's one-new-layer-per-tap idiom would leave three
+    /// hidden layers behind for one job. The FIRST click makes the result layer (original kept
+    /// and hidden, so it is still non-destructive); every click after that edits that layer in
+    /// place. History records each click, so step-back still walks them one at a time.
+    @MainActor private func lassoClear(atNormalized n: CGPoint, canvas: CGSize) {
+        guard activeTool == .magicLasso, let idx = activeIndex else { return }
+        guard document.layers[idx].backgroundRole == nil else { return }   // a solid background has nothing to lasso
+        guard let png = activeImagePNG,
+              let src = CGImageSourceCreateWithData(png as CFData, nil),
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return }
+        let t = document.layers[idx].transform
+        let canvasPt = CGPoint(x: n.x * canvas.width, y: n.y * canvas.height)
+        guard let seed = imagePixel(forCanvasPoint: canvasPt, canvas: canvas, transform: t,
+                                    imageW: cg.width, imageH: cg.height) else { return }
+        // Clearing = flooding with premultiplied transparent.
+        guard let cleared = floodFilledImage(cg, seed: seed, tolerance: Int(pen.lassoTolerance),
+                                             fill: (0, 0, 0, 0)),
+              let out = pngData(from: cleared) else { return }
+
+        document.captureHistoryBaselineIfNeeded()   // before the edit
+
+        if let lassoID = lassoLayerID, lassoID == activeLayerID,
+           let li = document.layers.firstIndex(where: { $0.id == lassoID }) {
+            document.layers[li].setImage(out)       // keep working on the layer we already made
+            document.recordHistory(toolID: Tool.magicLasso.rawValue,
+                                   groupTitle: Tool.magicLasso.title,
+                                   actionLabel: "Lasso Clear",
+                                   layerID: lassoID)
+        } else if let newID = document.addResultLayer(out, above: idx, nameSuffix: "lassoed"),
+                  let nIdx = document.layers.firstIndex(where: { $0.id == newID }) {
+            document.layers[nIdx].transform = t     // the cutout stays exactly where the art was
+            activeLayerID = newID
+            lassoLayerID = newID
+            document.recordHistory(toolID: Tool.magicLasso.rawValue,
+                                   groupTitle: Tool.magicLasso.title,
+                                   actionLabel: "Lasso Clear",
+                                   layerID: newID)
+        }
+        pen.clearBucketPreview()
+    }
+
     /// Recompute the bucket's fill-region highlight for the hovered seed (downscaled), or
     /// clear it. Region shown in the fill color. `force` recomputes when tolerance/color change.
     @MainActor private func refreshBucketPreview(canvas: CGSize, force: Bool = false) {
+        let lassoing = activeTool == .magicLasso
         let c = fillColor.rgb8
-        let hi: (r: UInt8, g: UInt8, b: UInt8, a: UInt8) = (c.r, c.g, c.b, 255)
-        guard activeTool == .fill, let hp = bucketHover, let idx = activeIndex,
+        // The lasso highlights in red because it is showing what will be REMOVED. Painting
+        // that region in the fill colour, the way the bucket does, would say the opposite.
+        let hi: (r: UInt8, g: UInt8, b: UInt8, a: UInt8) = lassoing ? (255, 59, 48, 255) : (c.r, c.g, c.b, 255)
+        guard activeTool == .fill || lassoing, let hp = bucketHover, let idx = activeIndex,
               document.layers[idx].isVisible, document.layers[idx].backgroundRole == nil,
               let id = activeLayerID, let png = activeImagePNG else {
             pen.refreshBucketPreview(seed: nil, highlight: hi); return
@@ -2713,7 +2771,8 @@ struct CanvasView: View {
         let t = document.layers[idx].transform
         let seed = imagePixel(forCanvasPoint: hp, canvas: canvas, transform: t,
                               imageW: pen.bucketSourceW, imageH: pen.bucketSourceH)
-        pen.refreshBucketPreview(seed: seed, highlight: hi, force: force)
+        pen.refreshBucketPreview(seed: seed, highlight: hi, force: force,
+                                 tolerance: lassoing ? pen.lassoTolerance : nil)
     }
 
     /// Eyedropper: render the active layer and sample its color (averaged over the
@@ -2856,8 +2915,9 @@ struct CanvasView: View {
                         .opacity(0.5)
                         .allowsHitTesting(false)
                 }
-                // Paint Bucket LIVE PREVIEW: the region a tap would flood, in the fill color.
-                if activeTool == .fill, let idx = activeIndex,
+                // LIVE PREVIEW: the region a tap would flood (bucket, in the fill colour) or
+                // clear (Magic Lasso, in red).
+                if activeTool == .fill || activeTool == .magicLasso, let idx = activeIndex,
                    document.layers[idx].isVisible, let hi = pen.bucketPreview {
                     let t = document.layers[idx].transform
                     Image(decorative: hi, scale: 1)
@@ -2941,6 +3001,8 @@ struct CanvasView: View {
                             }
                         case .fill:
                             bucketFill(atNormalized: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height), canvas: disp)
+                        case .magicLasso:
+                            lassoClear(atNormalized: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height), canvas: disp)
                         case .eyedropper:
                             sampleEyedropper(at: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height))
                         case .eraser:
@@ -2952,6 +3014,7 @@ struct CanvasView: View {
                         }
                     },
                 including: (activeTool == .pen || activeTool == .fill || activeTool == .eyedropper
+                            || activeTool == .magicLasso
                             || activeTool == .text
                             || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
@@ -2975,7 +3038,7 @@ struct CanvasView: View {
             .onChange(of: activeTool) {
                 if activeTool == .pen { pen.load(activePixelData) }
                 if activeTool != .eraser { pen.endEraseSession() }   // leaving the tool drops the copy session
-                if activeTool != .fill { bucketHover = nil; pen.clearBucketPreview() }
+                if activeTool != .fill && activeTool != .magicLasso { bucketHover = nil; pen.clearBucketPreview() }
                 refreshEraserPreview()
             }
             .onChange(of: activeLayerID) {
@@ -2993,6 +3056,7 @@ struct CanvasView: View {
             .onChange(of: pen.eraseTolerance) { refreshEraserPreview() }
             .onChange(of: pen.eraseContiguous) { refreshEraserPreview() }
             .onChange(of: pen.bucketTolerance) { refreshBucketPreview(canvas: disp, force: true) }
+            .onChange(of: pen.lassoTolerance) { refreshBucketPreview(canvas: disp, force: true) }
             .onChange(of: fillColor) {
                 if activeTool == .eraser { refreshEraserPreview() }
                 if activeTool == .fill { refreshBucketPreview(canvas: disp, force: true) }
@@ -3723,6 +3787,10 @@ final class PixelPen: ObservableObject {
     /// How loose the fill match is — how different a pixel can be from the tapped color and
     /// still flood. Higher = jumps softer edges; lower = stops at the faintest line ("wall").
     @Published var bucketTolerance: Double = 16
+    /// Magic Lasso's own looseness. Kept SEPARATE from the bucket's: filling inside a line
+    /// drawing wants a tight tolerance, while knocking a soft AI sky out wants a loose one,
+    /// and sharing one slider would make each tool fight the other's setting.
+    @Published var lassoTolerance: Double = 40
     /// Highlight of the region a tap would fill, over the active layer (downscaled). nil = none.
     @Published private(set) var bucketPreview: CGImage?
     private var bucketSource: CGImage?           // cached downscaled source
@@ -3750,11 +3818,14 @@ final class PixelPen: ObservableObject {
     /// Recompute the fill-region highlight for a downscaled seed (or clear it). `seed` is in
     /// the DOWNSCALED source's pixel space. `force` recomputes even if the seed pixel is the
     /// same (used when tolerance changes).
-    func refreshBucketPreview(seed: CGPoint?, highlight: (r: UInt8, g: UInt8, b: UInt8, a: UInt8), force: Bool = false) {
+    /// `tolerance` nil = the bucket's own setting; the Magic Lasso passes its own.
+    func refreshBucketPreview(seed: CGPoint?, highlight: (r: UInt8, g: UInt8, b: UInt8, a: UInt8),
+                              force: Bool = false, tolerance: Double? = nil) {
         guard let cg = bucketSource, let seed else { bucketPreview = nil; bucketLastSeed = nil; return }
         if !force, let last = bucketLastSeed, Int(last.x) == Int(seed.x), Int(last.y) == Int(seed.y) { return }
         bucketLastSeed = seed
-        bucketPreview = floodHighlightImage(cg, seed: seed, tolerance: Int(bucketTolerance), highlight: highlight)
+        bucketPreview = floodHighlightImage(cg, seed: seed, tolerance: Int(tolerance ?? bucketTolerance),
+                                            highlight: highlight)
     }
 
     private var ctx: CGContext?

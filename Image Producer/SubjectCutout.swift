@@ -289,3 +289,59 @@ struct RemoveBackgroundInspector: View {
         }
     }
 }
+
+// MARK: - Magic Lasso inspector
+
+/// **Magic Lasso** — click a region on the canvas and the matching contiguous area is cleared.
+///
+/// The third tool in the cut-out family, and the three do different jobs:
+///   • **Magic Eraser** (in Eraser) matches a COLOUR anywhere, or floods in from the border.
+///   • **Remove Background** matches a SUBJECT — it copes with soft gradient skies.
+///   • **Magic Lasso** matches a REGION you point at — the surgical one, for the piece the
+///     other two leave behind (the cliff under a lifted lighthouse, one cloud, one shadow).
+struct MagicLassoInspector: View {
+    @ObservedObject var document: ImageDocument
+    let activeLayerID: ImageLayer.ID?
+    @EnvironmentObject var pen: PixelPen   // same idiom as the other inspectors
+
+    private var activeIndex: Int? {
+        guard let id = activeLayerID else { return nil }
+        return document.layers.firstIndex(where: { $0.id == id })
+    }
+    private var hasImage: Bool {
+        guard let idx = activeIndex else { return false }
+        for el in document.layers[idx].elements {
+            if case .image(let img) = el.content, !img.pngData.isEmpty { return true }
+        }
+        return false
+    }
+
+    var body: some View {
+        if hasImage {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Click a region on the canvas and it clears, so the layer below shows through. Hover first — the area that will go is highlighted in red.")
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Tolerance  \(Int(pen.lassoTolerance))").font(.system(size: 18))
+                    Slider(value: $pen.lassoTolerance, in: 0...160, step: 1)
+                    Text("How different a pixel can be from the one you clicked and still go. Low stops at the faintest line. High walks through a soft sky or a gradient.")
+                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                }
+
+                Text("Click as many times as you need — sky, then ocean, then the rock. They all go on one layer rather than stacking a new one each click, and History steps back through them one at a time.")
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
+
+                Text("Your original layer is kept and hidden, never overwritten.")
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        } else {
+            PanelPlaceholder(systemImage: "lasso.badge.sparkles",
+                             title: "Magic Lasso",
+                             subtitle: "Select a content layer that has a picture on it")
+        }
+    }
+}
