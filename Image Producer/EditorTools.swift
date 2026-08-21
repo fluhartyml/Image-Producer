@@ -176,24 +176,28 @@ struct ToolGlyph: View {
     /// in place for any future tool added without art.
     private var assetName: String? {
         switch tool {
-        case .canvas:     "CanvasTool"
-        case .colorPalette: "PaletteTool"
-        case .move:       "MoveTool"
-        case .fill:       "BucketTool"
-        case .pen:        "PixelArtPenTool"
-        case .eraser:     "PinkEraser"
-        case .eyedropper: "ColorSampleEyeDropper"
-        case .shape:      "ShapeTool"
-        case .path:       "PathTool"
+        // HYBRID STRIP, Michael's call 2026-08-21 after seeing all three side by side
+        // at the real 28pt size (`~/Desktop/lighthouse/TOOLSTRIP-BEFORE-AFTER.png`):
+        // **Text and Image keep their hand-drawn art; everything else falls through to
+        // its SF Symbol.** Returning nil here is the whole mechanism — the fallback in
+        // `body` below was always there, it just never got used.
+        //
+        // Two of the retired pieces were fixing real defects, not just style:
+        //   • MoveTool had a blue ring baked into the ARTWORK, so Move read as selected
+        //     even when it wasn't — visible in the top-left of every screenshot taken
+        //     that morning.
+        //   • SFPickerTool was a grid of tiny glyphs, illegible at 28pt.
+        //
+        // NOTHING IS DELETED. Every imageset stays in Assets.xcassets, and the names are
+        // kept right here so any of them can come back by putting the string back:
+        //   canvas "CanvasTool" · colorPalette "PaletteTool" · move "MoveTool"
+        //   fill "BucketTool" · pen "PixelArtPenTool" · eraser "PinkEraser"
+        //   eyedropper "ColorSampleEyeDropper" · shape "ShapeTool" · path "PathTool"
+        //   symbol "SFPickerTool" · imagePlayground "ImagePlayground"
+        //   zoom "MagnefyingGlass"
         case .text:       "FontBook"
-        case .symbol:     "SFPickerTool"
         case .image:      "PhotoTool"
-        case .imagePlayground: "ImagePlayground"
-        // No custom art yet — deliberately nil so it uses the SF Symbol Michael picked
-        // (person.and.background.dotted). This is the documented fallback above.
-        case .cutout:     nil
-        case .magicLasso: nil
-        case .zoom:       "MagnefyingGlass"
+        default:          nil
         }
     }
 
