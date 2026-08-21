@@ -500,6 +500,8 @@ struct ToolInspector: View {
             ImageImportInspector(document: document, activeLayerID: activeLayerID)
         case .imagePlayground:
             ImagePlaygroundInspector(document: document, activeLayerID: activeLayerID)
+        case .cutout:
+            RemoveBackgroundInspector(document: document, activeLayerID: activeLayerID)
         case .eyedropper:
             EyedropperInspector(fillColor: $fillColor)
         case .eraser:
@@ -2618,6 +2620,10 @@ private struct ToolPointer: ViewModifier {
         case .eraser:     .image(Image(systemName: "eraser.fill"), hotSpot: UnitPoint(x: 0.5, y: 0.6))
         case .eyedropper: .image(Image(systemName: "eyedropper"),  hotSpot: UnitPoint(x: 0.15, y: 0.9))
         case .text:       .horizontalText
+        // Michael's call: the toolbar button is the subject-on-a-dotted-background symbol,
+        // but the CURSOR is the magic lasso — the pointer should say what the click will do.
+        case .cutout:     .image(Image(systemName: "lasso.badge.sparkles"),
+                                 hotSpot: UnitPoint(x: 0.5, y: 0.55))
         default:          nil   // Move / Zoom / Symbol / Image / etc. → system arrow
         }
     }
