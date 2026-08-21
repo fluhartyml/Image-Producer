@@ -759,12 +759,39 @@ extension ImageDocument {
     /// system's job, and we don't want the two to compete). Same `manifest.json` format
     /// as the official `fileWrapper(snapshot:)` writer, so the file stays interchangeable.
     func writePackage(to url: URL) throws {
+        try Self.writeEncodedPackage(encodedManifest(), to: url)
+    }
+
+    /// Encode the live model into the `manifest.json` payload. This READS the document, so
+    /// it stays on the main actor — which also means the writer below never has to touch
+    /// the document at all. It only ever sees `Data`.
+    ///
+    /// Named `encodedManifest`, not `encodedSnapshot`: History already owns that name for a
+    /// different thing (it encodes only the layer stack). Two encoders, two jobs.
+    func encodedManifest() throws -> Data {
         let manifest = ImageProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
                                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
                                            bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                                            cropMarks: cropMarks, registrationMarks: registrationMarks,
                                            colorSpaceCMYK: colorSpaceCMYK, history: history)
-        let data = try JSONEncoder().encode(manifest)
+        return try JSONEncoder().encode(manifest)
+    }
+
+    /// The package write itself. **BLOCKING — and deliberately `nonisolated` so it can
+    /// never be run on the main actor by accident.**
+    ///
+    /// 2026-08-21: it WAS being run on the main actor, and the app hung solid. This target
+    /// builds with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, so an unmarked method on a
+    /// model type is main-actor-isolated *by construction* — nothing in the old code looked
+    /// like threading, and that was the trap. `NSFileCoordinator` then blocked forever
+    /// waiting for an access claim on the iCloud-backed document: beachball, 0% CPU, no
+    /// recovery. Coordination has to be able to call back, and if the main thread is the
+    /// thing waiting, nothing can ever grant the claim.
+    ///
+    /// Evidence, not theory: `~/Desktop/bugs/2026-08-21-image-producer-autosave-hang-sample.txt`
+    /// — 1704 of 1704 samples parked in `AutosaveModifier.save()` →
+    /// `writePackage(to:)` → `_blockOnAccessClaim:` → `semaphore_wait_trap`.
+    nonisolated static func writeEncodedPackage(_ data: Data, to url: URL) throws {
         let mf = FileWrapper(regularFileWithContents: data)
         mf.preferredFilename = "manifest.json"
         let dir = FileWrapper(directoryWithFileWrappers: ["manifest.json": mf])
@@ -778,6 +805,22 @@ extension ImageDocument {
         }
         if let writeError { throw writeError }
         if let coordError { throw coordError }
+    }
+}
+
+/// Serializes every package write onto ONE background queue.
+///
+/// Two jobs, and both matter: the blocking coordinated write never runs on the main thread
+/// (see `ImageDocument.writeEncodedPackage`), and two autosaves can never be inside the
+/// same file at once. The queue is FIFO, so when edits come in bursts the newest snapshot
+/// is still the last one written.
+enum PackageWriter {
+    nonisolated(unsafe) private static let queue =
+        DispatchQueue(label: "com.nightgard.Image-Producer.package-write", qos: .utility)
+
+    /// Hand off an already-encoded snapshot. Returns immediately; the caller is never blocked.
+    nonisolated static func enqueue(_ data: Data, to url: URL) {
+        queue.async { try? ImageDocument.writeEncodedPackage(data, to: url) }
     }
 }
 

@@ -4137,7 +4137,11 @@ struct AutosaveModifier: ViewModifier {
         content
             .onReceive(document.objectWillChange) { _ in schedule() }
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active { debounce?.cancel(); save() }   // flush on background
+                // Flush on background. The write is now ENQUEUED rather than completed
+                // inline — the serial queue picks it up immediately, and on macOS the
+                // process isn't suspended on resign-active, so it lands. Blocking here to
+                // "make sure" is exactly the deadlock this change removes.
+                if phase != .active { debounce?.cancel(); save() }
             }
             .onChange(of: fileURL) { _, newURL in
                 // The user just named/saved it → drop the auto-recovery copy.
@@ -4157,6 +4161,17 @@ struct AutosaveModifier: ViewModifier {
         }
     }
 
+    /// Snapshot on the main actor, then hand the BYTES to the background writer.
+    ///
+    /// The coordinated write must never happen here. On 2026-08-21 this method called
+    /// `writePackage(to:)` directly, which runs `NSFileCoordinator` synchronously — and
+    /// because the target builds with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, "directly"
+    /// meant "on the main thread." Waiting for a file-access claim on an iCloud-backed
+    /// document from the main thread deadlocks permanently: beachball, 0% CPU, no recovery,
+    /// and the only way out was force-quitting the app mid-edit.
+    ///
+    /// Only the encode stays here, because it reads the model. Everything that can block
+    /// is on `PackageWriter`'s serial queue.
     private func save() {
         guard isEditable else { return }                      // read-only → nothing to do
         // Viewing a past history point is non-destructive: writing the previewed state (or
@@ -4164,15 +4179,21 @@ struct AutosaveModifier: ViewModifier {
         // save entirely while viewing — every state is preserved in the history snapshots, and
         // the newest committed state is already on disk from its own edit.
         guard !document.isViewingHistory else { return }
-        if let url = fileURL {
-            try? document.writePackage(to: url)               // saved doc: write in place
+
+        let url: URL
+        if let fileURL {
+            url = fileURL                                     // saved doc: write in place
         } else {
             // UNTITLED → auto-materialize a recovery copy so the canvas is never lost,
             // even on a crash before the first Save. One stable file per window,
             // overwritten each autosave; removed when the user finally names/saves it.
             if recoveryURL == nil { recoveryURL = makeRecoveryURL() }
-            if let url = recoveryURL { try? document.writePackage(to: url) }
+            guard let r = recoveryURL else { return }
+            url = r
         }
+
+        guard let data = try? document.encodedManifest() else { return }
+        PackageWriter.enqueue(data, to: url)
     }
 
     /// A crash-safety recovery file for a genuinely UNTITLED document (rare now that new
