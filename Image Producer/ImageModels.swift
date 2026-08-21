@@ -850,6 +850,48 @@ extension ImageDocument {
         } catch { return false }
     }
 
+    /// New-document seed from an IMAGE file. Same contract as `writeNewProjectFromPDF`:
+    /// an EMPTY document that the import fills, so a default layer stack never appears
+    /// out of nowhere. The image sets the canvas size (see `importImageAsLayer`).
+    @MainActor static func writeNewProjectFromImage(at url: URL, image imageURL: URL) -> Bool {
+        let doc = ImageDocument(layers: [])          // empty — the import provides the template
+        let scoped = imageURL.startAccessingSecurityScopedResource()
+        let added = importImageAsLayer(imageURL, into: doc)
+        if scoped { imageURL.stopAccessingSecurityScopedResource() }
+        guard added else { return false }
+        doc.name = url.deletingPathExtension().lastPathComponent
+        do {
+            try doc.writePackage(to: url)
+            pendingNewProjectURL = url      // so the editor opens it on the Canvas hub
+            return true
+        } catch { return false }
+    }
+
+    /// THE single entry point for "seed a new document from a file the user picked".
+    /// Both the Welcome button and the ⇧⌘N command call this, and so does a file opened
+    /// from the Finder — one place, so the paths can never disagree about which formats
+    /// are accepted. (Two paths disagreeing about the same rule is a bug shape we have
+    /// already paid for once.)
+    @MainActor static func writeNewProject(at url: URL, from sourceURL: URL) -> Bool {
+        isPDF(sourceURL) ? writeNewProjectFromPDF(at: url, pdf: sourceURL)
+                         : writeNewProjectFromImage(at: url, image: sourceURL)
+    }
+
+    /// Type check by CONTENT first, extension only as the fallback — a PDF named `.png`
+    /// should still import as a PDF.
+    nonisolated static func isPDF(_ url: URL) -> Bool {
+        if let t = (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType {
+            return t.conforms(to: .pdf)
+        }
+        return url.pathExtension.lowercased() == "pdf"
+    }
+
+    /// Everything "New from Import" will accept: PDF plus every image format this platform
+    /// can actually decode. Shared so the two pickers can never drift apart.
+    @MainActor static var newFromImportContentTypes: [UTType] {
+        [.pdf] + importableImageTypes
+    }
+
     /// ⇧⌘N "New from Import": like `writeNewProject`, but the document is seeded from an
     /// imported PDF instead of the default template — the PDF IS the template. Starts from
     /// an EMPTY ImageDocument (no `newDefault()` scaffold), so the Light/Dark background

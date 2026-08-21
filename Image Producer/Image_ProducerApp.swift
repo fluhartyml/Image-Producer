@@ -42,8 +42,54 @@ struct ExportCommands: Commands {
 }
 #endif
 
+#if os(macOS)
+/// Files opened from the Finder — Open With, a drag onto the app icon, a double-click.
+///
+/// The DocumentGroup only knows the project package type, so an IMAGE arriving this way
+/// would otherwise be refused outright. Here it is treated exactly the way "New from
+/// Import" treats it: seed a NEW project from the picture and open that. **The original
+/// file on disk is never touched** — you get a project to work in, not an edit of the
+/// user's photo.
+final class ImageProducerAppDelegate: NSObject, NSApplicationDelegate {
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for source in urls {
+            // Our own project package: hand straight to the document controller, unchanged.
+            let isProject = (try? source.resourceValues(forKeys: [.contentTypeKey]))?
+                .contentType?.conforms(to: .imageProject) ?? false
+            if isProject {
+                NSDocumentController.shared.openDocument(withContentsOf: source, display: true) { doc, _, err in
+                    if doc == nil {
+                        NSLog("ImageProducer open: failed for %@ — %@",
+                              source.path, String(describing: err))
+                    }
+                }
+                continue
+            }
+            Task { @MainActor in
+                guard let projectURL = ImageDocument.nextProjectURL(),
+                      ImageDocument.writeNewProject(at: projectURL, from: source) else {
+                    NSLog("ImageProducer open: could not create a project from %@", source.path)
+                    return
+                }
+                NSDocumentController.shared.noteNewRecentDocumentURL(projectURL)
+                NSDocumentController.shared.openDocument(withContentsOf: projectURL, display: true) { doc, _, err in
+                    if doc == nil {
+                        NSLog("ImageProducer open: seeded project would not open %@ — %@",
+                              projectURL.path, String(describing: err))
+                    }
+                }
+            }
+        }
+    }
+}
+#endif
+
 @main
 struct Image_ProducerApp: App {
+#if os(macOS)
+    @NSApplicationDelegateAdaptor(ImageProducerAppDelegate.self) private var appDelegate
+#endif
+
     var body: some Scene {
         // Document-based (roadmap 2.4.1): each icon is a saved package the user owns
         // in Files / iCloud Drive. New documents open with the default layer stack.
@@ -111,20 +157,22 @@ struct Image_ProducerApp: App {
                 }
                 .keyboardShortcut("n", modifiers: .command)
 
-                // ⇧⌘N: New from Import — the picked PDF IS the template. Seeds an EMPTY
+                // ⇧⌘N: New from Import — the picked file IS the template. Seeds an EMPTY
                 // document (NOT newDefault), so the Light/Dark floors appear only if the
-                // PDF carries them — they never spawn out of nowhere.
+                // source carries them — they never spawn out of nowhere. Images and PDFs
+                // alike; the accepted-type list is shared with the Welcome button so the
+                // two can't drift.
                 Button("New from Import…") {
                     let panel = NSOpenPanel()
-                    panel.allowedContentTypes = [.pdf]
+                    panel.allowedContentTypes = ImageDocument.newFromImportContentTypes
                     panel.allowsMultipleSelection = false
                     panel.canChooseDirectories = false
                     panel.prompt = "Import"
-                    panel.message = "Choose a PDF to open as a new document."
+                    panel.message = "Choose an image or PDF to open as a new document."
                     guard panel.runModal() == .OK, let pdfURL = panel.url else { return }
                     Task {
                         let url = await Task.detached { ImageDocument.nextProjectURL() }.value
-                        if let url, ImageDocument.writeNewProjectFromPDF(at: url, pdf: pdfURL) {
+                        if let url, ImageDocument.writeNewProject(at: url, from: pdfURL) {
                             NSDocumentController.shared.openDocument(withContentsOf: url,
                                                                      display: true) { doc, _, err in
                                 if doc == nil {

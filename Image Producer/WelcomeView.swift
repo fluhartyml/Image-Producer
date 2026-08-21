@@ -96,20 +96,22 @@ struct WelcomeView: View {
 
             // New from Import — the launch surface IS the "no document open" state, so the
             // import-as-new-document path belongs right here next to New Image (not only in
-            // the ⇧⌘N File-menu command). The picked PDF becomes the template: an empty doc
-            // seeded from the PDF, so the Light/Dark floors appear only if the PDF has them.
+            // the ⇧⌘N File-menu command). The picked file becomes the template: an empty doc
+            // seeded from it, so the Light/Dark floors appear only if the source has them.
+            // Takes an IMAGE as readily as a PDF — the panel used to be locked to PDF, which
+            // made an ordinary PNG unopenable even though the layer importer reads one fine.
             Button {
                 let panel = NSOpenPanel()
-                panel.allowedContentTypes = [.pdf]
+                panel.allowedContentTypes = ImageDocument.newFromImportContentTypes
                 panel.allowsMultipleSelection = false
                 panel.canChooseDirectories = false
                 panel.prompt = "Import"
-                panel.message = "Choose a PDF to open as a new document."
+                panel.message = "Choose an image or PDF to open as a new document."
                 guard panel.runModal() == .OK, let pdfURL = panel.url else { return }
                 Task {
                     let url = await Task.detached { ImageDocument.nextProjectURL() }.value
                     var opened = false
-                    if let url, ImageDocument.writeNewProjectFromPDF(at: url, pdf: pdfURL) {
+                    if let url, ImageDocument.writeNewProject(at: url, from: pdfURL) {
                         NSDocumentController.shared.noteNewRecentDocumentURL(url)
                         do { try await openDocument(at: url); opened = true }
                         catch {

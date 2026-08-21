@@ -17,6 +17,7 @@
 
 import SwiftUI
 import CoreGraphics
+import ImageIO
 import UniformTypeIdentifiers
 import PDFKit
 #if canImport(AppKit)
@@ -344,6 +345,31 @@ private func rasterizePDFPage(_ page: PDFPage, pixelSize: CGSize) -> CGImage? {
                                layerID: lastID)
     }
     return added
+}
+
+/// Seed a document from a single IMAGE file — the new-document twin of `importPDFAsLayers`
+/// for the one-page case. The picture becomes one content layer and nothing else is
+/// invented (no Light/Dark floors), matching the PDF rule that the import IS the template.
+///
+/// The image's own pixel size becomes the canvas. Opening a 1024×1024 PNG onto some other
+/// canvas would letterbox the very artwork you opened it to work on — the file knows its
+/// size, so it sets it.
+@MainActor func importImageAsLayer(_ url: URL, into document: ImageDocument) -> Bool {
+    guard let raw = try? Data(contentsOf: url),
+          let source = CGImageSourceCreateWithData(raw as CFData, nil),
+          let cg = CGImageSourceCreateImageAtIndex(source, 0, nil),
+          let png = pngData(from: cg) else { return false }
+
+    document.canvasWidth  = cg.width
+    document.canvasHeight = cg.height
+
+    document.captureHistoryBaselineIfNeeded()
+    var layer = ImageLayer(name: url.deletingPathExtension().lastPathComponent, role: .content)
+    layer.setImage(png)
+    document.layers.append(layer)          // append = top of the visual stack
+    document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
+                           actionLabel: "Import Image", layerID: layer.id)
+    return true
 }
 
 // MARK: - Unified export (format dropdown)
