@@ -44,6 +44,9 @@ struct ContentView: View {
     @State private var fillColor: Color = .white
     /// Export (⌘E): the unified export sheet with a format dropdown.
     @State private var showExportSheet = false
+    /// Result of an "Export ▸ Icon Set…" run. Always says what happened — a silent
+    /// export is the same failure shape as the Done button that reported nothing.
+    @State private var iconSetResult: String?
     /// Share (roadmap 2.5): a flat 1024 PNG of the visible layers, snapshot at tap.
     /// About / wordmark sheet — shows the "Image Producer / Graphic Arts" brand inside the app
     /// (the home-screen + App Store name can't carry the subheading).
@@ -205,13 +208,30 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showExportSheet) { ExportSheet(document: document) }
+        .alert("Icon Set", isPresented: Binding(get: { iconSetResult != nil },
+                                                set: { if !$0 { iconSetResult = nil } })) {
+            Button("OK", role: .cancel) { iconSetResult = nil }
+        } message: {
+            Text(iconSetResult ?? "").font(.system(size: 18))
+        }
         .sheet(isPresented: $showAbout) { AboutView() }
         .environmentObject(pen)
         #if os(macOS)
         // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
         // targeting the focused document.
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
+        // The top-level Export menu's "Icon Set…" item, targeting this document.
+        .focusedSceneValue(\.iconSetAction, { exportIconSet() })
         #endif
+    }
+
+    /// Export ▸ Icon Set… — renders the light and dark 1024s from this document's own
+    /// Light and Dark floors plus the Mac ladder, and writes a drop-in
+    /// `AppIcon.appiconset`. An empty result string means the user cancelled the
+    /// panel, which is not worth an alert.
+    private func exportIconSet() {
+        let message = IconSetExport.exportInteractively(from: document)
+        if !message.isEmpty { iconSetResult = message }
     }
 
     private var exportFilename: String {

@@ -27,6 +27,41 @@ extension FocusedValues {
     }
 }
 
+/// Focused-document "Export Icon Set" action — same pattern as `ExportActionKey`,
+/// separate closure so the two live on different menus and can never be confused.
+struct IconSetActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+extension FocusedValues {
+    var iconSetAction: (() -> Void)? {
+        get { self[IconSetActionKey.self] }
+        set { self[IconSetActionKey.self] = newValue }
+    }
+}
+
+#if os(macOS)
+/// A TOP-LEVEL **Export** menu in the menu bar, sitting alongside File, Edit and View
+/// — Michael's ask, 2026-08-21: *"i want an export menue drop down like Apple logo
+/// terminal shell edit view window help."*
+///
+/// It is a menu of **destinations**, not file formats. ⌘E stays where it is and keeps
+/// exporting *a file*; this menu exports *a deliverable* — something Xcode or App Store
+/// Connect will take as-is. One item today by his call ("only export icon set for now
+/// we will add more export features as we go and find real world uses"); Apple TV icons
+/// and the screenshot presets slot in underneath as they are built.
+struct ExportMenu: Commands {
+    @FocusedValue(\.iconSetAction) private var iconSetAction
+
+    var body: some Commands {
+        CommandMenu("Export") {
+            Button("Icon Set…") { iconSetAction?() }
+                .disabled(iconSetAction == nil)
+        }
+    }
+}
+#endif
+
 #if os(macOS)
 /// Adds File > Export… (⌘E) driving the focused document's Export flow.
 struct ExportCommands: Commands {
@@ -131,6 +166,10 @@ struct Image_ProducerApp: App {
             // out. Drives the focused document's Export action (nil-disabled when no
             // document is frontmost).
             ExportCommands()
+
+            // The top-level Export menu (destinations, not formats). Separate from the
+            // File > Export… item above on purpose — see ExportMenu.
+            ExportMenu()
             #endif
 
             #if os(macOS)
