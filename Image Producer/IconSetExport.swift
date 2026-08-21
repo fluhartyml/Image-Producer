@@ -26,6 +26,8 @@
 
 import Foundation
 import SwiftUI
+import ImageIO
+import UniformTypeIdentifiers
 #if os(macOS)
 import AppKit
 #endif
@@ -66,6 +68,36 @@ enum IconSetExport {
                              ppi: document.ppi)
     }
 
+    /// Re-encode a PNG **without an alpha channel.**
+    ///
+    /// Found 2026-08-21 by checking the first real export instead of trusting it:
+    /// every file came out `hasAlpha: yes`. They were fully opaque — sampled minimum
+    /// alpha 255 everywhere — so nothing was see-through, but the CHANNEL was still
+    /// there, and Apple rejects an iOS app icon that merely *contains* one
+    /// ("can't be transparent nor contain an alpha channel"). Michael's already-shipped
+    /// icons are 1024², no alpha; matching what has passed review costs nothing.
+    ///
+    /// Safe precisely because the Light/Dark floors are solid fills — there is no real
+    /// transparency to lose. If someone exports with both floors hidden they get a
+    /// black-backed icon rather than a broken one, which is the better failure.
+    static func stripAlpha(_ data: Data) -> Data {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return data }
+        let w = cg.width, h = cg.height
+        guard let ctx = CGContext(data: nil, width: w, height: h,
+                                  bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return data }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let flat = ctx.makeImage() else { return data }
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out, "public.png" as CFString, 1, nil)
+        else { return data }
+        CGImageDestinationAddImage(dest, flat, nil)
+        guard CGImageDestinationFinalize(dest) else { return data }
+        return out as Data
+    }
+
     /// Every file the set contains, keyed by filename. Light and dark come from the
     /// document's own Light and Dark floors — you never export twice or name a file
     /// by hand, which is the whole point of doing this inside a layer app.
@@ -74,10 +106,10 @@ enum IconSetExport {
         let light = render(.light, of: document)
         let dark  = render(.dark,  of: document)
 
-        if let d = ContentView.renderIconPNG(document: light, px: 1024) { files["icon-light-1024.png"] = d }
-        if let d = ContentView.renderIconPNG(document: dark,  px: 1024) { files["icon-dark-1024.png"]  = d }
+        if let d = ContentView.renderIconPNG(document: light, px: 1024) { files["icon-light-1024.png"] = stripAlpha(d) }
+        if let d = ContentView.renderIconPNG(document: dark,  px: 1024) { files["icon-dark-1024.png"]  = stripAlpha(d) }
         for px in macPixelSizes {
-            if let d = ContentView.renderIconPNG(document: light, px: px) { files["icon-mac-\(px).png"] = d }
+            if let d = ContentView.renderIconPNG(document: light, px: px) { files["icon-mac-\(px).png"] = stripAlpha(d) }
         }
         files["Contents.json"] = contentsJSON()
         return files
