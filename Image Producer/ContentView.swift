@@ -3229,20 +3229,50 @@ struct TransformBox: View {
         CGSize(width: -1, height: 1),  CGSize(width: 1, height: 1),
     ]
 
+    /// The grabber you SEE, and the target you can actually hit. Michael could not
+    /// grab a corner (fix-list C) partly because a 14pt square sitting exactly on the
+    /// canvas corner offers ~7pt of reachable area. The visual stays 14; the touch
+    /// target is 30 and invisible, so the handle looks the same and catches far more.
+    private let grabVisual: CGFloat = 14
+    private let grabTarget: CGFloat = 30
+
     var body: some View {
         // Guard: the active layer can be deleted while this box is still mounted,
         // leaving `index` pointing past the end of the array for one update pass.
         if index >= 0, index < document.layers.count {
-            let t = document.layers[index].transform
-            let isText = document.layers[index].textString != nil
-            // Hug the content's true shape (a cropped image is a rectangle, not a
-            // square) so the grabbers sit on the object, never orphaned at the canvas
-            // corners. contentSize is square for legacy layers (no contentAspect).
-            let cs = t.contentSize
+            let layer = document.layers[index]
+            let t = layer.transform
+            let isText = layer.textString != nil
             let ref = min(size.width, size.height)
-            let boxW = max(24, cs.width * ref)
-            let boxH = max(24, cs.height * ref)
-            let center = CGPoint(x: t.center.x * size.width, y: t.center.y * size.height)
+            // The square the canvas draws this layer into.
+            let side = ref * t.scale
+            let squareCenter = CGPoint(x: t.center.x * size.width, y: t.center.y * size.height)
+
+            // WHERE THE ART IS. A layer's transform describes a square; the picture
+            // inside it may be a small object floating in transparency — a Remove
+            // Background cutout keeps the layer's full size on purpose, so the square
+            // is the whole canvas while the subject is a lighthouse in the middle.
+            // Michael, 2026-08-21: "the selection was the full layer size and not the
+            // lighthouse pixels." Hug the opaque pixels, and the grabbers land ON the
+            // object instead of orphaned at the canvas corners (fix-list C and D).
+            //
+            // Fallback when there is nothing raster to measure (symbol, text, an empty
+            // layer): the whole square honouring contentAspect — exactly the old box.
+            let art = layer.artUnitRect ?? {
+                let cs = t.contentSize                       // fractions of `ref`
+                let w = t.scale > 0 ? cs.width / t.scale : 1  // → fractions of the square
+                let h = t.scale > 0 ? cs.height / t.scale : 1
+                return CGRect(x: (1 - w) / 2, y: (1 - h) / 2, width: w, height: h)
+            }()
+
+            let boxW = max(24, art.width * side)
+            let boxH = max(24, art.height * side)
+            let radians = t.rotationDegrees * .pi / 180
+            // The art's centre is offset from the square's centre whenever the picture
+            // does not sit dead centre in its layer — and that offset rotates with it.
+            let center = squareCenter.offsetBy(
+                rotate(CGSize(width: (art.midX - 0.5) * side,
+                              height: (art.midY - 0.5) * side), by: radians))
 
             // The movable box.
             Rectangle()
@@ -3273,9 +3303,12 @@ struct TransformBox: View {
             ForEach(Array(corners.enumerated()), id: \.offset) { _, off in
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.accentColor)
-                    .frame(width: 14, height: 14)
-                    .position(x: center.x + off.width * boxW / 2,
-                              y: center.y + off.height * boxH / 2)
+                    .frame(width: grabVisual, height: grabVisual)
+                    .frame(width: grabTarget, height: grabTarget)   // invisible margin
+                    .contentShape(Rectangle())
+                    .position(center.offsetBy(
+                        rotate(CGSize(width: off.width * boxW / 2,
+                                      height: off.height * boxH / 2), by: radians)))
                     .highPriorityGesture(
                         DragGesture(minimumDistance: 1, coordinateSpace: .named("canvas"))
                             .onChanged { value in
@@ -3300,11 +3333,33 @@ struct TransformBox: View {
                                     document.layers[index].transform.scale = min(max(max(nW, nH), 0.05), 4.0)
                                     document.layers[index].transform.contentAspect = min(max(nW / nH, 0.05), 20)
                                 } else {
-                                    // Non-text = uniform aspect-locked scale from center.
-                                    let half = max(abs(value.location.x - center.x),
-                                                   abs(value.location.y - center.y))
-                                    let newScale = min(max((half * 2) / ref, 0.1), 4.0)
-                                    document.layers[index].transform.scale = newScale
+                                    // Non-text = uniform aspect-locked scale, about the layer's
+                                    // own centre (which is what `scale` means).
+                                    //
+                                    // The grabbed corner sits at  squareCenter + scale * v,
+                                    // where v is fixed by which corner it is and where the art
+                                    // sits in the layer. So the scale that puts that corner
+                                    // nearest the pointer is the projection of the drag onto v.
+                                    // Solving it this way keeps the corner under the pointer
+                                    // even when the art is off-centre in its layer — the old
+                                    // max(|dx|,|dy|) assumed the box was the whole square.
+                                    let v = rotate(CGSize(
+                                        width: (art.midX - 0.5 + off.width * art.width / 2) * ref,
+                                        height: (art.midY - 0.5 + off.height * art.height / 2) * ref),
+                                                   by: radians)
+                                    let vv = v.width * v.width + v.height * v.height
+                                    let newScale: Double
+                                    if vv > 0.0001 {
+                                        let dx = value.location.x - squareCenter.x
+                                        let dy = value.location.y - squareCenter.y
+                                        newScale = (dx * v.width + dy * v.height) / vv
+                                    } else {
+                                        // Degenerate (no measurable art): the old behaviour.
+                                        let half = max(abs(value.location.x - squareCenter.x),
+                                                       abs(value.location.y - squareCenter.y))
+                                        newScale = (half * 2) / ref
+                                    }
+                                    document.layers[index].transform.scale = min(max(newScale, 0.1), 4.0)
                                 }
                             }
                             .onEnded { _ in startAnchor = nil }
@@ -3312,6 +3367,18 @@ struct TransformBox: View {
             }
         }
     }
+
+    /// Rotate an offset by `radians` (screen space: y grows downward).
+    private func rotate(_ s: CGSize, by radians: Double) -> CGSize {
+        guard radians != 0 else { return s }
+        let c = cos(radians), sn = sin(radians)
+        return CGSize(width: s.width * c - s.height * sn,
+                      height: s.width * sn + s.height * c)
+    }
+}
+
+private extension CGPoint {
+    func offsetBy(_ s: CGSize) -> CGPoint { CGPoint(x: x + s.width, y: y + s.height) }
 }
 
 /// Dims the canvas outside the crop rectangle (Photos-style) so you can see what
