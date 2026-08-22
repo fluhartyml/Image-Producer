@@ -2681,7 +2681,11 @@ private struct ToolPointer: ViewModifier {
         // ARROW, deliberately. Michael listed these as exceptions: they are driven from
         // the inspector and you never click the canvas with them, so a tool cursor over
         // the canvas would promise something the tool does not do.
-        case .imagePlayground, .canvas, .colorPalette, .text, .image, .cutout:
+        // Text places characters ON the canvas, so the I-beam is right — Michael put it
+        // back after the first pass moved it to the arrow.
+        case .text:       .horizontalText
+
+        case .imagePlayground, .canvas, .colorPalette, .image, .cutout:
             nil
         }
     }
