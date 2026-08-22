@@ -570,14 +570,16 @@ struct PaintBucketInspector: View {
         VStack(alignment: .leading, spacing: 16) {
             PaletteSwatchRow(document: document, color: $fillColor, label: "Fill color (from palette)")
 
-            if activeIsBackground {
+            if activeIsBackground || activeIsEmptyContent {
                 Button {
-                    fillActiveBackground()
+                    fillActiveLayer()
                 } label: {
                     Label("Fill Layer", systemImage: "drop.fill")
                 }
                 .buttonStyle(.borderedProminent)
-                Text("Or tap the canvas to pour.")
+                Text(activeIsBackground
+                     ? "Or tap the canvas to pour."
+                     : "Fills this layer edge to edge. Flood fill takes over once there is art to pour into.")
                     .font(.system(size: 18))
                     .foregroundStyle(.secondary)
             } else if activeHasImage {
@@ -600,12 +602,60 @@ struct PaintBucketInspector: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    private func fillActiveBackground() {
+    /// A CONTENT layer with nothing on it. It could take a whole-layer fill all along;
+    /// there was simply no branch for it.
+    private var activeIsEmptyContent: Bool {
+        guard let i = activeIndex else { return false }
+        guard case .content = document.layers[i].role else { return false }
+        return document.layers[i].elements.isEmpty
+    }
+
+    /// Whole-layer fill for EITHER a background layer or an empty content layer.
+    ///
+    /// Michael, 2026-08-22: "should not be constrained to light or dark layer only."
+    /// The Paint Bucket had two branches — whole-fill for Light/Dark, flood-fill for a
+    /// content layer with art — and an empty content layer fell between them, showing
+    /// a message and no button. Filling a blank layer with a flat colour is an ordinary
+    /// thing to want, and the constraint was arbitrary.
+    private func fillActiveLayer() {
         guard let i = activeIndex else { return }
         document.captureHistoryBaselineIfNeeded()
-        document.layers[i].setBackgroundFill(fillColor.hexString())
+
+        if activeIsBackground {
+            document.layers[i].setBackgroundFill(fillColor.hexString())
+            document.recordHistory(toolID: Tool.fill.rawValue, groupTitle: Tool.fill.title,
+                                   actionLabel: "Fill Background", layerID: document.layers[i].id)
+            return
+        }
+
+        // Content layer: a background layer stores a colour, but a content layer holds
+        // a raster — so the fill has to be rendered at canvas size.
+        guard let png = Self.solidPNG(color: fillColor, size: document.canvasPixelSize) else { return }
+        document.layers[i].setImage(png)
         document.recordHistory(toolID: Tool.fill.rawValue, groupTitle: Tool.fill.title,
-                               actionLabel: "Fill Background", layerID: document.layers[i].id)
+                               actionLabel: "Fill Layer", layerID: document.layers[i].id)
+    }
+
+    /// A flat rectangle of one colour, as PNG data.
+    private static func solidPNG(color: Color, size: CGSize) -> Data? {
+        let w = max(1, Int(size.width.rounded()))
+        let h = max(1, Int(size.height.rounded()))
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: space,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+
+        ctx.setFillColor(color.cgColorResolved)   // the project's existing cross-platform helper
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+
+        guard let cg = ctx.makeImage() else { return nil }
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil)
+        else { return nil }
+        CGImageDestinationAddImage(dest, cg, nil)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return data as Data
     }
 }
 
