@@ -171,9 +171,35 @@ struct ImagePlaygroundInspector: View {
     private func placeNewLayer(from url: URL) {
         guard let png = loadPNG(from: url) else { failed = true; return }
         failed = false
+
+        // SELECTING AN EMPTY LAYER IS AN INSTRUCTION. Michael, 2026-08-22, while
+        // building the Shell Citadel icon: he selected "Background", asked Image
+        // Playground for art, and got a fourth layer on top of his
+        // Foreground/Midground/Background stack instead. Choosing an empty slot means
+        // "put it HERE", and the app should read it that way.
+        //
+        // It still creates a NEW layer rather than writing into the selected one —
+        // his call, and the right one: the empty layer survives untouched, so this
+        // stays non-destructive and undo has something to fall back to. The name
+        // carries the slot so it is obvious which one it fills.
+        if let i = activeIndex,
+           case .content = document.layers[i].role,
+           document.layers[i].elements.isEmpty {
+            var layer = ImageLayer(name: slotLayerName(slot: document.layers[i].name), role: .content)
+            layer.setImage(png)
+            document.layers.insert(layer, at: i + 1)   // directly above the empty slot
+            return
+        }
+
         var layer = ImageLayer(name: layerName(from: prompt), role: .content)
         layer.setImage(png)
         document.layers.append(layer)   // end of array = top of the visual stack
+    }
+
+    /// "Background · a teal safe" — the slot it fills, then what made it.
+    private func slotLayerName(slot: String) -> String {
+        let t = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? "\(slot) · AI" : "\(slot) · \(String(t.prefix(18)))"
     }
 
     /// Filter result -> NON-DESTRUCTIVE: the AI edit lands on a new layer above the
