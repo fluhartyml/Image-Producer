@@ -2673,20 +2673,16 @@ private struct ToolPointer: ViewModifier {
         case .shape:      .image(Image(systemName: "square.on.circle"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
         case .path:       .image(Image(systemName: "point.topleft.down.to.point.bottomright.curvepath"),
                                  hotSpot: UnitPoint(x: 0.2, y: 0.2))
-        case .text:       .horizontalText
-
-        // Tools driven from the inspector. They still say what you are holding.
         case .move:       .image(Image(systemName: "arrow.up.and.down.and.arrow.left.and.right"),
                                  hotSpot: UnitPoint(x: 0.5, y: 0.5))
         case .zoom:       .image(Image(systemName: "magnifyingglass"), hotSpot: UnitPoint(x: 0.45, y: 0.45))
         case .symbol:     .image(Image(systemName: "star"),        hotSpot: UnitPoint(x: 0.5, y: 0.5))
-        case .image:      .image(Image(systemName: "photo"),       hotSpot: UnitPoint(x: 0.5, y: 0.5))
-        case .imagePlayground: .image(Image(systemName: "apple.image.playground"),
-                                      hotSpot: UnitPoint(x: 0.5, y: 0.5))
-        case .cutout:     .image(Image(systemName: "person.and.background.dotted"),
-                                 hotSpot: UnitPoint(x: 0.5, y: 0.5))
-        case .colorPalette: .image(Image(systemName: "paintpalette"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
-        case .canvas:     .image(Image(systemName: "photo.artframe"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
+
+        // ARROW, deliberately. Michael listed these as exceptions: they are driven from
+        // the inspector and you never click the canvas with them, so a tool cursor over
+        // the canvas would promise something the tool does not do.
+        case .imagePlayground, .canvas, .colorPalette, .text, .image, .cutout:
+            nil
         }
     }
     #endif
