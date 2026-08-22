@@ -570,19 +570,21 @@ struct PaintBucketInspector: View {
         VStack(alignment: .leading, spacing: 16) {
             PaletteSwatchRow(document: document, color: $fillColor, label: "Fill color (from palette)")
 
-            if activeIsBackground || activeIsEmptyContent {
-                Button {
-                    fillActiveLayer()
-                } label: {
-                    Label("Fill Layer", systemImage: "drop.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                Text(activeIsBackground
-                     ? "Or tap the canvas to pour."
-                     : "Fills this layer edge to edge. Flood fill takes over once there is art to pour into.")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
-            } else if activeHasImage {
+            // Fill Layer is ALWAYS available. It used to vanish the moment a layer had
+            // any art, which trapped Michael: he filled a blank layer, the panel flipped
+            // to flood-fill only, and the button he had just used was gone.
+            Button {
+                fillActiveLayer()
+            } label: {
+                Label("Fill Layer", systemImage: "drop.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            Text("Fills the whole layer, edge to edge.")
+                .font(.system(size: 18))
+                .foregroundStyle(.secondary)
+
+            if activeHasImage {
+                Divider()
                 Text("Flood fill — pour color up to the lines").font(.system(size: 18)).bold()
                 Text("Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
                     .font(.system(size: 18))
@@ -591,10 +593,6 @@ struct PaintBucketInspector: View {
                     Text("Tolerance  \(Int(pen.bucketTolerance))").font(.system(size: 18))
                     Slider(value: $pen.bucketTolerance, in: 0...160, step: 1)
                 }
-            } else {
-                Text("Select a background layer (Light or Dark) to fill it, or an image layer to flood-fill areas up to the lines.")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -621,42 +619,12 @@ struct PaintBucketInspector: View {
         guard let i = activeIndex else { return }
         document.captureHistoryBaselineIfNeeded()
 
-        if activeIsBackground {
-            document.layers[i].setBackgroundFill(fillColor.hexString())
-            document.recordHistory(toolID: Tool.fill.rawValue, groupTitle: Tool.fill.title,
-                                   actionLabel: "Fill Background", layerID: document.layers[i].id)
-            return
-        }
-
-        // Content layer: a background layer stores a colour, but a content layer holds
-        // a raster — so the fill has to be rendered at canvas size.
-        guard let png = Self.solidPNG(color: fillColor, size: document.canvasPixelSize) else { return }
-        document.layers[i].setImage(png)
+        guard document.fillLayerSolid(at: i, cgColor: fillColor.cgColorResolved) else { return }
         document.recordHistory(toolID: Tool.fill.rawValue, groupTitle: Tool.fill.title,
-                               actionLabel: "Fill Layer", layerID: document.layers[i].id)
+                               actionLabel: activeIsBackground ? "Fill Background" : "Fill Layer",
+                               layerID: document.layers[i].id)
     }
 
-    /// A flat rectangle of one colour, as PNG data.
-    private static func solidPNG(color: Color, size: CGSize) -> Data? {
-        let w = max(1, Int(size.width.rounded()))
-        let h = max(1, Int(size.height.rounded()))
-        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
-                                  bytesPerRow: 0, space: space,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-        else { return nil }
-
-        ctx.setFillColor(color.cgColorResolved)   // the project's existing cross-platform helper
-        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-
-        guard let cg = ctx.makeImage() else { return nil }
-        let data = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil)
-        else { return nil }
-        CGImageDestinationAddImage(dest, cg, nil)
-        guard CGImageDestinationFinalize(dest) else { return nil }
-        return data as Data
-    }
 }
 
 /// Units for the Canvas hub's dimensions / print-size readouts.
@@ -2685,18 +2653,40 @@ private struct ToolPointer: ViewModifier {
     }
 
     #if os(macOS)
+    /// EVERY tool gets its own pointer. Michael, 2026-08-22: "all of the tools should
+    /// change the arrow pointer to the respective tool pointer."
+    ///
+    /// The old version covered five tools and left the rest on the system arrow, on the
+    /// reasoning that panel-only tools never click the canvas. But the cursor is how you
+    /// know which tool you are holding — leaving it an arrow makes the app look like
+    /// nothing is selected, whichever tool it is. Each pointer uses that tool's own
+    /// toolbar symbol, so the cursor and the button always match.
     static func style(for tool: Tool) -> PointerStyle? {
         switch tool {
+        // Tools you click the canvas with — hot spot placed at the working tip.
         case .fill:       .image(Image(systemName: "drop.fill"),   hotSpot: UnitPoint(x: 0.5, y: 1.0))
         case .pen:        .image(Image(systemName: "pencil.tip"),  hotSpot: UnitPoint(x: 0.2, y: 0.9))
         case .eraser:     .image(Image(systemName: "eraser.fill"), hotSpot: UnitPoint(x: 0.5, y: 0.6))
         case .eyedropper: .image(Image(systemName: "eyedropper"),  hotSpot: UnitPoint(x: 0.15, y: 0.9))
-        case .text:       .horizontalText
-        // The magic lasso pointer went to the tool you actually click the canvas with.
-        // Remove Background is a button — it never needs a canvas cursor.
         case .magicLasso: .image(Image(systemName: "lasso.badge.sparkles"),
                                  hotSpot: UnitPoint(x: 0.5, y: 0.55))
-        default:          nil   // Move / Zoom / Symbol / Image / etc. → system arrow
+        case .shape:      .image(Image(systemName: "square.on.circle"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        case .path:       .image(Image(systemName: "point.topleft.down.to.point.bottomright.curvepath"),
+                                 hotSpot: UnitPoint(x: 0.2, y: 0.2))
+        case .text:       .horizontalText
+
+        // Tools driven from the inspector. They still say what you are holding.
+        case .move:       .image(Image(systemName: "arrow.up.and.down.and.arrow.left.and.right"),
+                                 hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        case .zoom:       .image(Image(systemName: "magnifyingglass"), hotSpot: UnitPoint(x: 0.45, y: 0.45))
+        case .symbol:     .image(Image(systemName: "star"),        hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        case .image:      .image(Image(systemName: "photo"),       hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        case .imagePlayground: .image(Image(systemName: "apple.image.playground"),
+                                      hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        case .cutout:     .image(Image(systemName: "person.and.background.dotted"),
+                                 hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        case .colorPalette: .image(Image(systemName: "paintpalette"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        case .canvas:     .image(Image(systemName: "photo.artframe"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
         }
     }
     #endif
@@ -2748,9 +2738,19 @@ struct CanvasView: View {
                                    layerID: document.layers[idx].id)
             return
         }
+        // A blank content layer: tapping a bucket on empty canvas should pour, not do
+        // nothing. Michael: "i cant tap the paint drip choose a color and then tap a
+        // (blank) area on the canvas".
         guard let png = activeImagePNG,
               let src = CGImageSourceCreateWithData(png as CFData, nil),
-              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return }
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
+            document.captureHistoryBaselineIfNeeded()
+            if document.fillLayerSolid(at: idx, cgColor: fillColor.cgColorResolved) {
+                document.recordHistory(toolID: Tool.fill.rawValue, groupTitle: Tool.fill.title,
+                                       actionLabel: "Fill Layer", layerID: document.layers[idx].id)
+            }
+            return
+        }
         let t = document.layers[idx].transform
         let canvasPt = CGPoint(x: n.x * canvas.width, y: n.y * canvas.height)
         guard let seed = imagePixel(forCanvasPoint: canvasPt, canvas: canvas, transform: t,
