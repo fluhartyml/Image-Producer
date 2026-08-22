@@ -2664,7 +2664,9 @@ private struct ToolPointer: ViewModifier {
     static func style(for tool: Tool) -> PointerStyle? {
         switch tool {
         // Tools you click the canvas with — hot spot placed at the working tip.
-        case .fill:       .image(Image(systemName: "drop.fill"),   hotSpot: UnitPoint(x: 0.5, y: 1.0))
+        // The drop's POINT is at the top of the glyph, not the bottom — that is the tip
+        // you aim with. Michael: "the hot point should be the top pointy part of the drip".
+        case .fill:       .image(Image(systemName: "drop.fill"),   hotSpot: UnitPoint(x: 0.5, y: 0.0))
         case .pen:        .image(Image(systemName: "pencil.tip"),  hotSpot: UnitPoint(x: 0.2, y: 0.9))
         case .eraser:     .image(Image(systemName: "eraser.fill"), hotSpot: UnitPoint(x: 0.5, y: 0.6))
         case .eyedropper: .image(Image(systemName: "eyedropper"),  hotSpot: UnitPoint(x: 0.15, y: 0.9))
