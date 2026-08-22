@@ -47,15 +47,43 @@ extension ImageDocument {
 
         layers[index].setImage(png)
 
-        // Cover the canvas exactly. Without the aspect, `contentAspect == nil` means
-        // "square" and the fill is laid out as a square — the half-size rectangle bug.
         var t = layers[index].transform
-        t.contentAspect = canvasHeight == 0 ? 1 : Double(canvasWidth) / Double(canvasHeight)
-        t.scale = 1.0
+        t.contentAspect = canvasAspect
+        t.scale = coverScale
         t.center = CGPoint(x: 0.5, y: 0.5)
         t.rotationDegrees = 0
         layers[index].transform = t
         return true
+    }
+
+    /// Width ÷ height of the canvas.
+    var canvasAspect: Double {
+        canvasHeight == 0 ? 1 : Double(canvasWidth) / Double(canvasHeight)
+    }
+
+    /// The `transform.scale` that makes canvas-shaped content cover the canvas exactly.
+    ///
+    /// WHY THIS IS NOT SIMPLY 1.0, which is the assumption that produced the half-size
+    /// fill Michael found: layer geometry measures everything as a fraction of
+    /// `min(canvasWidth, canvasHeight)` — the SHORT edge. On a square canvas the short
+    /// edge IS the canvas, so `scale = 1.0` covers it and the assumption survives. On his
+    /// 1024×512 banner the unit is 512, so 1.0 covers only half the width, and the fill
+    /// rendered at half size in the middle of the canvas.
+    ///
+    /// Working it through: content is drawn `contentSize × ref` points, and for a
+    /// landscape aspect `a`, `contentSize.width == scale`. To draw the full width,
+    /// `scale × ref == canvasWidth`, so `scale == canvasWidth / ref == a`. Portrait is
+    /// the mirror image, giving `1/a`. Both collapse to the long-to-short ratio.
+    ///
+    /// This uses the model's real unit rather than resizing anything after the fact —
+    /// Michael's objection to the quick fix was exactly that, and he was right.
+    ///
+    /// The deeper item is still open: `scale` READING as "fraction of the canvas" when it
+    /// means "fraction of the short edge" is a trap, and correcting it means migrating
+    /// every saved document so existing art does not move. Not today's job.
+    var coverScale: Double {
+        let a = canvasAspect
+        return max(a, 1 / max(a, 0.000_001))
     }
 
     /// A flat rectangle of one colour, as PNG data.
