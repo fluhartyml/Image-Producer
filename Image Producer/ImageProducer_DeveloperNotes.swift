@@ -1340,3 +1340,49 @@
 //    recurring; English-only / Americas-only. Not decided, just the default.
 //
 
+//  ============================================================================
+//  REQUESTED 2026-08-23 (Michael, dictated from his front porch) — NOT BUILT
+//  ============================================================================
+//
+//  Three features, recorded as asked. Nothing here is designed or started; this
+//  is the ask in his words plus what it implies, so it survives the session.
+//
+//  His words: "i want to add a layrr mask tool and im the layer mask i want it
+//  to be mon destructive but i want it to have a button in the tool inspecter
+//  labled cookie cutter ofe so it makes a new layer with the mask made
+//  perminant and i want a feature to be a share sheey to share an individual
+//  layer as an image"
+//
+//  R1. LAYER MASK TOOL — non-destructive.
+//      A mask hides parts of a layer without touching its pixels. The layer's
+//      raster is untouched; the mask is separate, editable, and reversible at
+//      any time. This is the "intuitive logic" pattern again — it is what he
+//      already assumes a mask is, and it is what every other editor does.
+//      Implies: a mask lives on the layer (so it saves and syncs with the
+//      document), it is paintable with the tools that already exist, and the
+//      Move box and LayerArtBounds have to reckon with the MASKED extent rather
+//      than the raw art. That last part is where this touches today's geometry.
+//
+//  R2. "COOKIE CUTTER" BUTTON — in the tool inspector, bakes the mask.
+//      Makes a NEW layer with the mask made permanent. Note the shape of it:
+//      the destructive result goes somewhere new and the masked original stays.
+//      Same rule he set for the Image Playground filter on 2026-08-22 — the
+//      result lands beside the source, never on top of it, so undo always has
+//      something to fall back to. He is consistent about this; treat it as a
+//      standing principle for anything that bakes.
+//      addResultLayer(_:above:nameSuffix:transform:) is the existing door.
+//      ⚠️ UNCLEAR: his label reads "cookie cutter ofe". The intended label is
+//      almost certainly "Cookie Cutter" — the trailing word was not resolved.
+//      ASK before it goes on a button; do not guess a label onto his UI.
+//
+//  R3. SHARE AN INDIVIDUAL LAYER AS AN IMAGE — share sheet.
+//      One layer, not the composite. Implies rendering that layer alone (which
+//      startFilter() in ImagePlaygroundTool.swift already does, into a solo
+//      ImageDocument) and handing the PNG to a share sheet — ShareLink on
+//      macOS, the iOS sheet on iPhone/iPad, same split Memory Aid LockBox uses.
+//      Open, and his call: does a shared layer carry its mask applied, its
+//      transform applied, and is it canvas-sized or cropped to the art?
+//
+//  Order is not set. R3 is the smallest and stands alone; R1 and R2 are one
+//  feature in two halves and R2 cannot exist before R1.
+//
