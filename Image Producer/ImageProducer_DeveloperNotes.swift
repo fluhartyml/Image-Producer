@@ -1373,12 +1373,22 @@
 //      addResultLayer(_:above:nameSuffix:transform:) is the existing door.
 //      LABEL, confirmed by him 2026-08-23: "Cookie Cutter Mode". Not "Cookie
 //      Cutter" — the word MODE is his and it stays on the button.
-//      Worth noticing what the word implies, without deciding it for him: a
-//      MODE is a state you are in, not a one-shot action. His sentence
-//      describes an action ("so it makes a new layer"), so the two readings
-//      are (a) a button that cuts once, named for the thing it does, or
-//      (b) a mode where the mask cuts through, as against the normal
-//      non-destructive one. He answered the label question, not this one.
+//      RESOLVED by him the same day, and it is better than either reading I
+//      had: "the button press IS the mode. when the button is released — on
+//      button up — the mode is over and the new layer has been created."
+//      So the mode lasts exactly as long as the press. Hold it down and you
+//      SEE the cut; let go and it is baked to a new layer. The word MODE is
+//      literal, and the duration of the mode is the duration of the finger.
+//      What follows from it, none of it needing a decision:
+//        - It is a live preview while held. The paint bucket already previews
+//          on hover, so the app has the shape for this.
+//        - There is no separate confirm step and no dialog. Releasing IS the
+//          confirm, which is why the preview has to be honest.
+//        - Cancel comes free from the platform: dragging off a button before
+//          release cancels it on both iOS and macOS. So peeking without
+//          committing already works and needs nothing built.
+//        - Undo has something to fall back to regardless, because the bake
+//          goes to a NEW layer and the masked original is untouched.
 //
 //  R3. SHARE AN INDIVIDUAL LAYER AS AN IMAGE — share sheet.
 //      One layer, not the composite. Implies rendering that layer alone (which
