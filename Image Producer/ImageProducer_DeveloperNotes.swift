@@ -1371,9 +1371,14 @@
 //      something to fall back to. He is consistent about this; treat it as a
 //      standing principle for anything that bakes.
 //      addResultLayer(_:above:nameSuffix:transform:) is the existing door.
-//      ⚠️ UNCLEAR: his label reads "cookie cutter ofe". The intended label is
-//      almost certainly "Cookie Cutter" — the trailing word was not resolved.
-//      ASK before it goes on a button; do not guess a label onto his UI.
+//      LABEL, confirmed by him 2026-08-23: "Cookie Cutter Mode". Not "Cookie
+//      Cutter" — the word MODE is his and it stays on the button.
+//      Worth noticing what the word implies, without deciding it for him: a
+//      MODE is a state you are in, not a one-shot action. His sentence
+//      describes an action ("so it makes a new layer"), so the two readings
+//      are (a) a button that cuts once, named for the thing it does, or
+//      (b) a mode where the mask cuts through, as against the normal
+//      non-destructive one. He answered the label question, not this one.
 //
 //  R3. SHARE AN INDIVIDUAL LAYER AS AN IMAGE — share sheet.
 //      One layer, not the composite. Implies rendering that layer alone (which
