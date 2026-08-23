@@ -157,10 +157,17 @@ extension ImageDocument {
     /// (Crop / AI Filter / Magic Eraser) preserves the source this way. Returns the new
     /// layer's id (e.g. so the caller can set its transform).
     @discardableResult
-    func addResultLayer(_ png: Data, above sourceIndex: Int, nameSuffix: String) -> ImageLayer.ID? {
+    /// `transform` places the result. Pass one when the result must land somewhere
+    /// specific — an Image Playground restyle inherits the source layer's placement so
+    /// the art does not jump, and a canvas-filling result gets `coveringTransform`.
+    /// Leaving it nil keeps the layer's default placement, which is what the pixel
+    /// operations (cutout, crop, erase, lasso) have always used.
+    func addResultLayer(_ png: Data, above sourceIndex: Int, nameSuffix: String,
+                        transform: LayerTransform? = nil) -> ImageLayer.ID? {
         guard layers.indices.contains(sourceIndex) else { return nil }
         var layer = ImageLayer(name: "\(layers[sourceIndex].name) (\(nameSuffix))", role: .content)
         layer.setImage(png)
+        if let transform { layer.transform = transform }
         layers[sourceIndex].isVisible = false        // keep the original, just hidden
         layers.insert(layer, at: sourceIndex + 1)    // directly above the source
         return layer.id
@@ -446,6 +453,18 @@ struct LayerTransform: Codable {
     /// saved before crop set it. Lets the Move box hug a non-square object and lets
     /// Fit/Fill snap it to the canvas with the right geometry.
     var contentAspect: Double? = nil
+
+    /// True when nothing has ever placed this layer — the transform is still exactly as
+    /// constructed. Used to tell "the user put it here" apart from "no one has decided
+    /// yet", because on a non-square canvas the default is not a neutral placement: it
+    /// draws at the SHORT edge, i.e. half width on a 2:1 banner.
+    var isUntouchedDefault: Bool {
+        contentAspect == nil
+        && rotationDegrees == 0
+        && abs(scale - 1.0) < 0.000_001
+        && abs(center.x - 0.5) < 0.000_001
+        && abs(center.y - 0.5) < 0.000_001
+    }
 
     /// The content's displayed size as a fraction of the canvas edge (width, height),
     /// honoring `contentAspect`. `scale` drives the limiting (larger) dimension; the

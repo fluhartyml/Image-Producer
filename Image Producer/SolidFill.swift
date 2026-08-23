@@ -82,8 +82,66 @@ extension ImageDocument {
     /// means "fraction of the short edge" is a trap, and correcting it means migrating
     /// every saved document so existing art does not move. Not today's job.
     var coverScale: Double {
-        let a = canvasAspect
-        return max(a, 1 / max(a, 0.000_001))
+        coverScale(forAspect: canvasAspect)
+    }
+
+    /// The `transform.scale` that makes content of aspect `a` (width ÷ height) cover the
+    /// canvas completely — the general form of `coverScale`, which is this with the
+    /// canvas's own aspect.
+    ///
+    /// WHY IT IS NEEDED SEPARATELY: an element is drawn into a SQUARE box of side
+    /// `ref × scale` (`ref` = the canvas's SHORT edge) and then `.scaledToFit()` inside
+    /// it, so the art's own aspect decides which of the box's dimensions it actually
+    /// fills. Content that is not canvas-shaped — an Image Playground result, an import —
+    /// therefore needs a different scale from a canvas-shaped fill to cover the same
+    /// canvas.
+    ///
+    /// Working it through: fitted into a square of side `S`, art of aspect `a` draws
+    /// `S × S/a` when `a ≥ 1` and `S·a × S` when `a < 1`. Covering a `W × H` canvas needs
+    /// a drawn box at least `W` wide and `H` tall, i.e. a width of `max(W, a·H)`; convert
+    /// that width back to the square's side and divide by `ref`.
+    func coverScale(forAspect a: Double) -> Double {
+        let aspect = max(a, 0.000_001)
+        let w = Double(max(1, canvasWidth))
+        let h = Double(max(1, canvasHeight))
+        let ref = min(w, h)
+        let drawnWidth = max(w, aspect * h)
+        let side = aspect >= 1 ? drawnWidth : drawnWidth / aspect
+        return side / ref
+    }
+
+    /// The transform to give a layer that has just been handed `png` and is meant to
+    /// FILL the canvas: the art's real aspect, a scale that covers, centred, unrotated.
+    ///
+    /// Michael, 2026-08-23, on a 1024×512 banner after Filter → Edit Current Layer:
+    /// *"it didnt fill the whole canvas with the filter."* Generated art arrived on a
+    /// layer with the default transform — `scale = 1.0`, `contentAspect = nil` — and
+    /// 1.0 means the SHORT edge, so it drew at half the banner's width. Same root cause
+    /// as the half-size paint-bucket fill; this is the same fix applied at the other
+    /// door, and it uses the model's real unit rather than resizing anything afterwards.
+    ///
+    /// `contentAspect` is set from the actual pixels so the Move box hugs the art and
+    /// `contentSize` is honest. Falls back to a canvas-shaped cover when the PNG cannot
+    /// be measured — never to the silent half-size default.
+    func coveringTransform(forPNG png: Data) -> LayerTransform {
+        var t = LayerTransform()
+        let aspect = Self.pixelAspect(ofPNG: png) ?? canvasAspect
+        t.contentAspect = aspect
+        t.scale = coverScale(forAspect: aspect)
+        t.center = CGPoint(x: 0.5, y: 0.5)
+        t.rotationDegrees = 0
+        return t
+    }
+
+    /// Width ÷ height of a PNG, read from the image header — no full decode.
+    static func pixelAspect(ofPNG png: Data) -> Double? {
+        guard let source = CGImageSourceCreateWithData(png as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let w = props[kCGImagePropertyPixelWidth] as? Double,
+              let h = props[kCGImagePropertyPixelHeight] as? Double,
+              w > 0, h > 0
+        else { return nil }
+        return w / h
     }
 
     /// A flat rectangle of one colour, as PNG data.

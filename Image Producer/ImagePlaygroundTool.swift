@@ -187,12 +187,14 @@ struct ImagePlaygroundInspector: View {
            document.layers[i].elements.isEmpty {
             var layer = ImageLayer(name: slotLayerName(slot: document.layers[i].name), role: .content)
             layer.setImage(png)
+            layer.transform = document.coveringTransform(forPNG: png)
             document.layers.insert(layer, at: i + 1)   // directly above the empty slot
             return
         }
 
         var layer = ImageLayer(name: layerName(from: prompt), role: .content)
         layer.setImage(png)
+        layer.transform = document.coveringTransform(forPNG: png)
         document.layers.append(layer)   // end of array = top of the visual stack
     }
 
@@ -208,7 +210,28 @@ struct ImagePlaygroundInspector: View {
         guard let png = loadPNG(from: url), let i = activeIndex,
               case .content = document.layers[i].role else { failed = true; return }
         failed = false
-        document.addResultLayer(png, above: i, nameSuffix: "AI edit")
+
+        // A RESTYLE MUST NOT MOVE THE ART. The result inherits the source layer's
+        // placement — scale, centre, rotation — so the only thing that changes is how
+        // the art looks. Only `contentAspect` is re-read, from the returned pixels,
+        // because Image Playground does not promise to hand back the source's shape.
+        //
+        // Michael, 2026-08-23: "i used filter-> edit current layer and it didnt fill the
+        // whole canvas with the filter." Without this the result took the DEFAULT
+        // transform — scale 1.0, which means the canvas's SHORT edge — so on his
+        // 1024×512 banner it drew at half the width no matter where the source sat.
+        // THE ONE EXCEPTION: a layer still sitting at the untouched default is not a
+        // placement decision, it is the ABSENCE of one — and on a non-square canvas that
+        // default is the half-size bug itself. Restyling such a layer would inherit the
+        // fault and reproduce exactly what he reported. So an unplaced source gets the
+        // covering transform; a source he has actually moved or scaled is left alone.
+        var t = document.layers[i].transform
+        if t.isUntouchedDefault {
+            t = document.coveringTransform(forPNG: png)
+        } else {
+            t.contentAspect = ImageDocument.pixelAspect(ofPNG: png) ?? t.contentAspect
+        }
+        document.addResultLayer(png, above: i, nameSuffix: "AI edit", transform: t)
     }
 
     /// The sheet hands back a file URL to the generated image (not necessarily PNG);
