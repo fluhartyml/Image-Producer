@@ -191,10 +191,12 @@ struct ProductionPiP: View {
     /// The canvas display rect's size — corners are the CANVAS's, not the window's.
     let bounds: CGSize
 
-    /// Persisted: which corner, and how big. Defaults to bottom-LEADING because the
-    /// canvas zoom controls already live bottom-trailing.
+    /// Persisted: which corner. Defaults to bottom-LEADING because the canvas zoom
+    /// controls already live bottom-trailing.
     @AppStorage("ip.pip.corner") private var cornerRaw: Int = PiPCorner.bottomLeading.rawValue
-    @AppStorage("ip.pip.side") private var storedSide: Double = 96
+
+    /// ONE size. Not stored, not adjustable — see the caption note in `body`.
+    private let storedSide: Double = 96
 
     @State private var drag: CGSize = .zero
     @State private var dragging = false
@@ -204,9 +206,14 @@ struct ProductionPiP: View {
     private var home: CGPoint { corner.point(in: bounds, panel: side) }
 
     var body: some View {
-        // No caption. Michael, 2026-08-24: "i like the one size so the 64 128 256
-        // caption should be blank." A size readout on a fixed-size reference panel
-        // is chrome describing something that never changes.
+        // NO CAPTION, and his reasoning is the point — Michael, 2026-08-24:
+        //   "i figured it already stays one size and instead of changing the PiP
+        //    size we remove the caption so the user doesnt think its a bug"
+        // The panel was always going to be one size. Printing "96 pt" on it implies
+        // the number is a property you can change, so when it does not, the app
+        // looks BROKEN. He diagnosed a PERCEIVED bug, not a real one.
+        // RULE: do not display a value the user cannot change and does not need.
+        // It reads as a control that is failing.
         ProductionThumbnail(document: document, side: side)
             .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
@@ -233,13 +240,6 @@ struct ProductionPiP: View {
                     }
                 }
         )
-        // Size cycles on double-click. No chrome — a control panel on a floating
-        // reference would be more UI than the thing it is referencing.
-        .onTapGesture(count: 2) {
-            withAnimation(.easeOut(duration: 0.15)) {
-                storedSide = storedSide >= 160 ? 64 : storedSide + 32
-            }
-        }
-        .help("Production preview — drag to any corner, double-click to resize. Never follows the canvas zoom.")
+        .help("Production preview — drag it to any corner. Never follows the canvas zoom.")
     }
 }
