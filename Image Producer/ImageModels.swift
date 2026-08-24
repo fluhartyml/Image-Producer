@@ -312,6 +312,30 @@ extension ImageDocument {
         historyCursor = .latest
     }
 
+    /// Remove ONE step from the trail and nothing else. The canvas is not touched.
+    ///
+    /// Michael, 2026-08-24: "restore does keep this step and deletes newer and the other
+    /// option in the right click is delete this history line only". So the two menu items
+    /// are now genuinely complementary — one changes the PICTURE, the other only tidies
+    /// the LIST.
+    ///
+    /// This is safe because every action stores a COMPLETE `DocumentSnapshot`, not a diff.
+    /// Removing one from the middle leaves every other snapshot valid on its own; the trail
+    /// simply no longer offers that particular state to return to.
+    ///
+    /// The live document is deliberately left alone — deleting a list row should never
+    /// change what is on screen. If the cursor was sitting ON the deleted step it falls
+    /// back to `.latest`, since the state it pointed at no longer exists.
+    func deleteHistoryStep(entry e: Int, action a: Int) {
+        guard history.entries.indices.contains(e),
+              history.entries[e].actions.indices.contains(a) else { return }
+        history.entries[e].actions.remove(at: a)
+        if history.entries[e].actions.isEmpty { history.entries.remove(at: e) }
+        if case .at(let ce, let ca) = historyCursor, ce == e, ca == a {
+            historyCursor = .latest
+        }
+    }
+
     /// COMMIT from the "Original" row: drop every recorded entry, back to the pre-edit state.
     func deleteHistoryFromBaseline() {
         history.entries.removeAll()

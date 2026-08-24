@@ -2141,11 +2141,15 @@ struct HistoryPanel: View {
                                             clampActiveLayer()
                                         },
                                         deleteEntry: {
-                                            document.deleteHistory(fromEntry: eIdx, action: 0)
+                                            // Whole group = every action it holds, newest
+                                            // first so the indices stay valid.
+                                            for a in stride(from: entry.actions.count - 1, through: 0, by: -1) {
+                                                document.deleteHistoryStep(entry: eIdx, action: a)
+                                            }
                                             clampActiveLayer()
                                         },
                                         deleteAction: { aIdx in
-                                            document.deleteHistory(fromEntry: eIdx, action: aIdx)
+                                            document.deleteHistoryStep(entry: eIdx, action: aIdx)
                                             clampActiveLayer()
                                         },
                                         restoreEntry: {
@@ -2239,14 +2243,16 @@ private struct HistoryEntryRow: View {
             .font(.system(size: 16, weight: groupHoldsCursor ? .semibold : .regular))
             .opacity(groupAhead ? 0.4 : 1)
             .contextMenu {
-                // Two choices, and they land on DIFFERENT states — Michael 2026-08-24.
-                // "Restore from" keeps this step; "Delete" drops it too.
+                // Two choices that do genuinely different jobs — Michael 2026-08-24:
+                // "restore does keep this step and deletes newer and the other option in
+                // the right click is delete this history line only". RESTORE changes the
+                // picture; DELETE only tidies the list and leaves the canvas alone.
                 Button(action: restoreEntry) {
                     Label("Restore from This Step", systemImage: "clock.arrow.circlepath")
                 }
                 Divider()
                 Button(role: .destructive, action: deleteEntry) {
-                    Label("Delete This Step and Newer", systemImage: "trash")
+                    Label("Delete This Step", systemImage: "trash")
                 }
             }
 
@@ -2279,7 +2285,7 @@ private struct HistoryEntryRow: View {
                         }
                         Divider()
                         Button(role: .destructive) { deleteAction(aIdx) } label: {
-                            Label("Delete This Step and Newer", systemImage: "trash")
+                            Label("Delete This Step", systemImage: "trash")
                         }
                     }
                 }
