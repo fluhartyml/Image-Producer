@@ -67,7 +67,7 @@ struct ProductionThumbnail: View {
         .frame(width: side, height: side)
         .clipped()
         .overlay(Rectangle().stroke(.secondary.opacity(0.35), lineWidth: 1))
-        .accessibilityLabel("Production icon preview, \(Int(side)) points")
+        .accessibilityLabel("Production icon preview at \(Int(side)) points")
     }
 }
 
@@ -103,14 +103,20 @@ struct ZoomInspector: View {
             Toggle("Floating preview", isOn: $showProductionPiP)
                 .toggleStyle(.switch)
             Text("Keeps the production preview on the canvas with ANY tool active — "
-                 + "drag it to any corner, double-click to resize.")
+                 + "drag it to any corner.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
-            Text("Actual Size")
+            // NOT "Actual Size" — Michael caught it, 2026-08-24: "the lable 'actual
+            // size' is incorrect because the canvas is a lot larger". He is right:
+            // ACTUAL SIZE means 1:1 with the DOCUMENT, and his canvas is 1024 while
+            // this is 128. What it shows is the icon at the size someone will SEE it,
+            // which is the opposite. R2 already had the right word — it calls this a
+            // "REAL-TIME PRODUCTION-ICON THUMBNAIL" — so use his.
+            Text("Production Preview")
                 .font(.headline)
 
             ProductionThumbnail(document: document, side: side)
@@ -119,6 +125,9 @@ struct ZoomInspector: View {
 
             Text("Small sizes")
                 .font(.subheadline.weight(.semibold))
+            Text("How it lands where icons are smallest — 16 is a Finder list row.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             HStack(alignment: .bottom, spacing: 14) {
                 ForEach(checkSizes, id: \.self) { s in
