@@ -2707,50 +2707,68 @@ struct CanvasView: View {
     /// canvas expression is already at the Swift type-checker's limit, and inlining
     /// even this much broke the build with "unable to type-check in reasonable
     /// time". Anything further added to the canvas should come out here too.
-    /// Commit the pen's raster to the active layer — but NEVER over the top of art
-    /// that is not pixels.
+    /// Commit a pen stroke — as a NEW LAYER, every time.
     ///
-    /// THE BUG THIS FIXES, found by Michael on 2026-08-24 while testing: he placed a
-    /// star symbol on Foreground, switched to the Pen, drew one stroke, and the star
-    /// was GONE. `ImageLayer.setPixels` REPLACES the whole elements array, so the
-    /// first stroke silently destroyed the symbol. No warning, and every other
-    /// destructive op in this app keeps the original.
+    /// THE BUG THIS STARTED FROM, found by Michael 2026-08-24: he placed a star on
+    /// Foreground, switched to the Pen, drew one stroke, and the star was GONE.
+    /// `ImageLayer.setPixels` REPLACES the elements array, so the first stroke
+    /// silently destroyed the symbol — with no warning and no undo, in an app where
+    /// every other destructive op keeps the original.
     ///
-    /// His fix, and it is the right one: "the first pixel should have created a copy
-    /// new layer foreground (pixels)". So the FIRST stroke onto a layer holding
-    /// non-pixel art forks a new layer named "<name> (pixels)" directly above it and
-    /// moves the pen there. Every stroke after that lands on the pixel layer, so this
-    /// does NOT spawn a layer per stroke.
+    /// HIS RULE, and he had to give it to me twice because I argued the second half
+    /// down as "a layer per stroke — wrong":
+    ///   1. "the first pixel should have created a copy new layer foreground (pixels)"
+    ///   2. "and every time you start a new pixel stroke it should make a new copy and
+    ///      (layer x) to keep it non distructive and reversable"
     ///
-    /// NOTE the difference from `addResultLayer`: that helper HIDES the source, which
-    /// is right for Apply-style operations. It is wrong here — the pixel-grid note in
-    /// this file says the layer below "shows through, for tracing", and tracing needs
-    /// the original visible. So the fork is done inline and the source stays on.
+    /// So EVERY stroke forks. Foreground → "Foreground (pixels)" → "(pixels 2)" →
+    /// "(pixels 3)". The previous PIXEL layer is hidden as each new one lands, so the
+    /// stack does not double-draw; unhide any earlier one to step back to it. The
+    /// ORIGINAL ART layer is never hidden — the pixel-grid note in this file says the
+    /// layer below "shows through, for tracing", and tracing needs it visible.
+    ///
+    /// Yes, this makes a lot of layers. That is the cost of being reversible, and it
+    /// is the same mantra as the other Applies ("original kept + hidden — there's no
+    /// undo"). His call, twice.
     @MainActor private func commitPenPixels(_ data: Data, actionLabel: String) {
         guard let i = activeIndex, document.layers.indices.contains(i) else { return }
         document.captureHistoryBaselineIfNeeded()   // before the edit
 
-        let holdsPixels = document.layers[i].pixelData != nil
-        let holdsOtherArt = !holdsPixels && !document.layers[i].elements.isEmpty
+        let source = document.layers[i]
+        let sourceHoldsPixels = source.pixelData != nil
 
-        if holdsOtherArt {
-            var fork = ImageLayer(name: "\(document.layers[i].name) (pixels)", role: .content)
-            fork.setPixels(data)
-            fork.transform = document.layers[i].transform     // sit exactly over the art
-            document.layers.insert(fork, at: i + 1)           // directly above the source
-            activeLayerID = fork.id                           // the pen follows the fork
-            document.recordHistory(toolID: Tool.pen.rawValue,
-                                   groupTitle: Tool.pen.title,
-                                   actionLabel: actionLabel,
-                                   layerID: fork.id)
-            return
+        // Naming is HIS — "(Pixel X)", capital, SINGULAR, always numbered
+        // (Michael 2026-08-24: "or not layerx but (Pixel X)" … "i think your singular
+        // (pixel) should be good"). So: Foreground (Pixel 1), (Pixel 2), (Pixel 3).
+        //
+        // Strip any existing "(Pixel n)" first so forks never compound into
+        // "Foreground (Pixel 1) (Pixel 2)".
+        var base = source.name
+        if let r = base.range(of: #" \(Pixel \d+\)$"#, options: .regularExpression) {
+            base.removeSubrange(r)
         }
 
-        document.layers[i].setPixels(data)
+        // Next free number in this family.
+        var n = 1
+        let taken = Set(document.layers.map(\.name))
+        func name(_ k: Int) -> String { "\(base) (Pixel \(k))" }
+        while taken.contains(name(n)) { n += 1 }
+
+        var fork = ImageLayer(name: name(n), role: .content)
+        fork.setPixels(data)
+        fork.transform = source.transform          // sit exactly over what it came from
+
+        // Hide the layer we forked FROM only when it was itself a pixel layer — two
+        // rasters of the same drawing stacked would double-draw. An art layer (symbol,
+        // text, image) stays visible so it can be traced.
+        if sourceHoldsPixels { document.layers[i].isVisible = false }
+
+        document.layers.insert(fork, at: i + 1)    // directly above
+        activeLayerID = fork.id                    // the pen follows the newest layer
         document.recordHistory(toolID: Tool.pen.rawValue,
                                groupTitle: Tool.pen.title,
                                actionLabel: actionLabel,
-                               layerID: document.layers[i].id)
+                               layerID: fork.id)
     }
 
     /// The canvas's preview overlays, factored OUT of `body`. That ZStack had
