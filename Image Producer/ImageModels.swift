@@ -287,6 +287,31 @@ extension ImageDocument {
         historyCursor = .latest
     }
 
+    /// COMMIT, keeping the chosen step: restore the state THIS action produced and drop
+    /// only what came after it.
+    ///
+    /// The distinction matters and it is the one Michael caught on 2026-08-24:
+    /// `deleteHistory(fromEntry:action:)` drops the chosen action TOO, landing you one
+    /// step EARLIER than the row you clicked. Phrased as "delete this and everything
+    /// after", that reads as housekeeping — nobody opens the menu wanting to delete
+    /// rows, they want to put the picture back. His words: "i think it should say two
+    /// choices, delete history row or restore from this history row".
+    ///
+    /// So the menu now offers both, and they land on different states:
+    ///   Restore from this row -> THIS function   (keep the step, drop what follows)
+    ///   Delete this row       -> deleteHistory   (drop the step as well)
+    func restoreHistory(toEntry e: Int, action a: Int) {
+        guard history.entries.indices.contains(e),
+              history.entries[e].actions.indices.contains(a) else { return }
+        var kept = Array(history.entries.prefix(e))
+        var entry = history.entries[e]
+        entry.actions = Array(entry.actions.prefix(a + 1))   // KEEP action `a`
+        kept.append(entry)
+        history.entries = kept
+        restore(entry.actions.last?.snapshot ?? history.baseline)
+        historyCursor = .latest
+    }
+
     /// COMMIT from the "Original" row: drop every recorded entry, back to the pre-edit state.
     func deleteHistoryFromBaseline() {
         history.entries.removeAll()

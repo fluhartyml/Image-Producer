@@ -2107,7 +2107,7 @@ struct HistoryPanel: View {
             if document.history.entries.isEmpty && document.history.baseline == nil {
                 PanelPlaceholder(systemImage: "clock.arrow.circlepath",
                                  title: "History",
-                                 subtitle: "Your edits appear here. Tap a step to view it — nothing is removed. Right-click (or long-press) a step to delete it and everything after.")
+                                 subtitle: "Your edits appear here. Tap a step to view it — nothing is removed. Right-click (or long-press) a step to restore from it, or to delete it.")
             } else {
                 List {
                     if document.history.baseline != nil {
@@ -2123,7 +2123,7 @@ struct HistoryPanel: View {
                         .contextMenu {
                             Button(role: .destructive) {
                                 document.deleteHistoryFromBaseline(); clampActiveLayer()
-                            } label: { Label("Delete Everything After", systemImage: "trash") }
+                            } label: { Label("Restore to Original", systemImage: "arrow.uturn.backward") }
                         }
                     }
                     ForEach(Array(document.history.entries.enumerated()), id: \.element.id) { eIdx, entry in
@@ -2146,6 +2146,15 @@ struct HistoryPanel: View {
                                         },
                                         deleteAction: { aIdx in
                                             document.deleteHistory(fromEntry: eIdx, action: aIdx)
+                                            clampActiveLayer()
+                                        },
+                                        restoreEntry: {
+                                            document.restoreHistory(toEntry: eIdx,
+                                                                    action: entry.actions.count - 1)
+                                            clampActiveLayer()
+                                        },
+                                        restoreAction: { aIdx in
+                                            document.restoreHistory(toEntry: eIdx, action: aIdx)
                                             clampActiveLayer()
                                         })
                     }
@@ -2185,6 +2194,8 @@ private struct HistoryEntryRow: View {
     let viewAction: (Int) -> Void
     let deleteEntry: () -> Void
     let deleteAction: (Int) -> Void
+    let restoreEntry: () -> Void
+    let restoreAction: (Int) -> Void
 
     private var toolSymbol: String { Tool(rawValue: entry.toolID)?.systemImage ?? "square.dashed" }
     private var lastOrdinal: Int { baseOrdinal + entry.actions.count - 1 }
@@ -2205,6 +2216,15 @@ private struct HistoryEntryRow: View {
                 .buttonStyle(.plain)
                 Button(action: viewEntry) {
                     HStack {
+                        // Step number, 1 = OLDEST (Michael 2026-08-24: "it should also
+                        // number the history rows in order 1, 2, 3, etc" … "one being
+                        // oldest"). A group spanning several actions shows its range,
+                        // so the numbers line up with the children when expanded.
+                        Text(baseOrdinal == lastOrdinal
+                             ? "\(baseOrdinal + 1)."
+                             : "\(baseOrdinal + 1)–\(lastOrdinal + 1).")
+                            .font(.system(size: 13).monospacedDigit())
+                            .foregroundStyle(.secondary)
                         Image(systemName: toolSymbol)
                         Text(entry.title)
                         Spacer()
@@ -2219,8 +2239,14 @@ private struct HistoryEntryRow: View {
             .font(.system(size: 16, weight: groupHoldsCursor ? .semibold : .regular))
             .opacity(groupAhead ? 0.4 : 1)
             .contextMenu {
+                // Two choices, and they land on DIFFERENT states — Michael 2026-08-24.
+                // "Restore from" keeps this step; "Delete" drops it too.
+                Button(action: restoreEntry) {
+                    Label("Restore from This Step", systemImage: "clock.arrow.circlepath")
+                }
+                Divider()
                 Button(role: .destructive, action: deleteEntry) {
-                    Label("Delete This and Everything After", systemImage: "trash")
+                    Label("Delete This Step and Newer", systemImage: "trash")
                 }
             }
 
@@ -2230,6 +2256,9 @@ private struct HistoryEntryRow: View {
                     let isCurrent = ord == cursorOrdinal
                     Button { viewAction(aIdx) } label: {
                         HStack {
+                            Text("\(ord + 1).")
+                                .font(.system(size: 12).monospacedDigit())
+                                .foregroundStyle(.secondary)
                             Text(action.label)
                             Spacer()
                             if isCurrent {
@@ -2245,8 +2274,12 @@ private struct HistoryEntryRow: View {
                     .buttonStyle(.plain)
                     .opacity(ord > cursorOrdinal ? 0.4 : 1)
                     .contextMenu {
+                        Button { restoreAction(aIdx) } label: {
+                            Label("Restore from This Step", systemImage: "clock.arrow.circlepath")
+                        }
+                        Divider()
                         Button(role: .destructive) { deleteAction(aIdx) } label: {
-                            Label("Delete This and Everything After", systemImage: "trash")
+                            Label("Delete This Step and Newer", systemImage: "trash")
                         }
                     }
                 }
