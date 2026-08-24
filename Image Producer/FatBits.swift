@@ -113,10 +113,11 @@ struct ZoomInspector: View {
             // NOT "Actual Size" — Michael caught it, 2026-08-24: "the lable 'actual
             // size' is incorrect because the canvas is a lot larger". He is right:
             // ACTUAL SIZE means 1:1 with the DOCUMENT, and his canvas is 1024 while
-            // this is 128. What it shows is the icon at the size someone will SEE it,
-            // which is the opposite. R2 already had the right word — it calls this a
-            // "REAL-TIME PRODUCTION-ICON THUMBNAIL" — so use his.
-            Text("Production Preview")
+            // this is 128, so the label meant the opposite of what it showed.
+            // He then named it himself — "it should say rendered icon size" — which
+            // beats Claude's "Production Preview": it states WHAT IT IS rather than
+            // what it is for. His words, verbatim.
+            Text("Rendered Icon Size")
                 .font(.headline)
 
             ProductionThumbnail(document: document, side: side)
