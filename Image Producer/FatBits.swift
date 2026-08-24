@@ -88,8 +88,11 @@ struct ZoomInspector: View {
     /// the Pen inspector. These are display sizes, a different axis entirely.
     private let checkSizes: [CGFloat] = [16, 32, 64]
 
-    /// The main preview's size. Defaults to 128 — roughly a Dock icon.
-    @State private var side: CGFloat = 128
+    /// ONE size, not a control. Michael, 2026-08-24: "i like the one size".
+    /// 128 is roughly a Dock icon. R2 asks for a thumbnail at true final size, and
+    /// a picker was me hedging on which "final" meant — his answer is that the
+    /// choice was not worth the control.
+    private let side: CGFloat = 128
 
     /// Shared with the canvas overlay — either surface can turn the PiP on or off.
     @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
@@ -111,15 +114,6 @@ struct ZoomInspector: View {
                 .font(.headline)
 
             ProductionThumbnail(document: document, side: side)
-
-            // Not a zoom control. This is which shipping size you are judging.
-            Picker("Preview at", selection: $side) {
-                Text("64").tag(CGFloat(64))
-                Text("128").tag(CGFloat(128))
-                Text("256").tag(CGFloat(256))
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 220)
 
             Divider()
 
@@ -210,13 +204,11 @@ struct ProductionPiP: View {
     private var home: CGPoint { corner.point(in: bounds, panel: side) }
 
     var body: some View {
-        VStack(spacing: 4) {
-            ProductionThumbnail(document: document, side: side)
-            Text("\(Int(side)) pt")
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.secondary)
-        }
-        .padding(8)
+        // No caption. Michael, 2026-08-24: "i like the one size so the 64 128 256
+        // caption should be blank." A size readout on a fixed-size reference panel
+        // is chrome describing something that never changes.
+        ProductionThumbnail(document: document, side: side)
+            .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.25)))
         .shadow(radius: dragging ? 12 : 6, y: 2)
