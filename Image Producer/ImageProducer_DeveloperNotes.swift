@@ -527,6 +527,25 @@
 //            AI restyles what's already there (image + text concept).
 //        Same framework, both concept inputs; only the OUTPUT TARGET differs
 //        (new layer vs active layer).
+//      • ✅ ZOOM — SHIPPED 2026-08-24. It is now in `Tool.shipping`; its inspector
+//        is no longer a placeholder. The inspector holds R2 (below): the LIVE
+//        PRODUCTION THUMBNAIL that does NOT follow the canvas zoom. Code in
+//        FatBits.swift; marching ants for selections in MarchingAnts.swift.
+//        NOTE the split, which is not a contradiction: NAVIGATION stays on the
+//        always-on Procreate gestures described below — you still never switch to
+//        a zoom tool to pan or pinch. What the TOOL gives you is the panel: the
+//        shipping-size truth sitting beside the magnified work. Navigation is a
+//        gesture; judging size is a tool.
+//        Prompted by a video Michael sent (2026-08-24) — "it explained every tool
+//        and feature i want in image producer" — MacPaint's FAT BITS, which is
+//        where R2's idea came from and what Andy Hertzfeld copied to build Susan
+//        Kare her first icon editor. Notes + reference stills in the apartment:
+//          Workshop/MacPaint-design-notes-for-Image-Producer.md
+//          Workshop/MacPaint-reference/
+//        STILL OPEN: marching ants around the Magic Lasso / Cookie Cutter
+//        selections. Those previews are RASTER masks, not outlines, so it needs
+//        contour tracing (marching squares) to get a path first. Ants ARE live on
+//        the crop rect, which was already a plain outline.
 //      • ZOOM (magnifying glass) — zoom the canvas for precise editing, and PAN
 //        FOLDS IN HERE (Michael 2026-06-11): pan = scroll the VIEW when zoomed in
 //        (two-finger drag / Photoshop Hand-tool style) = NAVIGATION; the content
