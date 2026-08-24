@@ -42,7 +42,10 @@ enum Tool: String, CaseIterable, Identifiable {
     /// so they're withheld from the strip until built — App Store review rejects
     /// visible "coming soon" controls (Guideline 2.1). Re-add a case here the moment
     /// its inspector ships. Order is preserved from the enum declaration.
-    static let shipping: [Tool] = allCases.filter { ![.shape, .path, .zoom].contains($0) }
+    /// ZOOM shipped 2026-08-24: its inspector is no longer a placeholder — it is
+    /// R2, the live production thumbnail (see FatBits.swift). Shape and Path are
+    /// still withheld.
+    static let shipping: [Tool] = allCases.filter { ![.shape, .path].contains($0) }
 
     /// Label shown in the tool's (placeholder) inspector.
     var title: String {

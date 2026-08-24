@@ -530,6 +530,10 @@ struct ToolInspector: View {
             EraserInspector(document: document, activeLayerID: activeLayerID, fillColor: $fillColor)
         case .pen:
             PenInspector(document: document, activeLayerID: activeLayerID)
+        case .zoom:
+            // R2 (resolved 2026-06-10): the live production thumbnail that does
+            // NOT follow the canvas zoom. See FatBits.swift.
+            ZoomInspector(document: document)
         default:
             ToolInspectorPlaceholder(tool: activeTool)
         }
@@ -3452,7 +3456,12 @@ struct CropOverlay: View {
                 .offset(y: r.minY)
             dim.frame(width: max(0, size.width - r.maxX), height: r.height)            // right band
                 .offset(x: r.maxX, y: r.minY)
-            Rectangle().stroke(Color.white, lineWidth: 1.5)                            // crop border
+            // Crop border = MARCHING ANTS. A crop rect IS a selection, and this is
+            // the one place in the app that already had a plain outline waiting for
+            // them. The white/black double stroke reads over any artwork underneath
+            // without knowing what it is — see MarchingAnts.swift for where the
+            // trick comes from (a Hamm's beer sign, via Bill Atkinson).
+            MarchingAnts(shape: Rectangle())
                 .frame(width: r.width, height: r.height)
                 .offset(x: r.minX, y: r.minY)
         }

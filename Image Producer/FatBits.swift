@@ -2,95 +2,121 @@
 //  FatBits.swift
 //  Image Producer
 //
-//  Magnified pixel editing with a live actual-size preview.
+//  The live production thumbnail that rides alongside magnified pixel editing.
 //
-//  WHERE IT COMES FROM. MacPaint hid this in the Goodies menu and called it FAT
-//  BITS: blow the pixels up so you can paint them one at a time, and — the part
-//  most apps forget — show a small panel of the picture at ACTUAL SIZE at the
-//  same time. Andy Hertzfeld saw it and built Susan Kare her first icon editor,
-//  because until then she was designing the Macintosh's icons on GRAPH PAPER.
+//  THIS IS R2, NOT A NEW IDEA. Michael resolved it on 2026-06-10 and wrote it
+//  into the DeveloperNotes:
 //
-//  WHY IT MATTERS HERE MORE THAN ANYWHERE. Image Producer is an icon app. When
-//  you edit an icon you are always zoomed in, but the only question that counts —
-//  "does it read at 16pt?" — can only be answered zoomed out. Fat Bits answered
-//  that in 1984 by refusing to choose: both views, at once, always.
+//    "(R2) ZOOM-IN/ZOOM-OUT CANVAS + FIXED-RESOLUTION THUMBNAIL (RESOLVED).
+//     THE PREVIEW THUMBNAIL stays at ACTUAL SCREEN RESOLUTION (1:1 device
+//     pixels, true final size) and does NOT follow the canvas zoom — it updates
+//     LIVE as each pixel is drawn so you always see the real, shipping-size icon
+//     take shape while the canvas is zoomed in. It renders the full layer
+//     composite, not just the pixel layer."
 //
-//  Michael, 2026-08-24, asked for "the actual icon thing they were tlking about
-//  for that lady" — Susan Kare. Notes and reference stills:
+//    In his own words: "a zoom in / zoom out canvas while the preview thumbnail
+//    remains actual screen resolution."
+//
+//  WHERE THE IDEA CAME FROM, which he found again on 2026-08-24. MacPaint hid
+//  this in the Goodies menu and called it FAT BITS: blow the pixels up to paint
+//  them one at a time, and — the half that modern apps drop — keep a panel of
+//  the picture at ACTUAL SIZE on screen at the same time. Andy Hertzfeld saw it
+//  and built Susan Kare her first icon editor; until then she was designing the
+//  Macintosh's icons on GRAPH PAPER. Notes and reference stills:
 //    Workshop/MacPaint-design-notes-for-Image-Producer.md
 //    Workshop/MacPaint-reference/
 //
-//  NOTE ON PLACEMENT. `zoom` is already in the LOCKED tool vocabulary
-//  (DeveloperNotes, "TOOL VOCABULARY") and was withheld from `Tool.shipping`
-//  only because its inspector was a placeholder. This is that inspector. No tool
-//  was added; one was finished.
+//  WHY IT MATTERS MORE HERE THAN ANYWHERE ELSE. This is an icon app. Editing an
+//  icon means being zoomed in, while the only question that counts — does it
+//  read at shipping size? — can only be answered zoomed out. MacPaint refused to
+//  choose between the two views. So does this.
+//
+//  IT IS LIVE FOR FREE. `ImageCompositeView` is a SwiftUI view, not a raster, so
+//  handing it a smaller `size` re-renders the whole composite at that size and
+//  SwiftUI keeps it current as the document changes. Nothing to invalidate,
+//  nothing to snapshot.
+//
+//  PLACEMENT. `zoom` was already in the LOCKED tool vocabulary and was withheld
+//  from `Tool.shipping` only because its inspector was a placeholder. This is
+//  that inspector. No tool was added; one was finished.
 //
 
 import SwiftUI
 
-// MARK: - Actual-size preview
+// MARK: - The live production thumbnail
 
-/// The small panel that shows the artwork at 1:1 while you work magnified.
+/// The finished icon at shipping size, updating as you draw.
 ///
-/// Deliberately dumb: it renders whatever image it is handed at a fixed pixel
-/// size with NO interpolation, so what you see is exactly what a user will see
-/// at that size. Smoothing here would be a lie.
-struct ActualSizePreview: View {
-    /// The composited artwork. Nil renders the empty frame, which is correct on
-    /// a new document rather than an error.
-    let image: CGImage?
+/// Deliberately does NOT follow the canvas zoom — that is the entire point of
+/// R2. Interpolation is off: smoothing an icon preview would show the user
+/// something the Finder never will.
+struct ProductionThumbnail: View {
+    @ObservedObject var document: ImageDocument
 
-    /// The size to show it at, in points. 32 is the classic icon grid; the
-    /// picker below offers the sizes that actually matter on Apple platforms.
-    let size: CGFloat
+    /// Side length in points. Not a zoom factor — a real size.
+    var side: CGFloat = 128
 
     var body: some View {
         ZStack {
-            // The app's existing transparency checkerboard (ContentView) — an
-            // icon's alpha is not a detail, it is most of the design. Small
-            // squares here because the previews themselves are small.
-            Checkerboard(squareSize: max(3, size / 8))
-                .frame(width: size, height: size)
-            if let image {
-                Image(decorative: image, scale: 1)
-                    .interpolation(.none)          // never smooth an icon preview
-                    .antialiased(false)
-                    .resizable()
-                    .frame(width: size, height: size)
-            }
+            // The app's existing transparency checkerboard. An icon's alpha is
+            // not a detail, it is most of the design.
+            Checkerboard(squareSize: max(3, side / 16))
+            ImageCompositeView(document: document,
+                               size: CGSize(width: side, height: side))
         }
-        .overlay(Rectangle().stroke(.secondary.opacity(0.4), lineWidth: 1))
-        .accessibilityLabel("Actual size preview, \(Int(size)) points")
+        .frame(width: side, height: side)
+        .clipped()
+        .overlay(Rectangle().stroke(.secondary.opacity(0.35), lineWidth: 1))
+        .accessibilityLabel("Production icon preview, \(Int(side)) points")
     }
 }
 
-// MARK: - The Fat Bits panel
+// MARK: - The Zoom inspector
 
-/// Fat Bits: the actual-size previews that ride alongside magnified editing.
+/// Zoom's inspector: the live production thumbnail, plus the sizes that decide
+/// whether an icon works.
 ///
-/// The magnification itself belongs to the canvas (see `ZoomableCanvas`); this
-/// is the half MacPaint got right that modern apps drop — the constant,
-/// unmagnified truth sitting next to the work.
-struct FatBitsPanel: View {
-    /// Composited artwork to preview. The caller supplies it; this view never
-    /// reaches into the document.
-    let image: CGImage?
+/// R2 specifies ONE thumbnail at true final size. The extra sizes below it are
+/// offered because an icon that reads at 128 can still be mud at 16, and 16 is a
+/// Finder list row. They are a row of previews, not a mode — nothing here
+/// changes what the canvas is doing.
+struct ZoomInspector: View {
+    @ObservedObject var document: ImageDocument
 
-    /// Sizes worth checking. 16 is a Finder list row and the cruellest test;
-    /// 1024 is the App Store. Michael's rule is that the small ones decide it.
-    static let sizes: [CGFloat] = [16, 32, 64, 128]
+    /// Shipping sizes worth checking at a glance. NOT the resolution ladder —
+    /// R1's ladder (128/256/512/1024) is the ART-CELL grid density and lives in
+    /// the Pen inspector. These are display sizes, a different axis entirely.
+    private let checkSizes: [CGFloat] = [16, 32, 64]
+
+    /// The main preview's size. Defaults to 128 — roughly a Dock icon.
+    @State private var side: CGFloat = 128
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
+
             Text("Actual Size")
                 .font(.headline)
 
-            // All four at once, largest first, so the eye can compare them in a
-            // single glance rather than by flipping a control.
+            ProductionThumbnail(document: document, side: side)
+
+            // Not a zoom control. This is which shipping size you are judging.
+            Picker("Preview at", selection: $side) {
+                Text("64").tag(CGFloat(64))
+                Text("128").tag(CGFloat(128))
+                Text("256").tag(CGFloat(256))
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 220)
+
+            Divider()
+
+            Text("Small sizes")
+                .font(.subheadline.weight(.semibold))
+
             HStack(alignment: .bottom, spacing: 14) {
-                ForEach(Self.sizes.reversed(), id: \.self) { s in
+                ForEach(checkSizes, id: \.self) { s in
                     VStack(spacing: 4) {
-                        ActualSizePreview(image: image, size: s)
+                        ProductionThumbnail(document: document, side: s)
                         Text("\(Int(s))")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
@@ -98,9 +124,16 @@ struct FatBitsPanel: View {
                 }
             }
 
-            Text("If it does not read at 16, it does not read.")
+            Text("The preview never follows the canvas zoom — that is the point. "
+                 + "Work up close, judge at size.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
         }
+        // Inspector convention (see PaintBucketInspector): pad here, and never
+        // add a ScrollView — ToolInspector already wraps content in one.
+        .padding()
     }
 }
