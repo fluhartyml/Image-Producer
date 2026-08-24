@@ -2707,6 +2707,52 @@ struct CanvasView: View {
     /// canvas expression is already at the Swift type-checker's limit, and inlining
     /// even this much broke the build with "unable to type-check in reasonable
     /// time". Anything further added to the canvas should come out here too.
+    /// Commit the pen's raster to the active layer — but NEVER over the top of art
+    /// that is not pixels.
+    ///
+    /// THE BUG THIS FIXES, found by Michael on 2026-08-24 while testing: he placed a
+    /// star symbol on Foreground, switched to the Pen, drew one stroke, and the star
+    /// was GONE. `ImageLayer.setPixels` REPLACES the whole elements array, so the
+    /// first stroke silently destroyed the symbol. No warning, and every other
+    /// destructive op in this app keeps the original.
+    ///
+    /// His fix, and it is the right one: "the first pixel should have created a copy
+    /// new layer foreground (pixels)". So the FIRST stroke onto a layer holding
+    /// non-pixel art forks a new layer named "<name> (pixels)" directly above it and
+    /// moves the pen there. Every stroke after that lands on the pixel layer, so this
+    /// does NOT spawn a layer per stroke.
+    ///
+    /// NOTE the difference from `addResultLayer`: that helper HIDES the source, which
+    /// is right for Apply-style operations. It is wrong here — the pixel-grid note in
+    /// this file says the layer below "shows through, for tracing", and tracing needs
+    /// the original visible. So the fork is done inline and the source stays on.
+    @MainActor private func commitPenPixels(_ data: Data, actionLabel: String) {
+        guard let i = activeIndex, document.layers.indices.contains(i) else { return }
+        document.captureHistoryBaselineIfNeeded()   // before the edit
+
+        let holdsPixels = document.layers[i].pixelData != nil
+        let holdsOtherArt = !holdsPixels && !document.layers[i].elements.isEmpty
+
+        if holdsOtherArt {
+            var fork = ImageLayer(name: "\(document.layers[i].name) (pixels)", role: .content)
+            fork.setPixels(data)
+            fork.transform = document.layers[i].transform     // sit exactly over the art
+            document.layers.insert(fork, at: i + 1)           // directly above the source
+            activeLayerID = fork.id                           // the pen follows the fork
+            document.recordHistory(toolID: Tool.pen.rawValue,
+                                   groupTitle: Tool.pen.title,
+                                   actionLabel: actionLabel,
+                                   layerID: fork.id)
+            return
+        }
+
+        document.layers[i].setPixels(data)
+        document.recordHistory(toolID: Tool.pen.rawValue,
+                               groupTitle: Tool.pen.title,
+                               actionLabel: actionLabel,
+                               layerID: document.layers[i].id)
+    }
+
     /// The canvas's preview overlays, factored OUT of `body`. That ZStack had
     /// reached the Swift type-checker's limit — adding even ONE more branch
     /// failed the build with "unable to type-check this expression in reasonable
@@ -3064,14 +3110,9 @@ struct CanvasView: View {
                         onErase: { n in pen.erase(toNormalized: n) },
                         onEnded: {
                             pen.endStroke()
-                            if let i = activeIndex, let data = pen.currentPNG() {
-                                document.captureHistoryBaselineIfNeeded()   // before the edit
-                                document.layers[i].setPixels(data)
+                            if let data = pen.currentPNG() {
                                 // History: right-click erase is a Pen-group Erase action.
-                                document.recordHistory(toolID: Tool.pen.rawValue,
-                                                       groupTitle: Tool.pen.title,
-                                                       actionLabel: "Erase",
-                                                       layerID: document.layers[i].id)
+                                commitPenPixels(data, actionLabel: "Erase")
                             }
                         }
                     )
@@ -3096,14 +3137,9 @@ struct CanvasView: View {
                         switch activeTool {
                         case .pen:
                             pen.endStroke()
-                            if let i = activeIndex, let data = pen.currentPNG() {
-                                document.captureHistoryBaselineIfNeeded()   // before the edit
-                                document.layers[i].setPixels(data)
+                            if let data = pen.currentPNG() {
                                 // History: one stroke = one action under the Pen group.
-                                document.recordHistory(toolID: Tool.pen.rawValue,
-                                                       groupTitle: Tool.pen.title,
-                                                       actionLabel: pen.erasing ? "Erase" : "Stroke",
-                                                       layerID: document.layers[i].id)
+                                commitPenPixels(data, actionLabel: pen.erasing ? "Erase" : "Stroke")
                             }
                         case .fill:
                             bucketFill(atNormalized: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height), canvas: disp)
