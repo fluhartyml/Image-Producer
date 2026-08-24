@@ -2699,6 +2699,80 @@ private struct ToolPointer: ViewModifier {
 }
 
 struct CanvasView: View {
+    /// Production preview PiP visible? Shared with the Zoom inspector's toggle via
+    /// AppStorage, so either surface can turn it on or off.
+    @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
+
+    /// The floating production preview, factored OUT of `body` deliberately: the
+    /// canvas expression is already at the Swift type-checker's limit, and inlining
+    /// even this much broke the build with "unable to type-check in reasonable
+    /// time". Anything further added to the canvas should come out here too.
+    /// The canvas's preview overlays, factored OUT of `body`. That ZStack had
+    /// reached the Swift type-checker's limit — adding even ONE more branch
+    /// failed the build with "unable to type-check this expression in reasonable
+    /// time". Anything new that draws over the canvas belongs in here, not inline.
+    @ViewBuilder
+    private func canvasOverlays(disp: CGSize, ref: CGFloat) -> some View {
+            // Magic Eraser LIVE PREVIEW: magenta over exactly the pixels an Erase would
+            // clear, over the active (visible) layer at its transform — tune by eye.
+            if activeTool == .eraser, let idx = activeIndex,
+               document.layers[idx].isVisible, let hi = pen.erasePreview {
+                let t = document.layers[idx].transform
+                Image(decorative: hi, scale: 1)
+                    .interpolation(.low)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: ref * t.scale, height: ref * t.scale)
+                    .rotationEffect(.degrees(t.rotationDegrees))
+                    .position(x: t.center.x * disp.width, y: t.center.y * disp.height)
+                    .opacity(0.5)
+                    .allowsHitTesting(false)
+            }
+            // LIVE PREVIEW: the region a tap would flood (bucket, in the fill colour) or
+            // clear (Magic Lasso, in red).
+            if activeTool == .fill || activeTool == .magicLasso, let idx = activeIndex,
+               document.layers[idx].isVisible, let hi = pen.bucketPreview {
+                let t = document.layers[idx].transform
+                Image(decorative: hi, scale: 1)
+                    .interpolation(.low)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: ref * t.scale, height: ref * t.scale)
+                    .rotationEffect(.degrees(t.rotationDegrees))
+                    .position(x: t.center.x * disp.width, y: t.center.y * disp.height)
+                    .opacity(0.55)
+                    .allowsHitTesting(false)
+            }
+            if showTransformBox, let idx = activeIndex {
+                TransformBox(document: document, index: idx, size: disp)
+            }
+            // Crop preview: dim everything outside the crop rect (Move tool only).
+            if activeTool == .move, let crop = document.cropRect {
+                CropOverlay(crop: crop, size: disp)
+                    .allowsHitTesting(false)
+            }
+            // Brush eraser footprint ring — follows the cursor so you see WHICH pixels
+            // a stroke will clear before committing (no undo). Circle ring / square box.
+            if activeTool == .eraser, pen.eraserMode == .brush, let hp = brushHover {
+                BrushCursor(diameter: pen.eraserBrushFraction * ref, square: pen.eraserSquare)
+                    .position(hp)
+                    .allowsHitTesting(false)
+            }
+            // The floating production preview — last in the ZStack so it sits on
+            // top of everything. It lives HERE rather than on the modifier chain
+            // below because that chain is already at the Swift type-checker's
+            // limit; adding a single .overlay to it broke the build with "unable
+            // to type-check in reasonable time".
+            productionPiP(in: disp)
+    }
+
+    @ViewBuilder
+    private func productionPiP(in size: CGSize) -> some View {
+        if showProductionPiP {
+            ProductionPiP(document: document, bounds: size)
+        }
+    }
+
     @ObservedObject var document: ImageDocument
     @Binding var activeLayerID: ImageLayer.ID?
     var showTransformBox: Bool = false
@@ -2976,51 +3050,7 @@ struct CanvasView: View {
                         .frame(width: disp.width, height: disp.height)
                         .allowsHitTesting(false)
                 }
-                // Magic Eraser LIVE PREVIEW: magenta over exactly the pixels an Erase would
-                // clear, over the active (visible) layer at its transform — tune by eye.
-                if activeTool == .eraser, let idx = activeIndex,
-                   document.layers[idx].isVisible, let hi = pen.erasePreview {
-                    let t = document.layers[idx].transform
-                    Image(decorative: hi, scale: 1)
-                        .interpolation(.low)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: ref * t.scale, height: ref * t.scale)
-                        .rotationEffect(.degrees(t.rotationDegrees))
-                        .position(x: t.center.x * disp.width, y: t.center.y * disp.height)
-                        .opacity(0.5)
-                        .allowsHitTesting(false)
-                }
-                // LIVE PREVIEW: the region a tap would flood (bucket, in the fill colour) or
-                // clear (Magic Lasso, in red).
-                if activeTool == .fill || activeTool == .magicLasso, let idx = activeIndex,
-                   document.layers[idx].isVisible, let hi = pen.bucketPreview {
-                    let t = document.layers[idx].transform
-                    Image(decorative: hi, scale: 1)
-                        .interpolation(.low)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: ref * t.scale, height: ref * t.scale)
-                        .rotationEffect(.degrees(t.rotationDegrees))
-                        .position(x: t.center.x * disp.width, y: t.center.y * disp.height)
-                        .opacity(0.55)
-                        .allowsHitTesting(false)
-                }
-                if showTransformBox, let idx = activeIndex {
-                    TransformBox(document: document, index: idx, size: disp)
-                }
-                // Crop preview: dim everything outside the crop rect (Move tool only).
-                if activeTool == .move, let crop = document.cropRect {
-                    CropOverlay(crop: crop, size: disp)
-                        .allowsHitTesting(false)
-                }
-                // Brush eraser footprint ring — follows the cursor so you see WHICH pixels
-                // a stroke will clear before committing (no undo). Circle ring / square box.
-                if activeTool == .eraser, pen.eraserMode == .brush, let hp = brushHover {
-                    BrushCursor(diameter: pen.eraserBrushFraction * ref, square: pen.eraserSquare)
-                        .position(hp)
-                        .allowsHitTesting(false)
-                }
+                canvasOverlays(disp: disp, ref: ref)
             }
             .frame(width: disp.width, height: disp.height)
             .coordinateSpace(name: "canvas")
@@ -3095,6 +3125,11 @@ struct CanvasView: View {
                             || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
             .modifier(ToolPointer(tool: activeTool))   // cursor reflects the active tool (macOS)
+            // The production preview, floating over the canvas and visible with ANY
+            // tool active — which is the whole point (R2: it updates as each pixel
+            // is drawn, so hiding it inside the Zoom inspector made it invisible
+            // exactly when it was needed). Overlaid AFTER the canvas gestures so its
+            // own drag-to-corner wins. See FatBits.swift.
             .onContinuousHover(coordinateSpace: .named("canvas")) { phase in
                 // Trackpad/pointer hover (no press) → position the footprint ring so you can
                 // aim before committing. Touch has no hover; the mid-stroke update covers that.

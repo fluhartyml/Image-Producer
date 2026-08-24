@@ -91,8 +91,21 @@ struct ZoomInspector: View {
     /// The main preview's size. Defaults to 128 — roughly a Dock icon.
     @State private var side: CGFloat = 128
 
+    /// Shared with the canvas overlay — either surface can turn the PiP on or off.
+    @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+
+            Toggle("Floating preview", isOn: $showProductionPiP)
+                .toggleStyle(.switch)
+            Text("Keeps the production preview on the canvas with ANY tool active — "
+                 + "drag it to any corner, double-click to resize.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
 
             Text("Actual Size")
                 .font(.headline)
@@ -135,5 +148,106 @@ struct ZoomInspector: View {
         // Inspector convention (see PaintBucketInspector): pad here, and never
         // add a ScrollView — ToolInspector already wraps content in one.
         .padding()
+    }
+}
+
+// MARK: - The floating PiP
+
+/// The production preview as a floating panel over the canvas, on at all times.
+///
+/// WHY THIS EXISTS AND THE INSPECTOR VERSION IS NOT ENOUGH. Michael, 2026-08-24:
+/// "can that preview be a togglable PiP?" — and he was correcting a real mistake.
+/// R2 says the thumbnail updates "LIVE as each pixel is drawn". Putting it in the
+/// ZOOM inspector means it is only visible while Zoom is the active tool, which is
+/// exactly when nobody is drawing. MacPaint's Fat Bits panel was ON SCREEN while
+/// you worked; it was not hidden behind a mode. This is that.
+///
+/// IT SNAPS TO A CORNER — his call, and the right one: "maybe drag and snaps to
+/// one of the canvas 4 corners?". Free positioning means it can be left half off
+/// the edge, or parked over the thing you are drawing. Four corners is a decision
+/// the user makes once, and the panel is always somewhere sensible.
+
+/// Which corner of the canvas the preview is parked in.
+enum PiPCorner: Int, CaseIterable {
+    case topLeading, topTrailing, bottomLeading, bottomTrailing
+
+    /// Centre point for a panel of `size` inside `bounds`, with a margin.
+    func point(in bounds: CGSize, panel: CGFloat, margin: CGFloat = 16) -> CGPoint {
+        let half = panel / 2 + margin
+        switch self {
+        case .topLeading:     return CGPoint(x: half, y: half)
+        case .topTrailing:    return CGPoint(x: bounds.width - half, y: half)
+        case .bottomLeading:  return CGPoint(x: half, y: bounds.height - half)
+        case .bottomTrailing: return CGPoint(x: bounds.width - half, y: bounds.height - half)
+        }
+    }
+
+    /// The corner nearest an arbitrary point — where a drag should land.
+    static func nearest(to p: CGPoint, in bounds: CGSize, panel: CGFloat) -> PiPCorner {
+        allCases.min(by: { a, b in
+            let pa = a.point(in: bounds, panel: panel), pb = b.point(in: bounds, panel: panel)
+            return hypot(pa.x - p.x, pa.y - p.y) < hypot(pb.x - p.x, pb.y - p.y)
+        }) ?? .bottomLeading
+    }
+}
+
+struct ProductionPiP: View {
+    @ObservedObject var document: ImageDocument
+
+    /// The canvas display rect's size — corners are the CANVAS's, not the window's.
+    let bounds: CGSize
+
+    /// Persisted: which corner, and how big. Defaults to bottom-LEADING because the
+    /// canvas zoom controls already live bottom-trailing.
+    @AppStorage("ip.pip.corner") private var cornerRaw: Int = PiPCorner.bottomLeading.rawValue
+    @AppStorage("ip.pip.side") private var storedSide: Double = 96
+
+    @State private var drag: CGSize = .zero
+    @State private var dragging = false
+
+    private var side: CGFloat { CGFloat(storedSide) }
+    private var corner: PiPCorner { PiPCorner(rawValue: cornerRaw) ?? .bottomLeading }
+    private var home: CGPoint { corner.point(in: bounds, panel: side) }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ProductionThumbnail(document: document, side: side)
+            Text("\(Int(side)) pt")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .padding(8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.25)))
+        .shadow(radius: dragging ? 12 : 6, y: 2)
+        .scaleEffect(dragging ? 1.04 : 1)          // it lifts while held
+        .position(x: home.x + drag.width, y: home.y + drag.height)
+        .gesture(
+            DragGesture()
+                .onChanged { v in
+                    dragging = true
+                    drag = v.translation
+                }
+                .onEnded { v in
+                    let dropped = CGPoint(x: home.x + v.translation.width,
+                                          y: home.y + v.translation.height)
+                    let target = PiPCorner.nearest(to: dropped, in: bounds, panel: side)
+                    // Snap: zero the offset and change corner in one animation, so it
+                    // flies to the corner rather than jumping.
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                        cornerRaw = target.rawValue
+                        drag = .zero
+                        dragging = false
+                    }
+                }
+        )
+        // Size cycles on double-click. No chrome — a control panel on a floating
+        // reference would be more UI than the thing it is referencing.
+        .onTapGesture(count: 2) {
+            withAnimation(.easeOut(duration: 0.15)) {
+                storedSide = storedSide >= 160 ? 64 : storedSide + 32
+            }
+        }
+        .help("Production preview — drag to any corner, double-click to resize. Never follows the canvas zoom.")
     }
 }
