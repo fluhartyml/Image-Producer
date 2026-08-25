@@ -60,11 +60,33 @@ final class ImageDocument: ObservableObject {
     /// (not saved); a reopened document always starts at `.latest`.
     @Published var historyCursor: HistoryCursor = .latest
 
-    /// Optional crop region — a normalized rectangle (0…1, origin top-left) in canvas
-    /// space marking the KEPT area. `nil` = no crop (full square). Non-destructive:
-    /// stored here and applied at export/share; the source layers are never trimmed.
-    /// A smaller rectangle fits inside the square canvas, so this needs no canvas resize.
-    @Published var cropRect: CGRect?
+    /// Optional crop/mask region marking the KEPT area. `nil` = no mask (full canvas).
+    /// Non-destructive: stored here and applied at export/share; the source layers are
+    /// never trimmed. A smaller region fits inside the canvas, so this needs no resize.
+    ///
+    /// A four-cornered `CropMask` rather than a rectangle, because the Mask tool lets
+    /// every corner move independently (⌘ drag) and lets the silhouette be a star, an
+    /// oval or any Unicode glyph. See `MaskTool.swift` for the whole story.
+    @Published var cropMask: CropMask?
+
+    /// The mask's bounding rectangle — the shape the crop had before the Mask tool, kept
+    /// as a bridge so every existing caller (export trim, the Move tool's Crop section,
+    /// the saved-file manifest) keeps working untouched.
+    ///
+    /// ⚠️ Assigning through this SETTER replaces any silhouette or bent corners with a
+    /// plain rectangle. That is correct for the rectangle-only callers that use it; the
+    /// Mask tool sets `cropMask` directly.
+    var cropRect: CGRect? {
+        get { cropMask?.bounds }
+        set { cropMask = newValue.map { CropMask(rect: $0) } }
+    }
+
+    /// Mask tool UI state — how a corner drag behaves. NOT persisted: it describes the
+    /// tool, not the picture. `maskRatio` nil means freeform (width and height
+    /// independent); `maskFreeCorners` true means every corner moves on its own and the
+    /// mask becomes a quadrilateral, which is what ⌘ does for the length of one drag.
+    @Published var maskRatio: CGFloat?
+    @Published var maskFreeCorners: Bool = false
 
     /// Output resolution in pixels-per-inch. Physical/print size = pixels ÷ ppi. Changing
     /// it is LOSSLESS — it reinterprets the SAME pixels at a new physical size; it never
@@ -123,7 +145,7 @@ final class ImageDocument: ObservableObject {
         self.canvasHeight = canvasHeight
         self.layers = layers
         self.palette = palette
-        self.cropRect = cropRect
+        self.cropMask = cropRect.map { CropMask(rect: $0) }
         self.ppi = ppi
         self.history = history
     }
@@ -762,7 +784,12 @@ struct ImageProjectManifest: Codable {
     /// Optional for backward-compat with .iconproj files saved before palettes existed.
     var palette: [String]?
     /// Optional crop region (normalized); absent in files saved before crop existed.
+    /// Still written on every save so a file stays readable by builds that predate the
+    /// Mask tool — they get the bounding rectangle, which is the honest degradation.
     var cropRect: CGRect?
+    /// The full mask (four corners + silhouette form); absent in files saved before the
+    /// Mask tool. Takes precedence over `cropRect` when present.
+    var cropMask: CropMask? = nil
     /// Output resolution (PPI); absent in files saved before it existed → defaults to 72.
     var ppi: Double?
     // Print setup (section C); all optional for back-compat.
@@ -790,6 +817,9 @@ extension ImageDocument: ReferenceFileDocument {
         self.init(name: manifest.name, canvasWidth: w, canvasHeight: h, layers: manifest.layers,
                   palette: manifest.palette ?? ImageDocument.lastUsedPalette, cropRect: manifest.cropRect,
                   ppi: manifest.ppi ?? 72, history: manifest.history ?? ImageHistory())
+        // A file written by the Mask tool carries the full four-corner mask; one written
+        // before it carries only a rectangle, which `init` has already turned into a mask.
+        if let saved = manifest.cropMask { cropMask = saved }
         // Print-setup fields (section C) — apply saved values over the defaults.
         if let v = manifest.bleedInches { bleedInches = v }
         if let v = manifest.safeMarginInches { safeMarginInches = v }
@@ -801,7 +831,8 @@ extension ImageDocument: ReferenceFileDocument {
     /// Capture current state for writing (called off the main actor by SwiftUI).
     func snapshot(contentType: UTType) throws -> ImageProjectManifest {
         ImageProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-                            layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
+                            layers: layers, palette: palette, cropRect: cropRect,
+                            cropMask: cropMask, ppi: ppi,
                             bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                             cropMarks: cropMarks, registrationMarks: registrationMarks,
                             colorSpaceCMYK: colorSpaceCMYK, history: history)
@@ -838,7 +869,8 @@ extension ImageDocument {
     /// different thing (it encodes only the layer stack). Two encoders, two jobs.
     func encodedManifest() throws -> Data {
         let manifest = ImageProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-                                           layers: layers, palette: palette, cropRect: cropRect, ppi: ppi,
+                                           layers: layers, palette: palette, cropRect: cropRect,
+                                           cropMask: cropMask, ppi: ppi,
                                            bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                                            cropMarks: cropMarks, registrationMarks: registrationMarks,
                                            colorSpaceCMYK: colorSpaceCMYK, history: history)

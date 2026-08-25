@@ -662,6 +662,8 @@ struct ToolInspector: View {
             ColorPaletteInspector(document: document, fillColor: $fillColor)
         case .move:
             MoveTransformInspector(document: document, activeLayerID: activeLayerID)
+        case .mask:
+            MaskInspector(document: document)
         case .fill:
             PaintBucketInspector(document: document,
                                  activeLayerID: activeLayerID,
@@ -2979,6 +2981,9 @@ private struct ToolPointer: ViewModifier {
                                  hotSpot: UnitPoint(x: 0.2, y: 0.2))
         case .move:       .image(Image(systemName: "arrow.up.and.down.and.arrow.left.and.right"),
                                  hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        // The mask is dragged by its corners and its middle, so the pointer is the frame
+        // itself, centred — same reasoning as Move.
+        case .mask:       .image(Image(systemName: "square.dashed"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
         case .zoom:       .image(Image(systemName: "magnifyingglass"), hotSpot: UnitPoint(x: 0.45, y: 0.45))
         case .symbol:     .image(Image(systemName: "star"),        hotSpot: UnitPoint(x: 0.5, y: 0.5))
 
@@ -3109,6 +3114,22 @@ struct CanvasView: View {
             if activeTool == .move, let crop = document.cropRect {
                 CropOverlay(crop: crop, size: disp)
                     .allowsHitTesting(false)
+            }
+            // MASK TOOL: the same dimming, but around a four-cornered mask you can grab.
+            // The overlay is inert; the box on top of it owns every gesture. Its handles
+            // move the MASK ONLY — the artwork is never touched, which is the whole reason
+            // this is a separate tool from Move/Transform.
+            if activeTool == .mask, document.cropMask != nil {
+                let maskBinding = Binding<CropMask>(
+                    get: { document.cropMask ?? CropMask(rect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8)) },
+                    set: { document.cropMask = $0 })
+                MaskOverlay(mask: maskBinding.wrappedValue, size: disp)
+                MaskBox(mask: maskBinding,
+                        size: disp,
+                        canvasPixels: CGSize(width: document.canvasWidth, height: document.canvasHeight),
+                        mode: document.maskFreeCorners
+                              ? .free
+                              : (document.maskRatio.map { MaskCornerMode.ratio($0) } ?? .rectangle))
             }
             // Brush eraser footprint ring — follows the cursor so you see WHICH pixels
             // a stroke will clear before committing (no undo). Circle ring / square box.
