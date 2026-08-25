@@ -49,6 +49,7 @@
 
 import SwiftUI
 import CoreText
+import Vision
 #if os(macOS)
 import AppKit
 #endif
@@ -63,9 +64,10 @@ import AppKit
 /// shapes" and is the deep well — every dingbat, arrow, star and ornament in every font
 /// on the machine, exact, via CoreText.
 ///
-/// **SF Symbols are deliberately absent for now.** They are not reachable as vector paths
-/// the way a font glyph is; masking with one means rendering it and tracing its alpha.
-/// That is the next step, not a dropped requirement.
+/// **SF Symbols arrive through `.path`.** They are not reachable as vector paths the way a
+/// font glyph is, so one is rendered and traced ONCE at pick time (`SymbolMaskResolver`)
+/// and the resulting loops are stored in the mask — which is also exactly the shape a
+/// hand-drawn Path-tool mask will take.
 ///
 /// Written to be adopted by the Shape tool when it ships — its locked vocabulary
 /// ("line / rectangle / oval / polygon", `EditorTools.swift:28`) is a subset of this.
@@ -76,6 +78,18 @@ enum MaskForm: Equatable, Hashable, Codable {
     case star
     /// Any Unicode character, drawn from `fontName` (nil = system font).
     case glyph(String, fontName: String?)
+    /// A RESOLVED outline: closed loops of points, normalized 0…1 inside the frame.
+    ///
+    /// This is how SF Symbols get in. A symbol is not reachable as a vector path the way
+    /// a font glyph is, so it is rendered once, traced with Vision's contour detector at
+    /// the moment it is chosen, and the resulting loops are stored here. Resolving once
+    /// rather than on every redraw keeps the render off the export path entirely, and
+    /// makes a saved file self-contained — it does not depend on that symbol still
+    /// existing in a future OS.
+    ///
+    /// It is also exactly what the Path tool will produce, so a hand-drawn mask will slot
+    /// into this same case with no new machinery. `label` is what the picker shows.
+    case path(loops: [[CGPoint]], label: String)
 
     var label: String {
         switch self {
@@ -84,6 +98,7 @@ enum MaskForm: Equatable, Hashable, Codable {
         case .polygon:   "Polygon"
         case .star:      "Star"
         case .glyph(let c, _): "Character \(c)"
+        case .path(_, let label): label
         }
     }
 
@@ -195,6 +210,17 @@ struct CropMask: Equatable, Codable {
         case .glyph(let text, let fontName):
             return Self.glyphPath(text, fontName: fontName, fitting: boundsRect(in: size))
                 ?? Path(ellipseIn: boundsRect(in: size))
+        case .path(let loops, _):
+            let r = boundsRect(in: size)
+            var p = Path()
+            for loop in loops where loop.count > 2 {
+                p.move(to: CGPoint(x: r.minX + loop[0].x * r.width, y: r.minY + loop[0].y * r.height))
+                for pt in loop.dropFirst() {
+                    p.addLine(to: CGPoint(x: r.minX + pt.x * r.width, y: r.minY + pt.y * r.height))
+                }
+                p.closeSubpath()
+            }
+            return p.isEmpty ? Path(ellipseIn: r) : p
         }
     }
 
@@ -490,6 +516,8 @@ struct MaskInspector: View {
     private static let quickGlyphs = ["★", "♥", "●", "▲", "✚", "❄", "♠", "♣", "◆", "☾"]
 
     @State private var glyphText = ""
+    @State private var symbolName = ""
+    @State private var symbolFailed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -525,6 +553,9 @@ struct MaskInspector: View {
         Picker("Shape", selection: formBinding) {
             ForEach(MaskForm.pickable, id: \.self) { f in Text(f.label).tag(f) }
             Text("Character").tag(MaskForm.glyph(currentGlyph, fontName: nil))
+            if case .path(let loops, let label) = document.cropMask?.form {
+                Text(label).tag(MaskForm.path(loops: loops, label: label))
+            }
         }
         .pickerStyle(.menu)
         .labelsHidden()
@@ -558,6 +589,48 @@ struct MaskInspector: View {
             Text("Any character from any installed font works — the mask uses the real glyph outline, so the marching ants trace its exact shape.")
                 .font(.system(size: 18)).foregroundStyle(.secondary)
         }
+
+        Divider()
+        symbolControls
+    }
+
+    /// SF Symbols. Picking one RESOLVES it to an outline immediately and stores that
+    /// outline in the mask — see `SymbolMaskResolver` for why it cannot simply be drawn
+    /// like a font glyph.
+    @ViewBuilder private var symbolControls: some View {
+        Text("SF Symbol").font(.system(size: 18)).foregroundStyle(.secondary)
+        HStack {
+            TextField("symbol name", text: $symbolName)
+                .font(.system(size: 18))
+            Button("Use") { useSymbol(symbolName) }
+                .disabled(symbolName.isEmpty)
+        }
+        // Two rows of four so the buttons stay finger-sized rather than crowding.
+        ForEach([Array(SymbolMaskResolver.quick.prefix(4)),
+                 Array(SymbolMaskResolver.quick.suffix(4))], id: \.self) { row in
+            HStack(spacing: 6) {
+                ForEach(row, id: \.self) { n in
+                    Button { useSymbol(n) } label: {
+                        Image(systemName: n).font(.system(size: 18)).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+        if symbolFailed {
+            Text("No symbol by that name, or nothing traceable came back. Try a filled variant — an outline-only symbol has very thin contours.")
+                .font(.system(size: 18)).foregroundStyle(.red)
+        }
+    }
+
+    private func useSymbol(_ name: String) {
+        guard let loops = SymbolMaskResolver.resolve(name) else {
+            symbolFailed = true
+            return
+        }
+        symbolFailed = false
+        symbolName = name
+        document.cropMask?.form = .path(loops: loops, label: name)
     }
 
     @ViewBuilder private func sidesStepper(label: String) -> some View {
@@ -608,5 +681,116 @@ struct MaskInspector: View {
     /// after that first moment is what changed.
     private func addMask() {
         document.cropMask = CropMask(rect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8))
+    }
+}
+
+// MARK: - Cutting the pixels
+
+extension CropMask {
+    /// Trim `cg` to this mask: cropped to the frame's bounding box, with everything
+    /// outside the SILHOUETTE made transparent.
+    ///
+    /// A plain rectangle comes out identical to the old `cropping(to:)` behaviour, so
+    /// this one path serves every mask. A star comes out star-shaped with transparent
+    /// corners, which is the entire point of a mask being a shape.
+    ///
+    /// Coordinates are the fiddly part. `silhouette(in:)` is top-left origin, matching
+    /// the canvas; `CGContext` is bottom-left origin. The path is flipped once, and the
+    /// context is translated so the mask's bounding box lands at the output's origin.
+    func clip(_ cg: CGImage) -> CGImage? {
+        let w = CGFloat(cg.width), h = CGFloat(cg.height)
+        let box = CGRect(x: bounds.minX * w, y: bounds.minY * h,
+                         width: bounds.width * w, height: bounds.height * h).integral
+        guard box.width >= 1, box.height >= 1 else { return nil }
+
+        guard let ctx = CGContext(data: nil,
+                                  width: Int(box.width), height: Int(box.height),
+                                  bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+
+        // Top-left path → bottom-left context.
+        var flip = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: h)
+        guard let flipped = silhouette(in: CGSize(width: w, height: h)).cgPath.copy(using: &flip) else { return nil }
+
+        ctx.translateBy(x: -box.minX, y: -(h - box.maxY))
+        ctx.addPath(flipped)
+        ctx.clip()
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()
+    }
+}
+
+// MARK: - SF Symbols → a real outline
+
+/// Turns an SF Symbol into closed loops of points, so it can be a mask silhouette.
+///
+/// **Why this is not as simple as the glyph case.** A Unicode character has a real outline
+/// sitting in a font file, and CoreText hands it over. An SF Symbol does not: it is
+/// rendered art, reachable only as pixels. So the symbol is drawn once at high resolution
+/// and its contours are traced with Vision's `VNDetectContoursRequest` — the same
+/// framework the app already uses for Remove Background.
+///
+/// **Resolved once, at pick time.** The loops are then stored in the mask itself
+/// (`MaskForm.path`), which keeps a render off the export path and makes a saved file
+/// independent of whether that symbol still ships in a future OS.
+enum SymbolMaskResolver {
+
+    /// A handful worth having one tap away. Anything else is typable — any SF Symbol name.
+    static let quick = ["heart.fill", "star.fill", "bolt.fill", "leaf.fill",
+                        "flame.fill", "drop.fill", "moon.fill", "pawprint.fill"]
+
+    /// Render the symbol, trace it, and return closed loops normalized 0…1 with a
+    /// top-left origin (matching the canvas). Nil when the name is not a real symbol or
+    /// nothing traceable came back.
+    @MainActor
+    static func resolve(_ name: String, samples: CGFloat = 512) -> [[CGPoint]]? {
+        guard !name.isEmpty, let cg = render(name, side: samples) else { return nil }
+
+        let request = VNDetectContoursRequest()
+        // The symbol is drawn white on black, so the subject is the LIGHT part.
+        request.detectsDarkOnLight = false
+        request.maximumImageDimension = Int(samples)
+        // Symbols are flat black-and-white; no contrast coaxing needed, and turning it up
+        // only invents edges inside solid areas.
+        request.contrastAdjustment = 1.0
+
+        let handler = VNImageRequestHandler(cgImage: cg, options: [:])
+        do { try handler.perform([request]) } catch { return nil }
+        guard let observation = request.results?.first as? VNContoursObservation else { return nil }
+
+        var loops: [[CGPoint]] = []
+        for i in 0..<observation.contourCount {
+            guard let contour = try? observation.contour(at: i) else { continue }
+            // Vision is bottom-left origin; the canvas is top-left. Flip y once here so
+            // every downstream user works in canvas terms.
+            let pts = contour.normalizedPoints.map { CGPoint(x: CGFloat($0.x), y: 1 - CGFloat($0.y)) }
+            // Skip specks — a stray 3-point contour is noise from antialiasing, not shape.
+            if pts.count > 8 { loops.append(pts) }
+        }
+        return loops.isEmpty ? nil : loops
+    }
+
+    /// Draw the symbol white on black, square, at `side` points.
+    @MainActor
+    private static func render(_ name: String, side: CGFloat) -> CGImage? {
+        #if os(macOS)
+        guard NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil else { return nil }
+        #else
+        guard UIImage(systemName: name) != nil else { return nil }
+        #endif
+        let content = ZStack {
+            Color.black
+            Image(systemName: name)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .foregroundStyle(.white)
+                .padding(side * 0.06)      // keep the glyph off the edge so contours close
+        }
+        .frame(width: side, height: side)
+
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = 1
+        return renderer.cgImage
     }
 }

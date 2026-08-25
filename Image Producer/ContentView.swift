@@ -380,11 +380,11 @@ struct ContentView: View {
         // Non-destructive crop: render the full square, then trim the CGImage to the
         // normalized crop rect (origin top-left, matching the canvas convention). A
         // non-square crop yields a rectangular PNG; nil = full square as before.
-        if let crop = document.cropRect {
-            let w = CGFloat(cg.width), h = CGFloat(cg.height)
-            let rect = CGRect(x: crop.minX * w, y: crop.minY * h,
-                              width: crop.width * w, height: crop.height * h).integral
-            if let cropped = cg.cropping(to: rect) { return pngData(from: cropped) }
+        // Trim to the mask. `clip` crops to the mask's bounding box AND makes everything
+        // outside the silhouette transparent — so a star mask exports a star, not the
+        // rectangle around one. A plain rectangular mask comes out exactly as before.
+        if let mask = document.cropMask, let cut = mask.clip(cg) {
+            return pngData(from: cut)
         }
         return pngData(from: cg)
     }
@@ -2688,9 +2688,11 @@ struct MoveTransformInspector: View {
         renderer.scale = 1
         let px = CGRect(x: crop.minX * w, y: crop.minY * h,
                         width: crop.width * w, height: crop.height * h).integral
+        // Bake through the same mask the canvas previewed, so Apply and Export agree.
+        let cutMask = document.cropMask ?? CropMask(rect: crop)
         guard px.width >= 1, px.height >= 1,
               let full = renderer.cgImage,
-              let cropped = full.cropping(to: px),
+              let cropped = cutMask.clip(full),
               let png = pngData(from: cropped) else { return }
         // Defer the mutation so the confirmation dialog fully dismisses and any in-flight
         // slider bindings settle before the layer's content changes.
