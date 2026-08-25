@@ -71,6 +71,30 @@ struct ContentView: View {
     private let maxZoom: CGFloat = 8
     private let zoomStep: CGFloat = 1
 
+    /// Zoom at the moment a pinch began, so the gesture scales from where you were
+    /// rather than snapping to 1× on the first delta.
+    @State private var zoomAtPinchStart: CGFloat?
+
+    /// Trackpad pinch — Michael, 2026-08-24: "the canvas doesnt pinch zoom on a mac".
+    ///
+    /// The +/− buttons worked, so zoom itself was fine; there was simply no gesture.
+    /// `ZoomableCanvas` wraps the content in a UIScrollView on iOS and is a PASSTHROUGH
+    /// on macOS — and macOS is PRIMARY for this app. So the Mac had buttons and nothing
+    /// else, on a machine whose trackpad pinch every other graphics app understands.
+    ///
+    /// Deliberately NOT animated: setZoom() animates, which is right for a button press
+    /// and wrong for a continuous gesture — it would lag behind the fingers.
+    private var pinchZoom: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                let base = zoomAtPinchStart ?? canvasZoom
+                if zoomAtPinchStart == nil { zoomAtPinchStart = base }
+                fitWidth = false                       // pinching leaves Fit Width, as +/− does
+                canvasZoom = min(max(base * value.magnification, minZoom), maxZoom)
+            }
+            .onEnded { _ in zoomAtPinchStart = nil }
+    }
+
     private func setZoom(_ z: CGFloat) {
         fitWidth = false                       // manual zoom leaves Fit Width
         withAnimation(.easeOut(duration: 0.15)) {
@@ -300,6 +324,7 @@ struct ContentView: View {
                            fillColor: $fillColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .scaleEffect(canvasZoom)
+                    .gesture(pinchZoom)
             }
         }
         .padding()
