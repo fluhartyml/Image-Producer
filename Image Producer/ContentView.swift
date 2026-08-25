@@ -1303,6 +1303,19 @@ struct CanvasInspector: View {
         // one he asked for. 2320/720 reduces to 29/9 exactly; it is not an odd rounding.
         CanvasAspectPreset(label: "Apple TV top shelf", ratioW: 8, ratioH: 3, minLongEdge: 1920),
         CanvasAspectPreset(label: "Apple TV top shelf (wide)", ratioW: 29, ratioH: 9, minLongEdge: 2320),
+
+        // 2:3, and the ratio is Apple's own word — TVTopShelfSectionedItem.h in the tvOS
+        // SDK says "/// A 2:3 poster image." for TVTopShelfSectionedItemImageShapePoster.
+        //
+        // ⚠️ THIS IS A DIFFERENT THING FROM THE TWO ABOVE, which is easy to miss. Those are
+        // the STATIC top shelf image every tvOS app ships in its brand asset. This one is
+        // for DYNAMIC top shelf content, drawn by a TV Services extension, where sectioned
+        // items come in three shapes: square 1:1, poster 2:3, HDTV 16:9. An app can use
+        // both — the static image when nothing else applies, the dynamic items when the
+        // extension supplies them.
+        //
+        // No minimum long edge: Apple states the shape, not a floor.
+        CanvasAspectPreset(label: "Apple TV poster", ratioW: 2, ratioH: 3),
     ]
 
     /// Pixel-defined targets. Michael asked for the YouTube thumbnail on 2026-08-25;
