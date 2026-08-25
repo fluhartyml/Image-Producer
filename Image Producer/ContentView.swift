@@ -71,6 +71,10 @@ struct ContentView: View {
     private let maxZoom: CGFloat = 8
     private let zoomStep: CGFloat = 1
 
+    /// Production preview PiP visible? Shared with the Zoom inspector's toggle via
+    /// AppStorage, so either surface can turn it on or off.
+    @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
+
     /// Zoom at the moment a pinch began, so the gesture scales from where you were
     /// rather than snapping to 1× on the first delta.
     @State private var zoomAtPinchStart: CGFloat?
@@ -427,6 +431,22 @@ struct ContentView: View {
         .padding()
         .background(Color(white: 0.5).opacity(0.12))
         .clipped()                                   // zoomed canvas stays inside its area
+        // The production preview floats over the canvas AREA — deliberately OUTSIDE the
+        // .scaleEffect / .offset applied above.
+        //
+        // BUG THIS FIXES, found by Michael 2026-08-24: "one bug the PiP moves with the
+        // pan". It had been placed inside the canvas ZStack, so it was scaled AND panned
+        // with the artwork and ended up hanging half off the bottom edge — which also
+        // made the panel's own caption a lie ("The preview never follows the canvas
+        // zoom"). It was following both.
+        //
+        // It belongs to the WINDOW, not to the picture. Same reason it snaps to the
+        // corners of the canvas area rather than to the artwork.
+        .overlay {
+            if showProductionPiP {
+                GeometryReader { g in ProductionPiP(document: document, bounds: g.size) }
+            }
+        }
         .overlay(alignment: .bottomTrailing) { canvasControls }
         // Safeguard: if a tool is marked incompatible with Fit Width, picking it drops
         // back to the normal fitted view so the tool can't break (Michael 2026-06-23).
@@ -2977,9 +2997,6 @@ private struct ToolPointer: ViewModifier {
 }
 
 struct CanvasView: View {
-    /// Production preview PiP visible? Shared with the Zoom inspector's toggle via
-    /// AppStorage, so either surface can turn it on or off.
-    @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
 
     /// The floating production preview, factored OUT of `body` deliberately: the
     /// canvas expression is already at the Swift type-checker's limit, and inlining
@@ -3100,19 +3117,6 @@ struct CanvasView: View {
                     .position(hp)
                     .allowsHitTesting(false)
             }
-            // The floating production preview — last in the ZStack so it sits on
-            // top of everything. It lives HERE rather than on the modifier chain
-            // below because that chain is already at the Swift type-checker's
-            // limit; adding a single .overlay to it broke the build with "unable
-            // to type-check in reasonable time".
-            productionPiP(in: disp)
-    }
-
-    @ViewBuilder
-    private func productionPiP(in size: CGSize) -> some View {
-        if showProductionPiP {
-            ProductionPiP(document: document, bounds: size)
-        }
     }
 
     @ObservedObject var document: ImageDocument
