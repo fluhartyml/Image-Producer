@@ -1290,6 +1290,19 @@ struct CanvasInspector: View {
         // the plain name of the thing and nothing else, and it is the ONLY entry carrying
         // that name so there is never a choice to make between two of them.
         CanvasAspectPreset(label: "YouTube thumbnail", ratioW: 16, ratioH: 9, minLongEdge: 640),
+
+        // 3:1. From knowledge, NOT from a local source — X has moved this before, so if a
+        // banner ever looks wrong, check their current spec before blaming the preset.
+        CanvasAspectPreset(label: "X banner", ratioW: 3, ratioH: 1, minLongEdge: 1500),
+
+        // ⭐ THESE TWO WERE MEASURED, NOT RECALLED. Read straight off Michael's own shipped
+        // tvOS app — Tally Matrix Clock's `App Icon & Top Shelf Image.brandassets`:
+        //   Top Shelf Image        1920 × 720   (@2x 3840 × 1440)  → exactly 8:3
+        //   Top Shelf Image Wide   2320 × 720   (@2x 4640 × 1440)  → exactly 29:9
+        // Apple ships BOTH slots, which is why there are two entries here rather than the
+        // one he asked for. 2320/720 reduces to 29/9 exactly; it is not an odd rounding.
+        CanvasAspectPreset(label: "Apple TV top shelf", ratioW: 8, ratioH: 3, minLongEdge: 1920),
+        CanvasAspectPreset(label: "Apple TV top shelf (wide)", ratioW: 29, ratioH: 9, minLongEdge: 2320),
     ]
 
     /// Pixel-defined targets. Michael asked for the YouTube thumbnail on 2026-08-25;
@@ -1304,6 +1317,9 @@ struct CanvasInspector: View {
         // wants that exact canvas, and it should read as a size, not as a second answer
         // to the same question.
         CanvasPixelPreset(label: "1280 × 720 exact", pixelWidth: 1280, pixelHeight: 720),
+        CanvasPixelPreset(label: "1500 × 500 exact", pixelWidth: 1500, pixelHeight: 500),
+        CanvasPixelPreset(label: "1920 × 720 exact", pixelWidth: 1920, pixelHeight: 720),
+        CanvasPixelPreset(label: "2320 × 720 exact", pixelWidth: 2320, pixelHeight: 720),
     ]
 
     static let envelopePresets = [
