@@ -119,6 +119,37 @@ struct ContentView: View {
         return SimultaneousGesture(pan, reset.exclusively(before: out).exclusively(before: inward))
     }
 
+    /// Where the zoom was before the last "all the way out", so the toggle can put it
+    /// back. Pan travels with it — returning to 3× with the artwork re-centred would
+    /// lose your place, which is the whole thing the toggle exists to preserve.
+    @State private var zoomBeforeToggle: CGFloat?
+    @State private var panBeforeToggle: CGSize = .zero
+
+    /// Double-tap the magnifying glass in the tool strip: zoom all the way out, or back
+    /// to where you were.
+    ///
+    /// Michael, 2026-08-24: "how about double click or tap the magnefying tool it zooms
+    /// all the way out or back in to the previous zoom".
+    ///
+    /// Better than Photoshop's equivalent, which jumps to 100% and FORGETS where you
+    /// were. This remembers, which is what you actually want while working magnified:
+    /// pop out to check the whole picture, pop back in and carry on at the same spot.
+    ///
+    /// Modifier-free by design — see feedback_sticky_keys_avoid_modifier_gestures.
+    private func toggleZoomAllTheWayOut() {
+        if canvasZoom > minZoom {
+            zoomBeforeToggle = canvasZoom
+            panBeforeToggle = canvasPan
+            applyZoom(minZoom)
+        } else if let z = zoomBeforeToggle {
+            applyZoom(z)
+            withAnimation(.easeOut(duration: 0.18)) {
+                canvasPan = panBeforeToggle
+                panAtDragStart = panBeforeToggle
+            }
+        }
+    }
+
     /// Land on a zoom level from the Zoom tool's double-clicks.
     ///
     /// Michael, 2026-08-24: "yes add option click to zoom out by -1.5x per double clich
@@ -189,7 +220,7 @@ struct ContentView: View {
                 canvasArea
                     .frame(height: geo.size.height * 0.42)
                 Divider()
-                ToolStrip(activeTool: $activeTool, lines: 1)
+                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, lines: 1)
                 Divider()
                 BottomPanel.PanelView(document: document, activeTool: activeTool,
                                       activeLayerID: $activeLayerID, selection: $bottomPanel,
@@ -202,7 +233,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Divider()
                 VStack(spacing: 0) {
-                    ToolStrip(activeTool: $activeTool, lines: 1)
+                    ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, lines: 1)
                     Divider()
                     BottomPanel.PanelView(document: document, activeTool: activeTool,
                                           activeLayerID: $activeLayerID, selection: $bottomPanel,
@@ -227,7 +258,7 @@ struct ContentView: View {
                     canvasArea
                         .frame(height: geo.size.height / 2)
                     Divider()
-                    ToolStrip(activeTool: $activeTool)
+                    ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
                     ActiveToolLabel(tool: activeTool)
                     Divider()
                     BottomPanel.PanelView(document: document,
@@ -246,7 +277,7 @@ struct ContentView: View {
                     canvasArea
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     Divider()
-                    ToolRail(activeTool: $activeTool)
+                    ToolRail(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
                     Divider()
                     ToolInspector(document: document,
                                   activeTool: activeTool,
@@ -459,6 +490,9 @@ struct ContentView: View {
 /// there are more tools than fit. Tapping a tool makes it the active tool.
 struct ToolStrip: View {
     @Binding var activeTool: Tool
+    /// Double-tap on a tool's own button. Zoom uses it to toggle all-the-way-out and
+    /// back — Michael 2026-08-24. Optional so callers that do not care can omit it.
+    var onDoubleTap: ((Tool) -> Void)? = nil
     /// Rows of tools: 2 on iPad (the default), 1 on iPhone (a single scrollable line).
     var lines: Int = 2
 
@@ -481,6 +515,9 @@ struct ToolStrip: View {
                             .foregroundStyle(activeTool == tool ? Color.accentColor : Color.primary)
                     }
                     .buttonStyle(.plain)
+                    // simultaneous, not .onTapGesture — a Button already owns the tap,
+                    // and replacing it would stop single-click tool selection working.
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { onDoubleTap?(tool) })
                     .help(tool.title)                 // tooltip on Mac / iPad pointer
                     .accessibilityLabel(tool.title)   // VoiceOver everywhere
                 }
@@ -516,6 +553,9 @@ struct ActiveToolLabel: View {
 /// vertically when there are more tools than fit.
 struct ToolRail: View {
     @Binding var activeTool: Tool
+    /// Double-tap on a tool's own button. Zoom uses it to toggle all-the-way-out and
+    /// back — Michael 2026-08-24. Optional so callers that do not care can omit it.
+    var onDoubleTap: ((Tool) -> Void)? = nil
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -532,6 +572,9 @@ struct ToolRail: View {
                             .foregroundStyle(activeTool == tool ? Color.accentColor : Color.primary)
                     }
                     .buttonStyle(.plain)
+                    // simultaneous, not .onTapGesture — a Button already owns the tap,
+                    // and replacing it would stop single-click tool selection working.
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { onDoubleTap?(tool) })
                     .help(tool.title)
                     .accessibilityLabel(tool.title)
                 }
