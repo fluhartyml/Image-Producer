@@ -2054,6 +2054,99 @@ struct HistoryPanel: View {
     @State private var expanded: Set<UUID> = []
     @State private var confirmingPurge = false
 
+    /// A history edit awaiting confirmation.
+    ///
+    /// HISTORY EDITS ARE FINITE — Michael's decision, 2026-08-24: "finite because that
+    /// settles the incongruity and has a well i warned ya before it executed."
+    ///
+    /// The incongruity he was sensing: Restore and Delete are both DESTRUCTIVE, and the
+    /// History panel IS this app's undo — ⌘Z/UndoManager was removed because it crashed.
+    /// So these two controls destroy the only recovery mechanism there is, and autosave
+    /// commits the result within about a second (the cursor returns to .latest, which
+    /// un-suppresses the write). There is nothing underneath to catch a misfire, and a
+    /// right-click on a small list row is exactly the gesture people misfire.
+    ///
+    /// The rule this satisfies: a confirmation is the FALLBACK FOR WHEN YOU CANNOT OFFER
+    /// UNDO. Undo would be better and is not available here. And the dialog names the
+    /// CONSEQUENCE rather than asking "are you sure?" — the user should be agreeing to
+    /// something specific, not being asked how confident they feel.
+    private enum PendingHistoryEdit: Identifiable {
+        case restore(entry: Int, action: Int, dropping: Int, label: String)
+        case deleteStep(entry: Int, action: Int, label: String)
+        case deleteGroup(entry: Int, count: Int, label: String)
+        case restoreOriginal(dropping: Int)
+
+        var id: String {
+            switch self {
+            case .restore(let e, let a, _, _):   "r\(e).\(a)"
+            case .deleteStep(let e, let a, _):   "d\(e).\(a)"
+            case .deleteGroup(let e, _, _):      "g\(e)"
+            case .restoreOriginal:               "orig"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .restore(_, _, _, let l):       "Restore from “\(l)”?"
+            case .deleteStep(_, _, let l):       "Delete “\(l)”?"
+            case .deleteGroup(_, _, let l):      "Delete “\(l)”?"
+            case .restoreOriginal:               "Restore to Original?"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .restore(_, _, let n, _):
+                n == 0 ? "This step is already the newest. Nothing will be deleted."
+                       : "\(n) newer step\(n == 1 ? "" : "s") will be permanently deleted. This can’t be undone."
+            case .deleteStep:
+                "This step will be permanently removed from the history. Your picture won’t change. This can’t be undone."
+            case .deleteGroup(_, let n, _):
+                "\(n) step\(n == 1 ? "" : "s") will be permanently removed from the history. Your picture won’t change. This can’t be undone."
+            case .restoreOriginal(let n):
+                "Every recorded step (\(n)) will be permanently deleted and the picture returns to how it started. This can’t be undone."
+            }
+        }
+
+        var buttonTitle: String {
+            switch self {
+            case .restore:          "Restore"
+            case .deleteStep,
+                 .deleteGroup:      "Delete"
+            case .restoreOriginal:  "Restore to Original"
+            }
+        }
+    }
+
+    @State private var pending: PendingHistoryEdit?
+
+    /// How many recorded actions sit AFTER the given point — what a Restore would drop.
+    private func actionsAfter(entry e: Int, action a: Int) -> Int {
+        var n = 0
+        for (i, entry) in document.history.entries.enumerated() {
+            if i < e { continue }
+            n += i == e ? max(0, entry.actions.count - (a + 1)) : entry.actions.count
+        }
+        return n
+    }
+
+    /// Carry out a confirmed edit.
+    private func perform(_ edit: PendingHistoryEdit) {
+        switch edit {
+        case .restore(let e, let a, _, _):
+            document.restoreHistory(toEntry: e, action: a)
+        case .deleteStep(let e, let a, _):
+            document.deleteHistoryStep(entry: e, action: a)
+        case .deleteGroup(let e, let count, _):
+            for a in stride(from: count - 1, through: 0, by: -1) {
+                document.deleteHistoryStep(entry: e, action: a)
+            }
+        case .restoreOriginal:
+            document.deleteHistoryFromBaseline()
+        }
+        clampActiveLayer()
+    }
+
     /// After viewing/deleting a history point the active layer may no longer exist (e.g. a
     /// fill result layer); fall back to the top layer so the editor keeps a valid selection.
     private func clampActiveLayer() {
@@ -2122,7 +2215,7 @@ struct HistoryPanel: View {
                         .listRowBackground(isCurrent ? Color.accentColor.opacity(0.15) : Color.clear)
                         .contextMenu {
                             Button(role: .destructive) {
-                                document.deleteHistoryFromBaseline(); clampActiveLayer()
+                                pending = .restoreOriginal(dropping: totalActions)
                             } label: { Label("Restore to Original", systemImage: "arrow.uturn.backward") }
                         }
                     }
@@ -2140,26 +2233,29 @@ struct HistoryPanel: View {
                                             document.jump(toEntry: eIdx, action: aIdx)
                                             clampActiveLayer()
                                         },
+                                        // Every destructive item ASKS FIRST. History edits
+                                        // are finite (Michael 2026-08-24) and this panel is
+                                        // the app's only undo, so nothing here executes on
+                                        // the click itself.
                                         deleteEntry: {
-                                            // Whole group = every action it holds, newest
-                                            // first so the indices stay valid.
-                                            for a in stride(from: entry.actions.count - 1, through: 0, by: -1) {
-                                                document.deleteHistoryStep(entry: eIdx, action: a)
-                                            }
-                                            clampActiveLayer()
+                                            pending = .deleteGroup(entry: eIdx,
+                                                                   count: entry.actions.count,
+                                                                   label: entry.title)
                                         },
                                         deleteAction: { aIdx in
-                                            document.deleteHistoryStep(entry: eIdx, action: aIdx)
-                                            clampActiveLayer()
+                                            pending = .deleteStep(entry: eIdx, action: aIdx,
+                                                                  label: entry.actions[aIdx].label)
                                         },
                                         restoreEntry: {
-                                            document.restoreHistory(toEntry: eIdx,
-                                                                    action: entry.actions.count - 1)
-                                            clampActiveLayer()
+                                            let a = entry.actions.count - 1
+                                            pending = .restore(entry: eIdx, action: a,
+                                                               dropping: actionsAfter(entry: eIdx, action: a),
+                                                               label: entry.title)
                                         },
                                         restoreAction: { aIdx in
-                                            document.restoreHistory(toEntry: eIdx, action: aIdx)
-                                            clampActiveLayer()
+                                            pending = .restore(entry: eIdx, action: aIdx,
+                                                               dropping: actionsAfter(entry: eIdx, action: aIdx),
+                                                               label: entry.actions[aIdx].label)
                                         })
                     }
                 }
@@ -2174,6 +2270,15 @@ struct HistoryPanel: View {
                             isPresented: $confirmingPurge, titleVisibility: .visible) {
             Button("Purge History", role: .destructive) { document.purgeHistory() }
             Button("Cancel", role: .cancel) { }
+        .confirmationDialog(pending?.title ?? "",
+                            isPresented: Binding(get: { pending != nil },
+                                                 set: { if !$0 { pending = nil } }),
+                            presenting: pending) { edit in
+            Button(edit.buttonTitle, role: .destructive) { perform(edit); pending = nil }
+            Button("Cancel", role: .cancel) { pending = nil }
+        } message: { edit in
+            Text(edit.message)
+        }
         } message: {
             Text("Keeps the current image and clears the entire edit trail. This can't be undone.")
         }
