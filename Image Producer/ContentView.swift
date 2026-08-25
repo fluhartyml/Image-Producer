@@ -3896,6 +3896,9 @@ struct LayerPanel: View {
     var showsHeader: Bool = true
     @Binding var activeLayerID: ImageLayer.ID?
     @State private var renamingID: ImageLayer.ID?
+    /// Which groups are folded shut, keyed by base name. VIEW STATE ONLY — never
+    /// saved, never sent to the document; closing a group changes nothing about the art.
+    @State private var collapsedGroups: Set<String> = []
     @State private var draftName = ""
 
     var body: some View {
@@ -3942,11 +3945,25 @@ struct LayerPanel: View {
 
     /// The layer rows (reversed = top-of-stack first). Returns DynamicViewContent so
     /// `.onMove`/`.onDelete` attach; `.tag` wires each row to List selection on macOS.
+    ///
+    /// Iterates `visibleRows`, NOT `document.layers` — a collapsed group contributes only
+    /// its topmost member. Every index handed to `.onMove`/`.onDelete` is therefore an
+    /// index into `visibleRows`, and both functions translate through ids rather than
+    /// positions because of it.
     private func layerRows() -> some DynamicViewContent {
-        ForEach(Array(document.layers.reversed())) { layer in
+        let groups = rowGroups
+        return ForEach(visibleRows) { layer in
             LayerRow(
                 layer: layer,
                 isActive: layer.id == activeLayerID,
+                groupBase: collapsibleBase(for: layer, in: groups),
+                isCollapsed: collapsibleBase(for: layer, in: groups).map { collapsedGroups.contains($0) } ?? false,
+                hiddenCount: hiddenCount(for: layer, in: groups),
+                onToggleGroup: {
+                    guard let base = collapsibleBase(for: layer, in: groups) else { return }
+                    if collapsedGroups.contains(base) { collapsedGroups.remove(base) }
+                    else { collapsedGroups.insert(base) }
+                },
                 onActivate: { activeLayerID = layer.id },
                 onToggleVisibility: { toggleVisibility(layer.id) },
                 onRename: { beginRename(layer) },
@@ -3957,6 +3974,91 @@ struct LayerPanel: View {
             .listRowBackground(layer.id == activeLayerID
                                ? Color.accentColor.opacity(0.15) : nil)
         }
+    }
+
+    // MARK: - Reveal caret (display only)
+    //
+    // Michael, 2026-08-25: "can layers have a reveal carrot? … i make a pixel per layer
+    // instead of having 100 new layers the parentesis are hidden behind the reveal
+    // carrot with the top most layer only showing" — then generalised it: "that logic
+    // can be for all tools that make new layers."
+    //
+    // ⭐ THE APP ALREADY ENCODED PARENTAGE IN THE NAMES. Every derived layer is
+    // `base (suffix)`: addResultLayer builds "\(name) (\(suffix))" and the pen's fork
+    // builds "\(base) (Pixel \(k))". Live suffixes: Pixel N, cropped, filled, lassoed,
+    // erased. So grouping needs NO new data model and NO change to the saved file.
+    //
+    // ⚠️ THIS IS A VIEW OF THE ARRAY, NOT A STRUCTURE IN IT. Nothing is stored, the
+    // stacking order is never rewritten, and compositing never sees any of it. A group is
+    // recomputed from scratch every render.
+    //
+    // ⚠️ CONTIGUOUS RUNS ONLY. Two layers sharing a base name but separated by an
+    // unrelated layer are NOT grouped — folding them together would draw a stack order
+    // that isn't the real one, and the list must never lie about z-order.
+
+    /// A run of adjacent rows sharing a base name. `base` is nil for a row that belongs
+    /// to no group, which is most of them.
+    struct LayerRowGroup {
+        let base: String?
+        let members: [ImageLayer]   // top-first, same order as the list
+    }
+
+    /// `"Foreground (Pixel 7)"` → `"Foreground"`. Nil when the name has no parenthetical
+    /// suffix, i.e. the layer was not produced from another layer.
+    static func derivedBase(of name: String) -> String? {
+        guard name.hasSuffix(")"), let open = name.lastIndex(of: "(") else { return nil }
+        let base = name[name.startIndex..<open].trimmingCharacters(in: .whitespaces)
+        return base.isEmpty ? nil : base
+    }
+
+    /// The stack, top-first, cut into contiguous runs. A run is one or more derived
+    /// children sharing a base, plus the parent of that same name when it sits directly
+    /// below them — which is where `addResultLayer` puts it.
+    var rowGroups: [LayerRowGroup] {
+        let topFirst = Array(document.layers.reversed())
+        var groups: [LayerRowGroup] = []
+        var i = 0
+        while i < topFirst.count {
+            guard let base = Self.derivedBase(of: topFirst[i].name) else {
+                groups.append(LayerRowGroup(base: nil, members: [topFirst[i]]))
+                i += 1
+                continue
+            }
+            var run = [topFirst[i]]
+            var j = i + 1
+            while j < topFirst.count, Self.derivedBase(of: topFirst[j].name) == base {
+                run.append(topFirst[j]); j += 1
+            }
+            // The source layer itself, sitting immediately under its children.
+            if j < topFirst.count, topFirst[j].name == base {
+                run.append(topFirst[j]); j += 1
+            }
+            // A lone child with no siblings and no parent present is not worth a caret.
+            groups.append(LayerRowGroup(base: run.count > 1 ? base : nil, members: run))
+            i = j
+        }
+        return groups
+    }
+
+    /// What the list actually shows: a collapsed group folds down to its topmost member.
+    var visibleRows: [ImageLayer] {
+        rowGroups.flatMap { group -> [ImageLayer] in
+            guard let base = group.base, collapsedGroups.contains(base),
+                  let first = group.members.first else { return group.members }
+            return [first]
+        }
+    }
+
+    /// The group base for a row that can carry a caret — only the group's TOP row does.
+    private func collapsibleBase(for layer: ImageLayer, in groups: [LayerRowGroup]) -> String? {
+        for g in groups where g.base != nil && g.members.first?.id == layer.id { return g.base }
+        return nil
+    }
+
+    /// How many rows are folded away behind this row's caret.
+    private func hiddenCount(for layer: ImageLayer, in groups: [LayerRowGroup]) -> Int {
+        for g in groups where g.members.first?.id == layer.id { return max(0, g.members.count - 1) }
+        return 0
     }
 
     private var isRenaming: Binding<Bool> {
@@ -4017,18 +4119,36 @@ struct LayerPanel: View {
 
     /// L5 — swipe-to-delete. Offsets index into the reversed (top-first) display,
     /// so map them back to layer ids before removing.
+    /// Offsets index `visibleRows`, so a collapsed group's row deletes only the member
+    /// being shown — the next one down simply becomes the new representative. Nothing
+    /// hidden is deleted by a gesture aimed at something visible.
     private func deleteAt(_ offsets: IndexSet) {
-        let topFirst = Array(document.layers.reversed())
-        let ids = offsets.map { topFirst[$0].id }
+        let rows = visibleRows
+        let ids = offsets.compactMap { $0 < rows.count ? rows[$0].id : nil }
         document.layers.removeAll { ids.contains($0.id) }
         if let active = activeLayerID, ids.contains(active) { activeLayerID = nil }
     }
 
-    /// The list shows the stack reversed (top-first), so reorder in that reversed
-    /// space and write the un-reversed result back to the bottom-to-top array.
+    /// The list shows the stack reversed (top-first), so reorder in that reversed space
+    /// and write the un-reversed result back to the bottom-to-top array.
+    ///
+    /// Offsets index `visibleRows`, which may be shorter than the stack, so the move is
+    /// resolved by IDENTITY rather than position: find what the drop should land above,
+    /// pull the dragged layers out of the full array, and put them back in front of it.
+    /// Dragging a collapsed group's row moves just that layer — the run stops being
+    /// contiguous and the grouping simply recomputes, because the grouping was never
+    /// stored in the first place.
     private func move(from source: IndexSet, to destination: Int) {
+        let rows = visibleRows
+        let movingIDs = Set(source.compactMap { $0 < rows.count ? rows[$0].id : nil })
+        guard !movingIDs.isEmpty else { return }
+        let anchorID = destination < rows.count ? rows[destination].id : nil
+
         var topFirst = Array(document.layers.reversed())
-        topFirst.move(fromOffsets: source, toOffset: destination)
+        let moving = topFirst.filter { movingIDs.contains($0.id) }
+        topFirst.removeAll { movingIDs.contains($0.id) }
+        let insertAt = anchorID.flatMap { id in topFirst.firstIndex { $0.id == id } } ?? topFirst.count
+        topFirst.insert(contentsOf: moving, at: insertAt)
         document.layers = topFirst.reversed()
     }
 }
@@ -4036,6 +4156,12 @@ struct LayerPanel: View {
 struct LayerRow: View {
     let layer: ImageLayer
     let isActive: Bool
+    /// Non-nil only on the TOP row of a collapsible run — that row owns the caret.
+    var groupBase: String? = nil
+    var isCollapsed: Bool = false
+    /// How many rows are folded away behind the caret.
+    var hiddenCount: Int = 0
+    var onToggleGroup: () -> Void = {}
     let onActivate: () -> Void
     let onToggleVisibility: () -> Void
     let onRename: () -> Void
@@ -4044,6 +4170,22 @@ struct LayerRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            // THE REVEAL CARET. Only a run's top row gets one. It is a Button, not a tap
+            // gesture on the row, so it cannot be swallowed by List selection on macOS or
+            // by .onMove's drag — the same reason the row itself must not be a Button.
+            if groupBase != nil {
+                Button(action: onToggleGroup) {
+                    Image(systemName: isCollapsed ? "chevron.forward" : "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 22, height: 22)      // a real target, not a 13pt glyph
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            } else {
+                // Keep ungrouped rows aligned with grouped ones.
+                Color.clear.frame(width: 22, height: 1)
+            }
             #if os(macOS)
             // macOS: plain label — List selection handles click-to-activate and .onMove
             // handles drag-to-reorder. A row-wide Button would eat the drag.
@@ -4073,6 +4215,16 @@ struct LayerRow: View {
             }
             .buttonStyle(.plain)
             #endif
+
+            // How many rows are folded away. Shown only while shut — the point of the
+            // count is to say what you cannot see, so it would be noise when open.
+            if isCollapsed, hiddenCount > 0 {
+                Text("\(hiddenCount)")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(Capsule().fill(Color.secondary.opacity(0.18)))
+            }
 
             Button(action: onToggleVisibility) {
                 Image(systemName: layer.isVisible ? "eye" : "eye.slash")
