@@ -1284,8 +1284,12 @@ struct CanvasInspector: View {
     /// Ratio-defined targets — **the ones that actually matter for upload**, because the
     /// platform re-encodes anyway and only the shape survives.
     static let screenAspectPresets = [
-        CanvasAspectPreset(label: "YouTube thumbnail — 16:9 (keeps your resolution)",
-                           ratioW: 16, ratioH: 9, minLongEdge: 640),
+        // ⭐ THE TITLE IS THE FEATURE. Michael, 2026-08-25: "the important thing is the
+        // title youtube thumbnail over the pixel density." He looks for the JOB, not the
+        // numbers — the numbers are what the preset exists to spare him. So the label is
+        // the plain name of the thing and nothing else, and it is the ONLY entry carrying
+        // that name so there is never a choice to make between two of them.
+        CanvasAspectPreset(label: "YouTube thumbnail", ratioW: 16, ratioH: 9, minLongEdge: 640),
     ]
 
     /// Pixel-defined targets. Michael asked for the YouTube thumbnail on 2026-08-25;
@@ -1296,7 +1300,10 @@ struct CanvasInspector: View {
     /// The section is deliberately open-ended — other screen targets drop straight in as
     /// one line each, and none of them need a physical size.
     static let screenPresets = [
-        CanvasPixelPreset(label: "YouTube thumbnail — exactly 1280 × 720", pixelWidth: 1280, pixelHeight: 720),
+        // Kept, but renamed off the "YouTube thumbnail" name — this one is for when he
+        // wants that exact canvas, and it should read as a size, not as a second answer
+        // to the same question.
+        CanvasPixelPreset(label: "1280 × 720 exact", pixelWidth: 1280, pixelHeight: 720),
     ]
 
     static let envelopePresets = [
