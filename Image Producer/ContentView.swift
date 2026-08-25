@@ -1295,6 +1295,16 @@ struct CanvasInspector: View {
         // banner ever looks wrong, check their current spec before blaming the preset.
         CanvasAspectPreset(label: "X banner", ratioW: 3, ratioH: 1, minLongEdge: 1500),
 
+        // 820 × 312, which reduces to 205:78 — an ugly ratio because Facebook's number is
+        // an arbitrary pixel size rather than a clean shape. Expressed as the exact ratio
+        // so the preset still keeps whatever resolution he is working at.
+        //
+        // ⚠️ FROM KNOWLEDGE, NOT FROM A LOCAL SOURCE, and Facebook has moved this before
+        // (851 × 315 was the spec for years). It also crops differently on phone and
+        // desktop, so the safe area is smaller than the canvas. If a banner ever looks
+        // wrong, check their current spec before blaming the preset.
+        CanvasAspectPreset(label: "Facebook banner", ratioW: 205, ratioH: 78, minLongEdge: 820),
+
         // ⭐ THESE TWO WERE MEASURED, NOT RECALLED. Read straight off Michael's own shipped
         // tvOS app — Tally Matrix Clock's `App Icon & Top Shelf Image.brandassets`:
         //   Top Shelf Image        1920 × 720   (@2x 3840 × 1440)  → exactly 8:3
@@ -1331,6 +1341,7 @@ struct CanvasInspector: View {
         // to the same question.
         CanvasPixelPreset(label: "1280 × 720 exact", pixelWidth: 1280, pixelHeight: 720),
         CanvasPixelPreset(label: "1500 × 500 exact", pixelWidth: 1500, pixelHeight: 500),
+        CanvasPixelPreset(label: "820 × 312 exact", pixelWidth: 820, pixelHeight: 312),
         CanvasPixelPreset(label: "1920 × 720 exact", pixelWidth: 1920, pixelHeight: 720),
         CanvasPixelPreset(label: "2320 × 720 exact", pixelWidth: 2320, pixelHeight: 720),
     ]
