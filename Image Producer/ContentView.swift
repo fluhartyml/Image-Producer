@@ -98,22 +98,44 @@ struct ContentView: View {
     /// dragged to, and leaving a stale offset there would park the artwork off-centre
     /// with no way to tell why.
     private var zoomToolGestures: some Gesture {
-        SimultaneousGesture(
-            DragGesture(minimumDistance: 2)
-                .onChanged { v in
-                    guard canvasZoom > 1 else { return }      // nothing to pan at fit size
-                    canvasPan = CGSize(width: panAtDragStart.width + v.translation.width,
-                                       height: panAtDragStart.height + v.translation.height)
-                }
-                .onEnded { _ in panAtDragStart = canvasPan },
-            TapGesture(count: 2)
-                .onEnded {
-                    fitWidth = false
-                    withAnimation(.easeOut(duration: 0.18)) {
-                        canvasZoom = min(canvasZoom * doubleClickZoomFactor, maxZoom)
-                    }
-                }
-        )
+        // ORDER MATTERS. A plain TapGesture still fires while modifiers are held, so the
+        // most specific combination has to get first refusal — hence .exclusively(before:)
+        // running shift+option, then option, then bare.
+        let reset = TapGesture(count: 2).modifiers([.option, .shift])
+            .onEnded { applyZoom(1) }
+        let out = TapGesture(count: 2).modifiers(.option)
+            .onEnded { applyZoom(canvasZoom / doubleClickZoomFactor) }
+        let inward = TapGesture(count: 2)
+            .onEnded { applyZoom(canvasZoom * doubleClickZoomFactor) }
+
+        let pan = DragGesture(minimumDistance: 2)
+            .onChanged { v in
+                guard canvasZoom > 1 else { return }          // nothing to pan at fit size
+                canvasPan = CGSize(width: panAtDragStart.width + v.translation.width,
+                                   height: panAtDragStart.height + v.translation.height)
+            }
+            .onEnded { _ in panAtDragStart = canvasPan }
+
+        return SimultaneousGesture(pan, reset.exclusively(before: out).exclusively(before: inward))
+    }
+
+    /// Land on a zoom level from the Zoom tool's double-clicks.
+    ///
+    /// Michael, 2026-08-24: "yes add option click to zoom out by -1.5x per double clich
+    /// or shift option click zooms to 1x".
+    ///
+    ///   double-click                -> × 1.5
+    ///   option + double-click       -> ÷ 1.5
+    ///   shift + option + double-click -> straight back to 1×
+    ///
+    /// Animated, unlike the pinch: a click is a discrete act and should be seen to
+    /// happen, where a continuous gesture must not lag behind the fingers.
+    private func applyZoom(_ z: CGFloat) {
+        fitWidth = false
+        withAnimation(.easeOut(duration: 0.18)) {
+            canvasZoom = min(max(z, minZoom), maxZoom)
+            if canvasZoom == 1 { canvasPan = .zero; panAtDragStart = .zero }
+        }
     }
 
     /// Trackpad pinch — Michael, 2026-08-24: "the canvas doesnt pinch zoom on a mac".
