@@ -828,6 +828,23 @@ struct CanvasSizePreset: Identifiable {
     var defaultLandscape = false
 }
 
+/// A canvas preset defined in PIXELS rather than inches.
+///
+/// ⚠️ SEPARATE FROM `CanvasSizePreset` ON PURPOSE, and the distinction is not cosmetic.
+/// An inch preset computes `pixels = physical × PPI`, which is right for anything that
+/// gets printed. A screen target is specified in pixels and has no physical size at all —
+/// a YouTube thumbnail is 1280 × 720 whatever the PPI happens to be. Run it through the
+/// inch path at the 300 PPI the inspector recommends for print and you would get
+/// 5333 × 3000, which is not a thumbnail.
+///
+/// So these set the pixel count directly and leave PPI untouched.
+struct CanvasPixelPreset: Identifiable {
+    var id: String { label }
+    let label: String
+    let pixelWidth: Int
+    let pixelHeight: Int
+}
+
 // MARK: - Canvas inspector (Tool: Canvas — the open project's central hub)
 
 /// The Canvas tool is the CENTRAL HUB for the open project. SLICE A (2026-06-22):
@@ -930,6 +947,7 @@ struct CanvasInspector: View {
                     Section("Index card")     { presetButtons(Self.indexPresets) }
                     Section("Business card")  { presetButtons(Self.businessPresets) }
                     Section("Envelope")       { presetButtons(Self.envelopePresets) }
+                    Section("Screen")         { pixelPresetButtons(Self.screenPresets) }
                 }
                 .font(.system(size: 18)).fixedSize()
 
@@ -1155,6 +1173,19 @@ struct CanvasInspector: View {
         ForEach(list) { p in Button(p.label) { applyPreset(p) } }
     }
 
+    @ViewBuilder private func pixelPresetButtons(_ list: [CanvasPixelPreset]) -> some View {
+        ForEach(list) { p in Button(p.label) { applyPixelPreset(p) } }
+    }
+
+    /// Apply a pixel preset: set the pixel count outright. **PPI is deliberately left
+    /// alone** — it describes print size, and a screen target has none. The Landscape
+    /// toggle is not consulted either: 1280 × 720 is 1280 × 720, and rotating it would
+    /// produce something no platform accepts.
+    private func applyPixelPreset(_ p: CanvasPixelPreset) {
+        document.canvasWidth = max(1, p.pixelWidth)
+        document.canvasHeight = max(1, p.pixelHeight)
+    }
+
     /// Apply a size preset: pixels = physical × current PPI, respecting the orientation.
     private func applyPreset(_ p: CanvasSizePreset) {
         let land = p.defaultLandscape                   // each preset's conventional orientation
@@ -1191,6 +1222,17 @@ struct CanvasInspector: View {
     static let businessPresets = [
         CanvasSizePreset(label: "Business card 3.5 × 2", shortIn: 2, longIn: 3.5, defaultLandscape: true),
     ]
+    /// Pixel-defined targets. Michael asked for the YouTube thumbnail on 2026-08-25;
+    /// **1280 × 720 is YouTube's own recommendation** (640 × 360 is their stated minimum,
+    /// and 16:9 is what the player expects, so anything else is letterboxed or cropped by
+    /// YouTube rather than by him).
+    ///
+    /// The section is deliberately open-ended — other screen targets drop straight in as
+    /// one line each, and none of them need a physical size.
+    static let screenPresets = [
+        CanvasPixelPreset(label: "YouTube thumbnail 1280 × 720", pixelWidth: 1280, pixelHeight: 720),
+    ]
+
     static let envelopePresets = [
         CanvasSizePreset(label: "Letter #6¾ 3.625 × 6.5", shortIn: 3.625, longIn: 6.5, defaultLandscape: true),
         CanvasSizePreset(label: "Business #10 4.125 × 9.5", shortIn: 4.125, longIn: 9.5, defaultLandscape: true),
