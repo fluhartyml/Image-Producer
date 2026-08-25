@@ -828,6 +828,28 @@ struct CanvasSizePreset: Identifiable {
     var defaultLandscape = false
 }
 
+/// A canvas preset defined by ASPECT RATIO, keeping the resolution already set.
+///
+/// **Michael, 2026-08-25, correcting the first version of this:** *"i think for the
+/// youtube thumbnail the important is the aspect ratio over the pixel density because
+/// youtube will reformat after upload, it just needs the aspect so it has minimum
+/// cutoff."* He is right — YouTube re-encodes and generates its own sizes, so the pixel
+/// count is not what survives. **The aspect is what stops it letterboxing or cropping
+/// him**, and the pixel count only matters at the boundaries: their 640 × 360 minimum
+/// and the 2 MB file cap.
+///
+/// So this keeps the canvas's LONG EDGE and sets the other side to match the ratio.
+/// Whatever resolution he has chosen is respected; only the shape changes.
+struct CanvasAspectPreset: Identifiable {
+    var id: String { label }
+    let label: String
+    let ratioW: Int
+    let ratioH: Int
+    /// Smallest long edge the target will accept, if it has one — used to warn, never to
+    /// silently resize. 0 = no stated minimum.
+    var minLongEdge: Int = 0
+}
+
 /// A canvas preset defined in PIXELS rather than inches.
 ///
 /// ⚠️ SEPARATE FROM `CanvasSizePreset` ON PURPOSE, and the distinction is not cosmetic.
@@ -856,6 +878,8 @@ struct CanvasInspector: View {
 
     @State private var draftName = ""
     @State private var renameError = false
+    /// Set when an aspect preset leaves the canvas below a target's stated minimum.
+    @State private var aspectWarning: String?
     // Export (sections C/D)
     @State private var exportData = Data()
     @State private var exportType: UTType = .pdf
@@ -947,9 +971,17 @@ struct CanvasInspector: View {
                     Section("Index card")     { presetButtons(Self.indexPresets) }
                     Section("Business card")  { presetButtons(Self.businessPresets) }
                     Section("Envelope")       { presetButtons(Self.envelopePresets) }
-                    Section("Screen")         { pixelPresetButtons(Self.screenPresets) }
+                    Section("Screen") {
+                        aspectPresetButtons(Self.screenAspectPresets)
+                        pixelPresetButtons(Self.screenPresets)
+                    }
                 }
                 .font(.system(size: 18)).fixedSize()
+
+                if let aspectWarning {
+                    Text(aspectWarning)
+                        .font(.system(size: 18)).foregroundStyle(.orange)
+                }
 
                 Text("Resolution (PPI) changes the print size losslessly — pixels stay. Editing Pixels or applying a size preset changes the pixel count; existing art scales to fit, letterboxed on the background. Set Resolution first (300 for print), then pick a size.")
                     .font(.system(size: 18)).foregroundStyle(.primary)
@@ -1173,6 +1205,33 @@ struct CanvasInspector: View {
         ForEach(list) { p in Button(p.label) { applyPreset(p) } }
     }
 
+    @ViewBuilder private func aspectPresetButtons(_ list: [CanvasAspectPreset]) -> some View {
+        ForEach(list) { p in Button(p.label) { applyAspectPreset(p) } }
+    }
+
+    /// Reshape the canvas to a ratio WITHOUT changing how big it is: the long edge is
+    /// kept and the short edge is recomputed. PPI is untouched.
+    private func applyAspectPreset(_ p: CanvasAspectPreset) {
+        guard p.ratioW > 0, p.ratioH > 0 else { return }
+        let long = max(document.canvasWidth, document.canvasHeight)
+        let wide = p.ratioW >= p.ratioH
+        let shortSide = Int((Double(long) * Double(min(p.ratioW, p.ratioH))
+                             / Double(max(p.ratioW, p.ratioH))).rounded())
+        document.canvasWidth  = wide ? long : max(1, shortSide)
+        document.canvasHeight = wide ? max(1, shortSide) : long
+
+        // SAY IT, DON'T FIX IT. Silently enlarging his canvas to clear a platform's floor
+        // would contradict the whole point of this preset — that it keeps the resolution
+        // he chose. So the shape changes and the shortfall is reported.
+        if p.minLongEdge > 0 && long < p.minLongEdge {
+            aspectWarning = "Canvas is \(document.canvasWidth) × \(document.canvasHeight). "
+                          + "That is below the \(p.minLongEdge)px minimum long edge for this target — "
+                          + "the shape is right, the resolution is too low. Raise Pixels, then re-apply."
+        } else {
+            aspectWarning = nil
+        }
+    }
+
     @ViewBuilder private func pixelPresetButtons(_ list: [CanvasPixelPreset]) -> some View {
         ForEach(list) { p in Button(p.label) { applyPixelPreset(p) } }
     }
@@ -1222,6 +1281,13 @@ struct CanvasInspector: View {
     static let businessPresets = [
         CanvasSizePreset(label: "Business card 3.5 × 2", shortIn: 2, longIn: 3.5, defaultLandscape: true),
     ]
+    /// Ratio-defined targets — **the ones that actually matter for upload**, because the
+    /// platform re-encodes anyway and only the shape survives.
+    static let screenAspectPresets = [
+        CanvasAspectPreset(label: "YouTube thumbnail — 16:9 (keeps your resolution)",
+                           ratioW: 16, ratioH: 9, minLongEdge: 640),
+    ]
+
     /// Pixel-defined targets. Michael asked for the YouTube thumbnail on 2026-08-25;
     /// **1280 × 720 is YouTube's own recommendation** (640 × 360 is their stated minimum,
     /// and 16:9 is what the player expects, so anything else is letterboxed or cropped by
@@ -1230,7 +1296,7 @@ struct CanvasInspector: View {
     /// The section is deliberately open-ended — other screen targets drop straight in as
     /// one line each, and none of them need a physical size.
     static let screenPresets = [
-        CanvasPixelPreset(label: "YouTube thumbnail 1280 × 720", pixelWidth: 1280, pixelHeight: 720),
+        CanvasPixelPreset(label: "YouTube thumbnail — exactly 1280 × 720", pixelWidth: 1280, pixelHeight: 720),
     ]
 
     static let envelopePresets = [
