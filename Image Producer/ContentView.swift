@@ -75,6 +75,47 @@ struct ContentView: View {
     /// rather than snapping to 1× on the first delta.
     @State private var zoomAtPinchStart: CGFloat?
 
+    /// How far the zoomed canvas has been panned. Only meaningful above 1× — a canvas
+    /// that fits its area has nowhere to go, so this resets whenever zoom returns to 1.
+    @State private var canvasPan: CGSize = .zero
+    @State private var panAtDragStart: CGSize = .zero
+
+    /// What one double-click is worth. Michael, 2026-08-24: "you double click the canvas
+    /// to zoom in +1.5x per double click".
+    private let doubleClickZoomFactor: CGFloat = 1.5
+
+    /// The ZOOM TOOL's own gestures — double-click to zoom in, drag to pan.
+    ///
+    /// Michael, 2026-08-24: "so maybe the pointer changes to a magnefying glass and you
+    /// double click the canvas to zoom in +1.5x per double click and click and drag to
+    /// pan". The magnifying-glass pointer already existed (ToolPointer); these did not.
+    ///
+    /// Only active while `.zoom` is the selected tool, so it can never steal a drag from
+    /// the Pen or the Bucket. Navigation by GESTURE stays always-on and untouched — this
+    /// is the tool-specific behaviour on top of it.
+    ///
+    /// At exactly 1× the pan resets: a canvas that fits its area has nowhere to be
+    /// dragged to, and leaving a stale offset there would park the artwork off-centre
+    /// with no way to tell why.
+    private var zoomToolGestures: some Gesture {
+        SimultaneousGesture(
+            DragGesture(minimumDistance: 2)
+                .onChanged { v in
+                    guard canvasZoom > 1 else { return }      // nothing to pan at fit size
+                    canvasPan = CGSize(width: panAtDragStart.width + v.translation.width,
+                                       height: panAtDragStart.height + v.translation.height)
+                }
+                .onEnded { _ in panAtDragStart = canvasPan },
+            TapGesture(count: 2)
+                .onEnded {
+                    fitWidth = false
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        canvasZoom = min(canvasZoom * doubleClickZoomFactor, maxZoom)
+                    }
+                }
+        )
+    }
+
     /// Trackpad pinch — Michael, 2026-08-24: "the canvas doesnt pinch zoom on a mac".
     ///
     /// The +/− buttons worked, so zoom itself was fine; there was simply no gesture.
@@ -99,6 +140,7 @@ struct ContentView: View {
         fitWidth = false                       // manual zoom leaves Fit Width
         withAnimation(.easeOut(duration: 0.15)) {
             canvasZoom = min(max(z, minZoom), maxZoom)
+            if canvasZoom == 1 { canvasPan = .zero; panAtDragStart = .zero }
         }
     }
 
@@ -324,7 +366,9 @@ struct ContentView: View {
                            fillColor: $fillColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .scaleEffect(canvasZoom)
+                    .offset(canvasPan)
                     .gesture(pinchZoom)
+                    .gesture(activeTool == .zoom ? zoomToolGestures : nil)
             }
         }
         .padding()
