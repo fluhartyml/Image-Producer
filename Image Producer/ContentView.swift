@@ -3176,10 +3176,12 @@ struct BrushCursor: View {
 /// actual click point (the drip of the drop, the tip of the pencil/dropper).
 private struct ToolPointer: ViewModifier {
     let tool: Tool
+    /// The bucket's current colour. Only the Fill pointer uses it.
+    var fillColor: Color = .white
 
     func body(content: Content) -> some View {
         #if os(macOS)
-        content.pointerStyle(Self.style(for: tool))
+        content.pointerStyle(Self.style(for: tool, fillColor: fillColor))
         #else
         content
         #endif
@@ -3194,12 +3196,68 @@ private struct ToolPointer: ViewModifier {
     /// know which tool you are holding — leaving it an arrow makes the app look like
     /// nothing is selected, whichever tool it is. Each pointer uses that tool's own
     /// toolbar symbol, so the cursor and the button always match.
-    static func style(for tool: Tool) -> PointerStyle? {
+    /// The Fill pointer: a drop in the CURRENT FILL COLOUR, wrapped in a contrasting halo.
+    ///
+    /// Michael, 2026-09-02, while trying to pour white into a black-looking area: "the
+    /// pointer is also black so two problems" and then "the drip pointer needs a smart
+    /// invert."
+    ///
+    /// ⚠️ A TRUE INVERT IS NOT POSSIBLE. macOS gives a cursor no way to sample what is
+    /// underneath it — the pointer is a static image handed to the window server, and
+    /// nothing redraws it as it travels over dark and light areas. So "invert against the
+    /// background" cannot be built, and saying otherwise would be a promise the OS does
+    /// not keep.
+    ///
+    /// WHAT IS BUILT INSTEAD solves the same problem more completely. The drop is drawn
+    /// in the colour it is about to pour, behind a halo of the OPPOSITE luminance —
+    /// black halo under a light colour, white halo under a dark one. Two tones means one
+    /// of them always contrasts, whatever it is over, so the cursor can never vanish the
+    /// way a flat black drop vanished into his black area. And it now answers a question
+    /// the old cursor could not: which colour am I holding.
+    static func dripPointer(fill: Color) -> Image {
+        let body = NSColor(fill).usingColorSpace(.sRGB) ?? .white
+        // Rec. 601 luma — how bright the colour reads, not its raw values.
+        let luma = 0.299 * body.redComponent + 0.587 * body.greenComponent + 0.114 * body.blueComponent
+        let halo: NSColor = luma > 0.55 ? .black : .white
+
+        let cfg = NSImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+        guard let glyph = NSImage(systemSymbolName: "drop.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(cfg) else {
+            return Image(systemName: "drop.fill")
+        }
+
+        let inset: CGFloat = 3                      // how far the halo stands out
+        let size = NSSize(width: glyph.size.width + inset * 2,
+                          height: glyph.size.height + inset * 2)
+        let out = NSImage(size: size)
+        out.lockFocus()
+        // The halo is the same glyph drawn slightly larger and behind, so it hugs the
+        // silhouette exactly instead of being a rectangle or a blur.
+        tinted(glyph, halo).draw(in: NSRect(origin: .zero, size: size))
+        tinted(glyph, body).draw(in: NSRect(x: inset, y: inset,
+                                            width: glyph.size.width, height: glyph.size.height))
+        out.unlockFocus()
+        return Image(nsImage: out)
+    }
+
+    /// Recolour a template symbol without losing its alpha shape.
+    private static func tinted(_ image: NSImage, _ color: NSColor) -> NSImage {
+        let out = NSImage(size: image.size)
+        out.lockFocus()
+        let rect = NSRect(origin: .zero, size: image.size)
+        image.draw(in: rect)
+        color.set()
+        rect.fill(using: .sourceAtop)
+        out.unlockFocus()
+        return out
+    }
+
+    static func style(for tool: Tool, fillColor: Color = .white) -> PointerStyle? {
         switch tool {
         // Tools you click the canvas with — hot spot placed at the working tip.
         // The drop's POINT is at the top of the glyph, not the bottom — that is the tip
         // you aim with. Michael: "the hot point should be the top pointy part of the drip".
-        case .fill:       .image(Image(systemName: "drop.fill"),   hotSpot: UnitPoint(x: 0.5, y: 0.0))
+        case .fill:       .image(dripPointer(fill: fillColor),     hotSpot: UnitPoint(x: 0.5, y: 0.0))
         case .pen:        .image(Image(systemName: "pencil.tip"),  hotSpot: UnitPoint(x: 0.2, y: 0.9))
         case .eraser:     .image(Image(systemName: "eraser.fill"), hotSpot: UnitPoint(x: 0.5, y: 0.6))
         case .eyedropper: .image(Image(systemName: "eyedropper"),  hotSpot: UnitPoint(x: 0.15, y: 0.9))
@@ -3231,6 +3289,48 @@ private struct ToolPointer: ViewModifier {
 }
 
 struct CanvasView: View {
+
+    /// Pour colour into the CLEAR AREA around a layer's art.
+    ///
+    /// The bucket's normal path seeds inside the layer's own bitmap, which only covers
+    /// the art itself. Scale a photo down and everything around it is outside that
+    /// bitmap — so a tap there had no pixel to start from and silently did nothing,
+    /// while looking to the user like a tap on the selected layer's transparent region.
+    /// (The black he was aiming at belonged to the Dark floor showing through, which is
+    /// why it read as "black pixels" rather than "nothing".)
+    ///
+    /// The fix is to give the tap something to land on: render THIS LAYER ALONE at the
+    /// full canvas size, so the clear surround becomes real transparent pixels, then run
+    /// the same flood fill from the tapped point. The flood compares alpha as well as
+    /// colour, so it spreads through the transparent area and stops dead at the art's
+    /// edge — no bleed into dark pixels inside the photograph.
+    ///
+    /// The result is canvas-sized and replaces the layer at an identity transform, which
+    /// is what makes the white travel WITH the layer: hide the floor underneath and the
+    /// layer still looks the way it did when he filled it. Non-destructive as everywhere
+    /// else — the original is kept, hidden, beneath the result.
+    @MainActor private func fillClearSurround(idx: Int, normalized n: CGPoint) {
+        guard document.layers.indices.contains(idx),
+              let full = renderLayerImage(document.layers[idx], in: document) else { return }
+
+        let seed = CGPoint(x: n.x * Double(full.width), y: n.y * Double(full.height))
+        let fc = fillColor.rgb8
+        guard let filled = floodFilledImage(full, seed: seed,
+                                            tolerance: Int(pen.bucketTolerance),
+                                            fill: (fc.r, fc.g, fc.b, 255)),
+              let out = pngData(from: filled) else { return }
+
+        document.captureHistoryBaselineIfNeeded()
+        var identity = LayerTransform()
+        identity.contentAspect = ImageDocument.pixelAspect(ofPNG: out)
+        if let newID = document.addResultLayer(out, above: idx, nameSuffix: "filled",
+                                               transform: identity) {
+            activeLayerID = newID
+            document.recordHistory(toolID: Tool.fill.rawValue, groupTitle: Tool.fill.title,
+                                   actionLabel: "Fill Clear Area", layerID: newID)
+        }
+    }
+
 
     /// The floating production preview, factored OUT of `body` deliberately: the
     /// canvas expression is already at the Swift type-checker's limit, and inlining
@@ -3441,7 +3541,20 @@ struct CanvasView: View {
         let t = document.layers[idx].transform
         let canvasPt = CGPoint(x: n.x * canvas.width, y: n.y * canvas.height)
         guard let seed = imagePixel(forCanvasPoint: canvasPt, canvas: canvas, transform: t,
-                                    imageW: cg.width, imageH: cg.height) else { return }
+                                    imageW: cg.width, imageH: cg.height) else {
+            // TAPPED OUTSIDE THE LAYER'S OWN ART — the clear surround. This used to
+            // `return` and do nothing at all, silently.
+            //
+            // Michael, 2026-09-02, once the behaviour was explained to him rather than
+            // fixed: "the 'reason it fails' IS the bug and i told you how i intuitivly
+            // want to fill the clar pixles that are black because of the layer below."
+            // He was right. `imagePixel` returns nil whenever the tap falls outside the
+            // scaled art's rectangle, and to a person those pixels are plainly part of
+            // the selected layer — they are simply clear. Refusing to fill them is not a
+            // limitation to explain, it is the defect.
+            fillClearSurround(idx: idx, normalized: n)
+            return
+        }
         let fc = fillColor.rgb8
         guard let filled = floodFilledImage(cg, seed: seed, tolerance: Int(pen.bucketTolerance),
                                             fill: (fc.r, fc.g, fc.b, 255)),
@@ -3721,7 +3834,7 @@ struct CanvasView: View {
                             || activeTool == .text
                             || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
-            .modifier(ToolPointer(tool: activeTool))   // cursor reflects the active tool (macOS)
+            .modifier(ToolPointer(tool: activeTool, fillColor: fillColor))   // cursor reflects the active tool, and the bucket carries its colour (macOS)
             // The production preview, floating over the canvas and visible with ANY
             // tool active — which is the whole point (R2: it updates as each pixel
             // is drawn, so hiding it inside the Zoom inspector made it invisible

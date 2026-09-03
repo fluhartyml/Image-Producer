@@ -212,7 +212,7 @@ private func layerPDFManifest(from pdf: PDFDocument) -> LayerPDFManifest? {
 /// Render a single layer alone (over transparency) at the canvas pixel size, using the
 /// same compositor as the full render. `forceVisible` shows even a hidden layer so the
 /// breakdown is complete. Returns a CGImage that carries alpha for transparent layers.
-@MainActor private func renderLayerImage(_ layer: ImageLayer, in document: ImageDocument) -> CGImage? {
+@MainActor func renderLayerImage(_ layer: ImageLayer, in document: ImageDocument) -> CGImage? {
     var solo = layer
     solo.isVisible = true
     let soloDoc = ImageDocument(name: document.name,
