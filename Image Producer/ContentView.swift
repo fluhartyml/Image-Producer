@@ -2780,6 +2780,13 @@ struct MoveTransformInspector: View {
                     .font(.system(size: 18)).foregroundStyle(.secondary)
             }
         }
+        // ⚠️ ALSO ON APPEAR, NOT ONLY ON CHANGE. Every call to applyCrop() used to come
+        // from an .onChange, which means a selection that is ALREADY set when the panel
+        // opens — restored, or left in @State — never computes a rect. The picker then
+        // reads "Square" while `document.cropRect` is nil and the overlay draws nothing,
+        // so re-choosing the value that is already chosen does nothing at all. Found
+        // while diagnosing the square-crop report, 2026-08-27.
+        .onAppear { if cropAspect != .original { applyCrop() } }
         .onChange(of: cropAspect) { applyCrop() }
         .onChange(of: cropSize) { applyCrop() }
         .onChange(of: freeWidth) { applyCrop() }
@@ -2890,10 +2897,28 @@ struct MoveTransformInspector: View {
     }
 
     /// A centered rect for a w:h ratio whose LIMITING dimension fills `size` of the
-    /// canvas — so it always fits inside the square (portrait + landscape both work).
+    /// canvas.
+    ///
+    /// ⚠️ THE CANVAS ASPECT MUST BE DIVIDED OUT. `cropRect` is stored in NORMALISED
+    /// canvas coordinates (0...1), not pixels — so "0.8 wide by 0.8 tall" is only a
+    /// SQUARE ON SCREEN when the canvas itself is square. On any other canvas it comes
+    /// out wearing the canvas's shape.
+    ///
+    /// Michael found this from real use, 2026-08-27: *"i chose square aspect ratio and it
+    /// stayed rectangle and didnt automatically snap to square with the shaded ask
+    /// previewing a square crop."* Measured off his screen: canvas 2.0:1, crop drawn
+    /// 1.97:1 at Square/80% — exactly 80% of width by 80% of height. The old comment here
+    /// said it "always fits inside the square", which quietly assumed a square canvas and
+    /// was the whole bug.
+    ///
+    /// So: convert the requested VISUAL ratio into a normalised-space ratio first.
     private func ratioRect(_ w: Double, _ h: Double, size: Double) -> CGRect {
         guard w > 0, h > 0 else { return centeredRect(width: size, height: size) }
-        let aspect = w / h
+        let cw = Double(document.canvasWidth), ch = Double(document.canvasHeight)
+        // A degenerate canvas would divide by zero; fall back to the old behaviour
+        // rather than producing NaN, which propagates into an invisible rect.
+        let canvasAspect = (cw > 0 && ch > 0) ? cw / ch : 1
+        let aspect = (w / h) / canvasAspect
         let width  = aspect >= 1 ? size : size * aspect
         let height = aspect >= 1 ? size / aspect : size
         return centeredRect(width: width, height: height)
@@ -2949,7 +2974,24 @@ struct MoveTransformInspector: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Scale  \(Int(document.layers[idx].transform.scale * 100))%")
                         .font(.system(size: 18))
-                    Slider(value: transformBinding(\.scale, idx), in: 0.1...4.0)
+                    // 100% SITS AT THE CENTRE. Michael, 2026-09-02, after saying Rotation
+                    // reads correctly and Scale does not: "i want 100% to be center then i
+                    // want gradiens but NO snap. i want gradians 1.5 2 2.5 3."
+                    //
+                    // The old slider ran 0.1...4.0 straight, which put 1.0 about a QUARTER
+                    // of the way along — so the resting value was nearly hard left, three
+                    // quarters of the track enlarged, and shrinking was crushed into a
+                    // sliver. Rotation only felt right because -180...180 is symmetric and
+                    // zero therefore lands dead centre; this gives Scale the same property.
+                    //
+                    // The track is now a POSITION from -1 to 1 with 1.0 at 0, mapped
+                    // piecewise: right half 1.0 -> 4.0, left half 1.0 -> 0.1. Both ends of
+                    // the original range are kept.
+                    //
+                    // NO `step:` ANYWHERE — he asked for that explicitly. The marks below
+                    // are drawn, not enforced; the slider passes straight through them.
+                    Slider(value: scaleSliderBinding(idx), in: -1...1)
+                    ScaleTicks()
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Rotation  \(Int(document.layers[idx].transform.rotationDegrees))°")
@@ -2979,6 +3021,36 @@ struct MoveTransformInspector: View {
                         : LayerTransform()[keyPath: keyPath] },
                 set: { if document.layers.indices.contains(idx) {
                         document.layers[idx].transform[keyPath: keyPath] = $0 } })
+    }
+
+    /// Slider position <-> layer scale, with 1.0 (100%) pinned to the centre of the track.
+    ///
+    /// Position runs -1...1. The right half grows 1x -> 4x; the left half is its exact
+    /// MIRROR, dividing by the same numbers — so a mark at -2 is half size and -3 is a
+    /// third. Michael, 2026-09-02: "i want the gradians on the left to have a minus."
+    ///
+    /// TRADE-OFF, STATED RATHER THAN HIDDEN: true symmetry puts the left end at 1/4x
+    /// (0.25) instead of the old 0.1. The corner drag handles still reach 0.1, so nothing
+    /// is unreachable — only the slider's own travel is symmetric now.
+    ///
+    /// `ScaleTicks` uses the same mapping, so every drawn mark lands under the value it
+    /// names, on both sides.
+    private func scaleSliderBinding(_ idx: Int) -> Binding<Double> {
+        Binding(
+            get: {
+                let scale = document.layers.indices.contains(idx)
+                    ? document.layers[idx].transform.scale
+                    : 1.0
+                return ScaleTicks.position(for: scale)
+            },
+            set: { position in
+                guard document.layers.indices.contains(idx) else { return }
+                let scale = position >= 0
+                    ? 1 + position * 3                  // 1x  -> 4x,  even steps up
+                    : 1 + position * 0.75               // 1x  -> 1/4x, even steps down
+                document.layers[idx].transform.scale = min(max(scale, 0.1), 4.0)
+            }
+        )
     }
 
     /// Snap the active object to the canvas, centered. Fit = the limiting (larger)
@@ -3264,13 +3336,24 @@ struct CanvasView: View {
                     .opacity(0.55)
                     .allowsHitTesting(false)
             }
-            if showTransformBox, let idx = activeIndex {
-                TransformBox(document: document, index: idx, size: disp)
-            }
-            // Crop preview: dim everything outside the crop rect (Move tool only).
+            // ⚠️ ORDER MATTERS: THE DIMMING GOES UNDER THE BOX, NOT OVER IT.
+            //
+            // These two used to be the other way round, and the grab handles were being
+            // painted over by the crop scrim. They still WORKED — CropOverlay is inert —
+            // but they were washed out and looked absent. Michael, 2026-08-27, opening a
+            // document straight after the crop fixes: "No grabbers".
+            //
+            // It was always the wrong z-order; it only became visible once the crop
+            // started computing on appear, because before that `cropRect` was nil on open
+            // and no scrim was ever drawn over a freshly opened document.
+            //
+            // A selection box belongs ABOVE a dimming layer. Always.
             if activeTool == .move, let crop = document.cropRect {
                 CropOverlay(crop: crop, size: disp)
                     .allowsHitTesting(false)
+            }
+            if showTransformBox, let idx = activeIndex {
+                TransformBox(document: document, index: idx, size: disp)
             }
             // MASK TOOL: the same dimming, but around a four-cornered mask you can grab.
             // The overlay is inert; the box on top of it owns every gesture. Its handles
@@ -4381,11 +4464,29 @@ struct LayerRow: View {
                     .background(Capsule().fill(Color.secondary.opacity(0.18)))
             }
 
+            // VISIBILITY EYE. Michael, 2026-09-02: "the show hide layer eyes are too
+            // faint and hard to distinguish. can you bold them and use color to
+            // indecate visable or hidden with a slash?"
+            //
+            // The old pair was an outline `eye` in `.primary` vs an outline `eye.slash`
+            // in `.secondary` — two thin glyphs separated mainly by OPACITY, which is
+            // the one difference that disappears first at a glance or at distance.
+            //
+            // Three signals now, so none of them has to carry it alone: the SHAPE
+            // (slash or no slash), the WEIGHT (filled and bold, not hairline), and the
+            // COLOUR (green on, red off). Colour is reinforcement rather than the
+            // meaning — the slash still says it on its own for anyone who cannot
+            // separate red from green.
             Button(action: onToggleVisibility) {
-                Image(systemName: layer.isVisible ? "eye" : "eye.slash")
-                    .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
+                Image(systemName: layer.isVisible ? "eye.fill" : "eye.slash.fill")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(layer.isVisible ? Color.green : Color.red)
+                    .frame(width: 32, height: 26)   // a target worth aiming at
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .help(layer.isVisible ? "Visible — click to hide" : "Hidden — click to show")
+            .accessibilityLabel(layer.isVisible ? "Hide layer" : "Show layer")
         }
         .padding(.vertical, 2)
         .contextMenu {
@@ -4394,6 +4495,102 @@ struct LayerRow: View {
             Divider()
             Button(role: .destructive, action: onDelete) { Label("Delete", systemImage: "trash") }
         }
+    }
+}
+
+// MARK: - Scale slider graduations
+
+/// The marks under the Scale slider. DRAWN ONLY — they are guides, never stops.
+///
+/// Michael, 2026-09-02: "i want gradiens but NO snap. i want gradians 1.5 2 2.5 3" and
+/// then "i want the gradians on the left to have a minus." So the track shows where the
+/// round numbers are and the thumb slides straight through them; there is no `step:` on
+/// the Slider and there is no snapping anywhere in this file.
+///
+/// A minus mark means DIVISION, mirroring the plus side: -2 is half size, -3 a third.
+/// That is why the left and right marks sit at mirrored distances from the centre.
+struct ScaleTicks: View {
+
+    /// Slider position (-1...1) for a given scale. The single source of truth for the
+    /// mapping — `scaleSliderBinding` reads it too, so marks cannot drift from behaviour.
+    static func position(for scale: Double) -> Double {
+        scale >= 1 ? (scale - 1) / 3 : (scale - 1) / 0.75
+    }
+
+    private struct Mark: Identifiable {
+        let id: String
+        let scale: Double
+        let label: String
+    }
+
+    private var marks: [Mark] {
+        var out: [Mark] = [Mark(id: "center", scale: 1, label: "100%")]
+
+        // GROW SIDE — his list, verbatim: "i want gradians 1.5 2 2.5 3."
+        for n in [1.5, 2.0, 2.5, 3.0] {
+            let text = n == 2 || n == 3 ? String(Int(n)) : String(n)
+            out.append(Mark(id: "+\(n)", scale: n, label: text))
+        }
+
+        // SHRINK SIDE — three even quarters down. See `fractionLabel` for why these are
+        // not the reciprocals of the grow side's numbers.
+        for (fraction, glyph) in Self.fractionLabel.sorted(by: { $0.key < $1.key }) {
+            out.append(Mark(id: "-\(fraction)", scale: fraction, label: glyph))
+        }
+        return out
+    }
+
+    /// The divisor -> the fraction of full size it produces, as a single glyph.
+    /// Keyed by the SAME numbers the grow side uses, so the two halves stay mirrored.
+    /// The divisor -> the fraction of full size it produces, as a single glyph.
+    ///
+    /// EVERY ONE IS A UNIT FRACTION — one over something. That is the rule, and Michael
+    /// arrived at it in two steps on 2026-09-02: "i dont like 2/5", then "2/3 isnt
+    /// normalized." Both rejects were the same shape — the only two labels in the set
+    /// with a numerator other than 1. A run of 1/4, 1/3, 1/2 is read as a series; drop a
+    /// 2/3 into it and the eye has to stop and work that one out, which defeats the
+    /// reason fractions were chosen over decimals in the first place.
+    ///
+    /// So the shrink side marks the divisors 4, 3 and 2. It no longer mirrors the grow
+    /// side's list exactly — that is the price of every label being legible on sight, and
+    /// it is the right trade. Each mark still sits at its true mirrored POSITION, and 1/4
+    /// falls at the left end of the track, which is where the travel stops anyway.
+    /// The shrink side's marks, as a fraction of full size.
+    ///
+    /// EVENLY SPACED, NOT RECIPROCAL. Michael, 2026-09-02, asked what it would look like
+    /// to "devide the shrink by the same gradians" and then corrected the reading: "i
+    /// dont mean literal." Taken literally, mirroring 1.5/2/2.5/3 produces 2/3, 1/2, 2/5,
+    /// 1/3 — which is where 2/5 and 2/3 came from, and he had already rejected both.
+    ///
+    /// What he meant was the same RHYTHM: four even steps out from the centre in each
+    /// direction. So the shrink half is linear from 1x down to 1/4x and gets three evenly
+    /// spaced quarters. Grow steps up by even amounts, shrink steps down by even amounts,
+    /// and every label is a half or a quarter.
+    private static let fractionLabel: [Double: String] = [
+        0.75: "\u{00BE}",   // three quarters
+        0.5:  "\u{00BD}",   // one half
+        0.25: "\u{00BC}",   // one quarter
+    ]
+
+    var body: some View {
+        GeometryReader { geo in
+            ForEach(marks) { mark in
+                VStack(spacing: 2) {
+                    Rectangle()
+                        .frame(width: 1, height: 5)
+                    Text(mark.label)
+                        .font(.system(size: 11, weight: mark.scale == 1 ? .semibold : .regular))
+                        .fixedSize()
+                }
+                .foregroundStyle(mark.scale == 1 ? Color.primary : Color.secondary)
+                // The thumb is inset by roughly half its width at each end, so the usable
+                // track is narrower than the view. Insetting by the same amount keeps a
+                // mark under the thumb that is sitting on that value.
+                .position(x: 9 + (geo.size.width - 18) * (ScaleTicks.position(for: mark.scale) + 1) / 2,
+                          y: 11)
+            }
+        }
+        .frame(height: 24)
     }
 }
 

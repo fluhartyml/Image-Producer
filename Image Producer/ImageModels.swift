@@ -927,14 +927,18 @@ enum PackageWriter {
 // MARK: - New project files (never "Untitled")
 
 extension ImageDocument {
-    /// New documents save as `.picprod` — a project package extension that opens reliably
-    /// and matches every existing project already on disk. (`.imgprd` and `.iconproj` are
-    /// also declared for this type. The app now owns its own type identifier
-    /// `com.nightgard.Image-Producer.project` — no longer shared with the retired
-    /// "Icon Producer" app — so the old LaunchServices collision is resolved and a fresh
-    /// `.imgprd` is recognized too; `.picprod` is kept as the default so new and existing
-    /// files share one extension. Any of `.picprod`/`.imgprd`/`.iconproj` open.)
-    static let projectExtension = "picprod"
+    /// New documents save as `.imgprd` — the extension that matches the app's own name.
+    /// `.picprod` was the previous default and is a leftover from "Picture Producer," a
+    /// name retired long ago; Michael caught it on the Phototizer icon file 2026-09-02:
+    /// "its supposed to be image producer not picture producer picture producer was a
+    /// long time ago."
+    ///
+    /// NOTHING BREAKS. All three extensions — `.imgprd`, `.picprod`, `.iconproj` — are
+    /// declared for the same type identifier `com.nightgard.Image-Producer.project`, which
+    /// the app owns outright (no longer shared with the retired "Icon Producer" app, so the
+    /// old LaunchServices collision stays resolved). Every existing project on disk keeps
+    /// opening exactly as before. Only the extension given to NEW documents changed.
+    static let projectExtension = "imgprd"
 
     /// Where new projects are written immediately so a canvas is never an unnamed
     /// "Untitled": the app's iCloud Documents folder (syncs across devices, shows in

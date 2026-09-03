@@ -63,6 +63,46 @@ struct ImagePlaygroundInspector: View {
         return document.layers[i]
     }
 
+    /// Why Filter is unavailable, said in terms of THIS document's layers.
+    ///
+    /// Michael, 2026-09-02: the old copy read "Restyle needs a content layer with art
+    /// selected," which is accurate and still left him stuck — he had filled a layer,
+    /// so as far as he was concerned there WAS art. His verdict on the experience was
+    /// one word: "Intuitive."
+    ///
+    /// THE TRAP THIS NAMES. A document has a CONTENT layer called "Background" AND a
+    /// pair of `.background`-role floor layers called Light and Dark. Filling Light or
+    /// Dark with the paint bucket puts colour on the floor, not art on a content layer —
+    /// so the canvas goes black and Filter stays greyed out, with nothing on screen
+    /// explaining the difference. A generic message cannot resolve that; only naming the
+    /// selected layer and its actual role can.
+    private var filterAvailabilityMessage: String {
+        if activeFilterable != nil {
+            return "New Layer = fresh layer · Restyle = redo the selected layer's art with your prompt."
+        }
+        guard let i = activeIndex else {
+            return "New Layer drops the result on a fresh layer. Select a layer to use Restyle."
+        }
+        let layer = document.layers[i]
+        switch layer.role {
+        case .background(let role, _):
+            let which = role == .light ? "Light" : "Dark"
+            return """
+            New Layer drops the result on a fresh layer. \
+            “\(layer.name)” is the \(which) floor — a solid fill, not artwork — so there is \
+            nothing for Restyle to redo. Select a content layer instead: Foreground, \
+            Midground or Background.
+            """
+        case .content:
+            return """
+            New Layer drops the result on a fresh layer. \
+            “\(layer.name)” is a content layer but has nothing on it yet. Filling the Light \
+            or Dark floor does not count — Restyle needs art on THIS layer. Import an image \
+            or draw something first, or use New Layer.
+            """
+        }
+    }
+
     /// Image Playground options with Apple's "Personalization" (people-from-library)
     /// turned OFF. ImagePlaygroundOptions.Personalization = automatic/enabled/disabled
     /// (SDK-verified). NOTE: the 27 beta currently ignores this — kept anyway since
@@ -126,9 +166,7 @@ struct ImagePlaygroundInspector: View {
                 .buttonStyle(.bordered)
                 .disabled(activeFilterable == nil)
 
-                Text(activeFilterable == nil
-                     ? "New Layer drops the result on a fresh layer. Restyle needs a content layer with art selected."
-                     : "New Layer = fresh layer · Restyle = redo the selected layer's art with your prompt.")
+                Text(filterAvailabilityMessage)
                     .font(.system(size: 18)).foregroundStyle(.secondary)
 
                 if failed {
