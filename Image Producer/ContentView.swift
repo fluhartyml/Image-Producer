@@ -54,6 +54,10 @@ struct ContentView: View {
     /// change standing in for the Enter key. Held here rather than at the mutation sites so
     /// the drag handles, both sliders and the Center/Reset/Fit/Fill buttons are all covered
     /// by one rule instead of eight call sites that could drift apart.
+    /// Camera/stop-motion working state. A @StateObject held by the window, NOT a property
+    /// of the document — the autosave's coordinated write can reload the document, which
+    /// wiped it roughly every two seconds. See `CameraState`.
+    @StateObject private var camera = CameraState()
     @State private var moveSessionLayerID: ImageLayer.ID?
     @State private var moveSessionTransform: LayerTransform?
     @State private var bottomPanel: BottomPanel = .layers
@@ -243,7 +247,7 @@ struct ContentView: View {
                 Divider()
                 ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, lines: 1)
                 Divider()
-                BottomPanel.PanelView(document: document, activeTool: activeTool,
+                BottomPanel.PanelView(document: document, camera: camera, activeTool: activeTool,
                                       activeLayerID: $activeLayerID, selection: $bottomPanel,
                                       fillColor: $fillColor, fileURL: fileURL, compact: true)
                     .frame(maxHeight: .infinity)
@@ -256,7 +260,8 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, lines: 1)
                     Divider()
-                    BottomPanel.PanelView(document: document, activeTool: activeTool,
+                    BottomPanel.PanelView(document: document,
+                                          camera: camera, activeTool: activeTool,
                                           activeLayerID: $activeLayerID, selection: $bottomPanel,
                                           fillColor: $fillColor, fileURL: fileURL, compact: true)
                 }
@@ -283,6 +288,7 @@ struct ContentView: View {
                     ActiveToolLabel(tool: activeTool)
                     Divider()
                     BottomPanel.PanelView(document: document,
+                                          camera: camera,
                                           activeTool: activeTool,
                                           activeLayerID: $activeLayerID,
                                           selection: $bottomPanel,
@@ -301,6 +307,7 @@ struct ContentView: View {
                     ToolRail(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
                     Divider()
                     ToolInspector(document: document,
+                                  camera: camera,
                                   activeTool: activeTool,
                                   activeLayerID: activeLayerID,
                                   fillColor: $fillColor,
@@ -424,6 +431,7 @@ struct ContentView: View {
                     let fittedHeight = geo.size.width / max(aspect, 0.0001)
                     ScrollView(.vertical) {
                         CanvasView(document: document,
+                                   camera: camera,
                                    activeLayerID: $activeLayerID,
                                    showTransformBox: activeTool == .move,
                                    activeTool: activeTool,
@@ -434,6 +442,7 @@ struct ContentView: View {
                 }
             } else {
                 CanvasView(document: document,
+                           camera: camera,
                            activeLayerID: $activeLayerID,
                            showTransformBox: activeTool == .move,
                            activeTool: activeTool,
@@ -520,7 +529,7 @@ struct ContentView: View {
         // through the stack — two mechanisms recording the same history, one of them noise.
         // The trade is the medium's own: a nudge you did not photograph is gone. The
         // shutter is the commit. (Michael 2026-09-03.)
-        guard !document.camera.animationMode else { return }
+        guard !camera.animationMode else { return }
 
         // The preserved original: identical content, the placement it had before the
         // session, hidden. A fresh id because it is a second layer, not the same one.
@@ -710,6 +719,7 @@ struct ToolRail: View {
 /// built yet. Reused by BOTH the portrait swipe panel and the landscape column.
 struct ToolInspector: View {
     @ObservedObject var document: ImageDocument
+    @ObservedObject var camera: CameraState
     let activeTool: Tool
     let activeLayerID: ImageLayer.ID?
     @Binding var fillColor: Color
@@ -793,7 +803,7 @@ struct ToolInspector: View {
             // "i want the tool inspector to be a standard landing for after any tool has
             // fired." So it doubles as the review screen: what you just shot, and how to
             // shoot the next one differently.
-            CameraInspector(document: document, fileURL: fileURL)
+            CameraInspector(document: document, camera: camera, fileURL: fileURL)
         default:
             ToolInspectorPlaceholder(tool: activeTool)
         }
@@ -2319,6 +2329,7 @@ enum BottomPanel: String, CaseIterable, Identifiable {
 
     struct PanelView: View {
         @ObservedObject var document: ImageDocument
+        @ObservedObject var camera: CameraState
         let activeTool: Tool
         // (PanelView is the bottom swipe panel; it observes the document too.)
         @Binding var activeLayerID: ImageLayer.ID?
@@ -2366,6 +2377,7 @@ enum BottomPanel: String, CaseIterable, Identifiable {
 
         private var toolPage: some View {
             ToolInspector(document: document,
+                          camera: camera,
                           activeTool: activeTool,
                           activeLayerID: activeLayerID,
                           fillColor: $fillColor,
@@ -3587,6 +3599,8 @@ struct CanvasView: View {
     }
 
     @ObservedObject var document: ImageDocument
+    /// Lightbox + playback preview state. Window-owned, not document-owned.
+    @ObservedObject var camera: CameraState
     @Binding var activeLayerID: ImageLayer.ID?
     var showTransformBox: Bool = false
     var activeTool: Tool = .move
@@ -3764,7 +3778,7 @@ struct CanvasView: View {
     /// Display visibility under a playback preview. While a frame is soloed, show that
     /// frame plus any visible background, so a transparent stamp isn't floating on nothing.
     private func isDisplayVisible(_ layer: ImageLayer) -> Bool {
-        guard let solo = document.camera.soloFrameIndex else { return layer.isVisible }
+        guard let solo = camera.soloFrameIndex else { return layer.isVisible }
         if let frame = layer.cameraFrame { return frame.index == solo }
         return layer.isVisible && layer.backgroundRole != nil
     }
@@ -3772,7 +3786,7 @@ struct CanvasView: View {
     /// Ghost opacity for a frame showing through the lightbox, or nil if it isn't a ghost.
     /// Older frames fade further back, the way sheets stack on a real lightbox.
     private func onionOpacity(for layer: ImageLayer) -> Double? {
-        let c = document.camera
+        let c = camera
         guard c.onionSkin, let frame = layer.cameraFrame else { return nil }
         let current = c.soloFrameIndex ?? (document.cameraFrames.last?.cameraFrame?.index ?? 0)
         let back = current - frame.index

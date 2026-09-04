@@ -52,9 +52,6 @@ final class ImageDocument: ObservableObject {
     /// persistent per-project. Empty until the recording hooks land (step 2).
     @Published var history: ImageHistory = ImageHistory()
 
-    /// Camera tool state. Transient — a shoot's settings and playback position are a
-    /// working mode, not part of the saved artwork.
-    @Published var camera = CameraSettings()
 
     /// Where the History panel is currently VIEWING. Tapping a history point moves this
     /// (non-destructively) and shows that state on the canvas; the list is never trimmed
@@ -1110,16 +1107,31 @@ extension ImageDocument {
 
 /// Working state for the Camera tool. None of this is saved: it is how you are shooting,
 /// not what you shot.
-struct CameraSettings {
+/// ⚠️ THIS DELIBERATELY DOES NOT LIVE ON `ImageDocument`, and it did once — for about an
+/// hour on 2026-09-03, which is how the reason was found.
+///
+/// The autosave writes the package ~1.5s after any change, and a coordinated write can make
+/// DocumentGroup RELOAD the document (the autosave's own comments say so). A reload rebuilds
+/// `ImageDocument`, so anything transient on it is wiped: Animation mode un-ticked itself
+/// about two seconds after every click, and the capture's result line reset to "No frames
+/// captured yet" while the captured layer sat in the list proving otherwise.
+///
+/// The second reason is just as good: writing to the document marks it DIRTY. Toggling onion
+/// skin or nudging the fps slider would have queued a full package write every time. Shooting
+/// settings are how you are working, not what you made.
+///
+/// Per-frame data — `CameraFrame`, exposure counts — DOES belong on the document, because
+/// that is the film.
+final class CameraState: ObservableObject {
     // ── What a press captures
     /// Off by default, so a plain first press gives a transparent stamp of just the art.
     /// The Light/Dark layers are a PREVIEW CONTROL, not artwork, so baking whichever one
     /// happens to be showing is rarely what you want.
-    var includeBackground = false
+    @Published var includeBackground = false
     /// 1× / 2× / 4×. Capturing above 1× leaves room to scale a stamp up later without
     /// it going soft.
-    var scale: Double = 1
-    var trimToArt = false
+    @Published var scale: Double = 1
+    @Published var trimToArt = false
 
     // ── Stop motion
     /// When on, the Camera owns preservation and Move stops forking. Without this a
@@ -1127,39 +1139,39 @@ struct CameraSettings {
     /// through the stack at their source's index — two preservation mechanisms stacked,
     /// and one of them is noise. The trade is real and it is the medium's own bargain:
     /// a nudge you did not photograph is gone. The shutter is the commit.
-    var animationMode = false
+    @Published var animationMode = false
 
     // ── Lightbox (DISPLAY ONLY — never captured)
     /// Onion skin is the animator's lightbox. It MUST stay a display overlay: if it
     /// worked by turning down a layer's real `opacity`, that ghost would be a visible
     /// layer and the next press would bake it in, compounding down the stack.
-    var onionSkin = false
-    var onionFrames = 2
-    var onionStrength = 0.28
+    @Published var onionSkin = false
+    @Published var onionFrames = 2
+    @Published var onionStrength = 0.28
 
     // ── Playback (DISPLAY ONLY)
-    var fps: Double = 8
+    @Published var fps: Double = 8
     /// Non-nil while previewing: show only this frame. Display-side, so nothing is
     /// captured and no layer's real visibility is touched.
-    var soloFrameIndex: Int?
-    var isPlaying = false
-    var loop = true
+    @Published var soloFrameIndex: Int?
+    @Published var isPlaying = false
+    @Published var loop = true
 
     // ── In-betweening
     /// Exposures given to each NEW capture. 1 = on 1s, 2 = on 2s, 3 = the anime rate.
-    var exposures = 1
+    @Published var exposures = 1
     /// Position in the expanded playback timeline (not the frame number — a held frame
     /// occupies several positions).
-    var playPos: Int?
+    @Published var playPos: Int?
     /// Frames to insert between each pair of shot frames.
-    var tweenSteps = 1
-    var easing: CameraEasing = .easeBoth
+    @Published var tweenSteps = 1
+    @Published var easing: CameraEasing = .easeBoth
     /// 0 = leave the shot positions alone, 1 = full 3-tap smoothing of the path.
-    var smoothing: Double = 0
+    @Published var smoothing: Double = 0
 
     /// Last press's outcome, shown at the top of the inspector. A silent capture is the
     /// same failure shape as a Done button that reports nothing.
-    var lastResult: String?
+    @Published var lastResult: String?
 }
 
 /// How `t` is shaped between two frames. Linear reads as mechanical no matter how many

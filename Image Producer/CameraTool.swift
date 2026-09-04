@@ -51,12 +51,13 @@ private func cameraLayerName(_ document: ImageDocument, fileURL: URL?, index: In
 /// without the background and trimmed to the art, and puts the result on a new topmost
 /// layer that carries its own negative.
 @MainActor
-func captureCameraFrame(_ document: ImageDocument, fileURL: URL?) {
-    let s = document.camera
+func captureCameraFrame(_ document: ImageDocument, camera: CameraState,
+                        fileURL: URL?) {
+    let s = camera
     guard let cg = renderCanvasImage(document, scale: CGFloat(s.scale),
                                      includeBackgrounds: s.includeBackground),
           var png = pngData(from: cg) else {
-        document.camera.lastResult = "Nothing to capture — no visible layers rendered."
+        camera.lastResult = "Nothing to capture — no visible layers rendered."
         return
     }
     var w = cg.width, h = cg.height
@@ -101,7 +102,7 @@ func captureCameraFrame(_ document: ImageDocument, fileURL: URL?) {
     if s.trimToArt { bits.append("trimmed") }
     if s.exposures > 1 { bits.append("on \(s.exposures)s") }
     if s.animationMode { bits.append("hidden (Animation)") }
-    document.camera.lastResult = bits.joined(separator: " · ")
+    camera.lastResult = bits.joined(separator: " · ")
 }
 
 // MARK: - In-betweening
@@ -152,11 +153,11 @@ private func smoothed(_ scenes: [[ImageLayer]], amount: Double) -> [[ImageLayer]
 /// generated tweens — they are derived, so regenerating is always safe — and never touches
 /// a real exposure.
 @MainActor
-func generateCameraInBetweens(_ document: ImageDocument) {
-    let s = document.camera
+func generateCameraInBetweens(_ document: ImageDocument, camera: CameraState) {
+    let s = camera
     let shot = document.cameraFrames.filter { $0.cameraFrame?.isTween == false }
     guard shot.count >= 2 else {
-        document.camera.lastResult = "Need at least two shot frames to tween."
+        camera.lastResult = "Need at least two shot frames to tween."
         return
     }
     guard s.tweenSteps >= 1 else { return }
@@ -165,7 +166,7 @@ func generateCameraInBetweens(_ document: ImageDocument) {
     for frame in shot {
         guard let data = frame.cameraFrame?.snapshot,
               let snap = try? JSONDecoder().decode(DocumentSnapshot.self, from: data) else {
-            document.camera.lastResult =
+            camera.lastResult =
                 "Frame \(frame.cameraFrame?.index ?? 0) has no negative — it can only be cross-faded."
             return
         }
@@ -223,7 +224,7 @@ func generateCameraInBetweens(_ document: ImageDocument) {
                            groupTitle: Tool.camera.title,
                            actionLabel: "In-betweens",
                            layerID: nil)
-    document.camera.lastResult =
+    camera.lastResult =
         "\(made) in-between\(made == 1 ? "" : "s") · \(s.easing.title)"
         + (s.smoothing > 0 ? " · smoothing \(Int(s.smoothing * 100))%" : "")
 }
@@ -232,6 +233,9 @@ func generateCameraInBetweens(_ document: ImageDocument) {
 
 struct CameraInspector: View {
     @ObservedObject var document: ImageDocument
+    /// Deliberately NOT on the document — see `CameraState`. Living there made Animation
+    /// mode un-tick itself every time the autosave fired.
+    @ObservedObject var camera: CameraState
     var fileURL: URL?
 
     private var shotCount: Int {
@@ -244,13 +248,13 @@ struct CameraInspector: View {
 
             // Always says what happened. Landing on an inspector that does not confirm
             // the capture is the same failure shape as a Done button reporting nothing.
-            Text(document.camera.lastResult ?? "No frames captured yet.")
+            Text(camera.lastResult ?? "No frames captured yet.")
                 .font(.system(size: 17))
-                .foregroundStyle(document.camera.lastResult == nil ? .secondary : .primary)
+                .foregroundStyle(camera.lastResult == nil ? .secondary : .primary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Button {
-                captureCameraFrame(document, fileURL: fileURL)
+                captureCameraFrame(document, camera: camera, fileURL: fileURL)
             } label: {
                 Label("Capture", systemImage: "camera").font(.system(size: 18))
             }
@@ -261,24 +265,24 @@ struct CameraInspector: View {
             // ── What a press captures
             Group {
                 Text("Capture").font(.system(size: 17, weight: .semibold))
-                Toggle("Include background", isOn: $document.camera.includeBackground)
-                Text(document.camera.includeBackground
+                Toggle("Include background", isOn: $camera.includeBackground)
+                Text(camera.includeBackground
                      ? "Bakes in whichever of Light/Dark is showing."
                      : "Transparent stamp of just the art.")
                     .font(.system(size: 14)).foregroundStyle(.secondary)
 
-                Picker("Scale", selection: $document.camera.scale) {
+                Picker("Scale", selection: $camera.scale) {
                     Text("1×").tag(1.0); Text("2×").tag(2.0); Text("4×").tag(4.0)
                 }
                 .pickerStyle(.segmented)
 
-                Toggle("Trim to art bounds", isOn: $document.camera.trimToArt)
+                Toggle("Trim to art bounds", isOn: $camera.trimToArt)
 
-                Stepper("Hold each capture: \(document.camera.exposures) beat\(document.camera.exposures == 1 ? "" : "s")",
-                        value: $document.camera.exposures, in: 1...8)
-                Text(document.camera.exposures == 1
+                Stepper("Hold each capture: \(camera.exposures) beat\(camera.exposures == 1 ? "" : "s")",
+                        value: $camera.exposures, in: 1...8)
+                Text(camera.exposures == 1
                      ? "On 1s — a new drawing every beat."
-                     : "On \(document.camera.exposures)s — limited animation. Anime runs about 8 drawings a second by holding each for three.")
+                     : "On \(camera.exposures)s — limited animation. Anime runs about 8 drawings a second by holding each for three.")
                     .font(.system(size: 14)).foregroundStyle(.secondary)
             }
 
@@ -287,8 +291,8 @@ struct CameraInspector: View {
             // ── Stop motion
             Group {
                 Text("Stop Motion").font(.system(size: 17, weight: .semibold))
-                Toggle("Animation mode", isOn: $document.camera.animationMode)
-                Text(document.camera.animationMode
+                Toggle("Animation mode", isOn: $camera.animationMode)
+                Text(camera.animationMode
                      ? "Move stops forking — the shutter is the commit. A nudge you did not photograph is gone."
                      : "Move keeps its own hidden copy of each placement.")
                     .font(.system(size: 14)).foregroundStyle(.secondary)
@@ -301,14 +305,14 @@ struct CameraInspector: View {
             // ── Lightbox — display only, never captured
             Group {
                 Text("Lightbox").font(.system(size: 17, weight: .semibold))
-                Toggle("Onion skin", isOn: $document.camera.onionSkin)
-                if document.camera.onionSkin {
-                    Stepper("Frames back: \(document.camera.onionFrames)",
-                            value: $document.camera.onionFrames, in: 1...5)
+                Toggle("Onion skin", isOn: $camera.onionSkin)
+                if camera.onionSkin {
+                    Stepper("Frames back: \(camera.onionFrames)",
+                            value: $camera.onionFrames, in: 1...5)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Strength  \(Int(document.camera.onionStrength * 100))%")
+                        Text("Strength  \(Int(camera.onionStrength * 100))%")
                             .font(.system(size: 15))
-                        Slider(value: $document.camera.onionStrength, in: 0.05...0.6)
+                        Slider(value: $camera.onionStrength, in: 0.05...0.6)
                     }
                 }
             }
@@ -320,45 +324,45 @@ struct CameraInspector: View {
                 Text("Playback").font(.system(size: 17, weight: .semibold))
                 HStack {
                     Button {
-                        document.camera.isPlaying.toggle()
-                        if document.camera.isPlaying, document.camera.playPos == nil {
-                            document.camera.playPos = -1
+                        camera.isPlaying.toggle()
+                        if camera.isPlaying, camera.playPos == nil {
+                            camera.playPos = -1
                         }
                     } label: {
-                        Label(document.camera.isPlaying ? "Stop" : "Play",
-                              systemImage: document.camera.isPlaying ? "stop.fill" : "play.fill")
+                        Label(camera.isPlaying ? "Stop" : "Play",
+                              systemImage: camera.isPlaying ? "stop.fill" : "play.fill")
                     }
                     .disabled(frameCount == 0)
                     Button("Exit preview") {
-                        document.camera.isPlaying = false
-                        document.camera.soloFrameIndex = nil
-                        document.camera.playPos = nil
+                        camera.isPlaying = false
+                        camera.soloFrameIndex = nil
+                        camera.playPos = nil
                     }
-                    .disabled(document.camera.soloFrameIndex == nil)
+                    .disabled(camera.soloFrameIndex == nil)
                 }
-                Toggle("Loop", isOn: $document.camera.loop)
+                Toggle("Loop", isOn: $camera.loop)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Int(document.camera.fps)) fps").font(.system(size: 15))
-                    Slider(value: $document.camera.fps, in: 1...24)
+                    Text("\(Int(camera.fps)) fps").font(.system(size: 15))
+                    Slider(value: $camera.fps, in: 1...24)
                 }
                 if frameCount > 1 {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Frame \(document.camera.soloFrameIndex ?? 0) of \(frameCount)"
+                        Text("Frame \(camera.soloFrameIndex ?? 0) of \(frameCount)"
                              + "  ·  \(document.playbackTimeline.count) beats")
                             .font(.system(size: 15))
                         Slider(value: Binding(
-                            get: { Double(document.camera.soloFrameIndex ?? 1) },
+                            get: { Double(camera.soloFrameIndex ?? 1) },
                             set: {
                                 let f = Int($0.rounded())
-                                document.camera.soloFrameIndex = f
-                                document.camera.playPos =
+                                camera.soloFrameIndex = f
+                                camera.playPos =
                                     document.playbackTimeline.firstIndex(of: f)
                             }),
                                in: 1...Double(frameCount))
                     }
                 }
                 // Retime the frame you are looking at — the cutout animator's real control.
-                if let solo = document.camera.soloFrameIndex,
+                if let solo = camera.soloFrameIndex,
                    let i = document.layers.firstIndex(where: { $0.cameraFrame?.index == solo }) {
                     Stepper("Hold frame \(solo): \(document.layers[i].cameraFrame?.exposures ?? 1)",
                             value: Binding(
@@ -373,32 +377,32 @@ struct CameraInspector: View {
             // ── In-betweens
             Group {
                 Text("In-Betweens").font(.system(size: 17, weight: .semibold))
-                Stepper("Frames between: \(document.camera.tweenSteps)",
-                        value: $document.camera.tweenSteps, in: 1...7)
-                Picker("Easing", selection: $document.camera.easing) {
+                Stepper("Frames between: \(camera.tweenSteps)",
+                        value: $camera.tweenSteps, in: 1...7)
+                Picker("Easing", selection: $camera.easing) {
                     ForEach(CameraEasing.allCases) { Text($0.title).tag($0) }
                 }
                 Text("Linear reads as mechanical — real motion starts slow and settles.")
                     .font(.system(size: 14)).foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Path smoothing  \(Int(document.camera.smoothing * 100))%")
+                    Text("Path smoothing  \(Int(camera.smoothing * 100))%")
                         .font(.system(size: 15))
-                    Slider(value: $document.camera.smoothing, in: 0...1)
+                    Slider(value: $camera.smoothing, in: 0...1)
                 }
                 Text("Pulls each shot toward its neighbours. Full smoothing flattens intentional motion too.")
                     .font(.system(size: 14)).foregroundStyle(.secondary)
                 HStack {
-                    Button("Generate") { generateCameraInBetweens(document) }
+                    Button("Generate") { generateCameraInBetweens(document, camera: camera) }
                         .disabled(shotCount < 2)
                     Button("Clear") {
                         document.layers.removeAll { $0.cameraFrame?.isTween == true }
-                        document.camera.lastResult = "In-betweens cleared."
+                        camera.lastResult = "In-betweens cleared."
                     }
                 }
             }
         }
         .padding()
-        .onReceive(Timer.publish(every: 1.0 / max(1, document.camera.fps),
+        .onReceive(Timer.publish(every: 1.0 / max(1, camera.fps),
                                  on: .main, in: .common).autoconnect()) { _ in
             advancePlayback()
         }
@@ -406,18 +410,18 @@ struct CameraInspector: View {
 
     /// Steps through the EXPANDED timeline, so a frame held on 3s occupies three beats.
     private func advancePlayback() {
-        guard document.camera.isPlaying else { return }
+        guard camera.isPlaying else { return }
         let timeline = document.playbackTimeline
         guard !timeline.isEmpty else { return }
-        var next = (document.camera.playPos ?? -1) + 1
+        var next = (camera.playPos ?? -1) + 1
         if next >= timeline.count {
-            guard document.camera.loop else {
-                document.camera.isPlaying = false
+            guard camera.loop else {
+                camera.isPlaying = false
                 return
             }
             next = 0
         }
-        document.camera.playPos = next
-        document.camera.soloFrameIndex = timeline[next]
+        camera.playPos = next
+        camera.soloFrameIndex = timeline[next]
     }
 }
