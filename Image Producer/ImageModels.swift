@@ -513,7 +513,7 @@ struct ImageLayer: Identifiable, Codable {
 }
 
 /// Placement of a layer within the square canvas.
-struct LayerTransform: Codable {
+struct LayerTransform: Codable, Equatable {
     /// Normalized center in canvas space (0...1, origin top-left).
     var center = CGPoint(x: 0.5, y: 0.5)
     /// Scale as a fraction of the canvas edge — the LIMITING (larger) content dimension.
