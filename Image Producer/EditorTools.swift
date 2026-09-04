@@ -35,6 +35,7 @@ enum Tool: String, CaseIterable, Identifiable {
     case cutout        // Remove Background — Vision subject lift, keeps the subject, drops the scene
     case magicLasso    // Magic Lasso — click a region, it selects the matching area and clears it
     case zoom          // navigation only (not history)
+    case camera        // Capture: stamps the visible canvas onto a new topmost layer
 
     var id: String { rawValue }
 
@@ -68,6 +69,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .cutout:     "Remove Background"
         case .magicLasso: "Magic Lasso"
         case .zoom:       "Zoom"
+        case .camera:     "Camera"
         }
     }
 
@@ -91,6 +93,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .cutout:     "person.and.background.dotted"
         case .magicLasso: "lasso.badge.sparkles"
         case .zoom:       "magnifyingglass"
+        case .camera:     "camera"
         }
     }
 

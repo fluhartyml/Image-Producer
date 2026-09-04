@@ -515,6 +515,13 @@ struct ContentView: View {
         // the stack with copies.
         guard document.layers[i].transform != before else { return }
 
+        // ⛔ ANIMATION MODE: the Camera owns preservation, so Move must not also fork.
+        // Otherwise a ten-frame shoot leaves ten hidden duplicates of the puppet scattered
+        // through the stack — two mechanisms recording the same history, one of them noise.
+        // The trade is the medium's own: a nudge you did not photograph is gone. The
+        // shutter is the commit. (Michael 2026-09-03.)
+        guard !document.camera.animationMode else { return }
+
         // The preserved original: identical content, the placement it had before the
         // session, hidden. A fresh id because it is a second layer, not the same one.
         var original = document.layers[i]
@@ -781,6 +788,12 @@ struct ToolInspector: View {
             // R2 (resolved 2026-06-10): the live production thumbnail that does
             // NOT follow the canvas zoom. See FatBits.swift.
             ZoomInspector(document: document)
+        case .camera:
+            // The inspector is the LANDING after the shutter fires — Michael 2026-09-03:
+            // "i want the tool inspector to be a standard landing for after any tool has
+            // fired." So it doubles as the review screen: what you just shot, and how to
+            // shoot the next one differently.
+            CameraInspector(document: document, fileURL: fileURL)
         default:
             ToolInspectorPlaceholder(tool: activeTool)
         }
@@ -3372,7 +3385,9 @@ private struct ToolPointer: ViewModifier {
         // back after the first pass moved it to the arrow.
         case .text:       .horizontalText
 
-        case .imagePlayground, .canvas, .colorPalette, .image, .cutout:
+        // Camera joins them: the shutter is a button in the inspector, never a canvas
+        // click, so a camera cursor would promise a click the tool does not take.
+        case .imagePlayground, .canvas, .colorPalette, .image, .cutout, .camera:
             nil
         }
     }
@@ -3737,6 +3752,35 @@ struct CanvasView: View {
     }
 
     /// Eyedropper: render the active layer and sample its color (averaged over the
+    // MARK: - Camera lightbox (DISPLAY ONLY)
+    //
+    // Onion skin and the playback preview live HERE, in the on-screen canvas, and nowhere
+    // near `ImageCompositeView` — which is what `renderCanvasImage` draws through. That
+    // separation is the whole safety property: if onion skin turned down a layer's real
+    // `opacity`, the ghost would be a visible layer and the next Capture would bake it in,
+    // compounding a fainter copy of every previous frame down the stack. Nothing below
+    // writes to a layer.
+
+    /// Display visibility under a playback preview. While a frame is soloed, show that
+    /// frame plus any visible background, so a transparent stamp isn't floating on nothing.
+    private func isDisplayVisible(_ layer: ImageLayer) -> Bool {
+        guard let solo = document.camera.soloFrameIndex else { return layer.isVisible }
+        if let frame = layer.cameraFrame { return frame.index == solo }
+        return layer.isVisible && layer.backgroundRole != nil
+    }
+
+    /// Ghost opacity for a frame showing through the lightbox, or nil if it isn't a ghost.
+    /// Older frames fade further back, the way sheets stack on a real lightbox.
+    private func onionOpacity(for layer: ImageLayer) -> Double? {
+        let c = document.camera
+        guard c.onionSkin, let frame = layer.cameraFrame else { return nil }
+        let current = c.soloFrameIndex ?? (document.cameraFrames.last?.cameraFrame?.index ?? 0)
+        let back = current - frame.index
+        guard back >= 1, back <= c.onionFrames else { return nil }
+        let falloff = 1.0 - Double(back - 1) / Double(max(1, c.onionFrames))
+        return c.onionStrength * falloff
+    }
+
     /// sample circle) at a normalized canvas point into fillColor.
     @MainActor private func sampleEyedropper(at n: CGPoint) {
         guard activeTool == .eyedropper, let idx = activeIndex else { return }
@@ -4009,7 +4053,11 @@ struct CanvasView: View {
     private func layerStack(size: CGSize) -> some View {
         ZStack {
             ForEach(document.layers) { layer in
-                if layer.isVisible { layerContent(layer, size: size) }
+                if let ghost = onionOpacity(for: layer) {
+                    layerContent(layer, size: size).opacity(ghost)
+                } else if isDisplayVisible(layer) {
+                    layerContent(layer, size: size)
+                }
             }
         }
     }
@@ -5221,11 +5269,17 @@ struct ExportSheet: View {
 struct ImageCompositeView: View {
     let document: ImageDocument
     let size: CGSize
+    /// The Camera's transparent-stamp capture renders with this false. The Light/Dark
+    /// layers are a preview control rather than artwork, so a capture should be able to
+    /// leave whichever one is showing out of the picture.
+    var includeBackgrounds: Bool = true
 
     var body: some View {
         ZStack {
             ForEach(document.layers) { layer in
-                if layer.isVisible { composited(layer) }
+                if layer.isVisible, includeBackgrounds || layer.backgroundRole == nil {
+                    composited(layer)
+                }
             }
         }
         .frame(width: size.width, height: size.height)

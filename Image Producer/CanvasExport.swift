@@ -41,8 +41,11 @@ extension Color {
 }
 
 /// Render the document's visible layers to a CGImage at canvasPixelSize × `scale`.
-@MainActor func renderCanvasImage(_ document: ImageDocument, scale: CGFloat = 1) -> CGImage? {
-    let renderer = ImageRenderer(content: ImageCompositeView(document: document, size: document.canvasPixelSize))
+@MainActor func renderCanvasImage(_ document: ImageDocument, scale: CGFloat = 1,
+                                  includeBackgrounds: Bool = true) -> CGImage? {
+    let renderer = ImageRenderer(content: ImageCompositeView(document: document,
+                                                            size: document.canvasPixelSize,
+                                                            includeBackgrounds: includeBackgrounds))
     renderer.scale = scale
     return renderer.cgImage
 }

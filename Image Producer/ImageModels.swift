@@ -52,6 +52,10 @@ final class ImageDocument: ObservableObject {
     /// persistent per-project. Empty until the recording hooks land (step 2).
     @Published var history: ImageHistory = ImageHistory()
 
+    /// Camera tool state. Transient — a shoot's settings and playback position are a
+    /// working mode, not part of the saved artwork.
+    @Published var camera = CameraSettings()
+
     /// Where the History panel is currently VIEWING. Tapping a history point moves this
     /// (non-destructively) and shows that state on the canvas; the list is never trimmed
     /// by viewing. `.latest` = the newest committed state (the default, and what the file
@@ -400,6 +404,9 @@ struct ImageLayer: Identifiable, Codable {
     /// 0...1.
     var opacity = 1.0
     var transform = LayerTransform()
+    /// Set only on layers made by the Camera tool. nil on every hand-made layer, and
+    /// optional so documents written before the Camera shipped still decode.
+    var cameraFrame: CameraFrame?
     var role: LayerRole
     /// Content elements on a CONTENT layer, composited bottom-to-top. Mixed types
     /// allowed (pixels + image + text + symbol on one layer). Empty = blank.
@@ -513,6 +520,39 @@ struct ImageLayer: Identifiable, Codable {
 }
 
 /// Placement of a layer within the square canvas.
+/// What a Camera press leaves behind, carried BY the captured layer.
+///
+/// The PNG on the layer is the photograph; `snapshot` is the negative — the scene state
+/// that produced it. Storing both is what makes transitions arithmetic instead of image
+/// analysis: two flattened pictures can only be cross-faded, but two snapshots give the
+/// start and end of every layer's `center` / `scale` / `rotationDegrees`, so an in-between
+/// is those numbers interpolated and the scene re-rendered. It also makes a frame
+/// RE-ENTERABLE — you can go back to frame 3 and re-pose it, because you kept the state
+/// and not just a print of it.
+///
+/// Michael 2026-09-03, on discovering the tool's unintended consequence: "animation and
+/// stop motion".
+struct CameraFrame: Codable, Equatable {
+    /// 1-based shot order. Doubles as the frame index — the same counter that keeps layer
+    /// names from colliding is the timeline.
+    var index: Int
+    /// The scene that produced this frame. Nested frame negatives are stripped before
+    /// encoding (see `ImageDocument.cameraNegative`), or every capture would embed all
+    /// previous captures and the document would grow exponentially.
+    var snapshot: Data?
+    var includedBackground = false
+    var scale: Double = 1
+    var trimmedToArt = false
+    /// True for frames the in-betweener generated rather than ones the user shot.
+    /// Kept separate so a re-tween can replace them without touching real exposures.
+    var isTween = false
+    /// How many playback beats this frame is HELD for — "shooting on 2s / 4s". Limited
+    /// animation's defining control: anime runs about 8 drawings a second by exposing each
+    /// one for three beats, and cutout work does the same. Holding is not a shortcut around
+    /// in-betweening, it is the other technique. Defaults to 1 so nothing is imposed.
+    var exposures: Int = 1
+}
+
 struct LayerTransform: Codable, Equatable {
     /// Normalized center in canvas space (0...1, origin top-left).
     var center = CGPoint(x: 0.5, y: 0.5)
@@ -1063,4 +1103,120 @@ extension ImageDocument {
     /// so the editor can't use "no file" to know it's new — it matches this instead to open
     /// a fresh project on the Canvas hub (name + extents up front). Consumed on first appear.
     static var pendingNewProjectURL: URL?
+}
+
+
+// MARK: - Camera tool state
+
+/// Working state for the Camera tool. None of this is saved: it is how you are shooting,
+/// not what you shot.
+struct CameraSettings {
+    // ── What a press captures
+    /// Off by default, so a plain first press gives a transparent stamp of just the art.
+    /// The Light/Dark layers are a PREVIEW CONTROL, not artwork, so baking whichever one
+    /// happens to be showing is rarely what you want.
+    var includeBackground = false
+    /// 1× / 2× / 4×. Capturing above 1× leaves room to scale a stamp up later without
+    /// it going soft.
+    var scale: Double = 1
+    var trimToArt = false
+
+    // ── Stop motion
+    /// When on, the Camera owns preservation and Move stops forking. Without this a
+    /// ten-frame shoot leaves ten hidden "(Move n)" duplicates of the puppet scattered
+    /// through the stack at their source's index — two preservation mechanisms stacked,
+    /// and one of them is noise. The trade is real and it is the medium's own bargain:
+    /// a nudge you did not photograph is gone. The shutter is the commit.
+    var animationMode = false
+
+    // ── Lightbox (DISPLAY ONLY — never captured)
+    /// Onion skin is the animator's lightbox. It MUST stay a display overlay: if it
+    /// worked by turning down a layer's real `opacity`, that ghost would be a visible
+    /// layer and the next press would bake it in, compounding down the stack.
+    var onionSkin = false
+    var onionFrames = 2
+    var onionStrength = 0.28
+
+    // ── Playback (DISPLAY ONLY)
+    var fps: Double = 8
+    /// Non-nil while previewing: show only this frame. Display-side, so nothing is
+    /// captured and no layer's real visibility is touched.
+    var soloFrameIndex: Int?
+    var isPlaying = false
+    var loop = true
+
+    // ── In-betweening
+    /// Exposures given to each NEW capture. 1 = on 1s, 2 = on 2s, 3 = the anime rate.
+    var exposures = 1
+    /// Position in the expanded playback timeline (not the frame number — a held frame
+    /// occupies several positions).
+    var playPos: Int?
+    /// Frames to insert between each pair of shot frames.
+    var tweenSteps = 1
+    var easing: CameraEasing = .easeBoth
+    /// 0 = leave the shot positions alone, 1 = full 3-tap smoothing of the path.
+    var smoothing: Double = 0
+
+    /// Last press's outcome, shown at the top of the inspector. A silent capture is the
+    /// same failure shape as a Done button that reports nothing.
+    var lastResult: String?
+}
+
+/// How `t` is shaped between two frames. Linear reads as mechanical no matter how many
+/// in-betweens you add — real motion starts slow, speeds up and settles, which animators
+/// call slow in and slow out.
+enum CameraEasing: String, CaseIterable, Identifiable {
+    case linear, easeIn, easeOut, easeBoth
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .linear:   "Linear"
+        case .easeIn:   "Slow in"
+        case .easeOut:  "Slow out"
+        case .easeBoth: "Slow in + out"
+        }
+    }
+    /// Shape a 0…1 progress value.
+    func shape(_ t: Double) -> Double {
+        let x = min(max(t, 0), 1)
+        switch self {
+        case .linear:   return x
+        case .easeIn:   return x * x
+        case .easeOut:  return 1 - (1 - x) * (1 - x)
+        case .easeBoth: return x * x * (3 - 2 * x)   // smoothstep
+        }
+    }
+}
+
+extension ImageDocument {
+    /// The scene state to store with a captured frame, with every OTHER frame's negative
+    /// stripped out. Without the stripping each capture would embed all previous captures.
+    func cameraNegative() -> Data? {
+        // Frames are the film, not the scene — a negative that contained the previous
+        // exposures would both bloat without bound and put old photographs inside the
+        // re-render of an in-between.
+        let scene = layers.filter { $0.cameraFrame == nil }
+        return try? JSONEncoder().encode(DocumentSnapshot(layers: scene))
+    }
+
+    /// Captured frames in shot order.
+    var cameraFrames: [ImageLayer] {
+        layers.filter { $0.cameraFrame != nil }
+              .sorted { ($0.cameraFrame?.index ?? 0) < ($1.cameraFrame?.index ?? 0) }
+    }
+
+    /// Next free shot number.
+    var nextCameraFrameIndex: Int {
+        (layers.compactMap { $0.cameraFrame?.index }.max() ?? 0) + 1
+    }
+
+    /// Frame numbers expanded by their exposure counts — the actual playback order. A
+    /// frame held on 3s appears three times, which is what makes limited animation read
+    /// as deliberate timing rather than a low frame rate.
+    var playbackTimeline: [Int] {
+        cameraFrames.flatMap { layer -> [Int] in
+            guard let f = layer.cameraFrame else { return [] }
+            return Array(repeating: f.index, count: max(1, f.exposures))
+        }
+    }
 }
