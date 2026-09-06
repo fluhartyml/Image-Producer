@@ -440,6 +440,9 @@ struct ImageLayer: Identifiable, Codable {
     /// GLOBAL color key — every pixel matching this color goes clear, holes and all.
     /// nil = no key. Optional for the same reason as `glow`. See GlowTool.swift.
     var greenKey: LayerGreenKey?
+    /// Ramp across the layer. On a PRISTINE layer it draws in two colors; on a layer
+    /// with artwork it drives alpha by position. nil = none. See GlowTool.swift.
+    var gradient: LayerGradient?
     var role: LayerRole
     /// Content elements on a CONTENT layer, composited bottom-to-top. Mixed types
     /// allowed (pixels + image + text + symbol on one layer). Empty = blank.
@@ -453,6 +456,17 @@ struct ImageLayer: Identifiable, Codable {
     }
 
     /// True while a layer is still blank (nothing filled / nothing placed).
+    /// PRISTINE = nothing drawn on this layer. The Gradient child's meaning hinges on
+    /// it: pristine draws the ramp in color, otherwise the ramp drives alpha. A
+    /// background layer counts as pristine only when it has no fill either — a filled
+    /// floor is content as far as this question goes.
+    var isPristine: Bool {
+        switch role {
+        case .background(_, let fillHex): return fillHex == nil
+        case .content: return elements.isEmpty
+        }
+    }
+
     var isBlank: Bool {
         switch role {
         case .background(_, let fillHex): fillHex == nil

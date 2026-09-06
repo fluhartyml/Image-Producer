@@ -4183,16 +4183,27 @@ struct CanvasView: View {
     /// tuned by eye and a 100px thumbnail is not something you can tune against.
     @ViewBuilder
     private func glowingContent(_ layer: ImageLayer, size: CGSize) -> some View {
-        if let glow = layer.glow, glow.isEnabled, layer.backgroundRole == nil {
+        // Same order as the export compositor — gradient, then glow, then opacity.
+        let body = gradientedContent(layer, size: size)
+        if let glow = layer.glow, glow.isEnabled {
             ZStack {
-                GlowHalo(glow: glow, reference: min(size.width, size.height)) {
-                    layerContent(layer, size: size)
-                }
-                layerContent(layer, size: size)
+                GlowHalo(glow: glow, reference: min(size.width, size.height)) { body }
+                body
             }
             .opacity(layer.opacity)
         } else {
-            layerContent(layer, size: size).opacity(layer.opacity)
+            body.opacity(layer.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private func gradientedContent(_ layer: ImageLayer, size: CGSize) -> some View {
+        if let g = layer.gradient, g.isEnabled {
+            GradientVeil(gradient: g, isPristine: layer.isPristine) {
+                layerContent(layer, size: size)
+            }
+        } else {
+            layerContent(layer, size: size)
         }
     }
 
@@ -5502,16 +5513,29 @@ struct ImageCompositeView: View {
     /// See GlowTool.swift for the model.
     @ViewBuilder
     private func glowing(_ layer: ImageLayer) -> some View {
-        if let glow = layer.glow, glow.isEnabled, layer.backgroundRole == nil {
+        // Order matters and is deliberate: the GRADIENT is applied to the layer's own
+        // drawing first (it either replaces it or fades it), THEN the glow is built from
+        // that result, THEN uniform opacity multiplies the whole thing. So a faded layer
+        // glows faded, which is what you would expect from looking at it.
+        let body = gradiented(layer)
+        if let glow = layer.glow, glow.isEnabled {
             ZStack {
-                GlowHalo(glow: glow, reference: min(size.width, size.height)) {
-                    composited(layer)
-                }
-                composited(layer)
+                GlowHalo(glow: glow, reference: min(size.width, size.height)) { body }
+                body
             }
             .opacity(layer.opacity)
         } else {
-            composited(layer).opacity(layer.opacity)
+            body.opacity(layer.opacity)
+        }
+    }
+
+    /// The layer as the gradient child leaves it. No gradient → the layer as drawn.
+    @ViewBuilder
+    private func gradiented(_ layer: ImageLayer) -> some View {
+        if let g = layer.gradient, g.isEnabled {
+            GradientVeil(gradient: g, isPristine: layer.isPristine) { composited(layer) }
+        } else {
+            composited(layer)
         }
     }
 

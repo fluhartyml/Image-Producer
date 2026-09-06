@@ -168,6 +168,63 @@ struct LayerGreenKey: Codable, Equatable {
     var tolerance: Int = 24
 }
 
+
+// MARK: - Gradient  (child 040)
+
+/// Which way the ramp runs. A COMPASS, his word — 2026-09-06: *"it has a gradiant
+/// direction compas in the child tool inspector."*
+enum GradientDirection: String, Codable, CaseIterable, Identifiable, Equatable {
+    case n, ne, e, se, s, sw, w, nw
+
+    var id: String { rawValue }
+    var label: String { rawValue.uppercased() }
+
+    /// Start and end points in SwiftUI's unit space, where y grows DOWNWARD — so
+    /// "north" is y = 0. Getting this backwards puts every gradient upside down.
+    var span: (start: UnitPoint, end: UnitPoint) {
+        switch self {
+        case .n:  (.bottom, .top)
+        case .ne: (.bottomLeading, .topTrailing)
+        case .e:  (.leading, .trailing)
+        case .se: (.topLeading, .bottomTrailing)
+        case .s:  (.top, .bottom)
+        case .sw: (.topTrailing, .bottomLeading)
+        case .w:  (.trailing, .leading)
+        case .nw: (.bottomTrailing, .topLeading)
+        }
+    }
+}
+
+/// GRADIENT — and its meaning depends on what the layer holds.
+///
+/// ⚖️ HIS DESIGN, 2026-09-06, arrived at by asking *"if the layer has an image present
+/// does the gradient turn into a gradient green key tool?"* — yes, and that question
+/// reorganised the whole tool:
+///
+///   • **PRISTINE LAYER** → the chosen colors DRAW the ramp. *"on a prestine layer the
+///     child tools have colors chosen so a gradient would draw a gradient using the
+///     chosen colors."* This is what makes the app able to draw its own icon's
+///     purple→blue background.
+///   • **LAYER WITH ARTWORK** → the ramp drives ALPHA. The art fades by position.
+///
+/// THE THREE CHILDREN ALL CONTROL ALPHA, differing only in what selects it: Green Key
+/// by COLOR, Gradient by POSITION, Translucent UNIFORMLY. That is why they are a
+/// family rather than a bag of effects.
+///
+/// ⛔ AND IT IS NOT THE PAINT BUCKET. *"i want this unique from the paint bucket tool."*
+/// The bucket WRITES pixels into the layer; this only DRAWS, and Apply is the only
+/// thing that ever writes. Switch the child off and the layer is exactly as it was.
+struct LayerGradient: Codable, Equatable {
+    var isEnabled = true
+    var direction: GradientDirection = .ne
+    /// Used when the layer is PRISTINE — the ramp is drawn in these two colors.
+    var startHex = "#7B4BC8"
+    var endHex   = "#2E9BF0"
+    /// Used when the layer HAS ARTWORK — the ramp drives opacity between these.
+    var startOpacity = 1.0
+    var endOpacity   = 0.0
+}
+
 // MARK: - The halo
 
 /// The blurred passes that sit UNDER a layer's artwork. `content` is the layer,
@@ -190,6 +247,37 @@ struct GlowHalo<Content: View>: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+
+// MARK: - The ramp
+
+/// Draws a layer's gradient, in whichever of its two meanings applies.
+///
+/// PRISTINE → the ramp IS the picture: two colors, corner to corner.
+/// WITH ART → the ramp is a MASK on the art, so it fades by position.
+///
+/// Either way this only draws. Nothing is written to the layer until Apply.
+struct GradientVeil<Content: View>: View {
+    let gradient: LayerGradient
+    let isPristine: Bool
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        let span = gradient.direction.span
+        if isPristine {
+            LinearGradient(colors: [Color(hex: gradient.startHex) ?? .purple,
+                                    Color(hex: gradient.endHex) ?? .blue],
+                           startPoint: span.start, endPoint: span.end)
+        } else {
+            content().mask(
+                LinearGradient(stops: [
+                    .init(color: .black.opacity(gradient.startOpacity), location: 0),
+                    .init(color: .black.opacity(gradient.endOpacity),   location: 1)
+                ], startPoint: span.start, endPoint: span.end)
+            )
+        }
     }
 }
 
@@ -227,6 +315,7 @@ struct LayerInspector: View {
     @State private var showTranslucent = false
     @State private var showGlow = false
     @State private var showGreenKey = false
+    @State private var showGradient = false
 
     private var targetIndex: Int? {
         guard let id = targetID ?? activeLayerID else { return nil }
@@ -262,6 +351,7 @@ struct LayerInspector: View {
                         translucentReveal(i)
                         glowReveal(i)
                         greenKeyReveal(i)
+                        gradientReveal(i)
                     }
                 }
             }
@@ -298,6 +388,7 @@ struct LayerInspector: View {
         return (layer.glow?.isEnabled ?? false)
             || layer.opacity < 1.0
             || (layer.greenKey?.isEnabled ?? false)
+            || (layer.gradient?.isEnabled ?? false)
     }
 
     private var layerPicker: some View {
@@ -596,6 +687,102 @@ struct LayerInspector: View {
         }
     }
 
+
+    // MARK: Child — Gradient
+
+    @ViewBuilder
+    private func gradientReveal(_ i: Int) -> some View {
+        let pristine = document.layers[i].isPristine
+        DisclosureGroup(isExpanded: $showGradient) {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("Gradient on this layer", isOn: gradientEnabled(i))
+                if document.layers[i].gradient?.isEnabled == true {
+                    compass(i)
+                    if pristine {
+                        Text("This layer is empty, so the gradient DRAWS in these two colors.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        swatches(title: "From", selection: gradientBinding(i).startHex)
+                        swatches(title: "To", selection: gradientBinding(i).endHex)
+                    } else {
+                        Text("This layer has artwork, so the gradient FADES it by position.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        opacityEnds(i)
+                    }
+                }
+            }
+            .padding(.top, 4)
+        } label: {
+            let g = document.layers[i].gradient
+            revealLabel("Gradient",
+                        on: g?.isEnabled ?? false,
+                        detail: (g?.isEnabled ?? false)
+                            ? "\(g?.direction.label ?? "") · \(pristine ? "draws" : "fades")"
+                            : nil)
+        }
+    }
+
+    private func gradientBinding(_ i: Int) -> Binding<LayerGradient> {
+        Binding(get: { self.document.layers[i].gradient ?? LayerGradient() },
+                set: { self.document.layers[i].gradient = $0 })
+    }
+
+    private func gradientEnabled(_ i: Int) -> Binding<Bool> {
+        Binding(get: { self.document.layers[i].gradient?.isEnabled ?? false },
+                set: { on in
+                    var g = self.document.layers[i].gradient ?? LayerGradient()
+                    g.isEnabled = on
+                    self.document.layers[i].gradient = on ? g : nil
+                })
+    }
+
+    /// THE COMPASS — his word for it. Eight points around a centre, the current one lit.
+    /// A compass rather than a slider because direction is a place, not a quantity.
+    @ViewBuilder
+    private func compass(_ i: Int) -> some View {
+        let current = document.layers[i].gradient?.direction ?? .ne
+        let rows: [[GradientDirection?]] = [[.nw, .n, .ne],
+                                            [.w,  nil, .e],
+                                            [.sw, .s, .se]]
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Direction").font(.subheadline).foregroundStyle(.secondary)
+            VStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { r in
+                    HStack(spacing: 4) {
+                        ForEach(0..<3, id: \.self) { c in
+                            if let dir = rows[r][c] {
+                                Button {
+                                    gradientBinding(i).wrappedValue.direction = dir
+                                } label: {
+                                    Text(dir.label)
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .frame(width: 34, height: 26)
+                                        .background(RoundedRectangle(cornerRadius: 5)
+                                            .fill(dir == current
+                                                  ? Color.accentColor.opacity(0.25)
+                                                  : Color.secondary.opacity(0.12)))
+                                        .overlay(RoundedRectangle(cornerRadius: 5)
+                                            .stroke(dir == current ? Color.accentColor : .clear))
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Color.clear.frame(width: 34, height: 26)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func opacityEnds(_ i: Int) -> some View {
+        let g = document.layers[i].gradient ?? LayerGradient()
+        labelledSlider("From", value: gradientBinding(i).startOpacity, range: 0...1,
+                       readout: String(format: "%.0f%%", g.startOpacity * 100))
+        labelledSlider("To", value: gradientBinding(i).endOpacity, range: 0...1,
+                       readout: String(format: "%.0f%%", g.endOpacity * 100))
+    }
+
     // MARK: - Apply
 
     /// ⚖️ THE NON-DESTRUCTIVE RULE — his words, 2026-09-06: *"yes it is the non
@@ -631,6 +818,7 @@ struct LayerInspector: View {
         original.glow = nil
         original.opacity = 1.0
         original.greenKey = nil
+        original.gradient = nil
         original.isVisible = false
 
         // 016 — THE NAME LISTS WHAT ACTUALLY BAKED. Agreed 2026-09-06. It used to say
@@ -644,6 +832,7 @@ struct LayerInspector: View {
         if source.glow?.isEnabled == true { applied.append("Glow") }
         if source.opacity < 1.0 { applied.append("Translucent") }
         if source.greenKey?.isEnabled == true { applied.append("Green Key") }
+        if source.gradient?.isEnabled == true { applied.append("Gradient") }
         let suffix = applied.isEmpty ? "Applied" : applied.joined(separator: " + ")
 
         var base = source.name
@@ -664,6 +853,7 @@ struct LayerInspector: View {
         document.layers[i].glow = nil          // pixels now, not a live effect
         document.layers[i].opacity = 1.0       // baked in
         document.layers[i].greenKey = nil      // baked in
+        document.layers[i].gradient = nil      // baked in
         document.layers[i].isVisible = true
         // A text layer mirrors its name from its typed text; leaving that link intact
         // would let the next keystroke wipe the suffix off the baked layer.
