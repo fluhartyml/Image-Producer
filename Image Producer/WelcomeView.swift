@@ -270,7 +270,7 @@ struct WelcomeView: View {
             // indistinguishable from a missing feature. He asked me twice today whether
             // I had removed it. A box that says it is empty answers that on sight.
             VStack(alignment: .leading, spacing: 6) {
-                Text("Recent")
+                Text("Recents")
                     .font(.headline)
                     .foregroundStyle(.secondary)
 

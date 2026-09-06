@@ -1326,6 +1326,12 @@ struct CanvasInspector: View {
                     try FileManager.default.moveItem(at: src, to: dst)
                     coordinator.item(at: src, didMoveTo: dst)   // notify the open document to follow
                     DispatchQueue.main.async {
+                        // Only the destination: the auto-generated name is discarded on
+                        // purpose, and a recents row pointing at a file that no longer
+                        // exists is worse than no row. (list() drops dead entries too.)
+                        #if os(macOS)
+                        RecentProjects.note(dst)
+                        #endif
                         document.say("Renamed to \(clean)", kind: .info)
                     }
                 } catch {
@@ -1353,6 +1359,19 @@ struct CanvasInspector: View {
                 // turns this into Save As. Deliberate, not a misuse.
                 coordinator.item(at: src, didMoveTo: dst)
                 DispatchQueue.main.async {
+                    // BOTH FILES GO INTO RECENTS — his call, 2026-09-06: "both should
+                    // logically be in the list unless i reset the recents from the file
+                    // menu." He is right, and the gap was mine: RecentProjects.note only
+                    // runs when a document is OPENED, and the copy is never opened — the
+                    // window follows it behind the scenes. So a non-destructive rename
+                    // produced two files on disk and one row in the list, which is the
+                    // inconsistency that made him call the whole thing a bug.
+                    //
+                    // Source first, then destination, so the newest lands at the top.
+                    #if os(macOS)
+                    RecentProjects.note(src)
+                    RecentProjects.note(dst)
+                    #endif
                     document.say("Saved as \(clean) — \(current) kept", kind: .info)
                 }
             } catch {
