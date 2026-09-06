@@ -13,6 +13,99 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+/// OUR OWN recent-projects list.
+///
+/// ⛔ WHY THIS EXISTS. The Welcome window read `NSDocumentController.shared
+/// .recentDocumentURLs`, and both the New and the Import paths dutifully called
+/// `noteNewRecentDocumentURL`. It never persisted: on 2026-09-06, with
+/// `ip.lifetimeProjectCount` at 22, the app's preferences held **no
+/// `NSRecentDocumentRecords` key at all** — so the list was empty for every project
+/// Michael had ever made, and the Welcome window has been showing a bare pair of
+/// "start something new" buttons with no way back to his work.
+///
+/// A SwiftUI `DocumentGroup` does not own an AppKit document controller in the way
+/// that API expects, so rather than keep guessing at it, the app keeps its own list
+/// in its own preferences — next to the other `ip.*` keys it already writes.
+///
+/// ⚠️ SECURITY-SCOPED BOOKMARKS, NOT PATHS — **this app IS sandboxed.**
+///
+/// The first version of this stored plain paths, on the strength of the
+/// `Image Producer.entitlements` file, which carries only iCloud keys and no
+/// `com.apple.security.app-sandbox`. That was the wrong file to read. The build
+/// settings say `ENABLE_APP_SANDBOX = YES`, Xcode synthesises the entitlement at
+/// sign time, and the signed app has both `app-sandbox` and
+/// `files.user-selected.read-write`.
+///
+/// A sandboxed app gets access to a user-chosen file for that launch only. A stored
+/// PATH would therefore list projects it cannot open after a relaunch — rows that do
+/// nothing, which is worse than an empty list. A security-scoped BOOKMARK is the
+/// thing that survives, and it has to be resolved and opened inside
+/// `startAccessingSecurityScopedResource()`.
+enum RecentProjects {
+    private static let key = "ip.recentDocumentBookmarks"
+    private static let limit = 8
+
+    /// Put `url` at the top, de-duplicated, capped. Called from every path that opens
+    /// or creates a project.
+    static func note(_ url: URL) {
+        guard let bookmark = try? url.bookmarkData(options: .withSecurityScope,
+                                                   includingResourceValuesForKeys: nil,
+                                                   relativeTo: nil) else {
+            NSLog("ImageProducer recents: could not bookmark %@", url.path)
+            return
+        }
+        var stored = (UserDefaults.standard.array(forKey: key) as? [Data]) ?? []
+        // De-duplicate by the URL each bookmark resolves to, not by the bookmark
+        // bytes — the same file bookmarked twice does not produce identical data.
+        stored.removeAll { resolve($0)?.standardizedFileURL == url.standardizedFileURL }
+        stored.insert(bookmark, at: 0)
+        UserDefaults.standard.set(Array(stored.prefix(limit)), forKey: key)
+
+        // Keep feeding AppKit too — it costs nothing and it is what File ▸ Open Recent
+        // uses. It has never persisted anything here (no NSRecentDocumentRecords key
+        // existed after 22 lifetime projects), which is the bug that started this.
+        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+    }
+
+    /// Newest first, with anything unresolvable dropped — a recents row that opens
+    /// nothing is worse than no row.
+    static func list() -> [URL] {
+        let stored = (UserDefaults.standard.array(forKey: key) as? [Data]) ?? []
+        var alive: [Data] = []
+        var urls: [URL] = []
+        for bookmark in stored {
+            if let url = resolve(bookmark), FileManager.default.fileExists(atPath: url.path) {
+                alive.append(bookmark)
+                urls.append(url)
+            }
+        }
+        if alive.count != stored.count { UserDefaults.standard.set(alive, forKey: key) }
+        return urls
+    }
+
+    /// Forget everything. Backs File ▸ Open Recent ▸ Clear Menu's counterpart here.
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: key)
+        NSDocumentController.shared.clearRecentDocuments(nil)
+    }
+
+    private static func resolve(_ bookmark: Data) -> URL? {
+        var stale = false
+        return try? URL(resolvingBookmarkData: bookmark,
+                        options: .withSecurityScope,
+                        relativeTo: nil,
+                        bookmarkDataIsStale: &stale)
+    }
+
+    /// Open a recents entry. The sandbox only hands over access inside this scope, so
+    /// the document must be opened WHILE it is held.
+    static func withAccess<T>(_ url: URL, _ body: () async throws -> T) async rethrows -> T {
+        let granted = url.startAccessingSecurityScopedResource()
+        defer { if granted { url.stopAccessingSecurityScopedResource() } }
+        return try await body()
+    }
+}
+
 struct WelcomeView: View {
     @Environment(\.newDocument) private var newDocument
     @Environment(\.openDocument) private var openDocument
@@ -36,7 +129,7 @@ struct WelcomeView: View {
     @State private var recents: [URL] = []
 
     private func refreshRecents() {
-        recents = NSDocumentController.shared.recentDocumentURLs
+        recents = RecentProjects.list()
     }
 
     var body: some View {
@@ -74,7 +167,7 @@ struct WelcomeView: View {
                     if let url, ImageDocument.writeNewProject(at: url) {
                         // Register in the recent-documents list (SwiftUI's openDocument
                         // doesn't always record it), then open.
-                        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+                        RecentProjects.note(url)
                         do { try await openDocument(at: url); opened = true }
                         catch {
                             NSLog("ImageProducer New: openDocument failed for %@ — %@",
@@ -94,6 +187,44 @@ struct WelcomeView: View {
             .controlSize(.large)
             .buttonStyle(.borderedProminent)
 
+            // OPEN — Michael spotted the gap, 2026-09-06: "i just noticed a missng
+            // element… what about an open?"
+            //
+            // The window offered two ways to START something and no way to RETURN to
+            // something, which is why "New from Import" was reading as the open button
+            // and why he asked whether it should just be called "Open Image."
+            //
+            // ⛔ It must NOT be called that, and Import must not be renamed to it. They
+            // are different verbs: Open reopens an .imgprd PROJECT; New from Import
+            // creates a NEW project seeded from a foreign file and never writes back to
+            // it. "Open Image" would promise editing that PNG in place — so the first
+            // time someone opened one, edited, and saved, they would expect their PNG to
+            // have changed. It has not.
+            Button {
+                let panel = NSOpenPanel()
+                panel.allowedContentTypes = [.imageProject]
+                panel.allowsMultipleSelection = false
+                panel.canChooseDirectories = false
+                panel.prompt = "Open"
+                panel.message = "Choose an Image Producer project to open."
+                guard panel.runModal() == .OK, let url = panel.url else { return }
+                Task {
+                    RecentProjects.note(url)
+                    do {
+                        try await openDocument(at: url)
+                        dismissWindow(id: "welcome")
+                    } catch {
+                        NSLog("ImageProducer Open: openDocument failed for %@ — %@",
+                              url.path, String(describing: error))
+                    }
+                }
+            } label: {
+                Label("Open…", systemImage: "folder")
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.large)
+            .buttonStyle(.bordered)
+
             // New from Import — the launch surface IS the "no document open" state, so the
             // import-as-new-document path belongs right here next to New Image (not only in
             // the ⇧⌘N File-menu command). The picked file becomes the template: an empty doc
@@ -112,7 +243,7 @@ struct WelcomeView: View {
                     let url = await Task.detached { ImageDocument.nextProjectURL() }.value
                     var opened = false
                     if let url, ImageDocument.writeNewProject(at: url, from: pdfURL) {
-                        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+                        RecentProjects.note(url)
                         do { try await openDocument(at: url); opened = true }
                         catch {
                             NSLog("ImageProducer New from Import: openDocument failed for %@ — %@",
@@ -138,7 +269,12 @@ struct WelcomeView: View {
                     ForEach(recents.prefix(6), id: \.self) { url in
                         Button {
                             Task {
-                                try? await openDocument(at: url)
+                                // Sandboxed: the grant only exists inside this scope,
+                                // so the document has to be opened while it is held.
+                                await RecentProjects.withAccess(url) {
+                                    RecentProjects.note(url)
+                                    try? await openDocument(at: url)
+                                }
                                 dismissWindow(id: "welcome")
                             }
                         } label: {
@@ -152,15 +288,11 @@ struct WelcomeView: View {
             }
 
             Spacer(minLength: 0)
-            // Link that pops open the app's File menu at the cursor, so "open other
-            // files" is one click instead of a hunt up in the menu bar.
-            Button("Open other files from the File menu.") {
-                if let fileMenu = NSApplication.shared.mainMenu?.item(withTitle: "File")?.submenu {
-                    fileMenu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
-                }
-            }
-            .buttonStyle(.link)
-            .font(.caption)
+            // The faint "Open other files from the File menu." link lived here. It only
+            // ever existed to cover the missing Open button — it popped the File menu at
+            // the cursor so the user could find Open themselves. With a real Open button
+            // above, it has no job, and a launch window is the wrong place to send
+            // someone hunting through a menu. Removed 2026-09-06 with his word.
         }
         .padding(40)
         .frame(width: 440, height: 520)

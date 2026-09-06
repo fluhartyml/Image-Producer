@@ -271,6 +271,17 @@ struct ContentView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            editorBody
+            Divider()
+            // THE STATUS LINE — his ask, 2026-09-06. Outside every layout branch on
+            // purpose: focus mode, phone, portrait and wide all get the same bar in
+            // the same place, so it is never the thing that moved.
+            StatusBar(document: document)
+        }
+    }
+
+    private var editorBody: some View {
         GeometryReader { geo in
             if canvasFocused {
                 // Full-screen focus: canvas only, tools/panel hidden. The on-canvas
@@ -363,6 +374,21 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showAbout) { AboutView() }
         .environmentObject(pen)
+        // Opening says so in the status bar — his ask, 2026-09-06: "opening should also
+        // cause the feedback bar talk to the user." Also the point where a document
+        // opened from the Finder, from Open Recent, or by a double-click gets into the
+        // recents list, since none of those go through the Welcome window.
+        .onAppear {
+            if let url = fileURL {
+                #if os(macOS)
+                RecentProjects.note(url)
+                #endif
+                document.say("Opened \(url.deletingPathExtension().lastPathComponent)",
+                             kind: .info)
+            } else {
+                document.say("New project", kind: .info)
+            }
+        }
         #if os(macOS)
         // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
         // targeting the focused document.
@@ -784,6 +810,8 @@ struct ToolInspector: View {
             ImageImportInspector(document: document, activeLayerID: activeLayerID)
         case .imagePlayground:
             ImagePlaygroundInspector(document: document, activeLayerID: activeLayerID)
+        case .glow:
+            GlowInspector(document: document, activeLayerID: activeLayerID)
         case .cutout:
             RemoveBackgroundInspector(document: document, activeLayerID: activeLayerID)
         case .magicLasso:
@@ -3399,7 +3427,10 @@ private struct ToolPointer: ViewModifier {
 
         // Camera joins them: the shutter is a button in the inspector, never a canvas
         // click, so a camera cursor would promise a click the tool does not take.
-        case .imagePlayground, .canvas, .colorPalette, .image, .cutout, .camera:
+        // Glow joins them for the same reason: it is chosen and tuned entirely in the
+        // inspector, so a special cursor over the canvas would promise a click it does
+        // not take.
+        case .imagePlayground, .canvas, .colorPalette, .image, .cutout, .camera, .glow:
             nil
         }
     }
@@ -4068,11 +4099,30 @@ struct CanvasView: View {
         ZStack {
             ForEach(document.layers) { layer in
                 if let ghost = onionOpacity(for: layer) {
-                    layerContent(layer, size: size).opacity(ghost)
+                    glowingContent(layer, size: size).opacity(ghost)
                 } else if isDisplayVisible(layer) {
-                    layerContent(layer, size: size)
+                    glowingContent(layer, size: size)
                 }
             }
+        }
+    }
+
+    /// The editing canvas draws through its own path rather than `ImageCompositeView`,
+    /// so the glow has to be applied here as well or the canvas shows something the
+    /// export does not. Michael, 2026-09-06, on seeing it only in the thumbnail:
+    /// "should the layer render realtime?" — yes, because Reach and Intensity are
+    /// tuned by eye and a 100px thumbnail is not something you can tune against.
+    @ViewBuilder
+    private func glowingContent(_ layer: ImageLayer, size: CGSize) -> some View {
+        if let glow = layer.glow, glow.isEnabled, layer.backgroundRole == nil {
+            ZStack {
+                GlowHalo(glow: glow, reference: min(size.width, size.height)) {
+                    layerContent(layer, size: size)
+                }
+                layerContent(layer, size: size)
+            }
+        } else {
+            layerContent(layer, size: size)
         }
     }
 
@@ -4586,8 +4636,26 @@ struct LayerPanel: View {
             // It also SEVERS the text→name auto-mirror, so from now on this layer's name is
             // frozen and independent — typing new text won't rename it. (This is why
             // renaming an emoji/text layer can no longer corrupt its glyph.)
+            let previous = document.layers[index].name
+            guard trimmed != previous else { return }
+
+            // ⛔ BUG HE FOUND, 2026-09-06: a rename changed the document and wrote
+            // NOTHING to history. Every history snapshot therefore still held the old
+            // name, so stepping back to undo something else silently reverted the
+            // rename with it — he renamed Midground to "Stars", stepped back one entry
+            // to drop a glow, and the name went with it. He had never applied the glow
+            // and had never asked for the name to move.
+            //
+            // History snapshots the WHOLE layer stack, so anything that edits the stack
+            // and does not record leaves a snapshot that will later overwrite it. The
+            // rename is fixed here; the rest of the Layers panel has the same hole.
+            document.captureHistoryBaselineIfNeeded()
             document.layers[index].name = trimmed
             document.layers[index].nameLinkedToText = false
+            document.recordHistory(toolID: "layers",
+                                   groupTitle: "Layers",
+                                   actionLabel: "Rename to “\(trimmed)”",
+                                   layerID: id)
         }
     }
 
@@ -5292,12 +5360,31 @@ struct ImageCompositeView: View {
         ZStack {
             ForEach(document.layers) { layer in
                 if layer.isVisible, includeBackgrounds || layer.backgroundRole == nil {
-                    composited(layer)
+                    glowing(layer)
                 }
             }
         }
         .frame(width: size.width, height: size.height)
         .clipped()
+    }
+
+    /// A layer plus its halo, if it has one. The halo is drawn from the SAME view the
+    /// compositor is about to draw — used as a mask — so it can never drift out of
+    /// register with the artwork. Backgrounds are excluded: a flat fill has no alpha
+    /// to mask against, so "glowing" one would just wash the canvas.
+    /// See GlowTool.swift for the model.
+    @ViewBuilder
+    private func glowing(_ layer: ImageLayer) -> some View {
+        if let glow = layer.glow, glow.isEnabled, layer.backgroundRole == nil {
+            ZStack {
+                GlowHalo(glow: glow, reference: min(size.width, size.height)) {
+                    composited(layer)
+                }
+                composited(layer)
+            }
+        } else {
+            composited(layer)
+        }
     }
 
     @ViewBuilder
@@ -5583,4 +5670,79 @@ struct AboutView: View {
 
 #Preview {
     ContentView(document: .newDefault())
+}
+
+// MARK: - Status bar
+
+/// The line under the canvas that says what the app just did.
+///
+/// Michael, 2026-09-06: *"a status bar under the bottom that talks to the user for
+/// every tool being applied or every history being made? sort of a debugging line for
+/// the user to see the image producer app working to keep the user engaged."*
+///
+/// It reads `document.status`, which is posted from `recordHistory` and from the file
+/// writer — so it needs no wiring per tool, and a tool that stays silent here is a
+/// tool that never recorded to history. That silence is a real signal, not a gap in
+/// this view: it is exactly the bug he found the same morning, where a rename changed
+/// the document, wrote nothing to history, and was then quietly undone by a step-back.
+struct StatusBar: View {
+    @ObservedObject var document: ImageDocument
+
+    /// Fades the note back to "Ready" so a stale line never reads as live.
+    @State private var faded = false
+
+    private static let clock: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: document.status?.systemImage ?? "circle.dashed")
+                .foregroundStyle(tint)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 16)
+
+            Text(document.status?.text ?? "Ready")
+                .font(.system(size: 12))
+                .foregroundStyle(document.status == nil || faded ? .secondary : .primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Spacer(minLength: 8)
+
+            if let note = document.status {
+                Text(Self.clock.string(from: note.at))
+                    .font(.system(size: 11).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(white: 0.5).opacity(0.10))
+        .contentShape(Rectangle())
+        .help(document.status?.text ?? "Ready")
+        .animation(.easeOut(duration: 0.15), value: document.status)
+        .onChange(of: document.status) { _, _ in
+            faded = false
+            // Dim after a while rather than clearing: the last thing that happened is
+            // still worth reading, it just stops claiming to be happening NOW.
+            Task {
+                try? await Task.sleep(for: .seconds(6))
+                faded = true
+            }
+        }
+    }
+
+    private var tint: Color {
+        switch document.status?.kind {
+        case .save:    .green
+        case .warning: .orange
+        case .info:    .secondary
+        case .edit:    .accentColor
+        case nil:      .secondary
+        }
+    }
 }

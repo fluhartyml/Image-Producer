@@ -52,6 +52,32 @@ final class ImageDocument: ObservableObject {
     /// persistent per-project. Empty until the recording hooks land (step 2).
     @Published var history: ImageHistory = ImageHistory()
 
+    /// THE STATUS LINE. Michael, 2026-09-06: *"maybe a status bar under the bottom
+    /// that talks to the user for every tool being applied or every history being
+    /// made? sort of a debugging line for the user to see the image producer app
+    /// working to keep the user engaged."*
+    ///
+    /// Fed from `recordHistory` — the one choke point every recorded edit already
+    /// passes through — so every tool narrates itself without being told to. That
+    /// also makes it an audit of the hole he found the same morning: an operation
+    /// that changes the document and says NOTHING here is an operation that never
+    /// recorded, and stepping back will silently undo it.
+    ///
+    /// TRANSIENT. Never written to the manifest — it describes the session, not the
+    /// document.
+    @Published var status: StatusNote?
+
+    /// Post a status note. Safe to call from the file-writing path, which SwiftUI
+    /// runs off the main actor.
+    func say(_ text: String, kind: StatusNote.Kind = .edit) {
+        let note = StatusNote(text: text, kind: kind, at: Date())
+        if Thread.isMainThread {
+            status = note
+        } else {
+            DispatchQueue.main.async { [weak self] in self?.status = note }
+        }
+    }
+
 
     /// Where the History panel is currently VIEWING. Tapping a history point moves this
     /// (non-destructively) and shows that state on the canvas; the list is never trimmed
@@ -231,6 +257,7 @@ extension ImageDocument {
             let m = history.entries[n - 1].actions.count
             if coalesce, m > 0, history.entries[n - 1].actions[m - 1].label == actionLabel {
                 history.entries[n - 1].actions[m - 1].snapshot = snapshot   // fold into the current row
+                say("\(groupTitle) — \(actionLabel)", kind: .edit)
                 return
             }
             history.entries[n - 1].actions.append(
@@ -239,6 +266,8 @@ extension ImageDocument {
             history.entries.append(HistoryEntry(toolID: toolID, title: groupTitle,
                 actions: [HistoryAction(label: actionLabel, layerID: layerID, snapshot: snapshot)]))
         }
+        // Narrate it. Every tool gets this for free because they all come through here.
+        say("\(groupTitle) — \(actionLabel)", kind: .edit)
     }
 
     /// If a NEW edit is recorded while VIEWING a past state, that's the implicit commit:
@@ -404,6 +433,10 @@ struct ImageLayer: Identifiable, Codable {
     /// Set only on layers made by the Camera tool. nil on every hand-made layer, and
     /// optional so documents written before the Camera shipped still decode.
     var cameraFrame: CameraFrame?
+    /// Neon or Plasma halo drawn UNDER this layer's artwork. nil = no glow, and
+    /// optional for the same reason `cameraFrame` is — documents written before the
+    /// Glow tool shipped still decode. See GlowTool.swift.
+    var glow: LayerGlow?
     var role: LayerRole
     /// Content elements on a CONTENT layer, composited bottom-to-top. Mixed types
     /// allowed (pixels + image + text + symbol on one layer). Empty = blank.
@@ -865,6 +898,25 @@ extension ImageDocument: ReferenceFileDocument {
         if let v = manifest.colorSpaceCMYK { colorSpaceCMYK = v }
     }
 
+    /// One line of narration for the status bar under the canvas. Transient — it is
+    /// about what just happened in this session, so it is never persisted.
+    struct StatusNote: Identifiable, Equatable {
+        enum Kind: Equatable { case edit, save, info, warning }
+        let id = UUID()
+        var text: String
+        var kind: Kind
+        var at: Date
+
+        var systemImage: String {
+            switch kind {
+            case .edit:    "wand.and.rays"
+            case .save:    "internaldrive"
+            case .info:    "info.circle"
+            case .warning: "exclamationmark.triangle"
+            }
+        }
+    }
+
     /// Capture current state for writing (called off the main actor by SwiftUI).
     func snapshot(contentType: UTType) throws -> ImageProjectManifest {
         ImageProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
@@ -879,6 +931,10 @@ extension ImageDocument: ReferenceFileDocument {
     func fileWrapper(snapshot: ImageProjectManifest,
                      configuration: WriteConfiguration) throws -> FileWrapper {
         let data = try JSONEncoder().encode(snapshot)
+        // The save notification he asked for. Called off the main actor by SwiftUI —
+        // `say` hops back on its own.
+        say("Saved — \(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file))",
+            kind: .save)
         let manifest = FileWrapper(regularFileWithContents: data)
         manifest.preferredFilename = "manifest.json"
         return FileWrapper(directoryWithFileWrappers: ["manifest.json": manifest])
