@@ -8,13 +8,13 @@
 //    "should not be constrained to light or dark layer only"
 //    "i cant tap the paint drip choose a color and then tap a (blank) area on the canvas"
 //
-//  The Paint Bucket had two behaviours — a solid fill for Light/Dark background layers,
+//  The Paint Bucket had two behaviors — a solid fill for Light/Dark background layers,
 //  and a flood fill bounded by lines for a content layer WITH art. An empty content
 //  layer matched neither, so both the button and the canvas tap did nothing. Tapping a
 //  blank canvas with a bucket and getting nothing is not a rule anyone would guess;
 //  it is the tool failing to behave the way it looks.
 //
-//  A background layer stores a colour. A content layer holds a raster, so the fill has
+//  A background layer stores a color. A content layer holds a raster, so the fill has
 //  to be rendered — and, critically, the layer's transform has to be told the raster's
 //  ASPECT. `contentAspect` defaults to nil, meaning "square", so a 2:1 fill dropped
 //  into a 2:1 canvas was laid out as if it were square and came out at half size.
@@ -28,7 +28,7 @@ import UniformTypeIdentifiers
 
 extension ImageDocument {
 
-    /// Fills the layer at `index` edge to edge with one colour.
+    /// Fills the layer at `index` edge to edge with one color.
     ///
     /// Works for a background layer (stores the hex) or a content layer (renders a
     /// raster at canvas size and sets the transform so it covers the canvas exactly).
@@ -111,7 +111,7 @@ extension ImageDocument {
     }
 
     /// The transform to give a layer that has just been handed `png` and is meant to
-    /// FILL the canvas: the art's real aspect, a scale that covers, centred, unrotated.
+    /// FILL the canvas: the art's real aspect, a scale that covers, centered, unrotated.
     ///
     /// Michael, 2026-08-23, on a 1024×512 banner after Filter → Edit Current Layer:
     /// *"it didnt fill the whole canvas with the filter."* Generated art arrived on a
@@ -144,7 +144,7 @@ extension ImageDocument {
         return w / h
     }
 
-    /// A flat rectangle of one colour, as PNG data.
+    /// A flat rectangle of one color, as PNG data.
     static func solidPNG(cgColor: CGColor, size: CGSize) -> Data? {
         let w = max(1, Int(size.width.rounded()))
         let h = max(1, Int(size.height.rounded()))

@@ -72,7 +72,7 @@ struct ImagePlaygroundInspector: View {
     ///
     /// THE TRAP THIS NAMES. A document has a CONTENT layer called "Background" AND a
     /// pair of `.background`-role floor layers called Light and Dark. Filling Light or
-    /// Dark with the paint bucket puts colour on the floor, not art on a content layer —
+    /// Dark with the paint bucket puts color on the floor, not art on a content layer —
     /// so the canvas goes black and Filter stays greyed out, with nothing on screen
     /// explaining the difference. A generic message cannot resolve that; only naming the
     /// selected layer and its actual role can.

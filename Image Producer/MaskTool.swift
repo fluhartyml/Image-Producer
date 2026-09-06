@@ -19,7 +19,7 @@
 //  center bound." Exactly right — with three degrees of freedom you can pin one corner
 //  and the two edges running off it, and the fourth is unreachable.
 //
-//  THE BEHAVIOUR HE SPECIFIED (verbatim, and it is the whole spec):
+//  THE BEHAVIOR HE SPECIFIED (verbatim, and it is the whole spec):
 //
 //    "aspect ratio square move one grabber then the opposite grabber stays locked and
 //     the square gets larger or smaller depending on the distance between the selected
@@ -304,7 +304,7 @@ struct CropMask: Equatable, Codable {
     }
 
     /// Plain drag: the opposite corner stays locked and the shape stays a rectangle, so
-    /// the two neighbours slide along their shared edges. Four degrees of freedom —
+    /// the two neighbors slide along their shared edges. Four degrees of freedom —
     /// every edge reachable, which is what the centered crop could never do.
     func resizingRectangle(_ i: Int, to p: CGPoint) -> CropMask {
         let anchor = corners[(i + 2) % 4]
@@ -424,7 +424,7 @@ struct MaskBox: View {
 
     @State private var dragStart: CropMask?
     /// ⌘ is sampled ONCE at the start of a drag and held for its duration. Sampling every
-    /// frame would let a Sticky-Keys release mid-drag flip the behaviour halfway through.
+    /// frame would let a Sticky-Keys release mid-drag flip the behavior halfway through.
     @State private var freeOverride = false
 
     private let grabVisual: CGFloat = 14
@@ -676,7 +676,7 @@ struct MaskInspector: View {
                 })
     }
 
-    /// A new mask starts at 80% of the canvas, centred — the same place the old Crop
+    /// A new mask starts at 80% of the canvas, centered — the same place the old Crop
     /// section started, so nothing about the first moment feels different. Everything
     /// after that first moment is what changed.
     private func addMask() {
@@ -690,7 +690,7 @@ extension CropMask {
     /// Trim `cg` to this mask: cropped to the frame's bounding box, with everything
     /// outside the SILHOUETTE made transparent.
     ///
-    /// A plain rectangle comes out identical to the old `cropping(to:)` behaviour, so
+    /// A plain rectangle comes out identical to the old `cropping(to:)` behavior, so
     /// this one path serves every mask. A star comes out star-shaped with transparent
     /// corners, which is the entire point of a mask being a shape.
     ///

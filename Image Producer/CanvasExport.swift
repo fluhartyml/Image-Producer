@@ -27,7 +27,7 @@ import UIKit
 #endif
 
 /// A concrete CGColor for the SwiftUI Color, cross-platform (ColorPicker gives a
-/// resolvable colour, so this is safe for the matte fill).
+/// resolvable color, so this is safe for the matte fill).
 extension Color {
     var cgColorResolved: CGColor {
         #if canImport(AppKit)
@@ -180,7 +180,7 @@ private struct LayerPDFManifest: Codable {
 }
 
 extension ImageLayer {
-    /// True when the layer carries NO raster bitmap — a background (a fill colour) or a
+    /// True when the layer carries NO raster bitmap — a background (a fill color) or a
     /// content layer whose elements are all text/symbol (or empty). These are tiny, so
     /// Image Producer stores them verbatim in its own layer PDFs and restores them to
     /// their exact editable kind ("home court advantage"). Image/pixel layers are
@@ -232,7 +232,7 @@ private func layerPDFManifest(from pdf: PDFDocument) -> LayerPDFManifest? {
 /// (bottom-to-top), each rendered on its own. Transparency is PRESERVED by default —
 /// PDF has a native alpha model, so transparent layers stay transparent and re-import
 /// cleanly (no white-matte halo). Pass a `matte` CGColor to FLATTEN each page onto that
-/// colour instead — for print/CMYK handoff where live transparency is unwanted.
+/// color instead — for print/CMYK handoff where live transparency is unwanted.
 @MainActor func makeLayerPDF(_ document: ImageDocument, matte: CGColor? = nil) -> Data? {
     let size = document.canvasPixelSize
     guard size.width > 0, size.height > 0 else { return nil }

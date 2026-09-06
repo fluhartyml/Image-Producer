@@ -53,7 +53,7 @@ enum LayerArtBounds {
     ///   2. the transparent margin inside the picture itself.
     ///
     /// Returns nil when the picture can't be decoded or is fully transparent — the
-    /// caller falls back to the whole square, which is today's behaviour.
+    /// caller falls back to the whole square, which is today's behavior.
     static func unitRect(forPNG png: Data) -> CGRect? {
         let key = png.count &* 31 &+ png.hashValue
         lock.lock()
@@ -130,7 +130,7 @@ extension ImageLayer {
     ///
     /// Raster content only — pixels and imported images. A symbol or a text glyph
     /// also has a true drawn box, but measuring those means rendering them, and a
-    /// text layer already has its own resize behaviour in the Move overlay. Those
+    /// text layer already has its own resize behavior in the Move overlay. Those
     /// keep the whole-square box they have today rather than getting a guess.
     var artUnitRect: CGRect? {
         for element in elements {

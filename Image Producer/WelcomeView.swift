@@ -32,7 +32,7 @@ import UniformTypeIdentifiers
 /// The first version of this stored plain paths, on the strength of the
 /// `Image Producer.entitlements` file, which carries only iCloud keys and no
 /// `com.apple.security.app-sandbox`. That was the wrong file to read. The build
-/// settings say `ENABLE_APP_SANDBOX = YES`, Xcode synthesises the entitlement at
+/// settings say `ENABLE_APP_SANDBOX = YES`, Xcode synthesizes the entitlement at
 /// sign time, and the signed app has both `app-sandbox` and
 /// `files.user-selected.read-write`.
 ///

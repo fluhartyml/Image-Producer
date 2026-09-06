@@ -413,7 +413,7 @@
 //      • MOVE / TRANSFORM — ONE tool (Michael 2026-06-11, chose combined not
 //        split). TRANSFORM is the umbrella: MOVE (reposition) · SCALE · ROTATE ·
 //        SKEW (slant/shear) · DISTORT (free corner drag) · FLIP. The inspector
-//        offers a MODE TOGGLE between the two behaviours Michael recalls as the
+//        offers a MODE TOGGLE between the two behaviors Michael recalls as the
 //        ARROW and the FINGER/HAND:
 //          - ARROW (pointer) = select + grab the HANDLES to scale/rotate/skew/
 //            transform.
@@ -645,7 +645,7 @@
 //      PREREQUISITE for v1: an ACTIVE/SELECTED layer must exist (we removed layer
 //        selection when the list became always-reorderable) -> tap a row = active
 //        layer, distinct from the drag handle. APPLY = tap the canvas to pour
-//        (not auto-fill on colour change). History logging deferred (no engine yet).
+//        (not auto-fill on color change). History logging deferred (no engine yet).
 //      PATTERN FILL — PARKED / UNCERTAIN (Michael 2026-06-11): Photoshop's bucket
 //        could fill with a tiled PATTERN instead of a solid color. Michael has
 //        never used it himself ("i dont know"); recalls a friend tiling a tiny

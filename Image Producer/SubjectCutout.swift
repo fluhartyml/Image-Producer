@@ -37,7 +37,7 @@ enum SubjectCutout {
             case .unreadable:
                 "That layer's picture couldn't be read."
             case .noSubjectFound:
-                "No subject was found to lift. This works on a picture with a clear subject sitting on a background — a flat colour field or a pattern has nothing to separate."
+                "No subject was found to lift. This works on a picture with a clear subject sitting on a background — a flat color field or a pattern has nothing to separate."
             case .maskingFailed(let why):
                 "The cutout failed: \(why)"
             }
@@ -128,8 +128,8 @@ import SwiftUI
 /// below."* That is the point of the tool — compositing, not cropping.
 ///
 /// Sits beside the Eraser's Magic Eraser rather than replacing it. The Magic Eraser matches a
-/// COLOUR, which wants a flat background; this matches a SUBJECT, so it copes with the soft
-/// gradient skies and clouds that Image Playground produces and colour-matching cannot touch.
+/// COLOR, which wants a flat background; this matches a SUBJECT, so it copes with the soft
+/// gradient skies and clouds that Image Playground produces and color-matching cannot touch.
 ///
 /// Non-destructive, exactly like the Magic Eraser: the cutout arrives on a NEW layer above and
 /// the original is hidden, never overwritten.
@@ -295,7 +295,7 @@ struct RemoveBackgroundInspector: View {
 /// **Magic Lasso** — click a region on the canvas and the matching contiguous area is cleared.
 ///
 /// The third tool in the cut-out family, and the three do different jobs:
-///   • **Magic Eraser** (in Eraser) matches a COLOUR anywhere, or floods in from the border.
+///   • **Magic Eraser** (in Eraser) matches a COLOR anywhere, or floods in from the border.
 ///   • **Remove Background** matches a SUBJECT — it copes with soft gradient skies.
 ///   • **Magic Lasso** matches a REGION you point at — the surgical one, for the piece the
 ///     other two leave behind (the cliff under a lifted lighthouse, one cloud, one shadow).

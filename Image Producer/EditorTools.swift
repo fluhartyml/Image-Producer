@@ -6,7 +6,7 @@
 //
 //  The toolbox lineup. These are the SELECTABLE tools that populate the tool
 //  strip. The set is locked in ImageProducer_DeveloperNotes.swift ("TOOL
-//  VOCABULARY"); the BEHAVIOUR of each tool is built later, one at a time. For
+//  VOCABULARY"); the BEHAVIOR of each tool is built later, one at a time. For
 //  now a tool just selects (highlights) and shows its placeholder inspector.
 //
 //  NOTE on names: "Pen" = the PIXEL painter; "Path" = the VECTOR Bezier tool
@@ -32,7 +32,8 @@ enum Tool: String, CaseIterable, Identifiable {
     case symbol        // SF Symbols
     case image         // import: File / Photo / paste / AI
     case imagePlayground   // Apple Image Playground — Maker (new layer) / Filter (restyle active layer)
-    case glow          // Layer Glow — Neon (one colour) / Plasma (two, blended across the halo)
+    case layer         // Layer… — one strip tool, children revealed in its inspector:
+                       // Translucent, Glow (Neon/Plasma), and Gradient when it lands.
     case cutout        // Remove Background — Vision subject lift, keeps the subject, drops the scene
     case magicLasso    // Magic Lasso — click a region, it selects the matching area and clears it
     case zoom          // navigation only (not history)
@@ -67,7 +68,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .symbol:     "Symbol"
         case .image:      "Image"
         case .imagePlayground: "Image Playground"
-        case .glow:       "Layer Glow"
+        case .layer:      "Layer…"
         case .cutout:     "Remove Background"
         case .magicLasso: "Magic Lasso"
         case .zoom:       "Zoom"
@@ -92,7 +93,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .symbol:     "star.fill"
         case .image:      "photo"
         case .imagePlayground: "apple.image.playground"
-        case .glow:       "rays"
+        case .layer:      "square.3.layers.3d"
         case .cutout:     "person.and.background.dotted"
         case .magicLasso: "lasso.badge.sparkles"
         case .zoom:       "magnifyingglass"
@@ -116,13 +117,13 @@ enum Tool: String, CaseIterable, Identifiable {
 // MARK: - Paint Bucket glyph (style B — solid bucket, colored pour)
 
 /// Vector paint bucket drawn with Canvas — used for the Fill tool's strip glyph
-/// (static colour) and the Fill cursor (live fill colour). Style "B" from the
+/// (static color) and the Fill cursor (live fill color). Style "B" from the
 /// 2026-06-15 concept mockup: solid body, a colored pour, a small puddle.
 /// `pourTip` is where the paint lands (unit space, origin top-left) → the cursor
 /// hotspot must sit there so the cursor aims where the fill goes.
 struct PaintBucketGlyph: View {
-    /// The pouring paint colour. Static amber for the toolbar glyph; the cursor
-    /// passes the user's live fill colour (the easter egg).
+    /// The pouring paint color. Static amber for the toolbar glyph; the cursor
+    /// passes the user's live fill color (the easter egg).
     var pourColor: Color = Color(red: 1.0, green: 0.69, blue: 0.0)
     var bodyColor: Color = Color(white: 0.85)
     var outline: Color = Color(white: 0.42)

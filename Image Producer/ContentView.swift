@@ -61,7 +61,7 @@ struct ContentView: View {
     @State private var moveSessionLayerID: ImageLayer.ID?
     @State private var moveSessionTransform: LayerTransform?
     @State private var bottomPanel: BottomPanel = .layers
-    /// Paint Bucket's current colour (roadmap 2.1) — the user's own light/dark choice.
+    /// Paint Bucket's current color (roadmap 2.1) — the user's own light/dark choice.
     @State private var fillColor: Color = .white
     /// Export (⌘E): the unified export sheet with a format dropdown.
     @State private var showExportSheet = false
@@ -117,7 +117,7 @@ struct ContentView: View {
     ///
     /// Only active while `.zoom` is the selected tool, so it can never steal a drag from
     /// the Pen or the Bucket. Navigation by GESTURE stays always-on and untouched — this
-    /// is the tool-specific behaviour on top of it.
+    /// is the tool-specific behavior on top of it.
     ///
     /// At exactly 1× the pan resets: a canvas that fits its area has nowhere to be
     /// dragged to, and leaving a stale offset there would park the artwork off-centre
@@ -145,7 +145,7 @@ struct ContentView: View {
     }
 
     /// Where the zoom was before the last "all the way out", so the toggle can put it
-    /// back. Pan travels with it — returning to 3× with the artwork re-centred would
+    /// back. Pan travels with it — returning to 3× with the artwork re-centered would
     /// lose your place, which is the whole thing the toggle exists to preserve.
     @State private var zoomBeforeToggle: CGFloat?
     @State private var panBeforeToggle: CGSize = .zero
@@ -810,8 +810,8 @@ struct ToolInspector: View {
             ImageImportInspector(document: document, activeLayerID: activeLayerID)
         case .imagePlayground:
             ImagePlaygroundInspector(document: document, activeLayerID: activeLayerID)
-        case .glow:
-            GlowInspector(document: document, activeLayerID: activeLayerID)
+        case .layer:
+            LayerInspector(document: document, activeLayerID: activeLayerID)
         case .cutout:
             RemoveBackgroundInspector(document: document, activeLayerID: activeLayerID)
         case .magicLasso:
@@ -840,7 +840,7 @@ struct ToolInspector: View {
 
 // MARK: - Paint Bucket inspector (Tool #2)
 
-/// Paint Bucket v1 (roadmap 2.1): pick a colour, then tap a BACKGROUND layer's
+/// Paint Bucket v1 (roadmap 2.1): pick a color, then tap a BACKGROUND layer's
 /// canvas to fill it — the user makes their own Light and Dark backgrounds. The
 /// "Fill" button applies without a canvas tap (and works on Mac / for VoiceOver).
 struct PaintBucketInspector: View {
@@ -915,7 +915,7 @@ struct PaintBucketInspector: View {
     /// Michael, 2026-08-22: "should not be constrained to light or dark layer only."
     /// The Paint Bucket had two branches — whole-fill for Light/Dark, flood-fill for a
     /// content layer with art — and an empty content layer fell between them, showing
-    /// a message and no button. Filling a blank layer with a flat colour is an ordinary
+    /// a message and no button. Filling a blank layer with a flat color is an ordinary
     /// thing to want, and the constraint was arbitrary.
     private func fillActiveLayer() {
         guard let i = activeIndex else { return }
@@ -1231,7 +1231,7 @@ struct CanvasInspector: View {
                 }
                 if flattenLayerPDF {
                     ColorPicker(selection: $layerMatte, supportsOpacity: false) {
-                        Text("Matte colour").font(.system(size: 18))
+                        Text("Matte color").font(.system(size: 18))
                     }
                 }
                 Text("Export writes page 1 = the composite, then one page per layer — transparency preserved (flatten only for print).")
@@ -2095,7 +2095,7 @@ struct FontPickerInspector: View {
 /// Import an image file onto the active CONTENT layer. Re-encoded to PNG and kept at
 /// native resolution; the canvas scales it to fit the icon (Move tool re-sizes it).
 /// v1 stores the bytes in the manifest; sibling-file storage in the package is a
-/// follow-up. (Seatrial: the resolution/scaling behaviour is the part to shake down.)
+/// follow-up. (Seatrial: the resolution/scaling behavior is the part to shake down.)
 struct ImageImportInspector: View {
     @ObservedObject var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
@@ -2181,7 +2181,7 @@ struct PixelGrid: View {
 
 // MARK: - Pen inspector (Tool #3 — pixel art)
 
-/// The Pixel Pen's controls: colour, the active layer's resolution (per-layer), a grid
+/// The Pixel Pen's controls: color, the active layer's resolution (per-layer), a grid
 /// toggle, and brush size. Drawing happens on the canvas; this configures the pen.
 struct PenInspector: View {
     @EnvironmentObject var pen: PixelPen
@@ -3059,7 +3059,7 @@ struct MoveTransformInspector: View {
     private func ratioRect(_ w: Double, _ h: Double, size: Double) -> CGRect {
         guard w > 0, h > 0 else { return centeredRect(width: size, height: size) }
         let cw = Double(document.canvasWidth), ch = Double(document.canvasHeight)
-        // A degenerate canvas would divide by zero; fall back to the old behaviour
+        // A degenerate canvas would divide by zero; fall back to the old behavior
         // rather than producing NaN, which propagates into an invisible rect.
         let canvasAspect = (cw > 0 && ch > 0) ? cw / ch : 1
         let aspect = (w / h) / canvasAspect
@@ -3320,7 +3320,7 @@ struct BrushCursor: View {
 /// actual click point (the drip of the drop, the tip of the pencil/dropper).
 private struct ToolPointer: ViewModifier {
     let tool: Tool
-    /// The bucket's current colour. Only the Fill pointer uses it.
+    /// The bucket's current color. Only the Fill pointer uses it.
     var fillColor: Color = .white
 
     func body(content: Content) -> some View {
@@ -3340,7 +3340,7 @@ private struct ToolPointer: ViewModifier {
     /// know which tool you are holding — leaving it an arrow makes the app look like
     /// nothing is selected, whichever tool it is. Each pointer uses that tool's own
     /// toolbar symbol, so the cursor and the button always match.
-    /// The Fill pointer: a drop in the CURRENT FILL COLOUR, wrapped in a contrasting halo.
+    /// The Fill pointer: a drop in the CURRENT FILL COLOR, wrapped in a contrasting halo.
     ///
     /// Michael, 2026-09-02, while trying to pour white into a black-looking area: "the
     /// pointer is also black so two problems" and then "the drip pointer needs a smart
@@ -3353,14 +3353,14 @@ private struct ToolPointer: ViewModifier {
     /// not keep.
     ///
     /// WHAT IS BUILT INSTEAD solves the same problem more completely. The drop is drawn
-    /// in the colour it is about to pour, behind a halo of the OPPOSITE luminance —
-    /// black halo under a light colour, white halo under a dark one. Two tones means one
+    /// in the color it is about to pour, behind a halo of the OPPOSITE luminance —
+    /// black halo under a light color, white halo under a dark one. Two tones means one
     /// of them always contrasts, whatever it is over, so the cursor can never vanish the
     /// way a flat black drop vanished into his black area. And it now answers a question
-    /// the old cursor could not: which colour am I holding.
+    /// the old cursor could not: which color am I holding.
     static func dripPointer(fill: Color) -> Image {
         let body = NSColor(fill).usingColorSpace(.sRGB) ?? .white
-        // Rec. 601 luma — how bright the colour reads, not its raw values.
+        // Rec. 601 luma — how bright the color reads, not its raw values.
         let luma = 0.299 * body.redComponent + 0.587 * body.greenComponent + 0.114 * body.blueComponent
         let halo: NSColor = luma > 0.55 ? .black : .white
 
@@ -3384,7 +3384,7 @@ private struct ToolPointer: ViewModifier {
         return Image(nsImage: out)
     }
 
-    /// Recolour a template symbol without losing its alpha shape.
+    /// Recolor a template symbol without losing its alpha shape.
     private static func tinted(_ image: NSImage, _ color: NSColor) -> NSImage {
         let out = NSImage(size: image.size)
         out.lockFocus()
@@ -3413,7 +3413,7 @@ private struct ToolPointer: ViewModifier {
         case .move:       .image(Image(systemName: "arrow.up.and.down.and.arrow.left.and.right"),
                                  hotSpot: UnitPoint(x: 0.5, y: 0.5))
         // The mask is dragged by its corners and its middle, so the pointer is the frame
-        // itself, centred — same reasoning as Move.
+        // itself, centered — same reasoning as Move.
         case .mask:       .image(Image(systemName: "square.dashed"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
         case .zoom:       .image(Image(systemName: "magnifyingglass"), hotSpot: UnitPoint(x: 0.45, y: 0.45))
         case .symbol:     .image(Image(systemName: "star"),        hotSpot: UnitPoint(x: 0.5, y: 0.5))
@@ -3430,7 +3430,7 @@ private struct ToolPointer: ViewModifier {
         // Glow joins them for the same reason: it is chosen and tuned entirely in the
         // inspector, so a special cursor over the canvas would promise a click it does
         // not take.
-        case .imagePlayground, .canvas, .colorPalette, .image, .cutout, .camera, .glow:
+        case .imagePlayground, .canvas, .colorPalette, .image, .cutout, .camera, .layer:
             nil
         }
     }
@@ -3439,7 +3439,7 @@ private struct ToolPointer: ViewModifier {
 
 struct CanvasView: View {
 
-    /// Pour colour into the CLEAR AREA around a layer's art.
+    /// Pour color into the CLEAR AREA around a layer's art.
     ///
     /// The bucket's normal path seeds inside the layer's own bitmap, which only covers
     /// the art itself. Scale a photo down and everything around it is outside that
@@ -3451,7 +3451,7 @@ struct CanvasView: View {
     /// The fix is to give the tap something to land on: render THIS LAYER ALONE at the
     /// full canvas size, so the clear surround becomes real transparent pixels, then run
     /// the same flood fill from the tapped point. The flood compares alpha as well as
-    /// colour, so it spreads through the transparent area and stops dead at the art's
+    /// color, so it spreads through the transparent area and stops dead at the art's
     /// edge — no bleed into dark pixels inside the photograph.
     ///
     /// The result is canvas-sized and replaces the layer at an identity transform, which
@@ -3570,7 +3570,7 @@ struct CanvasView: View {
                     .opacity(0.5)
                     .allowsHitTesting(false)
             }
-            // LIVE PREVIEW: the region a tap would flood (bucket, in the fill colour) or
+            // LIVE PREVIEW: the region a tap would flood (bucket, in the fill color) or
             // clear (Magic Lasso, in red).
             if activeTool == .fill || activeTool == .magicLasso, let idx = activeIndex,
                document.layers[idx].isVisible, let hi = pen.bucketPreview {
@@ -3696,7 +3696,7 @@ struct CanvasView: View {
             // TAPPED OUTSIDE THE LAYER'S OWN ART — the clear surround. This used to
             // `return` and do nothing at all, silently.
             //
-            // Michael, 2026-09-02, once the behaviour was explained to him rather than
+            // Michael, 2026-09-02, once the behavior was explained to him rather than
             // fixed: "the 'reason it fails' IS the bug and i told you how i intuitivly
             // want to fill the clar pixles that are black because of the layer below."
             // He was right. `imagePixel` returns nil whenever the tap falls outside the
@@ -3727,7 +3727,7 @@ struct CanvasView: View {
 
     /// **Magic Lasso** — click a region and the matching contiguous area is CLEARED, so the
     /// layer below shows through. Same seeded flood as the Paint Bucket, bounded by the same
-    /// colour edges; it writes transparent instead of paint.
+    /// color edges; it writes transparent instead of paint.
     ///
     /// Michael, 2026-08-20: this is the tool that finishes what Remove Background starts.
     /// Vision hands back the lighthouse *and the cliff it stands on* as one subject, because
@@ -3781,7 +3781,7 @@ struct CanvasView: View {
         let lassoing = activeTool == .magicLasso
         let c = fillColor.rgb8
         // The lasso highlights in red because it is showing what will be REMOVED. Painting
-        // that region in the fill colour, the way the bucket does, would say the opposite.
+        // that region in the fill color, the way the bucket does, would say the opposite.
         let hi: (r: UInt8, g: UInt8, b: UInt8, a: UInt8) = lassoing ? (255, 59, 48, 255) : (c.r, c.g, c.b, 255)
         guard activeTool == .fill || lassoing, let hp = bucketHover, let idx = activeIndex,
               document.layers[idx].isVisible, document.layers[idx].backgroundRole == nil,
@@ -4014,7 +4014,7 @@ struct CanvasView: View {
                             || activeTool == .text
                             || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
-            .modifier(ToolPointer(tool: activeTool, fillColor: fillColor))   // cursor reflects the active tool, and the bucket carries its colour (macOS)
+            .modifier(ToolPointer(tool: activeTool, fillColor: fillColor))   // cursor reflects the active tool, and the bucket carries its color (macOS)
             // The production preview, floating over the canvas and visible with ANY
             // tool active — which is the whole point (R2: it updates as each pixel
             // is drawn, so hiding it inside the Zoom inspector made it invisible
@@ -4089,7 +4089,7 @@ struct CanvasView: View {
             : CGSize(width: avail * aspect, height: avail)
     }
 
-    /// What a layer draws on the canvas. A filled background renders its colour;
+    /// What a layer draws on the canvas. A filled background renders its color;
     /// a content layer renders its elements at the layer's transform. (Most
     /// element kinds wait for their tools; `symbol` renders now so the TEST-ONLY
     /// shakedown star is visible for the Move/Transform tool.)
@@ -4121,8 +4121,9 @@ struct CanvasView: View {
                 }
                 layerContent(layer, size: size)
             }
+            .opacity(layer.opacity)
         } else {
-            layerContent(layer, size: size)
+            layerContent(layer, size: size).opacity(layer.opacity)
         }
     }
 
@@ -4358,7 +4359,7 @@ struct TransformBox: View {
                                         let dy = value.location.y - squareCenter.y
                                         newScale = (dx * v.width + dy * v.height) / vv
                                     } else {
-                                        // Degenerate (no measurable art): the old behaviour.
+                                        // Degenerate (no measurable art): the old behavior.
                                         let half = max(abs(value.location.x - squareCenter.x),
                                                        abs(value.location.y - squareCenter.y))
                                         newScale = (half * 2) / ref
@@ -4808,7 +4809,7 @@ struct LayerRow: View {
             //
             // Three signals now, so none of them has to carry it alone: the SHAPE
             // (slash or no slash), the WEIGHT (filled and bold, not hairline), and the
-            // COLOUR (green on, red off). Colour is reinforcement rather than the
+            // COLOR (green on, red off). Color is reinforcement rather than the
             // meaning — the slash still says it on its own for anyone who cannot
             // separate red from green.
             Button(action: onToggleVisibility) {
@@ -4846,7 +4847,7 @@ struct LayerRow: View {
 struct ScaleTicks: View {
 
     /// Slider position (-1...1) for a given scale. The single source of truth for the
-    /// mapping — `scaleSliderBinding` reads it too, so marks cannot drift from behaviour.
+    /// mapping — `scaleSliderBinding` reads it too, so marks cannot drift from behavior.
     static func position(for scale: Double) -> Double {
         scale >= 1 ? (scale - 1) / 3 : (scale - 1) / 0.75
     }
@@ -5010,8 +5011,8 @@ extension Color {
                      blue: Double(value & 0xFF) / 255)
     }
 
-    /// sRGB "#RRGGBB" for persisting a chosen colour (alpha dropped — backgrounds
-    /// are opaque). Returns nil if the platform colour can't be resolved.
+    /// sRGB "#RRGGBB" for persisting a chosen color (alpha dropped — backgrounds
+    /// are opaque). Returns nil if the platform color can't be resolved.
     func hexString() -> String? {
         #if canImport(UIKit)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
@@ -5036,7 +5037,7 @@ extension Color {
 
 // MARK: - Pixel Pen (Tool #3) — raster drawing into a 1024 master bitmap
 
-/// Owns the pen's mutable raster (a 1024×1024 bitmap) plus colour + size. The canvas
+/// Owns the pen's mutable raster (a 1024×1024 bitmap) plus color + size. The canvas
 /// strokes into it on drag and commits the PNG to the active layer on release; it is
 /// seeded from the layer's existing pixels so drawing accumulates rather than wipes.
 @MainActor
@@ -5313,7 +5314,7 @@ struct ExportSheet: View {
             if format == .pdfLayers {
                 Toggle("Flatten transparency onto a matte", isOn: $flattenMatte)
                 if flattenMatte {
-                    ColorPicker("Matte colour", selection: $matte, supportsOpacity: false)
+                    ColorPicker("Matte color", selection: $matte, supportsOpacity: false)
                 }
             }
             HStack {
@@ -5382,8 +5383,9 @@ struct ImageCompositeView: View {
                 }
                 composited(layer)
             }
+            .opacity(layer.opacity)
         } else {
-            composited(layer)
+            composited(layer).opacity(layer.opacity)
         }
     }
 

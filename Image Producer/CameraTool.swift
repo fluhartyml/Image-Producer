@@ -124,9 +124,9 @@ private func blend(_ a: LayerTransform, _ b: LayerTransform, _ t: Double) -> Lay
 }
 
 /// 3-tap smoothing of the shot path: pull each frame toward the average of its
-/// neighbours. `amount` blends between the shot positions (0) and fully smoothed (1),
+/// neighbors. `amount` blends between the shot positions (0) and fully smoothed (1),
 /// because full smoothing damps intentional motion too — a sharp direction change gets
-/// rounded into a curve. Endpoints are left alone; they have only one neighbour and
+/// rounded into a curve. Endpoints are left alone; they have only one neighbor and
 /// moving them drags the whole sequence.
 private func smoothed(_ scenes: [[ImageLayer]], amount: Double) -> [[ImageLayer]] {
     guard amount > 0, scenes.count >= 3 else { return scenes }
@@ -389,7 +389,7 @@ struct CameraInspector: View {
                         .font(.system(size: 15))
                     Slider(value: $camera.smoothing, in: 0...1)
                 }
-                Text("Pulls each shot toward its neighbours. Full smoothing flattens intentional motion too.")
+                Text("Pulls each shot toward its neighbors. Full smoothing flattens intentional motion too.")
                     .font(.system(size: 14)).foregroundStyle(.secondary)
                 HStack {
                     Button("Generate") { generateCameraInBetweens(document, camera: camera) }

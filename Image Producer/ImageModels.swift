@@ -11,7 +11,7 @@
 //  one kind of content layer — a BLANK, TRANSPARENT canvas — and "pixels / image
 //  / text / symbol" are ELEMENTS you add to ANY content layer (mixed + composited).
 //  A blank layer can become anything. Only the two background layers have a
-//  special role (a fillable solid colour, the icon's opacity floor).
+//  special role (a fillable solid color, the icon's opacity floor).
 //
 //  Other deliberate choices:
 //   • PERSISTENCE-AGNOSTIC + Codable-friendly. The "icon package" save format is
@@ -409,7 +409,7 @@ extension ImageDocument {
 /// One layer in the stack.
 /// CONTENT layers are blank transparent canvases — real alpha, see-through to the
 /// layers below — that hold a MIX of content `elements`. BACKGROUND layers are a
-/// fillable solid colour (the floor that removes any clear background from the
+/// fillable solid color (the floor that removes any clear background from the
 /// final icon); they start blank (no fill) until the user paints them.
 struct ImageLayer: Identifiable, Codable {
     var id = UUID()
@@ -622,10 +622,10 @@ struct LayerTransform: Codable, Equatable {
 
 /// What a layer IS at the structural level (NOT a content type).
 enum LayerRole: Codable {
-    /// A fillable solid-colour background — the icon's floor. STARTS BLANK
+    /// A fillable solid-color background — the icon's floor. STARTS BLANK
     /// (`fillHex == nil`); the user fills it with the paint bucket. Once filled it
     /// is opaque, which removes any clear background from the final icon. Light =
-    /// typically white, Dark = typically black, but the colour is user-chosen.
+    /// typically white, Dark = typically black, but the color is user-chosen.
     case background(_ role: BackgroundRole, fillHex: String?)
     /// A blank, transparent canvas that can hold any mix of content elements.
     case content
