@@ -337,7 +337,7 @@ struct WelcomeView: View {
         // stopping it. Letting the height be intrinsic means the window grows as
         // recents accumulate and never has to clip anything.
         .frame(width: 440)
-        .frame(minHeight: 520)
+        .fixedSize(horizontal: false, vertical: true)
         .background(
             LinearGradient(
                 colors: backgroundColors,
