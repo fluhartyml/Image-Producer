@@ -443,6 +443,9 @@ struct ImageLayer: Identifiable, Codable {
     /// Ramp across the layer. On a PRISTINE layer it draws in two colors; on a layer
     /// with artwork it drives alpha by position. nil = none. See GlowTool.swift.
     var gradient: LayerGradient?
+    /// How this layer's COLOR mixes with what is beneath — the one child on a
+    /// different axis from the others. nil = Normal. See GlowTool.swift.
+    var blend: LayerBlendMode?
     var role: LayerRole
     /// Content elements on a CONTENT layer, composited bottom-to-top. Mixed types
     /// allowed (pixels + image + text + symbol on one layer). Empty = blank.

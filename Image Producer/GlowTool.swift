@@ -225,6 +225,52 @@ struct LayerGradient: Codable, Equatable {
     var endOpacity   = 0.0
 }
 
+
+// MARK: - Blend  (child 060)
+
+/// BLEND — his name, 2026-09-06. The fourth child, and the only one on a different
+/// axis from the rest.
+///
+/// ⚖️ THE OTHER THREE CONTROL ALPHA — how MUCH of the layer shows. Blend controls
+/// COLOR — HOW it mixes with what is beneath. Same family in every other respect: a
+/// draw-time property, non-destructive, baked by Apply, never writes.
+///
+/// It is also in his own app icon: the three plates read as translucent sheets that
+/// TINT where they overlap. Alpha alone does not give that; a blend mode does.
+enum LayerBlendMode: String, Codable, CaseIterable, Identifiable, Equatable {
+    case normal, multiply, screen, overlay
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .normal:   "Normal"
+        case .multiply: "Multiply"
+        case .screen:   "Screen"
+        case .overlay:  "Overlay"
+        }
+    }
+
+    /// What it does, in the one sentence that actually helps at the moment of choosing.
+    var blurb: String {
+        switch self {
+        case .normal:   "Covers what is beneath, weighted by opacity."
+        case .multiply: "Always darker. White does nothing, black stays black — ink and shadow."
+        case .screen:   "Always lighter. Black does nothing, white stays white — light and glow."
+        case .overlay:  "Multiplies the darks and screens the lights — more contrast, texture kept."
+        }
+    }
+
+    var swiftUI: BlendMode {
+        switch self {
+        case .normal:   .normal
+        case .multiply: .multiply
+        case .screen:   .screen
+        case .overlay:  .overlay
+        }
+    }
+}
+
 // MARK: - The halo
 
 /// The blurred passes that sit UNDER a layer's artwork. `content` is the layer,
@@ -316,6 +362,7 @@ struct LayerInspector: View {
     @State private var showGlow = false
     @State private var showGreenKey = false
     @State private var showGradient = false
+    @State private var showBlend = false
 
     private var targetIndex: Int? {
         guard let id = targetID ?? activeLayerID else { return nil }
@@ -352,6 +399,7 @@ struct LayerInspector: View {
                         glowReveal(i)
                         greenKeyReveal(i)
                         gradientReveal(i)
+                        blendReveal(i)
                     }
                 }
             }
@@ -389,6 +437,7 @@ struct LayerInspector: View {
             || layer.opacity < 1.0
             || (layer.greenKey?.isEnabled ?? false)
             || (layer.gradient?.isEnabled ?? false)
+            || (layer.blend ?? .normal) != .normal
     }
 
     private var layerPicker: some View {
@@ -783,6 +832,41 @@ struct LayerInspector: View {
                        readout: String(format: "%.0f%%", g.endOpacity * 100))
     }
 
+
+    // MARK: Child — Blend
+
+    @ViewBuilder
+    private func blendReveal(_ i: Int) -> some View {
+        let current = document.layers[i].blend ?? .normal
+        let mode = Binding<LayerBlendMode>(
+            get: { self.document.layers[i].blend ?? .normal },
+            set: { self.document.layers[i].blend = $0 == .normal ? nil : $0 }
+        )
+        DisclosureGroup(isExpanded: $showBlend) {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("Mode", selection: mode) {
+                    ForEach(LayerBlendMode.allCases) { m in
+                        Text(m.title).tag(m)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                Text(current.blurb)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Blend needs something underneath to mix with — a layer on its own "
+                     + "looks the same in every mode.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.top, 4)
+        } label: {
+            revealLabel("Blend",
+                        on: current != .normal,
+                        detail: current != .normal ? current.title : nil)
+        }
+    }
+
     // MARK: - Apply
 
     /// ⚖️ THE NON-DESTRUCTIVE RULE — his words, 2026-09-06: *"yes it is the non
@@ -819,6 +903,7 @@ struct LayerInspector: View {
         original.opacity = 1.0
         original.greenKey = nil
         original.gradient = nil
+        original.blend = nil
         original.isVisible = false
 
         // 016 — THE NAME LISTS WHAT ACTUALLY BAKED. Agreed 2026-09-06. It used to say
@@ -833,6 +918,7 @@ struct LayerInspector: View {
         if source.opacity < 1.0 { applied.append("Translucent") }
         if source.greenKey?.isEnabled == true { applied.append("Green Key") }
         if source.gradient?.isEnabled == true { applied.append("Gradient") }
+        if (source.blend ?? .normal) != .normal { applied.append((source.blend ?? .normal).title) }
         let suffix = applied.isEmpty ? "Applied" : applied.joined(separator: " + ")
 
         var base = source.name
