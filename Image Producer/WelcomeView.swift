@@ -261,31 +261,63 @@ struct WelcomeView: View {
             .controlSize(.large)
             .buttonStyle(.bordered)
 
-            if !recents.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Recent")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    ForEach(recents.prefix(6), id: \.self) { url in
-                        Button {
-                            Task {
-                                // Sandboxed: the grant only exists inside this scope,
-                                // so the document has to be opened while it is held.
-                                await RecentProjects.withAccess(url) {
-                                    RecentProjects.note(url)
-                                    try? await openDocument(at: url)
-                                }
-                                dismissWindow(id: "welcome")
-                            }
-                        } label: {
-                            Label(url.deletingPathExtension().lastPathComponent,
-                                  systemImage: "doc")
-                        }
-                        .buttonStyle(.link)
+            // RECENT — ALWAYS DRAWN, EMPTY OR NOT. Michael, 2026-09-06: "can an empty
+            // recents list be a box with no files listed as a place holder below the
+            // 'new from import...'"
+            //
+            // It used to vanish when empty, which cost two things: the window changed
+            // shape the moment a first project existed, and — worse — an empty list was
+            // indistinguishable from a missing feature. He asked me twice today whether
+            // I had removed it. A box that says it is empty answers that on sight.
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Recent")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+
+                if recents.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .foregroundStyle(.tertiary)
+                        Text("No recent projects yet.")
+                            .foregroundStyle(.tertiary)
                     }
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+                    .padding(.horizontal, 10)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(recents.prefix(6), id: \.self) { url in
+                            Button {
+                                Task {
+                                    // Sandboxed: the grant only exists inside this scope,
+                                    // so the document has to be opened while it is held.
+                                    await RecentProjects.withAccess(url) {
+                                        RecentProjects.note(url)
+                                        try? await openDocument(at: url)
+                                    }
+                                    dismissWindow(id: "welcome")
+                                }
+                            } label: {
+                                Label(url.deletingPathExtension().lastPathComponent,
+                                      systemImage: "doc")
+                            }
+                            .buttonStyle(.link)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
+                    .padding(.horizontal, 10)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.primary.opacity(0.12))
+            )
 
             Spacer(minLength: 0)
             // The faint "Open other files from the File menu." link lived here. It only
