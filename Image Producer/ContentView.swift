@@ -4729,17 +4729,42 @@ struct LayerPanel: View {
         }
     }
 
+    // MARK: - Layers-panel history
+    //
+    // ⚠️ THE HOLE HE FOUND, 2026-09-06. History snapshots the WHOLE layer stack, so any
+    // operation that changes the stack and does NOT record leaves a snapshot that will
+    // later overwrite it. He renamed Midground to "Stars", stepped back one entry to
+    // drop a glow, and the name went with it — silently.
+    //
+    // Rename was fixed at his report. These five were the rest of the hole: every one
+    // of them edits the stack and wrote nothing. His call: "yes fix all five."
+    //
+    // They share the toolID "layers" so the History panel groups them as one tool run,
+    // the way the real tools group. Tool(rawValue:) does not resolve it, which is safe
+    // — the panel falls back to a dashed-square icon rather than crashing.
+    //
+    // ⚖️ AND THE STATUS BAR IS THE PROOF. It is fed from recordHistory, so before this
+    // change these five changed the document and said NOTHING. Silence there was the
+    // symptom. After it, every one of them narrates.
+
     private func toggleVisibility(_ id: ImageLayer.ID) {
-        if let index = document.layers.firstIndex(where: { $0.id == id }) {
-            document.layers[index].isVisible.toggle()
-        }
+        guard let index = document.layers.firstIndex(where: { $0.id == id }) else { return }
+        document.captureHistoryBaselineIfNeeded()
+        document.layers[index].isVisible.toggle()
+        let shown = document.layers[index].isVisible
+        document.recordHistory(toolID: "layers", groupTitle: "Layers",
+                               actionLabel: "\(shown ? "Show" : "Hide") \(document.layers[index].name)",
+                               layerID: id)
     }
 
     /// L3 — add a new blank content layer on TOP of the stack, and select it.
     private func addLayer() {
         let layer = ImageLayer(name: "Layer \(document.layers.count + 1)", role: .content)
+        document.captureHistoryBaselineIfNeeded()
         document.layers.append(layer)          // end of array = top of the visual stack
         activeLayerID = layer.id
+        document.recordHistory(toolID: "layers", groupTitle: "Layers",
+                               actionLabel: "Add \(layer.name)", layerID: layer.id)
     }
 
     /// L4.1 — exact copy (fill/elements, transform, opacity, visibility), named
@@ -4749,14 +4774,21 @@ struct LayerPanel: View {
         var copy = document.layers[i]
         copy.id = UUID()
         copy.name = document.layers[i].name + " copy"
+        document.captureHistoryBaselineIfNeeded()
         document.layers.insert(copy, at: i + 1)   // i+1 = one step toward the top
         activeLayerID = copy.id
+        document.recordHistory(toolID: "layers", groupTitle: "Layers",
+                               actionLabel: "Duplicate \(copy.name)", layerID: copy.id)
     }
 
     /// L4/L5 — delete a layer (context menu).
     private func delete(_ id: ImageLayer.ID) {
+        guard let name = document.layers.first(where: { $0.id == id })?.name else { return }
+        document.captureHistoryBaselineIfNeeded()
         document.layers.removeAll { $0.id == id }
         if activeLayerID == id { activeLayerID = nil }
+        document.recordHistory(toolID: "layers", groupTitle: "Layers",
+                               actionLabel: "Delete \(name)", layerID: nil)
     }
 
     /// L5 — swipe-to-delete. Offsets index into the reversed (top-first) display,
@@ -4767,8 +4799,14 @@ struct LayerPanel: View {
     private func deleteAt(_ offsets: IndexSet) {
         let rows = visibleRows
         let ids = offsets.compactMap { $0 < rows.count ? rows[$0].id : nil }
+        guard !ids.isEmpty else { return }
+        let names = document.layers.filter { ids.contains($0.id) }.map(\.name)
+        document.captureHistoryBaselineIfNeeded()
         document.layers.removeAll { ids.contains($0.id) }
         if let active = activeLayerID, ids.contains(active) { activeLayerID = nil }
+        let label = names.count == 1 ? "Delete \(names[0])" : "Delete \(names.count) layers"
+        document.recordHistory(toolID: "layers", groupTitle: "Layers",
+                               actionLabel: label, layerID: nil)
     }
 
     /// The list shows the stack reversed (top-first), so reorder in that reversed space
@@ -4791,7 +4829,11 @@ struct LayerPanel: View {
         topFirst.removeAll { movingIDs.contains($0.id) }
         let insertAt = anchorID.flatMap { id in topFirst.firstIndex { $0.id == id } } ?? topFirst.count
         topFirst.insert(contentsOf: moving, at: insertAt)
+        document.captureHistoryBaselineIfNeeded()
         document.layers = topFirst.reversed()
+        let label = moving.count == 1 ? "Reorder \(moving[0].name)" : "Reorder \(moving.count) layers"
+        document.recordHistory(toolID: "layers", groupTitle: "Layers",
+                               actionLabel: label, layerID: moving.first?.id)
     }
 }
 
