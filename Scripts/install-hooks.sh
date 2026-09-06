@@ -8,4 +8,13 @@ set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cp "$ROOT/Scripts/post-commit" "$ROOT/.git/hooks/post-commit"
 chmod +x "$ROOT/.git/hooks/post-commit"
-echo "installed: .git/hooks/post-commit -> Scripts/stamp-build.sh"
+chmod +x "$ROOT/Scripts/stamp-build.sh"
+
+# ⚠️ PROVE IT RUNS. Installing a hook and never firing it is how the first version of
+# this went unnoticed through twelve commits. Do not report success on a copy alone.
+if "$ROOT/.git/hooks/post-commit"; then
+    echo "installed and verified: .git/hooks/post-commit"
+else
+    echo "INSTALLED BUT FAILED TO RUN — exit $? — build number will NOT update" >&2
+    exit 1
+fi
