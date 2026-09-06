@@ -203,11 +203,14 @@ struct LayerInspector: View {
         return document.layers.firstIndex(where: { $0.id == id })
     }
 
-    /// Content layers only. A flat background has no alpha to mask against, so a glow
-    /// on one would be a full-canvas color wash rather than a halo.
-    private var dressableLayers: [ImageLayer] {
-        document.layers.filter { $0.backgroundRole == nil }
-    }
+    /// 028 — EVERY LAYER, no exclusion. His ruling, 2026-09-06: *"the background
+    /// layers are just named light and dark for automation purposes… its a generic
+    /// label just pre named."* The filter here was my assumption and it was wrong —
+    /// fading the Light floor so Dark shows through is a real icon move.
+    ///
+    /// Glow on a layer whose whole area is one solid fill gives a full-canvas wash
+    /// rather than a halo. That is what it looks like, not a reason to forbid it.
+    private var dressableLayers: [ImageLayer] { document.layers }
 
     private var targetSelection: Binding<ImageLayer.ID?> {
         Binding(get: { self.targetID ?? self.activeLayerID ?? self.dressableLayers.first?.id },
@@ -458,7 +461,6 @@ struct LayerInspector: View {
     private func apply(at i: Int) {
         guard document.layers.indices.contains(i) else { return }
         let source = document.layers[i]
-        guard source.backgroundRole == nil else { return }
 
         // Render the layer AS IT LOOKS RIGHT NOW — halo and opacity included, because
         // the compositor draws both. Fail-safe: if the render fails, change nothing.
@@ -478,14 +480,27 @@ struct LayerInspector: View {
         original.opacity = 1.0
         original.isVisible = false
 
-        // Strip any existing "(Glow)" / "(Glow n)" first so repeat applies never
-        // compound into "Stars (Glow) (Glow)" — the rule the Move tool follows.
+        // 016 — THE NAME LISTS WHAT ACTUALLY BAKED. Agreed 2026-09-06. It used to say
+        // "(Glow)" whichever child fired, so applying Translucent alone produced
+        // "Stars (Glow)", which is a lie on the layer's own label.
+        //
+        // Several at once are joined with " + ". Repeats NUMBER rather than compound:
+        // "(Glow)" then "(Glow 2)", never "(Glow) (Glow)" — the rule the Move tool
+        // follows, and the reason the existing suffix is stripped first.
+        var applied: [String] = []
+        if source.glow?.isEnabled == true { applied.append("Glow") }
+        if source.opacity < 1.0 { applied.append("Translucent") }
+        let suffix = applied.isEmpty ? "Applied" : applied.joined(separator: " + ")
+
         var base = source.name
-        if let r = base.range(of: #" \(Glow(?: \d+)?\)$"#, options: .regularExpression) {
+        if let r = base.range(of: #" \((?:Glow|Translucent|Applied)(?: \+ [A-Za-z]+)*(?: \d+)?\)$"#,
+                              options: .regularExpression) {
             base.removeSubrange(r)
         }
         let taken = Set(document.layers.map(\.name))
-        func candidate(_ k: Int) -> String { k == 1 ? "\(base) (Glow)" : "\(base) (Glow \(k))" }
+        func candidate(_ k: Int) -> String {
+            k == 1 ? "\(base) (\(suffix))" : "\(base) (\(suffix) \(k))"
+        }
         var n = 1
         while taken.contains(candidate(n)) { n += 1 }
 
@@ -504,7 +519,7 @@ struct LayerInspector: View {
 
         document.recordHistory(toolID: Tool.layer.rawValue,
                                groupTitle: Tool.layer.title,
-                               actionLabel: "Apply — \(candidate(n))",
+                               actionLabel: "Apply \(suffix) — \(candidate(n))",
                                layerID: bakedID)
 
         targetID = bakedID
