@@ -1300,11 +1300,61 @@ struct CanvasInspector: View {
 
         let coordinator = NSFileCoordinator()
         var coordErr: NSError?
-        coordinator.coordinate(writingItemAt: url, options: .forMoving,
+        // ⚖️ DESTRUCTIVE ONCE, THEN NEVER AGAIN — his rule, 2026-09-06:
+        //
+        //   "i do want the first name change from that standard numbered file name to
+        //    the user defined name to be destructive the first time but after it is
+        //    changed… becomes non destructive"
+        //
+        // He is right that a plain rename is destructive: `moveItem` leaves ONE file and
+        // the old name is gone. Undo cannot reach it either — history snapshots the
+        // layer stack, not the filesystem — so a step-back would never bring it back.
+        //
+        // But the FIRST rename is the one nobody wants preserved. A new project is
+        // born as `ImageProducer0022`; keeping that around forever is litter, not safety.
+        //
+        // THE NAME ITSELF CARRIES THE STATE, so this needs no flag and no save to have
+        // happened: if the file is still wearing its auto-generated name, the rename
+        // MOVES. Once it is wearing a name he chose, every later rename COPIES and
+        // leaves the previous one where it was.
+        let isStillAutoNamed = current.range(of: #"^ImageProducer\d{4}$"#,
+                                             options: .regularExpression) != nil
+        if isStillAutoNamed {
+            coordinator.coordinate(writingItemAt: url, options: .forMoving,
+                                   writingItemAt: newURL, options: .forReplacing, error: &coordErr) { src, dst in
+                do {
+                    try FileManager.default.moveItem(at: src, to: dst)
+                    coordinator.item(at: src, didMoveTo: dst)   // notify the open document to follow
+                    DispatchQueue.main.async {
+                        document.say("Renamed to \(clean)", kind: .info)
+                    }
+                } catch {
+                    DispatchQueue.main.async { renameError = true; draftName = displayName }
+                }
+            }
+            if coordErr != nil { renameError = true; draftName = displayName }
+            return
+        }
+
+        // ALREADY HIS NAME → copy, then follow the copy. The previous file stays exactly
+        // where it was, untouched, which is the same shape as every other tool in this
+        // app: the original is preserved and the work continues on the new thing.
+        coordinator.coordinate(readingItemAt: url, options: [],
                                writingItemAt: newURL, options: .forReplacing, error: &coordErr) { src, dst in
             do {
-                try FileManager.default.moveItem(at: src, to: dst)
-                coordinator.item(at: src, didMoveTo: dst)   // notify the open document to follow
+                try FileManager.default.copyItem(at: src, to: dst)
+                // ⚠️ THE OPEN WINDOW MUST FOLLOW THE COPY, or the name field shows the
+                // new name while every autosave keeps writing to the OLD file — the
+                // worst possible outcome, because it looks like it worked.
+                //
+                // `didMoveTo` is the presenter notification that makes the document
+                // switch URLs. We copied rather than moved, so the previous file is
+                // still sitting there untouched; telling the presenter it moved is what
+                // turns this into Save As. Deliberate, not a misuse.
+                coordinator.item(at: src, didMoveTo: dst)
+                DispatchQueue.main.async {
+                    document.say("Saved as \(clean) — \(current) kept", kind: .info)
+                }
             } catch {
                 DispatchQueue.main.async { renameError = true; draftName = displayName }
             }
