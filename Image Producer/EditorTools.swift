@@ -93,7 +93,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .symbol:     "star.fill"
         case .image:      "photo"
         case .imagePlayground: "apple.image.playground"
-        case .layer:      "square.3.layers.3d"
+        case .layer:      "square.3.layers.3d.middle.filled"
         case .cutout:     "person.and.background.dotted"
         case .magicLasso: "lasso.badge.sparkles"
         case .zoom:       "magnifyingglass"
