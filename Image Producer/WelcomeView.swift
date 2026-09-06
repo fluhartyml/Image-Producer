@@ -327,7 +327,17 @@ struct WelcomeView: View {
             // someone hunting through a menu. Removed 2026-09-06 with his word.
         }
         .padding(40)
-        .frame(width: 440, height: 520)
+        // WIDTH FIXED, HEIGHT INTRINSIC. It was a hard 440×520, which was right until
+        // the Recent box arrived — the content grew past 520 and the window clipped it
+        // at BOTH ends: the icon at the top and the Recent box at the bottom.
+        // Michael caught it on sight, 2026-09-06.
+        //
+        // The scene is already `.windowResizability(.contentSize)`, so the window sizes
+        // itself to whatever this view wants — a fixed height was the only thing
+        // stopping it. Letting the height be intrinsic means the window grows as
+        // recents accumulate and never has to clip anything.
+        .frame(width: 440)
+        .frame(minHeight: 520)
         .background(
             LinearGradient(
                 colors: backgroundColors,
