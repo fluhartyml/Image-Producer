@@ -437,6 +437,9 @@ struct ImageLayer: Identifiable, Codable {
     /// optional for the same reason `cameraFrame` is — documents written before the
     /// Glow tool shipped still decode. See GlowTool.swift.
     var glow: LayerGlow?
+    /// GLOBAL color key — every pixel matching this color goes clear, holes and all.
+    /// nil = no key. Optional for the same reason as `glow`. See GlowTool.swift.
+    var greenKey: LayerGreenKey?
     var role: LayerRole
     /// Content elements on a CONTENT layer, composited bottom-to-top. Mixed types
     /// allowed (pixels + image + text + symbol on one layer). Empty = blank.

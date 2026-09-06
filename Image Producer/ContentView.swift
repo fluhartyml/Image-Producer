@@ -4212,7 +4212,8 @@ struct CanvasView: View {
                 liveImageView(live, transform: layer.transform, size: size)
             } else {
                 ForEach(layer.elements) { element in
-                    elementView(element, transform: layer.transform, size: size)
+                    elementView(element, transform: layer.transform, size: size,
+                                greenKey: layer.greenKey?.isEnabled == true ? layer.greenKey : nil)
                 }
             }
         }
@@ -4234,7 +4235,8 @@ struct CanvasView: View {
     @ViewBuilder
     private func elementView(_ element: LayerElement,
                              transform t: LayerTransform,
-                             size: CGSize) -> some View {
+                             size: CGSize,
+                             greenKey: LayerGreenKey? = nil) -> some View {
         // Element sizing uses the shorter canvas edge (`ref`) so content scales-to-fit and
         // letterboxes on a non-square canvas; positioning uses the full width/height.
         let ref = min(size.width, size.height)
@@ -4266,7 +4268,20 @@ struct CanvasView: View {
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .image(let imageContent):
-            if let platformImage = PlatformImage(data: imageContent.pngData) {
+            // GREEN KEY, if this layer has one armed: draw the keyed raster instead of
+            // the stored one. The stored bytes are never touched — switch the child off
+            // and the original image is back, which is the family rule.
+            if let key = greenKey,
+               let keyed = GreenKeyCache.keyed(imageContent.pngData,
+                                               colorHex: key.colorHex,
+                                               tolerance: key.tolerance) {
+                Image(decorative: keyed, scale: 1)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: ref * t.scale, height: ref * t.scale)
+                    .rotationEffect(.degrees(t.rotationDegrees))
+                    .position(x: t.center.x * size.width, y: t.center.y * size.height)
+            } else if let platformImage = PlatformImage(data: imageContent.pngData) {
                 Image(platformImage: platformImage)
                     .resizable()
                     .scaledToFit()
@@ -5507,13 +5522,15 @@ struct ImageCompositeView: View {
             if let hex = fillHex, let color = Color(hex: hex) { color }
         case .content:
             ForEach(layer.elements) { element in
-                elementView(element, transform: layer.transform)
+                elementView(element, transform: layer.transform,
+                            greenKey: layer.greenKey?.isEnabled == true ? layer.greenKey : nil)
             }
         }
     }
 
     @ViewBuilder
-    private func elementView(_ element: LayerElement, transform t: LayerTransform) -> some View {
+    private func elementView(_ element: LayerElement, transform t: LayerTransform,
+                             greenKey: LayerGreenKey? = nil) -> some View {
         let ref = min(size.width, size.height)
         switch element.content {
         case .symbol(let symbol):
@@ -5543,7 +5560,20 @@ struct ImageCompositeView: View {
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .image(let imageContent):
-            if let platformImage = PlatformImage(data: imageContent.pngData) {
+            // GREEN KEY in the EXPORT path too. Missing it here would key the canvas and
+            // ship the unkeyed image — the worst kind of bug, because it looks right
+            // until the file leaves the app.
+            if let key = greenKey,
+               let keyed = GreenKeyCache.keyed(imageContent.pngData,
+                                               colorHex: key.colorHex,
+                                               tolerance: key.tolerance) {
+                Image(decorative: keyed, scale: 1)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: ref * t.scale, height: ref * t.scale)
+                    .rotationEffect(.degrees(t.rotationDegrees))
+                    .position(x: t.center.x * size.width, y: t.center.y * size.height)
+            } else if let platformImage = PlatformImage(data: imageContent.pngData) {
                 Image(platformImage: platformImage)
                     .resizable()
                     .scaledToFit()

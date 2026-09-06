@@ -439,3 +439,67 @@ struct EraserInspector: View {
         document.addResultLayer(out, above: idx, nameSuffix: "erased")
     }
 }
+
+// MARK: - Green Key cache
+
+/// Keying reads and rewrites every pixel, so it must never run on a plain redraw.
+///
+/// ⚠️ THIS IS THE ONE CHILD OF THE LAYER TOOL THAT COSTS REAL WORK. Glow and
+/// Translucent are pure view effects — masks and opacity, no pixels read. A color key
+/// has to walk the raster, which is fine once and ruinous sixty times a second.
+///
+/// So the result is cached against everything that can change it: the source bytes,
+/// the target color and the tolerance. Drag the tolerance slider and each distinct
+/// value is computed once; let go and move the window, and nothing recomputes at all.
+enum GreenKeyCache {
+    private struct Key: Hashable {
+        let source: Int          // hashValue of the source PNG bytes
+        let colorHex: String
+        let tolerance: Int
+    }
+    private static var store: [Key: CGImage] = [:]
+    /// Bounded so a long session cannot grow it without limit. Small on purpose —
+    /// a document has a handful of keyed layers, not hundreds.
+    private static let limit = 24
+
+    @MainActor static func keyed(_ png: Data, colorHex: String, tolerance: Int) -> CGImage? {
+        let k = Key(source: png.hashValue, colorHex: colorHex, tolerance: tolerance)
+        if let hit = store[k] { return hit }
+        guard let rgb = RGB(hex: colorHex),
+              let src = CGImageSourceCreateWithData(png as CFData, nil),
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return nil }
+        let target = (r: UInt8(rgb.r * 255), g: UInt8(rgb.g * 255), b: UInt8(rgb.b * 255))
+        // contiguous: false — GLOBAL. Every matching pixel anywhere in the layer, which
+        // is exactly the "swiss cheese is acceptable" behavior he specified.
+        guard let out = colorMaskedImage(cg, target: target, tolerance: tolerance,
+                                         contiguous: false) else { return nil }
+        if store.count >= limit { store.removeAll() }   // cheap eviction; correctness only
+        store[k] = out
+        return out
+    }
+}
+
+/// The most common OPAQUE color in an image, as "#RRGGBB".
+///
+/// Used by the Green Key child's "Sample from layer": on a keyable layer the
+/// background is, by definition, the color there is most of. Colors are bucketed to
+/// 5 bits per channel before counting, so a photographed screen's thousand greens
+/// collapse into one winner instead of splitting the vote a thousand ways.
+func dominantOpaqueColorHex(_ cg: CGImage) -> String? {
+    guard let (bytes, w, h) = rgbaBytes(from: cg), w > 0, h > 0 else { return nil }
+    var counts: [Int: Int] = [:]
+    var i = 0
+    while i < bytes.count {
+        if bytes[i + 3] > 200 {                       // opaque enough to be background
+            let r = Int(bytes[i]) >> 3, g = Int(bytes[i + 1]) >> 3, b = Int(bytes[i + 2]) >> 3
+            counts[(r << 10) | (g << 5) | b, default: 0] += 1
+        }
+        i += 4
+    }
+    guard let (bucket, _) = counts.max(by: { $0.value < $1.value }) else { return nil }
+    // Back to the middle of the bucket rather than its corner.
+    let r = ((bucket >> 10) & 31) << 3 | 4
+    let g = ((bucket >> 5) & 31) << 3 | 4
+    let b = (bucket & 31) << 3 | 4
+    return String(format: "#%02X%02X%02X", r, g, b)
+}

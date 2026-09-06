@@ -139,6 +139,35 @@ struct RGB: Equatable {
     }
 }
 
+
+// MARK: - Green Key  (child 050)
+
+/// GREEN KEY — his name for it, 2026-09-06, and the differentiator he set:
+///
+///   *"magic lasso NO 'swiss cheese' effect · layer green key tool 'swiss cheese'
+///    effect is acceptable"*
+///
+/// ⚖️ THAT IS THE WHOLE DESIGN. Magic Lasso is CONTIGUOUS — it floods from the pixel
+/// you click and never touches a matching color elsewhere. Green Key is **GLOBAL**:
+/// every pixel in the layer matching this color goes clear, holes and all.
+///
+/// **THE HOLES ARE THE POINT.** A real chroma key has to reach the gaps between
+/// fingers, through hair, inside a handle. Swiss cheese is the correct result here
+/// and the wrong result there, which is why both tools exist and neither replaces
+/// the other — his words: *"i want the layer and the magic lasso both not one or
+/// the other."*
+///
+/// Unlike Magic Lasso, which writes pixels on every click, this is held as a
+/// SETTING: color + tolerance stored on the layer, keyed live, reversible, and
+/// baked only when Apply is pressed.
+struct LayerGreenKey: Codable, Equatable {
+    var isEnabled = true
+    /// The color being removed, sampled from the layer or picked from the palette.
+    var colorHex = "#00B140"          // broadcast chroma green, as a starting point
+    /// How far from that color still counts as a match, per channel (0…128).
+    var tolerance: Int = 24
+}
+
 // MARK: - The halo
 
 /// The blurred passes that sit UNDER a layer's artwork. `content` is the layer,
@@ -197,6 +226,7 @@ struct LayerInspector: View {
     @State private var targetID: ImageLayer.ID?
     @State private var showTranslucent = false
     @State private var showGlow = false
+    @State private var showGreenKey = false
 
     private var targetIndex: Int? {
         guard let id = targetID ?? activeLayerID else { return nil }
@@ -231,6 +261,7 @@ struct LayerInspector: View {
                         Divider()
                         translucentReveal(i)
                         glowReveal(i)
+                        greenKeyReveal(i)
                     }
                 }
             }
@@ -264,7 +295,9 @@ struct LayerInspector: View {
     private var hasSomethingToApply: Bool {
         guard let i = targetIndex, document.layers.indices.contains(i) else { return false }
         let layer = document.layers[i]
-        return (layer.glow?.isEnabled ?? false) || layer.opacity < 1.0
+        return (layer.glow?.isEnabled ?? false)
+            || layer.opacity < 1.0
+            || (layer.greenKey?.isEnabled ?? false)
     }
 
     private var layerPicker: some View {
@@ -444,6 +477,125 @@ struct LayerInspector: View {
         }
     }
 
+
+    // MARK: Child — Green Key
+
+    /// GREEN KEY — global color removal, held as a setting.
+    ///
+    /// His differentiator, 2026-09-06: *"magic lasso NO 'swiss cheese' effect · layer
+    /// green key tool 'swiss cheese' effect is acceptable."* Magic Lasso floods from
+    /// one click and stays connected; this clears EVERY matching pixel in the layer.
+    ///
+    /// Naming is his too: **Green Key** labels the reveal, **Color Key** is the heading
+    /// above the palette and the eyedropper — *"green key is the child label color key
+    /// is above the pallete and eyedropper."*
+    @ViewBuilder
+    private func greenKeyReveal(_ i: Int) -> some View {
+        DisclosureGroup(isExpanded: $showGreenKey) {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("Key this layer", isOn: greenKeyEnabled(i))
+                if document.layers[i].greenKey?.isEnabled == true {
+                    Text("Color Key")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    greenKeySwatch(i)
+                    swatches(title: "", selection: greenKeyBinding(i).colorHex)
+                    eyedropperRow(i)
+                    greenKeyTolerance(i)
+                }
+            }
+            .padding(.top, 4)
+        } label: {
+            let k = document.layers[i].greenKey
+            revealLabel("Green Key",
+                        on: k?.isEnabled ?? false,
+                        detail: (k?.isEnabled ?? false) ? k?.colorHex : nil)
+        }
+    }
+
+    private func greenKeyBinding(_ i: Int) -> Binding<LayerGreenKey> {
+        Binding(get: { self.document.layers[i].greenKey ?? LayerGreenKey() },
+                set: { self.document.layers[i].greenKey = $0 })
+    }
+
+    private func greenKeyEnabled(_ i: Int) -> Binding<Bool> {
+        Binding(get: { self.document.layers[i].greenKey?.isEnabled ?? false },
+                set: { on in
+                    var k = self.document.layers[i].greenKey ?? LayerGreenKey()
+                    k.isEnabled = on
+                    self.document.layers[i].greenKey = on ? k : nil
+                })
+    }
+
+    /// The color currently being removed, shown big enough to judge.
+    @ViewBuilder
+    private func greenKeySwatch(_ i: Int) -> some View {
+        let hex = document.layers[i].greenKey?.colorHex ?? "#00B140"
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color(hex: hex) ?? .green)
+                .frame(width: 44, height: 28)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.35)))
+            Text(hex).font(.caption.monospaced()).foregroundStyle(.secondary)
+            Spacer()
+        }
+    }
+
+    /// ⚠️ THE EYEDROPPER IS THE PRIMARY WAY IN, and the palette is the shortcut.
+    /// The palette governs color you PUT IN; a key matches color that is already THERE,
+    /// and a photographed green screen is a thousand greens, none of them in a palette.
+    @ViewBuilder
+    private func eyedropperRow(_ i: Int) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                sampleFromLayer(i)
+            } label: {
+                Label("Sample from layer", systemImage: "eyedropper")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            Spacer()
+        }
+        Text("Samples the most common opaque color in this layer. For a specific spot, "
+             + "pick it with the Eyedropper tool first.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    /// Take the layer's dominant opaque color as the key. A whole-layer sample is the
+    /// right default for a chroma key: the background IS the most common color, and it
+    /// saves aiming at a canvas the inspector cannot see.
+    private func sampleFromLayer(_ i: Int) {
+        guard let cg = renderLayerImage(document.layers[i], in: document),
+              let hex = dominantOpaqueColorHex(cg) else {
+            document.say("Nothing to sample on this layer", kind: .warning)
+            return
+        }
+        greenKeyBinding(i).wrappedValue.colorHex = hex
+        document.say("Color Key sampled \(hex)", kind: .info)
+    }
+
+    @ViewBuilder
+    private func greenKeyTolerance(_ i: Int) -> some View {
+        let tol = Binding<Double>(
+            get: { Double(self.document.layers[i].greenKey?.tolerance ?? 24) },
+            set: { self.greenKeyBinding(i).wrappedValue.tolerance = Int($0) }
+        )
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Tolerance").font(.subheadline).foregroundStyle(.secondary)
+                Spacer()
+                Text("\(Int(tol.wrappedValue))")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            Slider(value: tol, in: 0...128)
+            Text("How far from that color still counts as a match. Higher reaches more "
+                 + "shades — and more of the subject.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
     // MARK: - Apply
 
     /// ⚖️ THE NON-DESTRUCTIVE RULE — his words, 2026-09-06: *"yes it is the non
@@ -478,6 +630,7 @@ struct LayerInspector: View {
         original.id = UUID()
         original.glow = nil
         original.opacity = 1.0
+        original.greenKey = nil
         original.isVisible = false
 
         // 016 — THE NAME LISTS WHAT ACTUALLY BAKED. Agreed 2026-09-06. It used to say
@@ -490,6 +643,7 @@ struct LayerInspector: View {
         var applied: [String] = []
         if source.glow?.isEnabled == true { applied.append("Glow") }
         if source.opacity < 1.0 { applied.append("Translucent") }
+        if source.greenKey?.isEnabled == true { applied.append("Green Key") }
         let suffix = applied.isEmpty ? "Applied" : applied.joined(separator: " + ")
 
         var base = source.name
@@ -509,6 +663,7 @@ struct LayerInspector: View {
         document.layers[i].transform = document.coveringTransform(forPNG: png)
         document.layers[i].glow = nil          // pixels now, not a live effect
         document.layers[i].opacity = 1.0       // baked in
+        document.layers[i].greenKey = nil      // baked in
         document.layers[i].isVisible = true
         // A text layer mirrors its name from its typed text; leaving that link intact
         // would let the next keystroke wipe the suffix off the baked layer.
