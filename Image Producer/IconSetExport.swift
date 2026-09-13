@@ -7,21 +7,33 @@
 //  loose PNGs still leaves you dragging files into wells, and the wells were always
 //  the actual work.
 //
-//  THE SIZES ARE NOT GUESSED. They were read on 2026-08-21 out of Image Producer's
-//  own `Assets.xcassets/AppIcon.appiconset/Contents.json` — written by Michael's own
-//  Xcode — because Apple's requirements move and this app's old 19-size ladder
-//  (16…1024) is left over from Icon Producer. What Xcode actually declares:
+//  ─────────────────────────────────────────────────────────────────────────────
+//  2026-09-13 — TWO FILES. LIGHT AND DARK, 1024x1024, AND NOTHING ELSE.
 //
-//    iOS   — exactly TWO images: 1024×1024, and a second 1024×1024 tagged
-//            `appearances: luminosity = dark`. iOS downsamples the rest itself.
-//    macOS — 6 unique files (16 · 32 · 64 · 128 · 256 · 512) wired into 10 slots,
-//            each point size at 1x and 2x, files shared: 16@2x IS the 32px file,
-//            and 512@2x is the 1024.
+//  This briefly grew a well-matrix exporter that read the destination catalog and
+//  rendered a PNG per declared well. It was dropped the same morning, on measurement
+//  rather than taste: switching the phone between Light and Dark changed NOTHING on
+//  the home screen — 1,434 differing pixels across two 2.96-megapixel screenshots,
+//  and every one of them the clock. Apple's own icons did not shift either.
 //
-//  ⚠️ And the finding that would have burned us: the macOS entries carry NO dark
-//  variant. Only the iOS 1024 has an appearance. So "light and dark of every size"
-//  is really light+dark of the iOS 1024 plus a light-only Mac ladder. We emit
-//  exactly what Xcode generates — anything extra risks an import warning.
+//  The reason is that iOS 18 moved icon appearance OFF system Dark Mode and onto the
+//  Home Screen's own control (long-press -> Edit -> Customize -> Automatic / Dark /
+//  Light / Tinted). Pinned to Light or Dark, the system never asks for the other
+//  variant at all. So the dark icon is already a minority path, and the rest of the
+//  ladder — direction, gamut, per-size Mac art — was effort spent on wells almost
+//  nothing would ever read.
+//
+//  WHAT THE REMAINING WELLS ARE:
+//    light (untagged)   the icon. Always needed.
+//    dark               shown only when the user's Home Screen is Dark or Automatic.
+//    tinted             NOT Liquid Glass — the iOS 18 grayscale-plus-user-colour wash.
+//                       LEFT EMPTY ON PURPOSE: iOS derives it from the light art, and
+//                       a supplied one is only worth it to override that derivation.
+//
+//  ⚠️ ALPHA: an iOS icon is rejected for merely CONTAINING an alpha channel, so both
+//  files are flattened. This is safe only because the Light and Dark floors are solid
+//  fills — there is no real transparency to lose.
+//  ─────────────────────────────────────────────────────────────────────────────
 //
 
 import Foundation
@@ -38,10 +50,13 @@ enum IconAppearance { case light, dark }
 @MainActor
 enum IconSetExport {
 
-    /// The UNIQUE macOS pixel sizes. Verified, not recalled — see the file header.
-    static let macPixelSizes = [16, 32, 64, 128, 256, 512]
-
     static let folderName = "AppIcon.appiconset"
+
+    /// The only pixel size an app icon needs. iOS downsamples everything else itself.
+    static let px = 1024
+
+    static let lightFile = "icon-light-1024.png"
+    static let darkFile  = "icon-dark-1024.png"
 
     // MARK: - Rendering
 
@@ -98,50 +113,48 @@ enum IconSetExport {
         return out as Data
     }
 
-    /// Every file the set contains, keyed by filename. Light and dark come from the
-    /// document's own Light and Dark floors — you never export twice or name a file
-    /// by hand, which is the whole point of doing this inside a layer app.
+    // MARK: - Building the set
+
+    /// The two PNGs and the Contents.json that wires them.
+    ///
+    /// Light and dark come from the document's own Light and Dark floors — you never
+    /// export twice or name a file by hand, which is the whole point of doing this
+    /// inside a layer app.
     static func build(from document: ImageDocument) -> [String: Data] {
         var files: [String: Data] = [:]
-        let light = render(.light, of: document)
-        let dark  = render(.dark,  of: document)
-
-        if let d = ContentView.renderIconPNG(document: light, px: 1024) { files["icon-light-1024.png"] = stripAlpha(d) }
-        if let d = ContentView.renderIconPNG(document: dark,  px: 1024) { files["icon-dark-1024.png"]  = stripAlpha(d) }
-        for px in macPixelSizes {
-            if let d = ContentView.renderIconPNG(document: light, px: px) { files["icon-mac-\(px).png"] = stripAlpha(d) }
+        if let d = ContentView.renderIconPNG(document: render(.light, of: document), px: px) {
+            files[lightFile] = stripAlpha(d)
         }
+        if let d = ContentView.renderIconPNG(document: render(.dark, of: document), px: px) {
+            files[darkFile] = stripAlpha(d)
+        }
+        guard !files.isEmpty else { return [:] }
         files["Contents.json"] = contentsJSON()
         return files
     }
 
     // MARK: - Contents.json
 
-    /// Mirrors Xcode's own output exactly — same keys, same order, same shared files.
+    /// Two filled wells plus the empty tinted one.
+    ///
+    /// The tinted entry is declared WITHOUT a filename on purpose. Declaring it keeps
+    /// the slot visible in Xcode so it can be filled later; leaving it empty is what
+    /// lets iOS derive the tint from the light art. `.sortedKeys` matches Xcode's own
+    /// alphabetical ordering so the file does not churn in a diff.
     static func contentsJSON() -> Data {
-        var images: [[String: Any]] = [
-            ["filename": "icon-light-1024.png", "idiom": "universal",
+        let images: [[String: Any]] = [
+            ["filename": lightFile, "idiom": "universal",
              "platform": "ios", "size": "1024x1024"],
             ["appearances": [["appearance": "luminosity", "value": "dark"]],
-             "filename": "icon-dark-1024.png", "idiom": "universal",
+             "filename": darkFile, "idiom": "universal",
              "platform": "ios", "size": "1024x1024"],
+            ["appearances": [["appearance": "luminosity", "value": "tinted"]],
+             "idiom": "universal", "platform": "ios", "size": "1024x1024"],
         ]
-        // (point size, scale, the pixel file it resolves to)
-        let macSlots: [(pt: Int, scale: Int, px: Int)] = [
-            (16, 1, 16), (16, 2, 32), (32, 1, 32), (32, 2, 64), (128, 1, 128),
-            (128, 2, 256), (256, 1, 256), (256, 2, 512), (512, 1, 512), (512, 2, 1024),
-        ]
-        for s in macSlots {
-            // 512@2x is the 1024 — the same file the iOS light slot uses, exactly as
-            // Xcode wires it. No duplicate megabyte on disk.
-            let file = s.px == 1024 ? "icon-light-1024.png" : "icon-mac-\(s.px).png"
-            images.append(["filename": file, "idiom": "mac",
-                           "scale": "\(s.scale)x", "size": "\(s.pt)x\(s.pt)"])
-        }
         let root: [String: Any] = ["images": images,
                                    "info": ["author": "xcode", "version": 1]]
         return (try? JSONSerialization.data(withJSONObject: root,
-                                            options: [.prettyPrinted])) ?? Data()
+                                            options: [.prettyPrinted, .sortedKeys])) ?? Data()
     }
 
     // MARK: - Writing
@@ -168,7 +181,14 @@ enum IconSetExport {
             let dir = try chooseDirectory()
             guard let dir else { return "" }               // user cancelled
             let set = try write(files, into: dir)
-            return "Wrote \(files.count) files to \(set.path).\n\nDrag \(folderName) into Assets.xcassets."
+            return """
+                Wrote \(lightFile) and \(darkFile) to \(set.path).
+
+                The tinted well is declared but left empty — iOS derives it from the \
+                light icon.
+
+                Drag \(folderName) into Assets.xcassets.
+                """
         } catch {
             return "Could not write the icon set: \(error.localizedDescription)"
         }
