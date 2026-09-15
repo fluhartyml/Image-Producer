@@ -3228,7 +3228,7 @@ struct MoveTransformInspector: View {
                             .help("Jog the layer's rotation by one degree")
                         Spacer()
                     }
-                    Slider(value: transformBinding(\.rotationDegrees, idx), in: -180...180)
+                    Slider(value: rotationSliderBinding(idx), in: -180...180)
                 }
                 HStack {
                     Button("Center") {
@@ -3273,6 +3273,35 @@ struct MoveTransformInspector: View {
         document.layers[idx].transform.rotationDegrees = min(180, max(-180, deg))
     }
 
+    /// Degrees the Rotation SLIDER snaps to.
+    ///
+    /// He floated two values — "maybe the rotation slider should be 30 or 45 degree
+    /// snaps?" — and 15 contains BOTH, so neither is lost: 30, 45, 60 and 90 are all
+    /// multiples of it. It also lands exactly on 0 and ±180.
+    ///
+    /// Change this one number to make it 30 or 45 instead. The jog arrows do not consult
+    /// it and reach every whole degree regardless.
+    private static let rotationSnapDegrees = 15.0
+
+    /// Rotation slider binding. SNAPS on the way in only.
+    ///
+    /// The getter returns the true angle, so 28° set by the jog arrows keeps reading 28°
+    /// and the handle sits off-mark until the slider is dragged again. Same division of
+    /// labour as Scale: slider for the coarse move, arrows for the fine one.
+    private func rotationSliderBinding(_ idx: Int) -> Binding<Double> {
+        Binding(
+            get: { document.layers.indices.contains(idx)
+                    ? document.layers[idx].transform.rotationDegrees
+                    : 0 },
+            set: { degrees in
+                guard document.layers.indices.contains(idx) else { return }
+                let step = Self.rotationSnapDegrees
+                document.layers[idx].transform.rotationDegrees =
+                    min(180, max(-180, (degrees / step).rounded() * step))
+            }
+        )
+    }
+
     /// Bounds-safe so a slider that fires after its layer was removed can't crash.
     private func transformBinding<V>(_ keyPath: WritableKeyPath<LayerTransform, V>,
                                      _ idx: Int) -> Binding<V> {
@@ -3303,8 +3332,21 @@ struct MoveTransformInspector: View {
                     : 1.0
                 return ScaleTicks.position(for: scale)
             },
-            set: { position in
+            set: { rawPosition in
                 guard document.layers.indices.contains(idx) else { return }
+                // SNAPS TO THE DRAWN MARKS. His change, 2026-09-15: "what i would like is
+                // the slider to snap ... but i want the jogging arrows to fine tune and
+                // not be restrained by the slider snap."
+                //
+                // This REVERSES his 2026-09-02 "NO snap" ruling, and deliberately: the
+                // reason for no-snap was that snapping put exact values out of reach, and
+                // the jog arrows now supply those. Snap for the coarse move, arrows for
+                // the last pixel.
+                //
+                // Only the SETTER snaps. The getter above returns the true position, so a
+                // value the arrows left between two marks stays visibly between them
+                // until the slider is next dragged.
+                let position = ScaleTicks.snapped(rawPosition)
                 let scale = position >= 0
                     ? 1 + position * 3                  // 1x  -> 4x,  even steps up
                     : 1 + position * 0.75               // 1x  -> 1/4x, even steps down
@@ -5036,6 +5078,25 @@ struct ScaleTicks: View {
     /// mapping — `scaleSliderBinding` reads it too, so marks cannot drift from behavior.
     static func position(for scale: Double) -> Double {
         scale >= 1 ? (scale - 1) / 3 : (scale - 1) / 0.75
+    }
+
+    /// The scales the slider SNAPS to — every drawn mark, plus 4.0.
+    ///
+    /// 4.0 is the track's top end and is NOT a drawn mark, so without it the slider could
+    /// no longer reach its own documented maximum once snapping was turned on; it would
+    /// stop at 3x. The bottom end needs no such addition — 0.25 is both the end of the
+    /// travel and a drawn mark (¼).
+    static let snapScales: [Double] = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0]
+
+    /// The nearest snap point to track position `p`, measured in TRACK space, not scale.
+    ///
+    /// The mapping is piecewise — the grow half covers 1x..4x and the shrink half
+    /// 1x..0.25x over the same travel — so snapping by nearest SCALE would make the grow
+    /// side's marks pull far harder than the shrink side's. Snapping where the finger
+    /// actually is keeps every mark equally sticky.
+    static func snapped(_ p: Double) -> Double {
+        let targets = snapScales.map { position(for: $0) }
+        return targets.min(by: { abs($0 - p) < abs($1 - p) }) ?? p
     }
 
     private struct Mark: Identifiable {
