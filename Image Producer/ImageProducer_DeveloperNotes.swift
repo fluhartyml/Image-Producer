@@ -1420,3 +1420,18 @@
 //  Order is not set. R3 is the smallest and stands alone; R1 and R2 are one
 //  feature in two halves and R2 cannot exist before R1.
 //
+//
+//  R4. AN API SO CLAUDE CAN REACH EVERYTHING IN THE APP — his ask, 2026-09-09 04:12.
+//      His words, from the same three minutes as the Lighthouse version of it:
+//      "i want the lighthouse to have an api so you can use an api to access
+//      everything in it" -> then "i meant image producer".
+//      CAPTURED, NOT STARTED. No branch, no code.
+//
+//      Why this one is the easier of the two: Image Producer is MULTIPLATFORM and
+//      runs on the Mac. Claude is already on the Mac. Lighthouse is on his phone,
+//      which is why that one needs somewhere reachable to live first.
+//
+//      Open and HIS to answer:
+//      - Read-only, or can Claude create and edit documents?
+//      - Does it act on the OPEN document, or on files on disk?
+//      - Mac only, or does the iPad build need it too?

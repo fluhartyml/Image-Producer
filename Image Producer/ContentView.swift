@@ -3185,8 +3185,20 @@ struct MoveTransformInspector: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Scale  \(Int(document.layers[idx].transform.scale * 100))%")
-                        .font(.system(size: 18))
+                    HStack(spacing: 10) {
+                        Text("Scale  \(Int(document.layers[idx].transform.scale * 100))%")
+                            .font(.system(size: 18))
+                        // JOG BY ONE PIXEL. His ask, 2026-09-15: "can you add an up down
+                        // arrow to jog the scale by one pixel." The slider is deliberately
+                        // unstepped (see below) and cannot be dragged finer than a few
+                        // percent; on the 1024 icon canvas one pixel is 0.098% of scale,
+                        // so these arrows are the only way to reach an exact size.
+                        Stepper(onIncrement: { jogScale(idx, byPixels:  1) },
+                                onDecrement: { jogScale(idx, byPixels: -1) }) { EmptyView() }
+                            .labelsHidden()
+                            .help("Jog the layer's size by one pixel")
+                        Spacer()
+                    }
                     // 100% SITS AT THE CENTRE. Michael, 2026-09-02, after saying Rotation
                     // reads correctly and Scale does not: "i want 100% to be center then i
                     // want gradiens but NO snap. i want gradians 1.5 2 2.5 3."
@@ -3207,8 +3219,15 @@ struct MoveTransformInspector: View {
                     ScaleTicks()
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Rotation  \(Int(document.layers[idx].transform.rotationDegrees))°")
-                        .font(.system(size: 18))
+                    HStack(spacing: 10) {
+                        Text("Rotation  \(Int(document.layers[idx].transform.rotationDegrees))°")
+                            .font(.system(size: 18))
+                        Stepper(onIncrement: { jogRotation(idx, byDegrees:  1) },
+                                onDecrement: { jogRotation(idx, byDegrees: -1) }) { EmptyView() }
+                            .labelsHidden()
+                            .help("Jog the layer's rotation by one degree")
+                        Spacer()
+                    }
                     Slider(value: transformBinding(\.rotationDegrees, idx), in: -180...180)
                 }
                 HStack {
@@ -3224,6 +3243,34 @@ struct MoveTransformInspector: View {
                 .buttonStyle(.bordered)
             }
         }
+    }
+
+    /// Nudge the layer's SIZE by whole pixels.
+    ///
+    /// `transform.scale` is a fraction of the SHORT canvas edge: content is drawn
+    /// `contentSize × ref` pixels where `ref = min(canvasWidth, canvasHeight)`, so the
+    /// limiting dimension in pixels is `scale × ref` and one pixel is `1/ref` of scale.
+    ///
+    /// It works in PIXELS and converts back, rather than adding a fixed delta to scale.
+    /// That way a value left at 39.4% by the slider lands on a whole pixel on the first
+    /// press and moves by exactly one on every press after — which is what "jog by one
+    /// pixel" has to mean if the readout is to be trusted.
+    ///
+    /// Floor is ONE pixel: scale can never reach zero or go negative.
+    private func jogScale(_ idx: Int, byPixels delta: Double) {
+        guard document.layers.indices.contains(idx) else { return }
+        let ref = Double(max(1, min(document.canvasWidth, document.canvasHeight)))
+        let px = (document.layers[idx].transform.scale * ref).rounded() + delta
+        document.layers[idx].transform.scale = max(1, px) / ref
+    }
+
+    /// Nudge rotation by whole degrees, clamped to the slider's own -180...180 so the two
+    /// controls can never disagree about the range. Rounds first for the same reason
+    /// `jogScale` does: 28.4° plus one should read 29°, not 29.4° displayed as 29°.
+    private func jogRotation(_ idx: Int, byDegrees delta: Double) {
+        guard document.layers.indices.contains(idx) else { return }
+        let deg = document.layers[idx].transform.rotationDegrees.rounded() + delta
+        document.layers[idx].transform.rotationDegrees = min(180, max(-180, deg))
     }
 
     /// Bounds-safe so a slider that fires after its layer was removed can't crash.
