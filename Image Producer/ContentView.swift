@@ -395,7 +395,9 @@ struct ContentView: View {
                 .help("About Image Producer — Graphic Arts")
             }
         }
-        .sheet(isPresented: $showExportSheet) { ExportSheet(document: document) }
+        .sheet(isPresented: $showExportSheet) {
+            ExportSheet(document: document, onIconSet: { exportIconSet() })
+        }
         .alert("Image Producer", isPresented: Binding(get: { iconSetResult != nil },
                                                 set: { if !$0 { iconSetResult = nil } })) {
             Button("OK", role: .cancel) { iconSetResult = nil }
@@ -423,12 +425,10 @@ struct ContentView: View {
         // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
         // targeting the focused document.
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
-        // The top-level Export menu's "Icon Set…" item, targeting this document.
-        .focusedSceneValue(\.iconSetAction, { exportIconSet() })
         #endif
     }
 
-    /// Export ▸ Icon Set… — renders the light and dark 1024s from this document's own
+    /// ⌘E ▸ Format ▸ Icon Set — renders the light and dark 1024s from this document's own
     /// Light and Dark floors plus the Mac ladder, and writes a drop-in
     /// `AppIcon.appiconset`. An empty result string means the user cancelled the
     /// panel, which is not worth an alert.
@@ -5857,11 +5857,26 @@ final class PixelPen: ObservableObject {
 
 /// One export window: pick a format from the dropdown and save. The primary export path
 /// (⌘E / the toolbar Export button). The all-sizes icon PNG folder lives on separately in
-/// the Canvas hub; this sheet covers single-file formats.
+/// the Canvas hub.
+///
+/// **The Icon Set lives here too, on the Mac.** It used to have its own top-level Export
+/// menu in the menu bar; Michael, 2026-09-16, standing in the ⌘E sheet looking for it:
+/// *"why are there two locations? can you remove the drop down menu and relocate to the
+/// command e dialog popup?"* One place to export from.
 struct ExportSheet: View {
     @ObservedObject var document: ImageDocument
+    /// Runs the icon-set export (it brings up its own folder panel and reports the result).
+    var onIconSet: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
-    @State private var format: ExportFormat = .png
+
+    /// A single file in some format, or the Xcode icon set — which is a folder, not a file,
+    /// so it cannot go through `fileExporter` and needs its own case.
+    private enum Choice: Hashable { case file(ExportFormat), iconSet }
+    @State private var choice: Choice = .file(.png)
+    private var format: ExportFormat? {
+        if case .file(let f) = choice { return f }
+        return nil
+    }
     @State private var flattenMatte = false
     @State private var matte: Color = .white
     @State private var payload = Data()
@@ -5877,8 +5892,12 @@ struct ExportSheet: View {
             Text("Export").font(.system(size: 22, weight: .semibold))
             HStack(spacing: 10) {
                 Text("Format").font(.system(size: 18)).foregroundStyle(.secondary)
-                Picker("Format", selection: $format) {
-                    ForEach(ExportFormat.allCases) { f in Text(f.rawValue).tag(f) }
+                Picker("Format", selection: $choice) {
+                    ForEach(ExportFormat.allCases) { f in Text(f.rawValue).tag(Choice.file(f)) }
+                    #if os(macOS)
+                    Divider()
+                    Text("Icon Set").tag(Choice.iconSet)
+                    #endif
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
@@ -5896,6 +5915,13 @@ struct ExportSheet: View {
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.capsule)
                 Button("Export…") {
+                    if choice == .iconSet {
+                        // Close the sheet first: the icon set opens its own folder panel.
+                        dismiss()
+                        DispatchQueue.main.async { onIconSet?() }
+                        return
+                    }
+                    guard let format else { return }
                     let m = (format == .pdfLayers && flattenMatte) ? matte.cgColorResolved : nil
                     if let d = format.data(from: document, matte: m) {
                         payload = d
@@ -5917,7 +5943,7 @@ struct ExportSheet: View {
         #endif
         .fileExporter(isPresented: $exporting,
                       document: CanvasDataDocument(payload),
-                      contentType: format.utType,
+                      contentType: (format ?? .png).utType,
                       defaultFilename: baseName) { _ in dismiss() }
     }
 }
