@@ -343,6 +343,17 @@ struct ContentView: View {
                 ImageDocument.pendingNewProjectURL = nil
             }
         }
+        // ⚠️ ALL .primaryAction, AND THAT IS THE FIX, NOT A STYLE CHOICE.
+        //
+        // These were .secondaryAction and their .help() tooltips never appeared — only the
+        // Export button, the one item already on .primaryAction, showed one. He found it by
+        // hovering each: "the hover text is only on the export glyph of paper with arrow
+        // pointing up."
+        //
+        // macOS treats secondary toolbar items as overflow-menu candidates, and a menu item
+        // has no hover tooltip to give. Nothing warns about this; the modifier is accepted
+        // and quietly does nothing. The evidence was on screen, so the fix is to copy the
+        // placement that demonstrably works rather than to reason about why.
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { showExportSheet = true } label: {
@@ -350,7 +361,7 @@ struct ContentView: View {
                 }
                 .help("Export the project to a file (⌘E) — pick the format")
             }
-            ToolbarItem(placement: .secondaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 // Native ShareLink (replaces the old render→custom-sheet path that came
                 // up empty). Shares a flat PNG of the visible layers (crop-trimmed).
                 ShareLink(item: shareItem, preview: SharePreview(exportFilename)) {
@@ -370,14 +381,14 @@ struct ContentView: View {
             // view was silently dropped. He reported "i dont dee the changes" on a build that
             // was otherwise correct, and the About sheet read 177, which is what ruled the
             // build out and pointed here. → verify-a-relaunched-app-is-actually-the-new-build
-            ToolbarItem(placement: .secondaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 Button { saveToDesktop() } label: {
                     Label("Save to Desktop", systemImage: "desktopcomputer.and.arrow.down")
                 }
                 .help("Write a flat PNG of the visible layers straight to the Desktop")
             }
             #endif
-            ToolbarItem(placement: .secondaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 Button { showAbout = true } label: {
                     Label("About Image Producer", systemImage: "info.circle")
                 }
