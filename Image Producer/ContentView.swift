@@ -456,7 +456,9 @@ struct ContentView: View {
     /// `AppIcon.appiconset`. An empty result string means the user cancelled the
     /// panel, which is not worth an alert.
     private func exportIconSet() {
-        let message = IconSetExport.exportInteractively(from: document)
+        // The FILE name, not document.name — the file is what he renamed and recognises.
+        let project = fileURL?.deletingPathExtension().lastPathComponent ?? document.name
+        let message = IconSetExport.exportInteractively(from: document, projectName: project)
         if !message.isEmpty { iconSetResult = message }
     }
 

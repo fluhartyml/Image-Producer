@@ -213,10 +213,22 @@ enum IconSetExport {
 
     // MARK: - Writing
 
-    /// Write the set into `directory` as `AppIcon.appiconset`. Replaces an existing
-    /// one at the same path, so re-exporting after an edit does the obvious thing.
-    static func write(_ files: [String: Data], into directory: URL) throws -> URL {
-        let set = directory.appendingPathComponent(folderName, isDirectory: true)
+    /// Write the set into `directory` as `AppIcon.appiconset` — inside a folder named for
+    /// the project when one is given. Replaces an existing set at the same path, so
+    /// re-exporting after an edit does the obvious thing.
+    ///
+    /// ⭐ The project folder is his, 2026-09-16: "i want the icon set folder to be unique
+    /// and have the image project name enclosing /phototizer/appicon.iconset". Every set
+    /// used to land as a bare `AppIcon.appiconset`, so two projects exported to the same
+    /// place replaced each other and nothing said whose icon it was. The inner name stays
+    /// `AppIcon.appiconset` because that is what Xcode's asset catalog expects.
+    static func write(_ files: [String: Data], into directory: URL,
+                      projectName: String? = nil) throws -> URL {
+        var parent = directory
+        if let folder = projectName.map(safeFolderName), !folder.isEmpty {
+            parent = directory.appendingPathComponent(folder, isDirectory: true)
+        }
+        let set = parent.appendingPathComponent(folderName, isDirectory: true)
         let fm = FileManager.default
         if fm.fileExists(atPath: set.path) { try fm.removeItem(at: set) }
         try fm.createDirectory(at: set, withIntermediateDirectories: true)
@@ -226,15 +238,22 @@ enum IconSetExport {
         return set
     }
 
+    /// A project name made safe as ONE folder name: no path separators, trimmed.
+    static func safeFolderName(_ name: String) -> String {
+        name.replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// Ask for a destination and write. Returns a sentence to show the user —
     /// success or failure, never silence.
-    static func exportInteractively(from document: ImageDocument) -> String {
+    static func exportInteractively(from document: ImageDocument, projectName: String? = nil) -> String {
         let files = build(from: document)
         guard files.count > 1 else { return "Nothing to export — the canvas rendered empty." }
         do {
             let dir = try chooseDirectory()
             guard let dir else { return "" }               // user cancelled
-            let set = try write(files, into: dir)
+            let set = try write(files, into: dir, projectName: projectName)
             return """
                 Wrote \(lightFile) and \(darkFile) to \(set.path).
 
@@ -257,7 +276,7 @@ enum IconSetExport {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.prompt = "Export Here"
-        panel.message = "Choose where to put \(folderName)."
+        panel.message = "Choose where to put the icon set. It is written inside a folder named for the project."
         return panel.runModal() == .OK ? panel.url : nil
         #else
         return try FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
