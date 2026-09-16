@@ -3235,6 +3235,7 @@ struct MoveTransformInspector: View {
                         Spacer()
                     }
                     Slider(value: rotationSliderBinding(idx), in: -180...180)
+                    RotationTicks()
                 }
                 HStack {
                     Button("Center") {
@@ -5209,6 +5210,71 @@ struct LayerRow: View {
 ///
 /// A minus mark means DIVISION, mirroring the plus side: -2 is half size, -3 a third.
 /// That is why the left and right marks sit at mirrored distances from the centre.
+/// Divisions under the Rotation slider — MAJOR labelled every 45°, MINOR every 15°.
+///
+/// His ask, 2026-09-15: "can the slider have 30 45 90 135 165 i cant get the divisions right
+/// can you help?"
+///
+/// ⚠️ WHY HIS LIST COULD NOT LOOK RIGHT, and it is not a matter of taste. The track is
+/// LINEAR in degrees, so a mark lands in proportion to its angle. 30 and 45 are 15° apart
+/// while 45 and 90 are 45° apart — the same list therefore bunches at one end and stretches
+/// at the other. **An uneven set of values always reads as broken on an even track**, however
+/// it is drawn.
+///
+/// ⭐ EVERY NUMBER HE NAMED IS A MULTIPLE OF 15, so nothing had to be given up. Two sizes,
+/// like a ruler: the meaningful angles get a long tick and a label, and the 15° steps between
+/// them get a short unlabelled one. 30, 60, 120, 150 and 165 all live on those minor marks,
+/// and the slider's 15° snap lands exactly on every mark drawn here.
+///
+/// ⚠️ `rotationSnapDegrees` and the 15 below must stay in step. If the snap ever changes,
+/// the minor marks have to change with it — a mark the slider cannot stop on is a lie.
+struct RotationTicks: View {
+
+    /// Track position 0...1 for a rotation in degrees. The slider runs -180...180.
+    static func fraction(for degrees: Double) -> Double { (degrees + 180) / 360 }
+
+    private struct Mark: Identifiable {
+        let id: Double
+        let degrees: Double
+        let isMajor: Bool
+    }
+
+    private var marks: [Mark] {
+        stride(from: -180.0, through: 180.0, by: 15.0).map {
+            Mark(id: $0, degrees: $0,
+                 isMajor: $0.truncatingRemainder(dividingBy: 45) == 0)
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            ForEach(marks) { mark in
+                VStack(spacing: 2) {
+                    Rectangle()
+                        .frame(width: 1, height: mark.isMajor ? 6 : 3)
+                    if mark.isMajor {
+                        Text("\(Int(mark.degrees))")
+                            .font(.system(size: 10,
+                                          weight: mark.degrees == 0 ? .semibold : .regular))
+                            .fixedSize()
+                    }
+                    Spacer(minLength: 0)
+                }
+                // Top-aligned so the short minor ticks line up with the tall major ones
+                // rather than centring themselves against a label that isn't there.
+                .frame(height: 22, alignment: .top)
+                .foregroundStyle(mark.degrees == 0 ? Color.primary : Color.secondary)
+                // The thumb is inset by roughly half its width at each end, so the usable
+                // track is narrower than the view. Insetting by the same amount keeps a
+                // mark under the thumb that is sitting on that value.
+                .position(x: 9 + (geo.size.width - 18) * RotationTicks.fraction(for: mark.degrees),
+                          y: 11)
+            }
+        }
+        .frame(height: 24)
+    }
+}
+
 struct ScaleTicks: View {
 
     /// Slider position (-1...1) for a given scale. The single source of truth for the
