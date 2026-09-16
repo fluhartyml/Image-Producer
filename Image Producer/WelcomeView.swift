@@ -207,6 +207,10 @@ struct WelcomeView: View {
                 panel.canChooseDirectories = false
                 panel.prompt = "Open"
                 panel.message = "Choose an Image Producer project to open."
+                // Start in the app's own iCloud folder. Without this, macOS reopens whatever
+                // folder any panel in this app used last — the Desktop, on 2026-09-16, and he
+                // expected "the image producer icloud folder."
+                panel.directoryURL = ImageDocument.projectsDirectory()
                 guard panel.runModal() == .OK, let url = panel.url else { return }
                 Task {
                     RecentProjects.note(url)
