@@ -714,6 +714,11 @@ struct ContentView: View {
 /// The always-visible toolbox: a horizontal row of tool icons that scrolls when
 /// there are more tools than fit. Tapping a tool makes it the active tool.
 struct ToolStrip: View {
+    /// Which tool the pointer is over. — his ask, 2026-09-15: the toolbar glyphs "have an
+    /// in focus highlight when you hover ov[e]r" and the tools had none, so a tool gave no
+    /// sign it was a target until you clicked it. Pointer-only; it never fires on touch.
+    @State private var hoveredTool: Tool?
+
     @Binding var activeTool: Tool
     /// Double-tap on a tool's own button. Zoom uses it to toggle all-the-way-out and
     /// back — Michael 2026-08-24. Optional so callers that do not care can omit it.
@@ -732,10 +737,21 @@ struct ToolStrip: View {
                     Button { activeTool = tool } label: {
                         ToolGlyph(tool: tool)
                             .frame(width: 44, height: 44)
+                            // ⚠️ THE TOOLTIP LIVES ON THE GLYPH, NOT ON THE BUTTON.
+                            // On the Button it was accepted and never appeared: "only those
+                            // glyps have hover ovr the tools have none." The button carries a
+                            // .simultaneousGesture for double-tap, and the gesture wrapper
+                            // swallows the hover tracking .help() depends on. Attaching it to
+                            // the drawn content puts it in front of that.
+                            .help(tool.title)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(activeTool == tool ? Color.accentColor.opacity(0.2)
-                                                             : Color.clear)
+                                    // SELECTED beats HOVERED beats nothing. The hover tint is
+                                    // deliberately weaker than the selection tint, so hovering
+                                    // the active tool does not read as a second selection.
+                                    .fill(activeTool == tool  ? Color.accentColor.opacity(0.2)
+                                        : hoveredTool == tool ? Color.primary.opacity(0.08)
+                                                              : Color.clear)
                             )
                             .foregroundStyle(activeTool == tool ? Color.accentColor : Color.primary)
                     }
@@ -743,7 +759,7 @@ struct ToolStrip: View {
                     // simultaneous, not .onTapGesture — a Button already owns the tap,
                     // and replacing it would stop single-click tool selection working.
                     .simultaneousGesture(TapGesture(count: 2).onEnded { onDoubleTap?(tool) })
-                    .help(tool.title)                 // tooltip on Mac / iPad pointer
+                    .onHover { hoveredTool = $0 ? tool : (hoveredTool == tool ? nil : hoveredTool) }
                     .accessibilityLabel(tool.title)   // VoiceOver everywhere
                 }
             }
@@ -777,6 +793,11 @@ struct ActiveToolLabel: View {
 /// gap the square canvas leaves, hugging the canvas's right edge. Scrolls
 /// vertically when there are more tools than fit.
 struct ToolRail: View {
+    /// Which tool the pointer is over. — his ask, 2026-09-15: the toolbar glyphs "have an
+    /// in focus highlight when you hover ov[e]r" and the tools had none, so a tool gave no
+    /// sign it was a target until you clicked it. Pointer-only; it never fires on touch.
+    @State private var hoveredTool: Tool?
+
     @Binding var activeTool: Tool
     /// Double-tap on a tool's own button. Zoom uses it to toggle all-the-way-out and
     /// back — Michael 2026-08-24. Optional so callers that do not care can omit it.
@@ -789,10 +810,21 @@ struct ToolRail: View {
                     Button { activeTool = tool } label: {
                         ToolGlyph(tool: tool)
                             .frame(width: 44, height: 44)
+                            // ⚠️ THE TOOLTIP LIVES ON THE GLYPH, NOT ON THE BUTTON.
+                            // On the Button it was accepted and never appeared: "only those
+                            // glyps have hover ovr the tools have none." The button carries a
+                            // .simultaneousGesture for double-tap, and the gesture wrapper
+                            // swallows the hover tracking .help() depends on. Attaching it to
+                            // the drawn content puts it in front of that.
+                            .help(tool.title)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(activeTool == tool ? Color.accentColor.opacity(0.2)
-                                                             : Color.clear)
+                                    // SELECTED beats HOVERED beats nothing. The hover tint is
+                                    // deliberately weaker than the selection tint, so hovering
+                                    // the active tool does not read as a second selection.
+                                    .fill(activeTool == tool  ? Color.accentColor.opacity(0.2)
+                                        : hoveredTool == tool ? Color.primary.opacity(0.08)
+                                                              : Color.clear)
                             )
                             .foregroundStyle(activeTool == tool ? Color.accentColor : Color.primary)
                     }
@@ -800,7 +832,7 @@ struct ToolRail: View {
                     // simultaneous, not .onTapGesture — a Button already owns the tap,
                     // and replacing it would stop single-click tool selection working.
                     .simultaneousGesture(TapGesture(count: 2).onEnded { onDoubleTap?(tool) })
-                    .help(tool.title)
+                    .onHover { hoveredTool = $0 ? tool : (hoveredTool == tool ? nil : hoveredTool) }
                     .accessibilityLabel(tool.title)
                 }
             }
