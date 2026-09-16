@@ -1435,3 +1435,151 @@
 //      - Read-only, or can Claude create and edit documents?
 //      - Does it act on the OPEN document, or on files on disk?
 //      - Mac only, or does the iPad build need it too?
+//
+//
+// ============================================================================
+// MARK: - 🧊 THE CRYOCHAMBER — recovery that lives INSIDE the app (2026-09-15)
+// ============================================================================
+//
+//  HIS DESIGN, captured the evening he lost a session's work on Phototizer.picprod
+//  and had no way back inside Image Producer. CAPTURED, NOT BUILT. No code yet.
+//
+//  ⛔ THE RULING THAT STARTED IT. Claude offered Time Machine. He refused it:
+//      "not time machine because that is a lazy work around"
+//  Time Machine WOULD have worked — hourly local snapshots existed all day and the
+//  file was recoverable. It is still the wrong answer, because it is outside the
+//  app. He named the principle in the same conversation:
+//
+//      ⭐ "remember this mantra, One Stop Shop"
+//
+//  An app solves its problem inside itself. -> feedback_one_stop_shop
+//
+//  --------------------------------------------------------------------------
+//  WHAT HE ASKED FOR, his words:
+//      "i want it to hold a copy you open in a 'cryochamber' or something untill
+//       you quit the app then the last saved state is purged"
+//
+//  --------------------------------------------------------------------------
+//  MARK: ⌘S IS A CONSCIOUS MARKER — this is the load-bearing idea
+//
+//  Claude argued ⌘S was a no-op because autosave writes 1.5s after every change,
+//  so "every command is a command s." HE CORRECTED IT TWICE, and the correction
+//  is the whole design:
+//
+//      "command s does something"
+//      ⭐ "it is a concious marker for save points the user knows once existed"
+//
+//  He is right on the mechanism as well as the meaning. ⌘S and autosave are two
+//  DIFFERENT code paths in this app:
+//
+//      ⌘S        -> ReferenceFileDocument.fileWrapper(snapshot:configuration:)
+//                   the real NSDocument save. Also speaks: say("Saved — <size>").
+//      autosave  -> writePackage(to:)  — custom, file-coordinated, deliberately
+//                   BYPASSES NSDocument (see the AutosaveModifier note).
+//
+//  ⚠️ CONSEQUENCE NOBODY HAD WRITTEN DOWN: the NSDocument path is the one macOS
+//     Versions is fed by. Autosave bypasses it. So every ⌘S has been depositing a
+//     real version all along, and File > Revert To should already hold them.
+//     ⬜ UNVERIFIED — one glance at the File menu settles it. Do not build over it
+//        without looking.
+//
+//  THE VALUE IS HUMAN MEMORY, NOT STORAGE. A marker is worth something because
+//  the user REMEMBERS MAKING IT. That is why a wall of anonymous timestamps fails
+//  even when it technically holds the data — you cannot pick the moment you cared
+//  about out of the eleven around it. macOS's Browse All Versions is exactly that
+//  wall, which makes it the Time Machine answer in a different coat.
+//  ⭐ SO THE LIST MUST BE THE APP'S OWN, showing HIS markers, recognisably.
+//
+//  --------------------------------------------------------------------------
+//  MARK: THE TWO REVERT ROUTES — his names, his semantics
+//
+//      Revert to Open        the document as it was when opened. Automatic,
+//                            always present, needs nothing from the user.
+//                            ⬜ THIS IS THE GENUINELY MISSING ONE. Nothing takes
+//                               a point at open, and autosave starts overwriting
+//                               1.5s later.
+//
+//      Revert to Last Save   ⭐ "revert to last save reverts to the last command s
+//                                 per opened session"
+//                            NEVER an autosave. Absent until he presses ⌘S once,
+//                            which is honest rather than lying about having a point.
+//
+//                            ⚠️ PER OPENED SESSION — his qualifier, and it bounds the
+//                            whole feature. A ⌘S from LAST WEEK is not a marker any
+//                            more. Only markers made since this document was opened
+//                            count, which is what makes "discard on quit" coherent
+//                            rather than throwing away something the user still
+//                            wanted. ⭐ THE SESSION IS THE UNIT: Open is the floor,
+//                            ⌘S markers are the points above it, the lot goes on quit.
+//
+//                            ⚠️ THIS IS WHERE IT DIVERGES FROM macOS VERSIONS, which
+//                            keeps versions for as long as the disk allows and knows
+//                            nothing about sessions. So Versions can INFORM the build
+//                            but cannot BE it — another reason the list has to be the
+//                            app's own.
+//
+//  He arrived here after first trying "last deliberate save should be treated as a
+//  reopen" — then caught its flaw himself in the next breath: "actually it should
+//  be a safety net for even the command s." A single slot that ⌘S overwrites
+//  destroys the net at the moment it is needed. Hence TWO anchors, not one slot.
+//
+//  --------------------------------------------------------------------------
+//  MARK: WHY IT IS CHEAP — APFS clonefile
+//
+//  clonefile() is copy-on-write: a frozen point costs ZERO BYTES and no time when
+//  taken, whatever the document's size, and only grows as the live copy diverges.
+//  ⭐ That is what makes this affordable on a package that has reached 227 MiB.
+//  Ten markers cost about what one costs. Discard the lot on quit, as he specified.
+//
+//  --------------------------------------------------------------------------
+//  MARK: THE WEIGHT WARNING — his, same conversation
+//
+//      "if the layer history gets too heavy image producer can do a popup warning
+//       the user the history has reached an unsubstanciatef level and may cause
+//       system degredation, purge history or cancel?"
+//
+//  ⬜ HIS WORDING TO CONFIRM: "unsubstanciatef" reads as UNSUSTAINABLE. Shipped
+//     copy is his voice — ASK, do not silently correct it.
+//  ⬜ HIS THRESHOLD TO SET. Measure, do not guess a number. The honest trigger is
+//     the SIZE OF A SINGLE AUTOSAVE WRITE, because the write is what actually
+//     degrades things — the whole package is rewritten 1.5s after every change.
+//
+//  ✅ Purge History ALREADY EXISTS and is already called that — History panel, the
+//     ⋯ menu, "Purge History…", behind a confirmation. document.purgeHistory().
+//     ⛔ AND IT IS NOT FREE: with undo removed, the History panel is the app's ONLY
+//        undo. Purging surrenders every step. The cryochamber is what would make
+//        purging safe, which is why these two belong in one design.
+//
+//  --------------------------------------------------------------------------
+//  MARK: 📏 THE MEASUREMENT BEHIND ALL OF IT — Phototizer.picprod, 2026-09-15
+//
+//      file ............... 238,206,176 bytes (227 MiB)
+//      "snapshot" values .. 40, totalling 223.7 MiB = 98.5% OF THE FILE
+//      live artwork ....... "layers":[ begins at byte 232,373,033 — about 3.5 MiB
+//      history entries .... 7 (Layers x3, Paint Bucket x2, Camera, Move/Transform)
+//
+//  Each of the 40 actions stores a FULL COPY of every layer's pixels, base64'd
+//  into the JSON — not a diff. They grew 5.4 -> 7.4 MiB each as a photo layer was
+//  added. There is NO CAP; history grows until purged.
+//
+//  ⭐ SO 98.5% OF THAT DOCUMENT IS UNDO, AND THE WHOLE 227 MiB IS REWRITTEN 1.5
+//     SECONDS AFTER EVERY NUDGE. That is the "system degredation" he is describing,
+//     and he identified it from feel before it was measured.
+//
+//  ⚠️ CLAUDE GOT THIS WRONG FIRST and he corrected it: "no it does have a history",
+//     then "it has always been supposed to have a history because the undo is
+//     purposfully turned off because undo crashed the app." The code comments say
+//     "no engine yet" and the History tab is a placeholder, so a session reading
+//     only the source concludes there is no history. THE FILE SAYS OTHERWISE.
+//     -> the durable fix for that confusion is the note below.
+//
+//  --------------------------------------------------------------------------
+//  MARK: ⬜ DURABLE FIXES — beyond purging, none of them started
+//
+//  1. A CAP on retained history steps.
+//  2. Snapshots that REFERENCE layer pixels instead of re-embedding them. The
+//     pixels rarely change; the transforms do. This is where the 98.5% goes.
+//  3. Stop base64'ing images into JSON. The package is a DIRECTORY wrapper and can
+//     hold real PNGs beside manifest.json. Base64 costs ~33% on top of the image
+//     and forces the whole file through a JSON parser on every open and write.
+//
