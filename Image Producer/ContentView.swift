@@ -4674,12 +4674,10 @@ struct LayerPanel: View {
     @State private var draftName = ""
     /// WHICH LAYERS ARE CHECKED. View state only — never saved, never in the document.
     ///
-    /// ⭐ THE CHECKBOX IS THE SELECTION, not a second idea beside it. His question,
-    /// 2026-09-15: "merge selected or should the checkbox indicate the selected layer?"
-    /// Two competing notions of "chosen" on one list disagree constantly, so `activeLayerID`
-    /// is DERIVED from this: exactly one checked means that layer is active and every
-    /// existing tool works unchanged; two or more means nil, and single-layer tools go
-    /// quiet rather than guessing which one was meant.
+    /// ⭐ FOR MULTI-LAYER OPERATIONS ONLY, and completely separate from `activeLayerID`.
+    /// His ruling, 2026-09-15: "no the check box is for multiple layers." Selection answers
+    /// "which layer am I editing"; the checkbox answers "which layers is this operation
+    /// for." Tying them together broke Move / Transform — see `toggleChecked`.
     @State private var checkedLayerIDs: Set<ImageLayer.ID> = []
     @State private var mergeMessage: String?
 
@@ -4732,26 +4730,21 @@ struct LayerPanel: View {
         }
     }
 
-    /// Check or uncheck one layer, keeping `activeLayerID` derived from the result.
+    /// Check or uncheck one layer.
     ///
-    /// Exactly one checked -> that is the active layer, and every single-layer tool
-    /// behaves precisely as it did before this feature existed. Anything else -> nil, so
-    /// a tool that needs one layer has none rather than a silently arbitrary one.
+    /// ⚠️ THE CHECKBOX IS FOR MULTIPLE LAYERS ONLY — his correction, 2026-09-15: "no the
+    /// check box is for multiple layers." It is INDEPENDENT of which layer is selected.
+    ///
+    /// ⛔ THE MISTAKE THIS REPLACES, so nobody rebuilds it: `activeLayerID` was DERIVED
+    /// from this set — one checked meant active, anything else meant nil. It sounded tidy
+    /// ("one idea, not two") and it broke the app on sight: with nothing checked, Move /
+    /// Transform had no layer and showed its empty placeholder, so a panel that had always
+    /// worked simply stopped. **Clicking a row selects a layer, exactly as it always has.
+    /// Checking a box does not select anything.** The two answer different questions:
+    /// "which layer am I editing" and "which layers is this operation for."
     private func toggleChecked(_ id: ImageLayer.ID) {
         if checkedLayerIDs.contains(id) { checkedLayerIDs.remove(id) }
         else { checkedLayerIDs.insert(id) }
-        syncActiveFromChecked()
-    }
-
-    private func syncActiveFromChecked() {
-        activeLayerID = checkedLayerIDs.count == 1 ? checkedLayerIDs.first : nil
-    }
-
-    /// Clicking a row still works and still means "just this one" — the checkbox is the
-    /// selection, so a plain click replaces the checked set rather than living beside it.
-    private func selectOnly(_ id: ImageLayer.ID) {
-        checkedLayerIDs = [id]
-        activeLayerID = id
     }
 
     /// Merge is the FIRST consumer of multi-select, not the reason for it. His framing,
@@ -4759,15 +4752,13 @@ struct LayerPanel: View {
     /// checked layers." Every other tool can adopt the set later without this changing.
     private func mergeChecked() {
         mergeMessage = mergeLayers(checkedLayerIDs, in: document)
-        if mergeMessage == nil {
-            // Land on the result, which is what the user is now looking at.
-            if let newest = document.layers.last(where: { $0.name.contains("(Merged") }) {
-                selectOnly(newest.id)
-            } else {
-                checkedLayerIDs.removeAll()
-                activeLayerID = nil
-            }
+        guard mergeMessage == nil else { return }
+        // Land on the result — it is what the user is now looking at — and clear the
+        // checks, because the operation they were for is done.
+        if let newest = document.layers.last(where: { $0.name.contains("(Merged") }) {
+            activeLayerID = newest.id
         }
+        checkedLayerIDs.removeAll()
     }
 
     /// Shown only when a multi-layer action is actually available.
@@ -4816,7 +4807,7 @@ struct LayerPanel: View {
                     if collapsedGroups.contains(base) { collapsedGroups.remove(base) }
                     else { collapsedGroups.insert(base) }
                 },
-                onActivate: { selectOnly(layer.id) },
+                onActivate: { activeLayerID = layer.id },
                 onToggleVisibility: { toggleVisibility(layer.id) },
                 onRename: { beginRename(layer) },
                 onDuplicate: { duplicate(layer.id) },
@@ -5093,35 +5084,45 @@ struct LayerRow: View {
             // against the eye's round outline, because the row now carries two toggles
             // that mean different things (selected vs visible) and two similar controls
             // side by side get confused fast.
-            if isCheckable {
-                Button(action: onToggleCheck) {
-                    Image(systemName: isChecked ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 15))
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
+            // THE LEADING CLUSTER — checkbox then caret, TIGHT TOGETHER.
+            //
+            // ⚠️ These two used to be separate children of the row's 10pt HStack, which put
+            // 10 + 22 + 10 = 42pt between the checkbox and the layer glyph. He caught it:
+            // "theres too much space between the checkbox and the layer glyph." The caret
+            // column has to stay (an ungrouped row must line up with a grouped one), so the
+            // fix is to stop paying the row's spacing TWICE for controls that read as one
+            // group. Nested at spacing 0, with a narrower caret column.
+            HStack(spacing: 0) {
+                if isCheckable {
+                    Button(action: onToggleCheck) {
+                        Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                            .font(.system(size: 15))
+                            .frame(width: 20, height: 22)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(isChecked ? Color.accentColor : .secondary)
+                    .help(isChecked ? "Uncheck this layer" : "Check this layer")
+                } else {
+                    // Light and Dark keep the row aligned without offering the control.
+                    Color.clear.frame(width: 20, height: 1)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(isChecked ? Color.accentColor : .secondary)
-                .help(isChecked ? "Uncheck this layer" : "Check this layer")
-            } else {
-                // Light and Dark keep the row aligned without offering the control.
-                Color.clear.frame(width: 22, height: 1)
-            }
-            // THE REVEAL CARET. Only a run's top row gets one. It is a Button, not a tap
-            // gesture on the row, so it cannot be swallowed by List selection on macOS or
-            // by .onMove's drag — the same reason the row itself must not be a Button.
-            if groupBase != nil {
-                Button(action: onToggleGroup) {
-                    Image(systemName: isCollapsed ? "chevron.forward" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 22, height: 22)      // a real target, not a 13pt glyph
-                        .contentShape(Rectangle())
+                // THE REVEAL CARET. Only a run's top row gets one. It is a Button, not a tap
+                // gesture on the row, so it cannot be swallowed by List selection on macOS or
+                // by .onMove's drag — the same reason the row itself must not be a Button.
+                if groupBase != nil {
+                    Button(action: onToggleGroup) {
+                        Image(systemName: isCollapsed ? "chevron.forward" : "chevron.down")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 16, height: 22)   // a real target, not a 13pt glyph
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                } else {
+                    // Keep ungrouped rows aligned with grouped ones.
+                    Color.clear.frame(width: 16, height: 1)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            } else {
-                // Keep ungrouped rows aligned with grouped ones.
-                Color.clear.frame(width: 22, height: 1)
             }
             #if os(macOS)
             // macOS: plain label — List selection handles click-to-activate and .onMove
