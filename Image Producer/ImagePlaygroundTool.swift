@@ -207,8 +207,13 @@ struct ImagePlaygroundInspector: View {
 
     /// Maker result -> a brand-new content layer at the top of the stack, named from the prompt.
     private func placeNewLayer(from url: URL) {
-        guard let png = loadPNG(from: url) else { failed = true; return }
+        guard let png = loadPNG(from: url) else {
+            failed = true
+            document.say("Image Playground result could not be placed", kind: .warning)
+            return
+        }
         failed = false
+        document.say("Image Playground — placed a new layer", kind: .edit)
 
         // SELECTING AN EMPTY LAYER IS AN INSTRUCTION. Michael, 2026-08-22, while
         // building the Shell Citadel icon: he selected "Background", asked Image
@@ -246,7 +251,12 @@ struct ImagePlaygroundInspector: View {
     /// source, and the original is hidden (kept), not overwritten — there's no undo.
     private func replaceActiveLayer(from url: URL) {
         guard let png = loadPNG(from: url), let i = activeIndex,
-              case .content = document.layers[i].role else { failed = true; return }
+              case .content = document.layers[i].role else {
+            failed = true
+            document.say("Image Playground result could not be placed", kind: .warning)
+            return
+        }
+        document.say("Image Playground — restyled \(document.layers[i].name) onto a new layer", kind: .edit)
         failed = false
 
         // A RESTYLE MUST NOT MOVE THE ART. The result inherits the source layer's

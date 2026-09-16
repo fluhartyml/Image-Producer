@@ -410,7 +410,10 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showAbout) { AboutView() }
         // The autosave's reload hands this window a NEW document instance — point it here.
-        .onChange(of: ObjectIdentifier(document)) { _, _ in window.attach(document) }
+        .onChange(of: ObjectIdentifier(document)) { _, _ in
+            window.attach(document)
+            document.say("Reloaded from disk after the autosave", kind: .info)
+        }
         .environmentObject(pen)
         // Opening says so in the status bar — his ask, 2026-09-06: "opening should also
         // cause the feedback bar talk to the user." Also the point where a document
@@ -477,7 +480,14 @@ struct ContentView: View {
         // The FILE name, not document.name — the file is what he renamed and recognises.
         let project = fileURL?.deletingPathExtension().lastPathComponent ?? document.name
         let message = IconSetExport.exportInteractively(from: document, projectName: project)
-        if !message.isEmpty { iconSetResult = message }
+        if message.isEmpty {
+            document.say("Icon set export cancelled", kind: .info)
+        } else {
+            iconSetResult = message
+            let ok = message.hasPrefix("Wrote")
+            document.say(ok ? "Exported icon set — \(project)/\(IconSetExport.folderName)"
+                            : "Icon set export failed — see the message", kind: ok ? .save : .warning)
+        }
     }
 
     /// Write a flat PNG of the visible layers to the Desktop, no panel.
@@ -530,8 +540,10 @@ struct ContentView: View {
         do {
             try png.write(to: url)
             iconSetResult = "Wrote \(url.lastPathComponent) to the Desktop."
+            document.say("Saved \(url.lastPathComponent) to the Desktop", kind: .save)
         } catch {
             iconSetResult = "Could not write to the Desktop: \(error.localizedDescription)"
+            document.say("Save to Desktop failed — \(error.localizedDescription)", kind: .warning)
         }
     }
 
@@ -1415,16 +1427,27 @@ struct CanvasInspector: View {
         .fileExporter(isPresented: $showDataExporter,
                       document: CanvasDataDocument(exportData),
                       contentType: exportType,
-                      defaultFilename: exportFilename) { _ in }
+                      defaultFilename: exportFilename) { result in
+            document.reportExport(result, what: exportFilename)
+        }
         .fileExporter(isPresented: $showWebExporter,
                       document: webBundle,
                       contentType: .folder,
-                      defaultFilename: folderFilename) { _ in }
+                      defaultFilename: folderFilename) { result in
+            document.reportExport(result, what: folderFilename)
+        }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf]) { result in
-            guard case .success(let url) = result else { return }
+            guard case .success(let url) = result else {
+                if case .failure(let e) = result { document.say("PDF import failed — \(e.localizedDescription)", kind: .warning) }
+                return
+            }
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            _ = importPDFAsLayers(url, into: document)
+            document.say("Importing \(url.lastPathComponent)…", kind: .info)
+            let n = importPDFAsLayers(url, into: document)
+            document.say(n > 0 ? "Imported \(n) page\(n == 1 ? "" : "s") from \(url.lastPathComponent) as layers"
+                               : "Nothing imported — \(url.lastPathComponent) had no readable pages",
+                         kind: n > 0 ? .edit : .warning)
         }
         .onAppear { draftName = displayName }
         .onChange(of: document.name) { draftName = displayName }
@@ -1500,10 +1523,16 @@ struct CanvasInspector: View {
                         document.say("Renamed to \(clean)", kind: .info)
                     }
                 } catch {
-                    DispatchQueue.main.async { renameError = true; draftName = displayName }
+                    DispatchQueue.main.async {
+                        renameError = true; draftName = displayName
+                        document.say("Rename failed — \(error.localizedDescription)", kind: .warning)
+                    }
                 }
             }
-            if coordErr != nil { renameError = true; draftName = displayName }
+            if let coordErr {
+                renameError = true; draftName = displayName
+                document.say("Rename failed — \(coordErr.localizedDescription)", kind: .warning)
+            }
             return
         }
 
@@ -1540,10 +1569,16 @@ struct CanvasInspector: View {
                     document.say("Saved as \(clean) — \(current) kept", kind: .info)
                 }
             } catch {
-                DispatchQueue.main.async { renameError = true; draftName = displayName }
+                DispatchQueue.main.async {
+                    renameError = true; draftName = displayName
+                    document.say("Save As failed — \(error.localizedDescription)", kind: .warning)
+                }
             }
         }
-        if coordErr != nil { renameError = true; draftName = displayName }
+        if let coordErr {
+            renameError = true; draftName = displayName
+            document.say("Save As failed — \(coordErr.localizedDescription)", kind: .warning)
+        }
     }
 
     /// The name to show: the FILE name when the project is saved (authoritative), else
@@ -1902,14 +1937,21 @@ struct ColorPaletteInspector: View {
         .padding()
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .fileExporter(isPresented: $savingPalette, document: paletteDoc,
-                      contentType: .iconPalette, defaultFilename: "\(document.name) Palette") { _ in }
+                      contentType: .iconPalette, defaultFilename: "\(document.name) Palette") { result in
+            document.reportExport(result, what: "palette")
+        }
         .fileImporter(isPresented: $loadingPalette, allowedContentTypes: [.iconPalette]) { result in
             loadFailed = false
             guard case .success(let url) = result else { return }
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             guard let data = try? Data(contentsOf: url),
-                  let file = try? JSONDecoder().decode(PaletteFile.self, from: data) else { loadFailed = true; return }
+                  let file = try? JSONDecoder().decode(PaletteFile.self, from: data) else {
+                loadFailed = true
+                document.say("Palette not loaded — \(url.lastPathComponent) could not be read", kind: .warning)
+                return
+            }
+            document.say("Loaded palette \(url.deletingPathExtension().lastPathComponent)", kind: .info)
             document.palette = file.normalizedColors
             ImageDocument.lastUsedPalette = document.palette
             if !document.palette.indices.contains(pen.selectedSlot) { pen.selectedSlot = 0 }
@@ -2381,7 +2423,11 @@ struct ImageImportInspector: View {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         guard let raw = try? Data(contentsOf: url),
               let png = pngData(fromImageData: raw),
-              let i = activeIndex else { failed = true; return }
+              let i = activeIndex else {
+            failed = true
+            document.say("Image not imported — \(url.lastPathComponent) could not be read", kind: .warning)
+            return
+        }
         document.captureHistoryBaselineIfNeeded()
         document.layers[i].setImage(png)
         document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
@@ -2540,7 +2586,9 @@ struct PenInspector: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .fileExporter(isPresented: $savingPalette, document: paletteDoc,
-                          contentType: .iconPalette, defaultFilename: paletteFilename) { _ in }
+                          contentType: .iconPalette, defaultFilename: paletteFilename) { result in
+                document.reportExport(result, what: "palette")
+            }
             .fileImporter(isPresented: $loadingPalette, allowedContentTypes: [.iconPalette]) { result in
                 paletteLoadFailed = false
                 guard case .success(let url) = result else { return }
@@ -2568,8 +2616,10 @@ struct PenInspector: View {
         guard let data = try? Data(contentsOf: url),
               let file = try? JSONDecoder().decode(PaletteFile.self, from: data) else {
             paletteLoadFailed = true
+            document.say("Palette not loaded — \(url.lastPathComponent) could not be read", kind: .warning)
             return
         }
+        document.say("Loaded palette \(url.deletingPathExtension().lastPathComponent)", kind: .info)
         document.palette = file.normalizedColors
         ImageDocument.lastUsedPalette = document.palette
         if document.palette.indices.contains(pen.selectedSlot) {
@@ -6005,7 +6055,10 @@ struct ExportSheet: View {
         .fileExporter(isPresented: $exporting,
                       document: CanvasDataDocument(payload),
                       contentType: (format ?? .png).utType,
-                      defaultFilename: baseName) { _ in dismiss() }
+                      defaultFilename: baseName) { result in
+            document.reportExport(result, what: "\(baseName) (\(format?.rawValue ?? "file"))")
+            dismiss()
+        }
     }
 }
 
@@ -6259,6 +6312,7 @@ struct AutosaveModifier: ViewModifier {
                 if newURL != nil, let r = recoveryURL {
                     try? FileManager.default.removeItem(at: r)
                     recoveryURL = nil
+                    document.say("Named and saved — removed the untitled recovery copy", kind: .info)
                 }
             }
     }
@@ -6298,7 +6352,11 @@ struct AutosaveModifier: ViewModifier {
             // UNTITLED → auto-materialize a recovery copy so the canvas is never lost,
             // even on a crash before the first Save. One stable file per window,
             // overwritten each autosave; removed when the user finally names/saves it.
-            if recoveryURL == nil { recoveryURL = makeRecoveryURL() }
+            if recoveryURL == nil {
+                recoveryURL = makeRecoveryURL()
+                document.say(recoveryURL.map { "Untitled — keeping a recovery copy as \($0.lastPathComponent)" }
+                             ?? "Untitled — could not create a recovery copy", kind: recoveryURL == nil ? .warning : .info)
+            }
             guard let r = recoveryURL else { return }
             url = r
         }
@@ -6407,7 +6465,7 @@ struct AboutView: View {
 /// every tool being applied or every history being made? sort of a debugging line for
 /// the user to see the image producer app working to keep the user engaged."*
 ///
-/// It reads `document.status`, which is posted from `recordHistory` and from the file
+/// It reads `DocumentWindow.status` (window-held since 2026-09-16), posted from `recordHistory` and from the file
 /// writer — so it needs no wiring per tool, and a tool that stays silent here is a
 /// tool that never recorded to history. That silence is a real signal, not a gap in
 /// this view: it is exactly the bug he found the same morning, where a rename changed

@@ -71,6 +71,19 @@ final class ImageDocument: ObservableObject {
     /// document is rebuilt by the autosave's reload, and a @Published status here both got
     /// wiped with it and triggered an autosave of its own every time it changed.
 
+    /// Report a `fileExporter` result. Cancelling is said too — "nothing happened" is a
+    /// thing that happened, and silence would leave him wondering whether it wrote.
+    func reportExport(_ result: Result<URL, Error>, what: String) {
+        switch result {
+        case .success(let url):
+            say("Exported \(url.lastPathComponent) to \(url.deletingLastPathComponent().lastPathComponent)", kind: .save)
+        case .failure(let error as CocoaError) where error.code == .userCancelled:
+            say("Export of \(what) cancelled", kind: .info)
+        case .failure(let error):
+            say("Export of \(what) failed — \(error.localizedDescription)", kind: .warning)
+        }
+    }
+
     /// Post a status note. Safe to call from the file-writing path, which SwiftUI
     /// runs off the main actor.
     nonisolated func say(_ text: String, kind: StatusNote.Kind = .edit) {
@@ -323,6 +336,7 @@ extension ImageDocument {
         guard history.entries.indices.contains(e),
               history.entries[e].actions.indices.contains(a) else { return }
         restore(history.entries[e].actions[a].snapshot)
+        say("Viewing history — \(history.entries[e].title): \(history.entries[e].actions[a].label)", kind: .info)
         let lastE = history.entries.count - 1
         let lastA = history.entries[lastE].actions.count - 1
         historyCursor = (e == lastE && a == lastA) ? .latest : .at(entry: e, action: a)
@@ -331,6 +345,7 @@ extension ImageDocument {
     /// TAP the "Original" row: view the pre-first-edit state (non-destructive).
     func jumpToBaseline() {
         restore(history.baseline)
+        say("Viewing history — Original", kind: .info)
         historyCursor = history.entries.isEmpty ? .latest : .baseline
     }
 
@@ -347,6 +362,7 @@ extension ImageDocument {
         history.entries = kept
         restore(history.entries.last?.actions.last?.snapshot ?? history.baseline)
         historyCursor = .latest
+        say("History — deleted that step and everything after it", kind: .info)
     }
 
     /// COMMIT, keeping the chosen step: restore the state THIS action produced and drop
@@ -372,6 +388,7 @@ extension ImageDocument {
         history.entries = kept
         restore(entry.actions.last?.snapshot ?? history.baseline)
         historyCursor = .latest
+        say("History — restored \(entry.title): \(entry.actions.last?.label ?? ""), later steps dropped", kind: .info)
     }
 
     /// Remove ONE step from the trail and nothing else. The canvas is not touched.
@@ -396,6 +413,7 @@ extension ImageDocument {
         if case .at(let ce, let ca) = historyCursor, ce == e, ca == a {
             historyCursor = .latest
         }
+        say("History — removed one step (canvas unchanged)", kind: .info)
     }
 
     /// COMMIT from the "Original" row: drop every recorded entry, back to the pre-edit state.
@@ -403,6 +421,7 @@ extension ImageDocument {
         history.entries.removeAll()
         restore(history.baseline)
         historyCursor = .latest
+        say("History — back to Original, every step removed", kind: .info)
     }
 
     /// Purge History (the ONLY thing that clears the trail): keep the CURRENT image, drop the
@@ -412,6 +431,7 @@ extension ImageDocument {
         history.baseline = nil
         history.blobs = nil
         historyCursor = .latest
+        say("History purged — the current image is kept, every step is gone", kind: .warning)
     }}
 
 // MARK: - Optimize History (lossless, 2026-09-16)

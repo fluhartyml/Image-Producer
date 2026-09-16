@@ -237,6 +237,7 @@ struct RemoveBackgroundInspector: View {
     private func scan() {
         guard let (_, png) = activeImage else { return }
         problem = nil; working = true; previews = [:]; chosen = []
+        document.say("Remove Background — looking for subjects…", kind: .info)
         Task {
             do {
                 let n = try SubjectCutout.instanceCount(in: png)
@@ -259,6 +260,7 @@ struct RemoveBackgroundInspector: View {
                 await MainActor.run {
                     problem = (error as? SubjectCutout.Failure)?.errorDescription ?? error.localizedDescription
                     working = false
+                    document.say("Remove Background — \(problem ?? "failed")", kind: .warning)
                 }
             }
         }
@@ -267,6 +269,7 @@ struct RemoveBackgroundInspector: View {
     private func apply(instances: IndexSet?) {
         guard let (idx, png) = activeImage else { return }
         problem = nil; working = true
+        document.say("Remove Background — lifting the subject…", kind: .info)
         Task {
             do {
                 let out = try SubjectCutout.lift(imageData: png, instances: instances)
@@ -284,6 +287,7 @@ struct RemoveBackgroundInspector: View {
                 await MainActor.run {
                     problem = (error as? SubjectCutout.Failure)?.errorDescription ?? error.localizedDescription
                     working = false
+                    document.say("Remove Background — \(problem ?? "failed")", kind: .warning)
                 }
             }
         }
