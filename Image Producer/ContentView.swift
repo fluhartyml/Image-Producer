@@ -5309,7 +5309,21 @@ struct ScaleTicks: View {
     }
 
     private var marks: [Mark] {
-        var out: [Mark] = [Mark(id: "center", scale: 1, label: "100%")]
+        // LABELLED "1", NOT "100%" — and the reason is a collision, not a preference.
+        //
+        // The two halves are not equally dense: the shrink side steps 0.333 of the track
+        // between marks, the grow side 0.167. So "100%" sat at the centre with only half
+        // the room its neighbours have, and at panel width its box overlapped "1.5" —
+        // they rendered touching. He saw it: "fix the collision."
+        //
+        // "1" is a third the width and makes the row a single consistent number line:
+        // ¼ ½ ¾ 1 1.5 2 2.5 3. Nothing is lost, because the readout directly above this
+        // slider already says "Scale 100%" in full.
+        //
+        // ⚠️ HIS RULE IS UNTOUCHED. "i want 100% to be center" is about POSITION, and 1.0
+        // still sits dead centre — only the text changed. Kept SEMIBOLD so it still reads
+        // as the anchor rather than just another number.
+        var out: [Mark] = [Mark(id: "center", scale: 1, label: "1")]
 
         // GROW SIDE — his list, verbatim: "i want gradians 1.5 2 2.5 3."
         for n in [1.5, 2.0, 2.5, 3.0] {
