@@ -1538,8 +1538,12 @@
 //       the user the history has reached an unsubstanciatef level and may cause
 //       system degredation, purge history or cancel?"
 //
-//  ⬜ HIS WORDING TO CONFIRM: "unsubstanciatef" reads as UNSUSTAINABLE. Shipped
-//     copy is his voice — ASK, do not silently correct it.
+//  ✅ WORDING CONFIRMED BY HIM 2026-09-15: "unsustainable is right." The typo
+//     stays quoted above because his words are quoted verbatim; the SHIPPED string
+//     uses UNSUSTAINABLE:
+//
+//         "This document's history has reached an unsustainable level and may
+//          cause system degradation."          [Purge History]  [Cancel]
 //  ⬜ HIS THRESHOLD TO SET. Measure, do not guess a number. The honest trigger is
 //     the SIZE OF A SINGLE AUTOSAVE WRITE, because the write is what actually
 //     degrades things — the whole package is rewritten 1.5s after every change.
