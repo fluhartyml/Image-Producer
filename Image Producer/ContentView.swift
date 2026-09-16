@@ -3188,6 +3188,12 @@ struct MoveTransformInspector: View {
                     HStack(spacing: 10) {
                         Text("Scale  \(Int(document.layers[idx].transform.scale * 100))%")
                             .font(.system(size: 18))
+                        // THE PIXEL READOUT IS NOT DECORATION — without it the arrows read
+                        // as broken. See `scalePixelLabel`.
+                        Text(scalePixelLabel(idx))
+                            .font(.system(size: 18))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
                         // JOG BY ONE PIXEL. His ask, 2026-09-15: "can you add an up down
                         // arrow to jog the scale by one pixel." The slider is deliberately
                         // unstepped (see below) and cannot be dragged finer than a few
@@ -3243,6 +3249,31 @@ struct MoveTransformInspector: View {
                 .buttonStyle(.bordered)
             }
         }
+    }
+
+    /// The layer's rendered size in PIXELS — the unit the jog arrows actually move in.
+    ///
+    /// ⚠️ THE READOUT HAD TO GAIN THIS, and the reason is a lesson. "Scale 41%" is whole
+    /// percent, and one pixel on a 1024 canvas is 0.098% of scale — so ELEVEN presses were
+    /// needed to move the displayed number by one, and the arrows looked dead.
+    ///
+    /// Michael, 2026-09-15: "im trying to make the layer on screen two or three pixels
+    /// larger than it is and it seems to be stuck on 40%." It was never stuck. The control
+    /// was ten times finer than the number reporting it, which is a display bug wearing a
+    /// behaviour bug's clothes.
+    ///
+    /// ⭐ A CONTROL MUST BE REPORTED IN ITS OWN UNIT. The slider moves percent, so percent
+    /// stays; the arrows move pixels, so pixels are shown beside it.
+    ///
+    /// Shows W × H when the layer is not square, because `scale` drives only the limiting
+    /// dimension and `contentAspect` decides the other — one number would be a half-truth.
+    private func scalePixelLabel(_ idx: Int) -> String {
+        guard document.layers.indices.contains(idx) else { return "" }
+        let ref = Double(max(1, min(document.canvasWidth, document.canvasHeight)))
+        let size = document.layers[idx].transform.contentSize
+        let w = Int((size.width  * ref).rounded())
+        let h = Int((size.height * ref).rounded())
+        return w == h ? "\(w) px" : "\(w) × \(h) px"
     }
 
     /// Nudge the layer's SIZE by whole pixels.
