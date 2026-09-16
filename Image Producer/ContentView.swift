@@ -357,17 +357,26 @@ struct ContentView: View {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
                 .help("Share a flat PNG of the visible layers")
-                #if os(macOS)
-                // SAVE TO DESKTOP — his ask, 2026-09-15: "can share also share to photos or
-                // share to the desktop?" Photos was already there (the share sheet offers it
-                // for a real PNG). The Desktop is NOT a share destination on macOS and never
-                // has been, so it cannot come from ShareLink — it has to be its own command.
+            }
+            #if os(macOS)
+            // SAVE TO DESKTOP — his ask, 2026-09-15: "can share also share to photos or
+            // share to the desktop?" Photos was already there (the share sheet offers it for
+            // a real PNG). The Desktop is NOT a share destination on macOS and never has
+            // been, so it cannot come from ShareLink — it has to be its own command.
+            //
+            // ⛔ IT NEEDS ITS OWN ToolbarItem, and the first attempt did not have one.
+            // Putting this Button inside the ShareLink's item compiled cleanly, produced no
+            // warning, and rendered NOTHING — a ToolbarItem holds ONE control, so the second
+            // view was silently dropped. He reported "i dont dee the changes" on a build that
+            // was otherwise correct, and the About sheet read 177, which is what ruled the
+            // build out and pointed here. → verify-a-relaunched-app-is-actually-the-new-build
+            ToolbarItem(placement: .secondaryAction) {
                 Button { saveToDesktop() } label: {
                     Label("Save to Desktop", systemImage: "desktopcomputer.and.arrow.down")
                 }
                 .help("Write a flat PNG of the visible layers straight to the Desktop")
-                #endif
             }
+            #endif
             ToolbarItem(placement: .secondaryAction) {
                 Button { showAbout = true } label: {
                     Label("About Image Producer", systemImage: "info.circle")
