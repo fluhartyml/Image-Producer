@@ -357,6 +357,16 @@ struct ContentView: View {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
                 .help("Share a flat PNG of the visible layers")
+                #if os(macOS)
+                // SAVE TO DESKTOP — his ask, 2026-09-15: "can share also share to photos or
+                // share to the desktop?" Photos was already there (the share sheet offers it
+                // for a real PNG). The Desktop is NOT a share destination on macOS and never
+                // has been, so it cannot come from ShareLink — it has to be its own command.
+                Button { saveToDesktop() } label: {
+                    Label("Save to Desktop", systemImage: "desktopcomputer.and.arrow.down")
+                }
+                .help("Write a flat PNG of the visible layers straight to the Desktop")
+                #endif
             }
             ToolbarItem(placement: .secondaryAction) {
                 Button { showAbout = true } label: {
@@ -366,7 +376,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showExportSheet) { ExportSheet(document: document) }
-        .alert("Icon Set", isPresented: Binding(get: { iconSetResult != nil },
+        .alert("Image Producer", isPresented: Binding(get: { iconSetResult != nil },
                                                 set: { if !$0 { iconSetResult = nil } })) {
             Button("OK", role: .cancel) { iconSetResult = nil }
         } message: {
@@ -405,6 +415,48 @@ struct ContentView: View {
     private func exportIconSet() {
         let message = IconSetExport.exportInteractively(from: document)
         if !message.isEmpty { iconSetResult = message }
+    }
+
+    /// Write a flat PNG of the visible layers to the Desktop, no panel.
+    ///
+    /// ⛔ IT NEVER SUFFIXES. His rule, taught 2026-08-25: *"making numbered suffixed files
+    /// creates bloat."* A ` (2)` looks like the careful choice and is not — it silently
+    /// doubles the file, and hands a human the decision with LESS information than the code
+    /// had at the moment of collision.
+    ///
+    /// So the collision is decided here, while both versions are in hand:
+    ///   • byte-identical  -> say so and write nothing. The file he wants is already there.
+    ///   • different       -> say so and write nothing. Overwriting his file is his call,
+    ///                         not mine, and nothing is destroyed by declining.
+    /// → Skills Lab, "Compare on collision; never suffix" · [[feedback_fail_safe_principle]]
+    private func saveToDesktop() {
+        guard let png = ContentView.renderIconPNG(document: document, px: 1024) else {
+            iconSetResult = "The canvas could not be rendered."
+            return
+        }
+        let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
+        let url = desktop.appendingPathComponent(exportFilename + ".png")
+
+        if let existing = try? Data(contentsOf: url) {
+            if existing == png {
+                iconSetResult = "\(url.lastPathComponent) is already on the Desktop, and identical. Nothing written."
+            } else {
+                iconSetResult = """
+                    \(url.lastPathComponent) is already on the Desktop and is DIFFERENT.
+
+                    Nothing was written. Rename or move that file, or use Export (⌘E) to choose \
+                    a name.
+                    """
+            }
+            return
+        }
+
+        do {
+            try png.write(to: url)
+            iconSetResult = "Wrote \(url.lastPathComponent) to the Desktop."
+        } catch {
+            iconSetResult = "Could not write to the Desktop: \(error.localizedDescription)"
+        }
     }
 
     private var exportFilename: String {
@@ -1199,16 +1251,19 @@ struct CanvasInspector: View {
                     }
                 } label: { Label("Print PDF (bleed + marks)", systemImage: "doc.richtext").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent)
+                .help("One PDF at trim size with bleed and crop marks, for a printer")
                 Button {
                     webBundle = ImageExportBundle(files: makeWebFolder(document, baseName: displayName))
                     folderFilename = "\(displayName) Web"; showWebExporter = true
                 } label: { Label("Web folder (PNG @1x/2x/3x)", systemImage: "globe").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
+                .help("A folder of PNGs at 1x, 2x and 3x for a website")
                 Button {
                     webBundle = ImageExportBundle(files: makeIconFolder(document))
                     folderFilename = "\(displayName) Icons"; showWebExporter = true
                 } label: { Label("Icon — all sizes (PNG folder)", systemImage: "square.and.arrow.up.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
+                .help("Every app-icon size from 16 to 1024, as a folder of PNGs")
                 Text("Print PDF = trim + bleed. Web = PNGs @1x/2x/3x. Icon — all sizes = every app-icon size (16→1024) as a PNG folder. For a single PNG/JPEG/TIFF/PDF, use Export (⌘E) and pick the format.")
                     .font(.system(size: 18)).foregroundStyle(.primary)
             }
@@ -1225,6 +1280,7 @@ struct CanvasInspector: View {
                         exportFilename = "\(displayName) Layers"; showDataExporter = true
                     }
                 } label: { Label("Export layers → PDF (one page each)", systemImage: "square.stack.3d.up").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                .help("Page 1 is the composite, then one page per layer")
                 .buttonStyle(.borderedProminent)
                 Toggle(isOn: $flattenLayerPDF) {
                     Text("Flatten transparency onto a matte").font(.system(size: 18))
@@ -1239,6 +1295,7 @@ struct CanvasInspector: View {
                 Button {
                     importingPDF = true
                 } label: { Label("Import PDF as layers…", systemImage: "square.and.arrow.down.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                .help("Bring each page of a PDF in as its own editable image layer")
                 .buttonStyle(.bordered)
                 Text("Import brings each page in as its own editable image layer.")
                     .font(.system(size: 18)).foregroundStyle(.primary)
