@@ -55,9 +55,11 @@ enum RecentProjects {
             return
         }
         var stored = (UserDefaults.standard.array(forKey: key) as? [Data]) ?? []
-        // De-duplicate by the URL each bookmark resolves to, not by the bookmark
-        // bytes — the same file bookmarked twice does not produce identical data.
-        stored.removeAll { resolve($0)?.standardizedFileURL == url.standardizedFileURL }
+        // De-duplicate by the PATH recorded inside each bookmark, read without resolving
+        // it. Resolving can fail (see list()), and an entry that cannot resolve must still
+        // be recognised as this file, or every reopen would add another copy of it.
+        let target = url.standardizedFileURL.path
+        stored.removeAll { recordedPath(of: $0) == target || resolve($0)?.standardizedFileURL.path == target }
         stored.insert(bookmark, at: 0)
         UserDefaults.standard.set(Array(stored.prefix(limit)), forKey: key)
 
@@ -67,19 +69,38 @@ enum RecentProjects {
         NSDocumentController.shared.noteNewRecentDocumentURL(url)
     }
 
-    /// Newest first, with anything unresolvable dropped — a recents row that opens
-    /// nothing is worse than no row.
+    /// Newest first — the entries that open right now.
+    ///
+    /// ⛔ THIS NO LONGER DELETES ANYTHING. It used to rewrite the stored list with only the
+    /// entries that resolved, so ONE bad launch erased the lot, permanently. That is what
+    /// happened on 2026-09-16 at 06:56: the Time Machine snapshot from 06:10 still held
+    /// Phototizer, LayerKeytest and Layerlayertest; the preferences written at 06:56 held
+    /// nothing. Michael: "it used to remember, it just recently forgot them."
+    ///
+    /// An entry that does not open now is kept and simply not shown; it is tried again on
+    /// the next launch. Only Clear, or falling off the end of the 8-entry cap, removes one.
+    ///
+    /// ⚠️ And the existence check runs INSIDE the security scope. The sandbox can answer
+    /// "no such file" for a file this app has not been granted yet, which would have
+    /// looked exactly like a deleted project.
     static func list() -> [URL] {
         let stored = (UserDefaults.standard.array(forKey: key) as? [Data]) ?? []
-        var alive: [Data] = []
         var urls: [URL] = []
         for bookmark in stored {
-            if let url = resolve(bookmark), FileManager.default.fileExists(atPath: url.path) {
-                alive.append(bookmark)
+            guard let url = resolve(bookmark) else {
+                NSLog("ImageProducer recents: kept but not shown — could not resolve %@",
+                      recordedPath(of: bookmark) ?? "(unknown path)")
+                continue
+            }
+            let granted = url.startAccessingSecurityScopedResource()
+            let exists = FileManager.default.fileExists(atPath: url.path)
+            if granted { url.stopAccessingSecurityScopedResource() }
+            if exists {
                 urls.append(url)
+            } else {
+                NSLog("ImageProducer recents: kept but not shown — not found at %@", url.path)
             }
         }
-        if alive.count != stored.count { UserDefaults.standard.set(alive, forKey: key) }
         return urls
     }
 
@@ -91,10 +112,20 @@ enum RecentProjects {
 
     private static func resolve(_ bookmark: Data) -> URL? {
         var stale = false
-        return try? URL(resolvingBookmarkData: bookmark,
-                        options: .withSecurityScope,
-                        relativeTo: nil,
-                        bookmarkDataIsStale: &stale)
+        do {
+            return try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope,
+                           relativeTo: nil, bookmarkDataIsStale: &stale)
+        } catch {
+            NSLog("ImageProducer recents: resolve failed — %@", String(describing: error))
+            return nil
+        }
+    }
+
+    /// The path a bookmark was made for, read from the bookmark itself — no resolving, no
+    /// sandbox grant needed.
+    private static func recordedPath(of bookmark: Data) -> String? {
+        URL.resourceValues(forKeys: [.pathKey], fromBookmarkData: bookmark)?.path
+            .map { URL(fileURLWithPath: $0).standardizedFileURL.path }
     }
 
     /// Open a recents entry. The sandbox only hands over access inside this scope, so
