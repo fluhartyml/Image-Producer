@@ -68,6 +68,8 @@ struct ContentView: View {
     /// Result of an "Export ▸ Icon Set…" run. Always says what happened — a silent
     /// export is the same failure shape as the Done button that reported nothing.
     @State private var iconSetResult: String?
+    /// A revert awaiting confirmation — it replaces everything done since that point.
+    @State private var pendingRevert: Cryochamber.Point?
     /// Share (roadmap 2.5): a flat 1024 PNG of the visible layers, snapshot at tap.
     /// About / wordmark sheet — shows the "Image Producer / Graphic Arts" brand inside the app
     /// (the home-screen + App Store name can't carry the subheading).
@@ -425,6 +427,27 @@ struct ContentView: View {
         // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
         // targeting the focused document.
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
+        // File ▸ Revert to Open / Revert to Last Save — nil (disabled) until frozen.
+        .focusedSceneValue(\.revertToOpenAction,
+                           document.hasFrozenOpen ? { pendingRevert = .open } : nil)
+        .focusedSceneValue(\.revertToLastSaveAction,
+                           document.hasFrozenLastSave ? { pendingRevert = .lastSave } : nil)
+        .focusedSceneValue(\.optimizeHistoryAction, { Task { await document.optimizeHistory() } })
+        .confirmationDialog(pendingRevert == .lastSave ? "Revert to Last Save?" : "Revert to Open?",
+                            isPresented: Binding(get: { pendingRevert != nil },
+                                                 set: { if !$0 { pendingRevert = nil } }),
+                            titleVisibility: .visible,
+                            presenting: pendingRevert) { point in
+            Button(point == .open ? "Revert to Open" : "Revert to Last Save", role: .destructive) {
+                _ = document.revert(to: point)
+                pendingRevert = nil
+            }
+            Button("Cancel", role: .cancel) { pendingRevert = nil }
+        } message: { point in
+            Text(point == .open
+                 ? "Everything since you opened this document is replaced, history included."
+                 : "Everything since your last ⌘S is replaced, history included.")
+        }
         #endif
     }
 
@@ -454,7 +477,20 @@ struct ContentView: View {
             iconSetResult = "The canvas could not be rendered."
             return
         }
+        #if os(macOS)
+        // ⛔ The sandbox refuses the Desktop outright — the first version of this wrote
+        // straight to it and had never once worked: "You don't have permission to save the
+        // file … in the folder Desktop." He found it 2026-09-16. The Desktop has to be
+        // granted by the user, once, and remembered. → DesktopAccess
+        guard let desktop = DesktopAccess.grantedDesktop() else {
+            iconSetResult = "Save to Desktop needs your Desktop folder chosen once. Nothing was written."
+            return
+        }
+        let scoped = desktop.startAccessingSecurityScopedResource()
+        defer { if scoped { desktop.stopAccessingSecurityScopedResource() } }
+        #else
         let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
+        #endif
         let url = desktop.appendingPathComponent(exportFilename + ".png")
 
         if let existing = try? Data(contentsOf: url) {
@@ -2817,6 +2853,11 @@ struct HistoryPanel: View {
                 }
                 Spacer()
                 Menu {
+                    // Lossless — keeps every step, drops only duplicate copies of pixels.
+                    Button { Task { await document.optimizeHistory() } } label: {
+                        Label("Optimize History", systemImage: "arrow.down.right.and.arrow.up.left")
+                    }
+                    .disabled(document.history.entries.isEmpty && document.history.baseline == nil)
                     Button(role: .destructive) { confirmingPurge = true } label: {
                         Label("Purge History…", systemImage: "trash")
                     }
@@ -6168,9 +6209,35 @@ struct AutosaveModifier: ViewModifier {
     /// Where an UNTITLED document is auto-materialized so an unnamed canvas can never
     /// be lost before its first manual Save. Cleared once the user names/saves it.
     @State private var recoveryURL: URL?
+    /// The weight warning shows once per crossing: it re-arms after the file drops back
+    /// under the line (a purge or an optimize), so it can warn again if it grows again.
+    @State private var weightWarned = false
+    @State private var showWeightWarning = false
+
+    /// ⭐ His number, 2026-09-16: "250 is fine." Picked against measurements he felt —
+    /// fine at 227 MB, sluggish at 560 MB. Decimal megabytes, as Finder shows them.
+    static let weightWarningBytes = 250_000_000
 
     func body(content: Content) -> some View {
         content
+            .onAppear {
+                // Freeze Revert to Open BEFORE anything can autosave over it. The freeze is
+                // queued ahead of every write this session will make.
+                guard let fileURL, !document.hasFrozenOpen else { return }
+                let doc = document
+                document.cryochamber.freezeOpen(from: fileURL) { ok in
+                    DispatchQueue.main.async {
+                        doc.hasFrozenOpen = ok
+                        if !ok { doc.say("Could not freeze the opened state — Revert to Open is unavailable", kind: .warning) }
+                    }
+                }
+            }
+            .alert("History Is Too Heavy", isPresented: $showWeightWarning) {
+                Button("Purge History", role: .destructive) { document.purgeHistory() }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("This document's history has reached an unsustainable level and may cause system degradation.")
+            }
             .onReceive(document.objectWillChange) { _ in schedule() }
             .onChange(of: scenePhase) { _, phase in
                 // Flush on background. The write is now ENQUEUED rather than completed
@@ -6230,6 +6297,12 @@ struct AutosaveModifier: ViewModifier {
 
         guard let data = try? document.encodedManifest() else { return }
         PackageWriter.enqueue(data, to: url)
+
+        if data.count > Self.weightWarningBytes {
+            if !weightWarned { weightWarned = true; showWeightWarning = true }
+        } else {
+            weightWarned = false
+        }
     }
 
     /// A crash-safety recovery file for a genuinely UNTITLED document (rare now that new

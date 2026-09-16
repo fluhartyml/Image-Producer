@@ -27,7 +27,46 @@ extension FocusedValues {
     }
 }
 
+struct RevertToOpenActionKey: FocusedValueKey { typealias Value = () -> Void }
+struct RevertToLastSaveActionKey: FocusedValueKey { typealias Value = () -> Void }
+struct OptimizeHistoryActionKey: FocusedValueKey { typealias Value = () -> Void }
+
+extension FocusedValues {
+    var revertToOpenAction: (() -> Void)? {
+        get { self[RevertToOpenActionKey.self] }
+        set { self[RevertToOpenActionKey.self] = newValue }
+    }
+    var revertToLastSaveAction: (() -> Void)? {
+        get { self[RevertToLastSaveActionKey.self] }
+        set { self[RevertToLastSaveActionKey.self] = newValue }
+    }
+    var optimizeHistoryAction: (() -> Void)? {
+        get { self[OptimizeHistoryActionKey.self] }
+        set { self[OptimizeHistoryActionKey.self] = newValue }
+    }
+}
+
 #if os(macOS)
+/// File ▸ Optimize History, Revert to Open, Revert to Last Save — the cryochamber and the
+/// lossless optimize, 2026-09-16. See Cryochamber.swift.
+struct CryochamberCommands: Commands {
+    @FocusedValue(\.revertToOpenAction) private var revertToOpen
+    @FocusedValue(\.revertToLastSaveAction) private var revertToLastSave
+    @FocusedValue(\.optimizeHistoryAction) private var optimizeHistory
+
+    var body: some Commands {
+        CommandGroup(after: .saveItem) {
+            Button("Optimize History") { optimizeHistory?() }
+                .disabled(optimizeHistory == nil)
+            Divider()
+            Button("Revert to Open…") { revertToOpen?() }
+                .disabled(revertToOpen == nil)
+            Button("Revert to Last Save…") { revertToLastSave?() }
+                .disabled(revertToLastSave == nil)
+        }
+    }
+}
+
 /// Adds File > Export… (⌘E) driving the focused document's Export flow.
 struct ExportCommands: Commands {
     @FocusedValue(\.exportAction) private var exportAction
@@ -51,6 +90,11 @@ struct ExportCommands: Commands {
 /// file on disk is never touched** — you get a project to work in, not an edit of the
 /// user's photo.
 final class ImageProducerAppDelegate: NSObject, NSApplicationDelegate {
+    /// The cryochamber's points last one session, by his design: gone on quit.
+    func applicationWillTerminate(_ notification: Notification) {
+        Cryochamber.discardSession()
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         for source in urls {
             // Our own project package: hand straight to the document controller, unchanged.
@@ -89,6 +133,11 @@ struct Image_ProducerApp: App {
 #if os(macOS)
     @NSApplicationDelegateAdaptor(ImageProducerAppDelegate.self) private var appDelegate
 #endif
+
+    init() {
+        // A session that crashed never discarded its chamber. Clear those now.
+        Cryochamber.sweepAbandoned()
+    }
 
     var body: some Scene {
         // Document-based (roadmap 2.4.1): each icon is a saved package the user owns
@@ -131,6 +180,7 @@ struct Image_ProducerApp: App {
             // out. Drives the focused document's Export action (nil-disabled when no
             // document is frontmost).
             ExportCommands()
+            CryochamberCommands()
             #endif
 
             #if os(macOS)

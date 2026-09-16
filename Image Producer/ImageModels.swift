@@ -23,6 +23,7 @@
 import SwiftUI
 import Combine
 import UniformTypeIdentifiers
+import CryptoKit
 
 // MARK: - Document
 
@@ -66,6 +67,12 @@ final class ImageDocument: ObservableObject {
     /// TRANSIENT. Never written to the manifest — it describes the session, not the
     /// document.
     @Published var status: StatusNote?
+
+    /// This session's frozen points — Revert to Open / Revert to Last Save. Never saved.
+    let cryochamber = Cryochamber()
+    /// Mirrors `cryochamber.has(.lastSave)` for the menu, which needs something observable.
+    @Published var hasFrozenLastSave = false
+    @Published var hasFrozenOpen = false
 
     /// Post a status note. Safe to call from the file-writing path, which SwiftUI
     /// runs off the main actor.
@@ -228,7 +235,10 @@ extension ImageDocument {
 extension ImageDocument {
     /// Encode the current layer stack as a `DocumentSnapshot`.
     private func encodedSnapshot() -> Data? {
-        try? JSONEncoder().encode(DocumentSnapshot(layers: layers))
+        let store = BlobStore(history.blobs ?? [:])
+        let data = try? BlobCoding.encoder(store).encode(DocumentSnapshot(layers: layers))
+        if store.added { history.blobs = store.blobs }
+        return data
     }
 
     /// Capture the pre-edit layer stack as the history baseline the FIRST time an edit is
@@ -293,7 +303,9 @@ extension ImageDocument {
     /// Restore a snapshot's layer stack onto the live document (leaves non-history state —
     /// name, canvas size, palette, crop, ppi, print setup — untouched).
     private func restore(_ data: Data?) {
-        guard let data, let snap = try? JSONDecoder().decode(DocumentSnapshot.self, from: data) else { return }
+        guard let data,
+              let snap = try? BlobCoding.decoder(BlobStore(history.blobs ?? [:]))
+                  .decode(DocumentSnapshot.self, from: data) else { return }
         layers = snap.layers
     }
 
@@ -400,7 +412,108 @@ extension ImageDocument {
     func purgeHistory() {
         history.entries.removeAll()
         history.baseline = nil
+        history.blobs = nil
         historyCursor = .latest
+    }}
+
+// MARK: - Optimize History (lossless, 2026-09-16)
+
+/// What `optimizeHistory` reports back.
+struct HistoryOptimizeResult: Sendable {
+    let before: Int
+    let after: Int
+    let steps: Int
+}
+
+extension ImageDocument {
+    /// Approximate bytes the history occupies in the manifest (snapshots + blobs, before
+    /// JSON's base64). Cheap — sums lengths, decodes nothing.
+    var historyByteCount: Int {
+        let snaps = history.entries.reduce(0) { $0 + $1.actions.reduce(0) { $0 + ($1.snapshot?.count ?? 0) } }
+        return snaps + (history.baseline?.count ?? 0) + (history.blobs?.values.reduce(0) { $0 + $1.count } ?? 0)
+    }
+
+    /// Michael, 2026-09-15, at 560 MB: *"maybe we have an optimize and save option?"*
+    ///
+    /// LOSSLESS. Every step survives; only duplicate copies of the same pixels go. Each
+    /// snapshot is decoded, re-encoded into ONE fresh blob store, decoded again and compared
+    /// against the original byte-for-byte (sorted-key JSON). **If any step fails that check,
+    /// or the history changes while this runs, NOTHING is replaced.** Blobs no longer
+    /// referenced by any step (left behind by deleted rows) are dropped as a side effect.
+    ///
+    /// The heavy work runs off the main thread; the swap happens back on it. Autosave then
+    /// writes the smaller file on its own.
+    @discardableResult
+    func optimizeHistory() async -> HistoryOptimizeResult? {
+        guard !isViewingHistory else {
+            say("Optimize History — return to the latest step first", kind: .warning)
+            return nil
+        }
+        let original = history
+        let before = historyByteCount
+        let steps = original.entries.reduce(0) { $0 + $1.actions.count }
+        say("Optimizing history — \(steps) steps…", kind: .info)
+
+        let rebuilt: ImageHistory? = await Task.detached(priority: .userInitiated) {
+            ImageDocument.rebuildDeduplicated(original)
+        }.value
+
+        guard let rebuilt else {
+            say("Optimize History — a step did not survive the check. Nothing was changed.", kind: .warning)
+            return nil
+        }
+        guard Self.sameShape(history, original) else {
+            say("Optimize History — the history changed while optimizing. Nothing was changed.", kind: .warning)
+            return nil
+        }
+        history = rebuilt
+        let after = historyByteCount
+        let fmt = { (n: Int) in ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file) }
+        say("Optimized — history \(fmt(before)) → \(fmt(after)), all \(steps) steps kept", kind: .save)
+        return HistoryOptimizeResult(before: before, after: after, steps: steps)
+    }
+
+    /// Same entries, same actions, same snapshot bytes — i.e. nothing was edited meanwhile.
+    private static func sameShape(_ a: ImageHistory, _ b: ImageHistory) -> Bool {
+        guard a.baseline == b.baseline, a.entries.count == b.entries.count else { return false }
+        for (x, y) in zip(a.entries, b.entries) {
+            guard x.id == y.id, x.actions.count == y.actions.count else { return false }
+            for (p, q) in zip(x.actions, y.actions) where p.id != q.id || p.snapshot != q.snapshot {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// Pure function of the history — no document access, safe off the main actor.
+    nonisolated static func rebuildDeduplicated(_ old: ImageHistory) -> ImageHistory? {
+        let oldStore = BlobStore(old.blobs ?? [:])
+        let newStore = BlobStore()
+        let plain = JSONEncoder()
+        plain.outputFormatting = [.sortedKeys]
+
+        func convert(_ data: Data?) -> Data?? {
+            guard let data else { return .some(nil) }
+            guard let snap = try? BlobCoding.decoder(oldStore).decode(DocumentSnapshot.self, from: data),
+                  let encoded = try? BlobCoding.encoder(newStore).encode(snap),
+                  let back = try? BlobCoding.decoder(newStore).decode(DocumentSnapshot.self, from: encoded),
+                  let lhs = try? plain.encode(snap),
+                  let rhs = try? plain.encode(back),
+                  lhs == rhs else { return nil }
+            return .some(encoded)
+        }
+
+        var out = old
+        guard let baseline = convert(old.baseline) else { return nil }
+        out.baseline = baseline
+        for e in out.entries.indices {
+            for a in out.entries[e].actions.indices {
+                guard let snap = convert(out.entries[e].actions[a].snapshot) else { return nil }
+                out.entries[e].actions[a].snapshot = snap
+            }
+        }
+        out.blobs = newStore.blobs.isEmpty ? nil : newStore.blobs
+        return out
     }
 }
 
@@ -613,6 +726,48 @@ struct CameraFrame: Codable, Equatable {
     /// one for three beats, and cutout work does the same. Holding is not a shortcut around
     /// in-betweening, it is the other technique. Defaults to 1 so nothing is imposed.
     var exposures: Int = 1
+
+    init(index: Int, snapshot: Data?, includedBackground: Bool = false, scale: Double = 1,
+         trimmedToArt: Bool = false, isTween: Bool = false, exposures: Int = 1) {
+        self.index = index
+        self.snapshot = snapshot
+        self.includedBackground = includedBackground
+        self.scale = scale
+        self.trimmedToArt = trimmedToArt
+        self.isTween = isTween
+        self.exposures = exposures
+    }
+
+    /// Hand-written ONLY so `snapshot` can go through `BlobCoding`. Measured on
+    /// Phototizer.picprod 2026-09-16: the same camera negative re-embedded in every later
+    /// history step was 223 MB of a 654 MB history. Every other field codes as it always did.
+    private enum CodingKeys: String, CodingKey {
+        case index, snapshot, snapshotRef, includedBackground, scale, trimmedToArt, isTween, exposures
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        index = try c.decode(Int.self, forKey: .index)
+        snapshot = try BlobCoding.decode(from: c, inline: .snapshot, ref: .snapshotRef,
+                                         userInfo: decoder.userInfo)
+        includedBackground = try c.decodeIfPresent(Bool.self, forKey: .includedBackground) ?? false
+        scale = try c.decodeIfPresent(Double.self, forKey: .scale) ?? 1
+        trimmedToArt = try c.decodeIfPresent(Bool.self, forKey: .trimmedToArt) ?? false
+        isTween = try c.decodeIfPresent(Bool.self, forKey: .isTween) ?? false
+        exposures = try c.decodeIfPresent(Int.self, forKey: .exposures) ?? 1
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(index, forKey: .index)
+        if let snapshot {
+            try BlobCoding.encode(snapshot, into: &c, inline: .snapshot, ref: .snapshotRef,
+                                  userInfo: encoder.userInfo)
+        }
+        try c.encode(includedBackground, forKey: .includedBackground)
+        try c.encode(scale, forKey: .scale)
+        try c.encode(trimmedToArt, forKey: .trimmedToArt)
+        try c.encode(isTween, forKey: .isTween)
+        try c.encode(exposures, forKey: .exposures)
+    }
 }
 
 struct LayerTransform: Codable, Equatable {
@@ -692,11 +847,33 @@ enum ElementContent: Codable {
 struct PixelContent: Codable {
     /// PNG bytes of the pixel raster at the master resolution.
     var pngData = Data()
+
+    init(pngData: Data = Data()) { self.pngData = pngData }
+    // Inside a history snapshot the bytes become a reference into the history's blob
+    // store; everywhere else they stay inline exactly as before. See `BlobCoding`.
+    init(from decoder: Decoder) throws {
+        pngData = try BlobCoding.decode(from: decoder.container(keyedBy: BlobCoding.PNGKey.self),
+                                        inline: .pngData, ref: .pngRef, userInfo: decoder.userInfo) ?? Data()
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: BlobCoding.PNGKey.self)
+        try BlobCoding.encode(pngData, into: &c, inline: .pngData, ref: .pngRef, userInfo: encoder.userInfo)
+    }
 }
 
 struct ImageContent: Codable {
     /// PNG bytes at the master resolution. Empty = not yet populated.
     var pngData = Data()
+
+    init(pngData: Data = Data()) { self.pngData = pngData }
+    init(from decoder: Decoder) throws {
+        pngData = try BlobCoding.decode(from: decoder.container(keyedBy: BlobCoding.PNGKey.self),
+                                        inline: .pngData, ref: .pngRef, userInfo: decoder.userInfo) ?? Data()
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: BlobCoding.PNGKey.self)
+        try BlobCoding.encode(pngData, into: &c, inline: .pngData, ref: .pngRef, userInfo: encoder.userInfo)
+    }
 }
 
 struct TextContent: Codable {
@@ -850,6 +1027,80 @@ struct ImageHistory: Codable {
     /// step-back can return all the way to the original — the "Original" row in the panel.
     /// Captured once, on the first edit; `nil` until then.
     var baseline: Data? = nil
+    /// Each distinct image, ONCE, keyed by its SHA-256. History snapshots refer to these
+    /// instead of carrying their own copy. Absent in files written before 2026-09-16, whose
+    /// snapshots still carry inline bytes and still decode. See `BlobCoding`.
+    var blobs: [String: Data]? = nil
+}
+
+// MARK: - Blob store (history dedupe, 2026-09-16)
+//
+// WHY: Phototizer.picprod reached 628 MB and he reported the app "getting unstable".
+// Measured: 654 MB of history, of which 261 MB was layer PNGs — but only 12 MB of
+// DISTINCT images, 11 of them — and 223 MB was the same camera negative repeated. Every
+// history step embedded a full copy of every layer's pixels, and the whole file is
+// rewritten 1.5 s after every change.
+//
+// HOW: while a HISTORY SNAPSHOT is encoded, each image's bytes go into one store keyed by
+// hash and the snapshot keeps only the key. Live layers in the manifest are untouched —
+// they stay inline, so the document itself reads exactly as before.
+//
+// ⚠️ A build from before this change can open a file written after it, but cannot step
+// back through snapshots that hold references (its decoder expects inline bytes). The
+// current image is unaffected.
+
+/// The store an encoder interns into, or a decoder resolves from. A class so the Codable
+/// implementations deep in the tree can reach it through `userInfo`.
+nonisolated final class BlobStore: @unchecked Sendable {
+    private(set) var blobs: [String: Data]
+    private(set) var added = false
+    init(_ blobs: [String: Data] = [:]) { self.blobs = blobs }
+
+    func intern(_ data: Data) -> String {
+        let key = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        if blobs[key] == nil { blobs[key] = data; added = true }
+        return key
+    }
+    func data(for key: String) -> Data? { blobs[key] }
+}
+
+nonisolated enum BlobCoding {
+    static let storeKey = CodingUserInfoKey(rawValue: "com.nightgard.Image-Producer.blobStore")!
+
+    enum PNGKey: String, CodingKey { case pngData, pngRef }
+
+    static func encoder(_ store: BlobStore) -> JSONEncoder {
+        let e = JSONEncoder(); e.userInfo[storeKey] = store; return e
+    }
+    static func decoder(_ store: BlobStore) -> JSONDecoder {
+        let d = JSONDecoder(); d.userInfo[storeKey] = store; return d
+    }
+
+    /// With a store in `userInfo` (history snapshots): write a reference. Without one
+    /// (live layers, exports, camera negatives): write the bytes inline, as always.
+    static func encode<K: CodingKey>(_ data: Data, into c: inout KeyedEncodingContainer<K>,
+                                     inline: K, ref: K, userInfo: [CodingUserInfoKey: Any]) throws {
+        if let store = userInfo[storeKey] as? BlobStore, !data.isEmpty {
+            try c.encode(store.intern(data), forKey: ref)
+        } else {
+            try c.encode(data, forKey: inline)
+        }
+    }
+
+    /// Reads either shape. A reference with no matching blob THROWS rather than quietly
+    /// producing an empty image — a snapshot that cannot be restored exactly must not
+    /// restore at all.
+    static func decode<K: CodingKey>(from c: KeyedDecodingContainer<K>, inline: K, ref: K,
+                                     userInfo: [CodingUserInfoKey: Any]) throws -> Data? {
+        if let key = try c.decodeIfPresent(String.self, forKey: ref) {
+            guard let store = userInfo[storeKey] as? BlobStore, let data = store.data(for: key) else {
+                throw DecodingError.dataCorruptedError(forKey: ref, in: c,
+                                                       debugDescription: "No blob for \(key)")
+            }
+            return data
+        }
+        return try c.decodeIfPresent(Data.self, forKey: inline)
+    }
 }
 
 /// A restorable capture of just the LAYER STACK at one history point. History governs
@@ -967,6 +1218,10 @@ extension ImageDocument: ReferenceFileDocument {
         // `say` hops back on its own.
         say("Saved — \(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file))",
             kind: .save)
+        // ⌘S is "a conscious marker" — freeze exactly these bytes as Last Save.
+        if cryochamber.freezeLastSave(manifest: data) {
+            DispatchQueue.main.async { [weak self] in self?.hasFrozenLastSave = true }
+        }
         let manifest = FileWrapper(regularFileWithContents: data)
         manifest.preferredFilename = "manifest.json"
         return FileWrapper(directoryWithFileWrappers: ["manifest.json": manifest])
@@ -1046,6 +1301,12 @@ enum PackageWriter {
     /// Hand off an already-encoded snapshot. Returns immediately; the caller is never blocked.
     nonisolated static func enqueue(_ data: Data, to url: URL) {
         queue.async { try? ImageDocument.writeEncodedPackage(data, to: url) }
+    }
+
+    /// Run other file work in the same FIFO as the writes — the cryochamber's Open freeze
+    /// uses this so it is guaranteed to read the file before any autosave replaces it.
+    nonisolated static func run(_ work: @escaping @Sendable () -> Void) {
+        queue.async(execute: work)
     }
 }
 

@@ -1442,7 +1442,14 @@
 // ============================================================================
 //
 //  HIS DESIGN, captured the evening he lost a session's work on Phototizer.picprod
-//  and had no way back inside Image Producer. CAPTURED, NOT BUILT. No code yet.
+//  and had no way back inside Image Producer.
+//
+//  ✅ BUILT 2026-09-16 at his word ("can we add the optimize image and the safeguards from
+//     last night?") — Cryochamber.swift (Revert to Open / Revert to Last Save, File menu),
+//     the 250 MB weight warning in AutosaveModifier (his number: "250 is fine"), and the
+//     lossless Optimize History (ImageModels.swift, "Blob store"). Measured first: 654 MB
+//     of history held only 12 MB of distinct images; 223 MB was one camera negative
+//     repeated. ⬜ NOT YET SEEN RUNNING BY HIM.
 //
 //  ⛔ THE RULING THAT STARTED IT. Claude offered Time Machine. He refused it:
 //      "not time machine because that is a lazy work around"
