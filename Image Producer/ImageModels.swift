@@ -66,22 +66,20 @@ final class ImageDocument: ObservableObject {
     ///
     /// TRANSIENT. Never written to the manifest — it describes the session, not the
     /// document.
-    @Published var status: StatusNote?
-
-    /// This session's frozen points — Revert to Open / Revert to Last Save. Never saved.
-    let cryochamber = Cryochamber()
-    /// Mirrors `cryochamber.has(.lastSave)` for the menu, which needs something observable.
-    @Published var hasFrozenLastSave = false
-    @Published var hasFrozenOpen = false
+    ///
+    /// ⚠️ 2026-09-16: NOT a property of the document any more — see `DocumentWindow`. The
+    /// document is rebuilt by the autosave's reload, and a @Published status here both got
+    /// wiped with it and triggered an autosave of its own every time it changed.
 
     /// Post a status note. Safe to call from the file-writing path, which SwiftUI
     /// runs off the main actor.
-    func say(_ text: String, kind: StatusNote.Kind = .edit) {
+    nonisolated func say(_ text: String, kind: StatusNote.Kind = .edit) {
         let note = StatusNote(text: text, kind: kind, at: Date())
+        let window = DocumentWindow.window(for: self)
         if Thread.isMainThread {
-            status = note
+            MainActor.assumeIsolated { window?.post(note) }
         } else {
-            DispatchQueue.main.async { [weak self] in self?.status = note }
+            DispatchQueue.main.async { window?.post(note) }
         }
     }
 
@@ -454,20 +452,25 @@ extension ImageDocument {
         let steps = original.entries.reduce(0) { $0 + $1.actions.count }
         say("Optimizing history — \(steps) steps…", kind: .info)
 
-        let rebuilt: ImageHistory? = await Task.detached(priority: .userInitiated) {
-            ImageDocument.rebuildDeduplicated(original)
+        let rebuilt: ImageHistory? = await Task.detached(priority: .userInitiated) { [weak self] in
+            ImageDocument.rebuildDeduplicated(original) { done in
+                self?.say("Optimizing history — step \(done) of \(steps)…", kind: .info)
+            }
         }.value
 
         guard let rebuilt else {
             say("Optimize History — a step did not survive the check. Nothing was changed.", kind: .warning)
             return nil
         }
-        guard Self.sameShape(history, original) else {
+        // The autosave may have reloaded the document while this ran; apply to the one the
+        // window is showing now, or the result would land on a discarded instance.
+        let live = DocumentWindow.window(for: self)?.document ?? self
+        guard Self.sameShape(live.history, original) else {
             say("Optimize History — the history changed while optimizing. Nothing was changed.", kind: .warning)
             return nil
         }
-        history = rebuilt
-        let after = historyByteCount
+        live.history = rebuilt
+        let after = live.historyByteCount
         let fmt = { (n: Int) in ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file) }
         say("Optimized — history \(fmt(before)) → \(fmt(after)), all \(steps) steps kept", kind: .save)
         return HistoryOptimizeResult(before: before, after: after, steps: steps)
@@ -486,7 +489,8 @@ extension ImageDocument {
     }
 
     /// Pure function of the history — no document access, safe off the main actor.
-    nonisolated static func rebuildDeduplicated(_ old: ImageHistory) -> ImageHistory? {
+    nonisolated static func rebuildDeduplicated(_ old: ImageHistory,
+                                                progress: (Int) -> Void = { _ in }) -> ImageHistory? {
         let oldStore = BlobStore(old.blobs ?? [:])
         let newStore = BlobStore()
         let plain = JSONEncoder()
@@ -506,10 +510,13 @@ extension ImageDocument {
         var out = old
         guard let baseline = convert(old.baseline) else { return nil }
         out.baseline = baseline
+        var done = 0
         for e in out.entries.indices {
             for a in out.entries[e].actions.indices {
                 guard let snap = convert(out.entries[e].actions[a].snapshot) else { return nil }
                 out.entries[e].actions[a].snapshot = snap
+                done += 1
+                if done % 10 == 0 { progress(done) }
             }
         }
         out.blobs = newStore.blobs.isEmpty ? nil : newStore.blobs
@@ -1219,8 +1226,13 @@ extension ImageDocument: ReferenceFileDocument {
         say("Saved — \(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file))",
             kind: .save)
         // ⌘S is "a conscious marker" — freeze exactly these bytes as Last Save.
-        if cryochamber.freezeLastSave(manifest: data) {
-            DispatchQueue.main.async { [weak self] in self?.hasFrozenLastSave = true }
+        if let window = DocumentWindow.window(for: self) {
+            if window.chamber.freezeLastSave(manifest: data) {
+                say("Froze this save — File ▸ Revert to Last Save returns here", kind: .save)
+                DispatchQueue.main.async { window.hasFrozenLastSave = true }
+            } else {
+                say("Could not freeze this save for Revert to Last Save", kind: .warning)
+            }
         }
         let manifest = FileWrapper(regularFileWithContents: data)
         manifest.preferredFilename = "manifest.json"
@@ -1299,8 +1311,12 @@ enum PackageWriter {
         DispatchQueue(label: "com.nightgard.Image-Producer.package-write", qos: .utility)
 
     /// Hand off an already-encoded snapshot. Returns immediately; the caller is never blocked.
-    nonisolated static func enqueue(_ data: Data, to url: URL) {
-        queue.async { try? ImageDocument.writeEncodedPackage(data, to: url) }
+    nonisolated static func enqueue(_ data: Data, to url: URL,
+                                     completion: (@Sendable (Error?) -> Void)? = nil) {
+        queue.async {
+            do { try ImageDocument.writeEncodedPackage(data, to: url); completion?(nil) }
+            catch { completion?(error) }
+        }
     }
 
     /// Run other file work in the same FIFO as the writes — the cryochamber's Open freeze

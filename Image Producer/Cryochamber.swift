@@ -122,10 +122,10 @@ extension ImageDocument {
     /// crop, resolution and print setup, exactly as they were frozen. Autosave writes the
     /// result to the file on its own. Returns false and changes nothing if the point
     /// cannot be read.
-    func revert(to point: Cryochamber.Point) -> Bool {
+    func revert(to point: Cryochamber.Point, from chamber: Cryochamber) -> Bool {
         let manifest: ImageProjectManifest
         do {
-            guard let m = try cryochamber.thaw(point) else { return false }
+            guard let m = try chamber.thaw(point) else { return false }
             manifest = m
         } catch {
             say("Could not read the frozen copy — nothing was changed", kind: .warning)

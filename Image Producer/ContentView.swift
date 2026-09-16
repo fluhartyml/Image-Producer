@@ -58,6 +58,8 @@ struct ContentView: View {
     /// of the document — the autosave's coordinated write can reload the document, which
     /// wiped it roughly every two seconds. See `CameraState`.
     @StateObject private var camera = CameraState()
+    /// Status line + cryochamber — window-held because the document is rebuilt on reload.
+    @StateObject private var window = DocumentWindow()
     @State private var moveSessionLayerID: ImageLayer.ID?
     @State private var moveSessionTransform: LayerTransform?
     @State private var bottomPanel: BottomPanel = .layers
@@ -279,7 +281,7 @@ struct ContentView: View {
             // THE STATUS LINE — his ask, 2026-09-06. Outside every layout branch on
             // purpose: focus mode, phone, portrait and wide all get the same bar in
             // the same place, so it is never the thing that moved.
-            StatusBar(document: document)
+            StatusBar(window: window)
         }
     }
 
@@ -407,12 +409,28 @@ struct ContentView: View {
             Text(iconSetResult ?? "").font(.system(size: 18))
         }
         .sheet(isPresented: $showAbout) { AboutView() }
+        // The autosave's reload hands this window a NEW document instance — point it here.
+        .onChange(of: ObjectIdentifier(document)) { _, _ in window.attach(document) }
         .environmentObject(pen)
         // Opening says so in the status bar — his ask, 2026-09-06: "opening should also
         // cause the feedback bar talk to the user." Also the point where a document
         // opened from the Finder, from Open Recent, or by a double-click gets into the
         // recents list, since none of those go through the Welcome window.
         .onAppear {
+            window.attach(document)
+            // Freeze Revert to Open BEFORE anything can autosave over it: the freeze is queued
+            // on the package writer ahead of every write this session will make.
+            if let url = fileURL, !window.hasFrozenOpen {
+                let doc = document, win = window
+                win.chamber.freezeOpen(from: url) { ok in
+                    DispatchQueue.main.async {
+                        win.hasFrozenOpen = ok
+                        doc.say(ok ? "Froze the opened state — File ▸ Revert to Open returns here"
+                                   : "Could not freeze the opened state — Revert to Open is unavailable",
+                                kind: ok ? .info : .warning)
+                    }
+                }
+            }
             if let url = fileURL {
                 #if os(macOS)
                 RecentProjects.note(url)
@@ -429,9 +447,9 @@ struct ContentView: View {
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
         // File ▸ Revert to Open / Revert to Last Save — nil (disabled) until frozen.
         .focusedSceneValue(\.revertToOpenAction,
-                           document.hasFrozenOpen ? { pendingRevert = .open } : nil)
+                           window.hasFrozenOpen ? { pendingRevert = .open } : nil)
         .focusedSceneValue(\.revertToLastSaveAction,
-                           document.hasFrozenLastSave ? { pendingRevert = .lastSave } : nil)
+                           window.hasFrozenLastSave ? { pendingRevert = .lastSave } : nil)
         .focusedSceneValue(\.optimizeHistoryAction, { Task { await document.optimizeHistory() } })
         .confirmationDialog(pendingRevert == .lastSave ? "Revert to Last Save?" : "Revert to Open?",
                             isPresented: Binding(get: { pendingRevert != nil },
@@ -439,7 +457,7 @@ struct ContentView: View {
                             titleVisibility: .visible,
                             presenting: pendingRevert) { point in
             Button(point == .open ? "Revert to Open" : "Revert to Last Save", role: .destructive) {
-                _ = document.revert(to: point)
+                _ = document.revert(to: point, from: window.chamber)
                 pendingRevert = nil
             }
             Button("Cancel", role: .cancel) { pendingRevert = nil }
@@ -6222,18 +6240,6 @@ struct AutosaveModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onAppear {
-                // Freeze Revert to Open BEFORE anything can autosave over it. The freeze is
-                // queued ahead of every write this session will make.
-                guard let fileURL, !document.hasFrozenOpen else { return }
-                let doc = document
-                document.cryochamber.freezeOpen(from: fileURL) { ok in
-                    DispatchQueue.main.async {
-                        doc.hasFrozenOpen = ok
-                        if !ok { doc.say("Could not freeze the opened state — Revert to Open is unavailable", kind: .warning) }
-                    }
-                }
-            }
             .alert("History Is Too Heavy", isPresented: $showWeightWarning) {
                 Button("Purge History", role: .destructive) { document.purgeHistory() }
                 Button("Cancel", role: .cancel) { }
@@ -6297,11 +6303,26 @@ struct AutosaveModifier: ViewModifier {
             url = r
         }
 
-        guard let data = try? document.encodedManifest() else { return }
-        PackageWriter.enqueue(data, to: url)
+        guard let data = try? document.encodedManifest() else {
+            document.say("Autosave could not encode the document — nothing written", kind: .warning)
+            return
+        }
+        let size = ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
+        let doc = document
+        document.say("Autosaving — \(size)…", kind: .save)
+        PackageWriter.enqueue(data, to: url) { error in
+            if let error {
+                doc.say("Autosave FAILED — \(error.localizedDescription)", kind: .warning)
+            } else {
+                doc.say("Autosaved — \(size)", kind: .save)
+            }
+        }
 
         if data.count > Self.weightWarningBytes {
-            if !weightWarned { weightWarned = true; showWeightWarning = true }
+            if !weightWarned {
+                weightWarned = true; showWeightWarning = true
+                document.say("History is over 250 MB — \(size)", kind: .warning)
+            }
         } else {
             weightWarned = false
         }
@@ -6392,7 +6413,7 @@ struct AboutView: View {
 /// this view: it is exactly the bug he found the same morning, where a rename changed
 /// the document, wrote nothing to history, and was then quietly undone by a step-back.
 struct StatusBar: View {
-    @ObservedObject var document: ImageDocument
+    @ObservedObject var window: DocumentWindow
 
     /// Fades the note back to "Ready" so a stale line never reads as live.
     @State private var faded = false
@@ -6405,20 +6426,20 @@ struct StatusBar: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: document.status?.systemImage ?? "circle.dashed")
+            Image(systemName: window.status?.systemImage ?? "circle.dashed")
                 .foregroundStyle(tint)
                 .font(.system(size: 12, weight: .semibold))
                 .frame(width: 16)
 
-            Text(document.status?.text ?? "Ready")
+            Text(window.status?.text ?? "Ready")
                 .font(.system(size: 12))
-                .foregroundStyle(document.status == nil || faded ? .secondary : .primary)
+                .foregroundStyle(window.status == nil || faded ? .secondary : .primary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 
             Spacer(minLength: 8)
 
-            if let note = document.status {
+            if let note = window.status {
                 Text(Self.clock.string(from: note.at))
                     .font(.system(size: 11).monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -6429,9 +6450,9 @@ struct StatusBar: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(white: 0.5).opacity(0.10))
         .contentShape(Rectangle())
-        .help(document.status?.text ?? "Ready")
-        .animation(.easeOut(duration: 0.15), value: document.status)
-        .onChange(of: document.status) { _, _ in
+        .help(window.status?.text ?? "Ready")
+        .animation(.easeOut(duration: 0.15), value: window.status)
+        .onChange(of: window.status) { _, _ in
             faded = false
             // Dim after a while rather than clearing: the last thing that happened is
             // still worth reading, it just stops claiming to be happening NOW.
@@ -6443,7 +6464,7 @@ struct StatusBar: View {
     }
 
     private var tint: Color {
-        switch document.status?.kind {
+        switch window.status?.kind {
         case .save:    .green
         case .warning: .orange
         case .info:    .secondary
