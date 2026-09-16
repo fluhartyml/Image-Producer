@@ -60,6 +60,21 @@ enum IconSetExport {
 
     // MARK: - Rendering
 
+    /// What a CLEAR floor becomes in an icon set — opaque white.
+    ///
+    /// ⚠️ ICON SET ONLY. Share, Export and PDF keep real transparency; they are not
+    /// bound by App Store Connect's rules and clearing a floor there is a legitimate way
+    /// to get a transparent PNG. Michael, 2026-09-15: clear is "alpha clear" on those
+    /// paths and white here.
+    ///
+    /// ⭐ AND THIS APP DOES NOT POLICE THE USER. Whether a white dark-icon is a good idea
+    /// is Apple's question and his — "we ar[e]nt on the app store connect tea[m] so its not
+    /// in our lane to have an opinion about a user deleting a dark layer and exporting an
+    /// icon set." The exporter's job is to be faithful and PREDICTABLE, not correct on the
+    /// user's behalf. What it must never do is invent a third answer of its own, which is
+    /// exactly what the old black was.
+    static let clearAsWhite = "#FFFFFF"
+
     /// A DETACHED copy of the document with exactly one background floor visible.
     ///
     /// Deliberately a copy rather than toggling the user's own layers: an export must
@@ -70,9 +85,29 @@ enum IconSetExport {
     /// would otherwise hand Xcode a rectangular PNG it will reject.
     static func render(_ appearance: IconAppearance, of document: ImageDocument) -> ImageDocument {
         var layers = document.layers
+        var floorIsLit = false
         for i in layers.indices {
-            guard case .background(let role, _) = layers[i].role else { continue }
-            layers[i].isVisible = (role == .light) == (appearance == .light)
+            guard case .background(let role, let fillHex) = layers[i].role else { continue }
+            let visible = (role == .light) == (appearance == .light)
+            layers[i].isVisible = visible
+            guard visible else { continue }
+            floorIsLit = true
+            // CLEAR MEANS WHITE IN AN ICON SET. His ruling, 2026-09-15: "if a dark layer
+            // is absent its color is white as in no color only so there are no alpha clear
+            // layers because app store connect rejects a photo that has an alpha layer
+            // even with no clear pixels."
+            if fillHex == nil { layers[i].setBackgroundFill(Self.clearAsWhite) }
+        }
+        // ...AND SO DOES A MISSING FLOOR. Deleting the Dark layer outright is the same
+        // authoring gesture as clearing it, so it has to reach the same result. Without
+        // this, a document with no Dark floor renders transparent and `stripAlpha` turns
+        // it BLACK — a value nobody chose, which looks plausible and ships broken.
+        // A white dark-icon is obviously wrong the moment it is seen. Loud beats plausible.
+        if !floorIsLit {
+            layers.insert(ImageLayer(name: appearance == .light ? "Light" : "Dark",
+                                     role: .background(appearance == .light ? .light : .dark,
+                                                       fillHex: Self.clearAsWhite)),
+                          at: 0)      // index 0 is the BOTTOM of the stack
         }
         return ImageDocument(name: document.name,
                              canvasWidth: document.canvasWidth,
