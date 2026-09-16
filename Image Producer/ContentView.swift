@@ -4672,6 +4672,16 @@ struct LayerPanel: View {
     /// saved, never sent to the document; closing a group changes nothing about the art.
     @State private var collapsedGroups: Set<String> = []
     @State private var draftName = ""
+    /// WHICH LAYERS ARE CHECKED. View state only — never saved, never in the document.
+    ///
+    /// ⭐ THE CHECKBOX IS THE SELECTION, not a second idea beside it. His question,
+    /// 2026-09-15: "merge selected or should the checkbox indicate the selected layer?"
+    /// Two competing notions of "chosen" on one list disagree constantly, so `activeLayerID`
+    /// is DERIVED from this: exactly one checked means that layer is active and every
+    /// existing tool works unchanged; two or more means nil, and single-layer tools go
+    /// quiet rather than guessing which one was meant.
+    @State private var checkedLayerIDs: Set<ImageLayer.ID> = []
+    @State private var mergeMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -4707,11 +4717,78 @@ struct LayerPanel: View {
             .listStyle(.plain)
             .environment(\.editMode, .constant(.active))
             #endif
+            mergeBar
+        }
+        .alert("Layers", isPresented: Binding(get: { mergeMessage != nil },
+                                              set: { if !$0 { mergeMessage = nil } })) {
+            Button("OK", role: .cancel) { mergeMessage = nil }
+        } message: {
+            Text(mergeMessage ?? "")
         }
         .alert("Rename Layer", isPresented: isRenaming) {
             TextField("Name", text: $draftName)
             Button("Cancel", role: .cancel) { renamingID = nil }
             Button("Rename") { commitRename() }
+        }
+    }
+
+    /// Check or uncheck one layer, keeping `activeLayerID` derived from the result.
+    ///
+    /// Exactly one checked -> that is the active layer, and every single-layer tool
+    /// behaves precisely as it did before this feature existed. Anything else -> nil, so
+    /// a tool that needs one layer has none rather than a silently arbitrary one.
+    private func toggleChecked(_ id: ImageLayer.ID) {
+        if checkedLayerIDs.contains(id) { checkedLayerIDs.remove(id) }
+        else { checkedLayerIDs.insert(id) }
+        syncActiveFromChecked()
+    }
+
+    private func syncActiveFromChecked() {
+        activeLayerID = checkedLayerIDs.count == 1 ? checkedLayerIDs.first : nil
+    }
+
+    /// Clicking a row still works and still means "just this one" — the checkbox is the
+    /// selection, so a plain click replaces the checked set rather than living beside it.
+    private func selectOnly(_ id: ImageLayer.ID) {
+        checkedLayerIDs = [id]
+        activeLayerID = id
+    }
+
+    /// Merge is the FIRST consumer of multi-select, not the reason for it. His framing,
+    /// 2026-09-15: "with the check [b]oxes we can do things like do one tool to all
+    /// checked layers." Every other tool can adopt the set later without this changing.
+    private func mergeChecked() {
+        mergeMessage = mergeLayers(checkedLayerIDs, in: document)
+        if mergeMessage == nil {
+            // Land on the result, which is what the user is now looking at.
+            if let newest = document.layers.last(where: { $0.name.contains("(Merged") }) {
+                selectOnly(newest.id)
+            } else {
+                checkedLayerIDs.removeAll()
+                activeLayerID = nil
+            }
+        }
+    }
+
+    /// Shown only when a multi-layer action is actually available.
+    @ViewBuilder private var mergeBar: some View {
+        if checkedLayerIDs.count >= 2 {
+            Divider()
+            HStack {
+                Text("\(checkedLayerIDs.count) checked")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Uncheck") { checkedLayerIDs.removeAll(); activeLayerID = nil }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                Button("Merge") { mergeChecked() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .help("Combine the checked layers into a new layer above them. The originals are kept, switched off.")
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
         }
     }
 
@@ -4728,6 +4805,9 @@ struct LayerPanel: View {
             LayerRow(
                 layer: layer,
                 isActive: layer.id == activeLayerID,
+                isCheckable: !layer.isBackgroundFloor,
+                isChecked: checkedLayerIDs.contains(layer.id),
+                onToggleCheck: { toggleChecked(layer.id) },
                 groupBase: collapsibleBase(for: layer, in: groups),
                 isCollapsed: collapsibleBase(for: layer, in: groups).map { collapsedGroups.contains($0) } ?? false,
                 hiddenCount: hiddenCount(for: layer, in: groups),
@@ -4736,7 +4816,7 @@ struct LayerPanel: View {
                     if collapsedGroups.contains(base) { collapsedGroups.remove(base) }
                     else { collapsedGroups.insert(base) }
                 },
-                onActivate: { activeLayerID = layer.id },
+                onActivate: { selectOnly(layer.id) },
                 onToggleVisibility: { toggleVisibility(layer.id) },
                 onRename: { beginRename(layer) },
                 onDuplicate: { duplicate(layer.id) },
@@ -4988,6 +5068,13 @@ struct LayerPanel: View {
 struct LayerRow: View {
     let layer: ImageLayer
     let isActive: Bool
+    /// ⛔ FALSE FOR LIGHT AND DARK. His rule, 2026-09-15: "keep the light and dark layers
+    /// un checkmarkable and exempt ecept for actually ed[it]ing the layer." They are
+    /// alternate renditions rather than a stack, so no multi-layer operation may ever
+    /// reach them. Removing the control is a stronger guard than disabling it.
+    var isCheckable: Bool = true
+    var isChecked: Bool = false
+    var onToggleCheck: () -> Void = {}
     /// Non-nil only on the TOP row of a collapsible run — that row owns the caret.
     var groupBase: String? = nil
     var isCollapsed: Bool = false
@@ -5002,6 +5089,24 @@ struct LayerRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            // THE CHECKBOX IS THE SELECTION — one idea, not two. Deliberately a SQUARE
+            // against the eye's round outline, because the row now carries two toggles
+            // that mean different things (selected vs visible) and two similar controls
+            // side by side get confused fast.
+            if isCheckable {
+                Button(action: onToggleCheck) {
+                    Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 15))
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(isChecked ? Color.accentColor : .secondary)
+                .help(isChecked ? "Uncheck this layer" : "Check this layer")
+            } else {
+                // Light and Dark keep the row aligned without offering the control.
+                Color.clear.frame(width: 22, height: 1)
+            }
             // THE REVEAL CARET. Only a run's top row gets one. It is a Button, not a tap
             // gesture on the row, so it cannot be swallowed by List selection on macOS or
             // by .onMove's drag — the same reason the row itself must not be a Button.

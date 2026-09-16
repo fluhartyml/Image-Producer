@@ -470,6 +470,18 @@ struct ImageLayer: Identifiable, Codable {
         }
     }
 
+    /// Is this one of the two icon FLOORS (Light / Dark)?
+    ///
+    /// ⚠️ ASK THIS, never re-derive it inline. Light and Dark are ALTERNATE RENDITIONS,
+    /// not a stack — `IconSetExport.render` shows exactly one by role — so no multi-layer
+    /// operation may ever include them. His rule, 2026-09-15: "keep the light and dark
+    /// layers un checkmarkable and exempt ecept for actually ed[it]ing the layer."
+    /// One accessor means one place to change if that rule ever moves.
+    var isBackgroundFloor: Bool {
+        if case .background = role { return true }
+        return false
+    }
+
     var isBlank: Bool {
         switch role {
         case .background(_, let fillHex): fillHex == nil
