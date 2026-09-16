@@ -60,20 +60,39 @@ enum IconSetExport {
 
     // MARK: - Rendering
 
-    /// What a CLEAR floor becomes in an icon set — opaque white.
+    /// What a CLEAR **or MISSING** floor becomes in an icon set.
     ///
-    /// ⚠️ ICON SET ONLY. Share, Export and PDF keep real transparency; they are not
-    /// bound by App Store Connect's rules and clearing a floor there is a legitimate way
-    /// to get a transparent PNG. Michael, 2026-09-15: clear is "alpha clear" on those
-    /// paths and white here.
+    /// ⭐ PER ROLE, and he arrived at this by reversing himself: white for Light, BLACK for
+    /// Dark. His first rule was white for both — "if a dark layer is absent its color is
+    /// white as in no color only" — and he changed it after the asymmetry was raised:
+    /// "you changed my mind on dark being black and not white as in no color."
     ///
-    /// ⭐ AND THIS APP DOES NOT POLICE THE USER. Whether a white dark-icon is a good idea
-    /// is Apple's question and his — "we ar[e]nt on the app store connect tea[m] so its not
-    /// in our lane to have an opinion about a user deleting a dark layer and exporting an
-    /// icon set." The exporter's job is to be faithful and PREDICTABLE, not correct on the
-    /// user's behalf. What it must never do is invent a third answer of its own, which is
-    /// exactly what the old black was.
-    static let clearAsWhite = "#FFFFFF"
+    /// **Why black is right for Dark:** a dark icon with a black floor is a PLAUSIBLE icon.
+    /// A dark icon with a WHITE floor is a glaring one. Both were defensible, and the
+    /// earlier argument here was that loud beats plausible — but that reasoning belongs to
+    /// a FAILURE, and this is not a failure. Leaving the Dark floor clear is a legitimate
+    /// way to say "black". Punishing it with a white icon would be the app second-guessing
+    /// the user, which is exactly what he ruled out: "we ar[e]nt on the app store connect
+    /// tea[m] so its not in our lane to have an opinion."
+    ///
+    /// ⚠️ ICON SET ONLY. Share, Export and PDF keep real transparency — they are not bound
+    /// by App Store Connect's rules, and clearing a floor there is a legitimate way to get
+    /// a transparent PNG. His split: clear is "alpha clear" on those paths, a real colour
+    /// here.
+    ///
+    /// ⚠️ AND IT IS THE EXPORT COPY ONLY. `render(_:of:)` works on a detached document, so
+    /// nothing here reaches his file. His words: "if it replaced a[nd] wrote it to the image
+    /// file that would be destructive."
+    ///
+    /// ⭐ WHAT IT MUST NEVER DO is invent a third answer of its own. The original code
+    /// rendered a clear floor transparent and then let `stripAlpha` flatten it to black —
+    /// a value nobody chose, arrived at by accident rather than by decision.
+    static func defaultFloorHex(for role: BackgroundRole) -> String {
+        switch role {
+        case .light: "#FFFFFF"
+        case .dark:  "#000000"
+        }
+    }
 
     /// A DETACHED copy of the document with exactly one background floor visible.
     ///
@@ -96,7 +115,7 @@ enum IconSetExport {
             // is absent its color is white as in no color only so there are no alpha clear
             // layers because app store connect rejects a photo that has an alpha layer
             // even with no clear pixels."
-            if fillHex == nil { layers[i].setBackgroundFill(Self.clearAsWhite) }
+            if fillHex == nil { layers[i].setBackgroundFill(Self.defaultFloorHex(for: role)) }
         }
         // ...AND SO DOES A MISSING FLOOR. Deleting the Dark layer outright is the same
         // authoring gesture as clearing it, so it has to reach the same result. Without
@@ -104,9 +123,9 @@ enum IconSetExport {
         // it BLACK — a value nobody chose, which looks plausible and ships broken.
         // A white dark-icon is obviously wrong the moment it is seen. Loud beats plausible.
         if !floorIsLit {
+            let role: BackgroundRole = appearance == .light ? .light : .dark
             layers.insert(ImageLayer(name: appearance == .light ? "Light" : "Dark",
-                                     role: .background(appearance == .light ? .light : .dark,
-                                                       fillHex: Self.clearAsWhite)),
+                                     role: .background(role, fillHex: Self.defaultFloorHex(for: role))),
                           at: 0)      // index 0 is the BOTTOM of the stack
         }
         return ImageDocument(name: document.name,
