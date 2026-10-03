@@ -132,10 +132,14 @@ struct ContentView: View {
         // ORDER MATTERS. A plain TapGesture still fires while modifiers are held, so the
         // most specific combination has to get first refusal — hence .exclusively(before:)
         // running shift+option, then option, then bare.
+        // Keyboard modifiers on a gesture are Mac-only; iPhone/iPad get the bare double-tap
+        // zoom and the pan (this is what kept the iOS target from compiling since Aug 24).
+        #if os(macOS)
         let reset = TapGesture(count: 2).modifiers([.option, .shift])
             .onEnded { applyZoom(1) }
         let out = TapGesture(count: 2).modifiers(.option)
             .onEnded { applyZoom(canvasZoom / doubleClickZoomFactor) }
+        #endif
         let inward = TapGesture(count: 2)
             .onEnded { applyZoom(canvasZoom * doubleClickZoomFactor) }
 
@@ -147,7 +151,11 @@ struct ContentView: View {
             }
             .onEnded { _ in panAtDragStart = canvasPan }
 
+        #if os(macOS)
         return SimultaneousGesture(pan, reset.exclusively(before: out).exclusively(before: inward))
+        #else
+        return SimultaneousGesture(pan, inward)
+        #endif
     }
 
     /// Where the zoom was before the last "all the way out", so the toggle can put it
@@ -2384,7 +2392,7 @@ struct FontPickerInspector: View {
         // layer as you touch it. Michael, 2026-10-03: "if i change font weight font size …
         // change the font type change tint whatever options are available should change
         // real time when the text layer and text tool inspectors are both chosen."
-        .onChange(of: family) { applyStyle() }
+        .onChange(of: family) { applyStyle(); pen.textFamily = family }
         .onChange(of: bold) { applyStyle() }
         .onChange(of: italic) { applyStyle() }
         .onChange(of: underline) { applyStyle() }
@@ -2392,7 +2400,9 @@ struct FontPickerInspector: View {
         .onChange(of: size) { applySize() }
         .onChange(of: outlineWidth) { applyStyle() }
         .onChange(of: outlineColor) { applyStyle() }
-        .onChange(of: tint) { applyStyle() }
+        .onChange(of: tint) { applyStyle(); pen.textTintHex = tint.hexString() }
+        // Canvas-click text starts with what this panel shows (see `PixelPen.textFamily`).
+        .onAppear { pen.textFamily = family; pen.textTintHex = tint.hexString() }
     }
 
     /// Write the controls' style onto the text layer being edited. One coalesced History
@@ -2743,7 +2753,7 @@ struct PenInspector: View {
                 }
                 .font(.system(size: 18))
                 .buttonStyle(.bordered)
-                Text("Save these 8 colors as a reusable brand palette, or load one into this icon.")
+                Text("Save these colors as a reusable brand palette, or load one into this icon.")
                     .font(.system(size: 18)).foregroundStyle(.secondary)
                 if paletteLoadFailed {
                     Text("Couldn't read that palette file.").font(.system(size: 18)).foregroundStyle(.red)
@@ -2769,6 +2779,15 @@ struct PenInspector: View {
                         .font(.system(size: 18)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                // DRAW / ERASE — the switch the code always expected and the UI never had.
+                // Mac right-click still erases for one stroke without flipping it.
+                Picker("Mode", selection: $pen.erasing) {
+                    Text("Draw").tag(false)
+                    Text("Erase").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
 
                 Toggle("Show grid", isOn: $pen.showGrid)
 
@@ -4521,7 +4540,9 @@ struct CanvasView: View {
     @MainActor private func startTextAt(_ n: CGPoint) {
         guard activeTool == .text else { return }
         var layer = ImageLayer(name: "Text", role: .content)
-        layer.setText("", fontName: "Helvetica", tintHex: pen.color.hexString() ?? "#000000")
+        // The Text panel's font and tint — it used to hard-code Helvetica and the pen color.
+        layer.setText("", fontName: pen.textFamily ?? "Helvetica",
+                      tintHex: pen.textTintHex ?? pen.color.hexString() ?? "#000000")
         layer.transform.center = CGPoint(x: min(max(n.x, 0), 1), y: min(max(n.y, 0), 1))
         document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
         activeLayerID = layer.id
@@ -4634,10 +4655,12 @@ struct CanvasView: View {
                 switch phase {
                 case .active(let loc):
                     if activeTool == .eraser, pen.eraserMode == .brush { brushHover = loc }
-                    if activeTool == .fill { bucketHover = loc; refreshBucketPreview(canvas: disp) }
+                    // Magic Lasso shares the hover preview (in red) — it used to be left out, so its
+                    // "hover first" instruction showed nothing.
+                    if activeTool == .fill || activeTool == .magicLasso { bucketHover = loc; refreshBucketPreview(canvas: disp) }
                 case .ended:
                     brushHover = nil
-                    if activeTool == .fill { bucketHover = nil; refreshBucketPreview(canvas: disp) }
+                    if activeTool == .fill || activeTool == .magicLasso { bucketHover = nil; refreshBucketPreview(canvas: disp) }
                 }
             }
             .onAppear {
@@ -5974,6 +5997,10 @@ final class PixelPen: ObservableObject {
     /// Draw vs Erase mode — driven by the on-screen Draw/Erase toggle (all platforms).
     /// Mac right-click erases momentarily without flipping this.
     @Published var erasing = false
+    /// The Text panel's current font and tint, so text started by clicking the canvas
+    /// matches the panel instead of Helvetica in the pen color. nil until the panel opens.
+    @Published var textFamily: String?
+    @Published var textTintHex: String?
     @Published var showGrid = true
     /// Eyedropper sample radius in pixels (0 = single pixel; >0 = averaged circle).
     @Published var eyedropperRadius: Int = 2

@@ -944,9 +944,12 @@ struct LayerInspector: View {
         if (source.blend ?? .normal) != .normal { applied.append((source.blend ?? .normal).title) }
         let suffix = applied.isEmpty ? "Applied" : applied.joined(separator: " + ")
 
+        // Strip EVERY effect label, not just Glow/Translucent — "(Green Key)" used to
+        // survive the strip, so keying twice gave "Background (Green Key) (Green Key)".
         var base = source.name
-        if let r = base.range(of: #" \((?:Glow|Translucent|Applied)(?: \+ [A-Za-z]+)*(?: \d+)?\)$"#,
-                              options: .regularExpression) {
+        let effect = "Glow|Translucent|Green Key|Gradient|Applied|Multiply|Screen|Overlay"
+        while let r = base.range(of: #" \((?:\#(effect))(?: \+ (?:\#(effect)))*(?: \d+)?\)$"#,
+                                 options: .regularExpression) {
             base.removeSubrange(r)
         }
         let taken = Set(document.layers.map(\.name))
