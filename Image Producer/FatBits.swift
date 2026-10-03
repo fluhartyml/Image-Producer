@@ -53,17 +53,17 @@ import SwiftUI
 struct ProductionThumbnail: View {
     @ObservedObject var document: ImageDocument
 
-    /// LONG-edge length in points. Not a zoom factor — a real size.
+    /// HEIGHT in points — fixed. Not a zoom factor — a real size.
     var side: CGFloat = 128
 
     /// THE PREVIEW TAKES THE CANVAS'S SHAPE. Michael, 2026-10-03, on a 1500 × 500
-    /// banner: "the preview should mirror the canvas shape and not get letterbox."
-    /// It was always square — right for an icon, wrong for everything else.
+    /// banner: "the preview should mirror the canvas shape and not get letterbox" —
+    /// then "the height should remain the same where the width increases." So the
+    /// height is always `side` and only the width follows the canvas: a 3:1 banner is
+    /// three times as wide, a square icon is unchanged, a tall poster is narrower.
     static func fitted(_ canvas: CGSize, side: CGFloat) -> CGSize {
         guard canvas.width > 0, canvas.height > 0 else { return CGSize(width: side, height: side) }
-        return canvas.width >= canvas.height
-            ? CGSize(width: side, height: (side * canvas.height / canvas.width).rounded())
-            : CGSize(width: (side * canvas.width / canvas.height).rounded(), height: side)
+        return CGSize(width: (side * canvas.width / canvas.height).rounded(), height: side)
     }
 
     private var size: CGSize { Self.fitted(document.canvasPixelSize, side: side) }
