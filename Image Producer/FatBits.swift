@@ -53,17 +53,20 @@ import SwiftUI
 struct ProductionThumbnail: View {
     @ObservedObject var document: ImageDocument
 
-    /// HEIGHT in points — fixed. Not a zoom factor — a real size.
+    /// The SHORT edge in points — fixed. Not a zoom factor — a real size.
     var side: CGFloat = 128
 
-    /// THE PREVIEW TAKES THE CANVAS'S SHAPE. Michael, 2026-10-03, on a 1500 × 500
-    /// banner: "the preview should mirror the canvas shape and not get letterbox" —
-    /// then "the height should remain the same where the width increases." So the
-    /// height is always `side` and only the width follows the canvas: a 3:1 banner is
-    /// three times as wide, a square icon is unchanged, a tall poster is narrower.
+    /// THE PREVIEW TAKES THE CANVAS'S SHAPE, AND ONLY EVER GROWS. Michael, 2026-10-03,
+    /// on a 1500 × 500 banner: "the preview should mirror the canvas shape and not get
+    /// letterbox" → "the height should remain the same where the width increases" →
+    /// "the width should never decrease … if the canvas turns out to be higher than
+    /// wider." So the SHORT edge is always `side` and the long edge grows: a 3:1 banner
+    /// is three times as wide, a 1:3 poster three times as tall, a square unchanged.
     static func fitted(_ canvas: CGSize, side: CGFloat) -> CGSize {
         guard canvas.width > 0, canvas.height > 0 else { return CGSize(width: side, height: side) }
-        return CGSize(width: (side * canvas.width / canvas.height).rounded(), height: side)
+        return canvas.width >= canvas.height
+            ? CGSize(width: (side * canvas.width / canvas.height).rounded(), height: side)
+            : CGSize(width: side, height: (side * canvas.height / canvas.width).rounded())
     }
 
     private var size: CGSize { Self.fitted(document.canvasPixelSize, side: side) }
