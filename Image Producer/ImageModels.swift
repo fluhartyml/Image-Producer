@@ -43,6 +43,9 @@ final class ImageDocument: ObservableObject {
     @Published var canvasHeight: Int
     /// Pixel size as a CGSize — the export / render reference.
     var canvasPixelSize: CGSize { CGSize(width: canvasWidth, height: canvasHeight) }
+    /// The canvas size as History last saw it — recorded or restored. The Canvas panel
+    /// records a "Canvas Size" step only when the live size differs from this.
+    var historyCanvasSize: CGSize?
 
     /// Where a NEW layer goes: directly above the selected one. Michael, 2026-10-03: "when
     /// i am on a selected layer and i choose a tool that makes a new layer like text, i want
@@ -259,7 +262,9 @@ extension ImageDocument {
     /// Encode the current layer stack as a `DocumentSnapshot`.
     private func encodedSnapshot() -> Data? {
         let store = BlobStore(history.blobs ?? [:])
-        let data = try? BlobCoding.encoder(store).encode(DocumentSnapshot(layers: layers))
+        let data = try? BlobCoding.encoder(store).encode(
+            DocumentSnapshot(layers: layers, canvasWidth: canvasWidth, canvasHeight: canvasHeight))
+        historyCanvasSize = canvasPixelSize
         if store.added { history.blobs = store.blobs }
         return data
     }
@@ -323,13 +328,18 @@ extension ImageDocument {
         historyCursor = .latest
     }
 
-    /// Restore a snapshot's layer stack onto the live document (leaves non-history state —
-    /// name, canvas size, palette, crop, ppi, print setup — untouched).
+    /// Restore a snapshot's layer stack — and, for steps that stored it, the canvas size —
+    /// onto the live document. Name, palette, crop, ppi and print setup stay untouched.
     private func restore(_ data: Data?) {
         guard let data,
               let snap = try? BlobCoding.decoder(BlobStore(history.blobs ?? [:]))
                   .decode(DocumentSnapshot.self, from: data) else { return }
         layers = snap.layers
+        if let w = snap.canvasWidth, let h = snap.canvasHeight {
+            historyCanvasSize = CGSize(width: w, height: h)   // set FIRST: the watcher compares to it
+            canvasWidth = w
+            canvasHeight = h
+        }
     }
 
     /// True while VIEWING a past state (not at the newest committed point). Autosave is
@@ -1228,6 +1238,11 @@ nonisolated enum BlobCoding {
 /// reverts). Reversing an action = replacing `document.layers` with this.
 struct DocumentSnapshot: Codable {
     var layers: [ImageLayer]
+    /// The canvas size at this step (2026-10-03), so restoring a step after a canvas
+    /// resize puts the size back too. nil in steps recorded before then — they leave the
+    /// size alone, as every step used to.
+    var canvasWidth: Int? = nil
+    var canvasHeight: Int? = nil
 }
 
 /// Where the History panel is currently VIEWING (see `ImageDocument.historyCursor`).

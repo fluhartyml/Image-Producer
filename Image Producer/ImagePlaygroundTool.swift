@@ -220,6 +220,7 @@ struct ImagePlaygroundInspector: View {
         // cannot reach the layer, which is why the prompt is typed in this inspector.
         let drawn = prompt
         document.say("Image Playground — placed a new layer", kind: .edit)
+        document.captureHistoryBaselineIfNeeded()
 
         // SELECTING AN EMPTY LAYER IS AN INSTRUCTION. Michael, 2026-08-22, while
         // building the Shell Citadel icon: he selected "Background", asked Image
@@ -238,6 +239,8 @@ struct ImagePlaygroundInspector: View {
             layer.setImage(png)
             layer.transform = document.coveringTransform(forPNG: png)
             document.layers.insert(layer, at: i + 1)   // directly above the empty slot
+            document.recordHistory(toolID: Tool.imagePlayground.rawValue, groupTitle: Tool.imagePlayground.title,
+                                   actionLabel: "New Layer", layerID: layer.id)
             return
         }
 
@@ -246,6 +249,8 @@ struct ImagePlaygroundInspector: View {
         layer.transform = document.coveringTransform(forPNG: png)
         // Above the selected layer, like every tool that makes one (Michael, 2026-10-03).
         document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
+        document.recordHistory(toolID: Tool.imagePlayground.rawValue, groupTitle: Tool.imagePlayground.title,
+                               actionLabel: "New Layer", layerID: layer.id)
     }
 
     /// "Background · a teal safe" — the slot it fills, then what made it.
@@ -285,7 +290,10 @@ struct ImagePlaygroundInspector: View {
         } else {
             t.contentAspect = ImageDocument.pixelAspect(ofPNG: png) ?? t.contentAspect
         }
-        document.addResultLayer(png, above: i, nameSuffix: "Image Playground edit", transform: t)
+        document.captureHistoryBaselineIfNeeded()
+        let newID = document.addResultLayer(png, above: i, nameSuffix: "Image Playground edit", transform: t)
+        document.recordHistory(toolID: Tool.imagePlayground.rawValue, groupTitle: Tool.imagePlayground.title,
+                               actionLabel: "Restyle", layerID: newID)
     }
 
     /// The sheet hands back a file URL to the generated image (not necessarily PNG);

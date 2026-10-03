@@ -1481,9 +1481,23 @@ struct CanvasInspector: View {
                                : "Nothing imported — \(url.lastPathComponent) had no readable pages",
                          kind: n > 0 ? .edit : .warning)
         }
-        .onAppear { draftName = displayName }
+        .onAppear {
+            draftName = displayName
+            // The pre-change state, so the first size change has an "Original" to go back to.
+            document.captureHistoryBaselineIfNeeded()
+        }
         .onChange(of: document.name) { draftName = displayName }
         .onChange(of: fileURL) { draftName = displayName; renameError = false }
+        // CANVAS SIZE IS A HISTORY STEP — every path that changes it (Pixels fields,
+        // Landscape, the three preset menus) lands here. Typing a number coalesces into one
+        // step. A History restore sets the size it stored, which matches
+        // `historyCanvasSize`, so viewing the past never records itself as a new edit.
+        .onChange(of: document.canvasPixelSize) {
+            guard !document.isViewingHistory,
+                  document.canvasPixelSize != document.historyCanvasSize else { return }
+            document.recordHistory(toolID: Tool.canvas.rawValue, groupTitle: Tool.canvas.title,
+                                   actionLabel: "Canvas Size", layerID: nil, coalesce: true)
+        }
     }
 
     @ViewBuilder private func attrRow(_ label: String, _ value: String) -> some View {
@@ -4544,8 +4558,11 @@ struct CanvasView: View {
         layer.setText("", fontName: pen.textFamily ?? "Helvetica",
                       tintHex: pen.textTintHex ?? pen.color.hexString() ?? "#000000")
         layer.transform.center = CGPoint(x: min(max(n.x, 0), 1), y: min(max(n.y, 0), 1))
+        document.captureHistoryBaselineIfNeeded()
         document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
         activeLayerID = layer.id
+        document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
+                               actionLabel: "New Text Layer", layerID: layer.id)
     }
 
     var body: some View {

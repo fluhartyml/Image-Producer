@@ -484,7 +484,10 @@ struct EraserInspector: View {
               let out = pngData(from: masked) else { failed = true; return }
         // Non-destructive: the masked result goes on a new layer above; the original
         // (with its background) is hidden, not overwritten — there's no undo.
-        document.addResultLayer(out, above: idx, nameSuffix: "erased")
+        document.captureHistoryBaselineIfNeeded()
+        let newID = document.addResultLayer(out, above: idx, nameSuffix: "erased")
+        document.recordHistory(toolID: Tool.eraser.rawValue, groupTitle: Tool.eraser.title,
+                               actionLabel: "Erase Color", layerID: newID)
     }
 }
 
