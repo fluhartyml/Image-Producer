@@ -53,18 +53,29 @@ import SwiftUI
 struct ProductionThumbnail: View {
     @ObservedObject var document: ImageDocument
 
-    /// Side length in points. Not a zoom factor — a real size.
+    /// LONG-edge length in points. Not a zoom factor — a real size.
     var side: CGFloat = 128
+
+    /// THE PREVIEW TAKES THE CANVAS'S SHAPE. Michael, 2026-10-03, on a 1500 × 500
+    /// banner: "the preview should mirror the canvas shape and not get letterbox."
+    /// It was always square — right for an icon, wrong for everything else.
+    static func fitted(_ canvas: CGSize, side: CGFloat) -> CGSize {
+        guard canvas.width > 0, canvas.height > 0 else { return CGSize(width: side, height: side) }
+        return canvas.width >= canvas.height
+            ? CGSize(width: side, height: (side * canvas.height / canvas.width).rounded())
+            : CGSize(width: (side * canvas.width / canvas.height).rounded(), height: side)
+    }
+
+    private var size: CGSize { Self.fitted(document.canvasPixelSize, side: side) }
 
     var body: some View {
         ZStack {
             // The app's existing transparency checkerboard. An icon's alpha is
             // not a detail, it is most of the design.
             Checkerboard(squareSize: max(3, side / 16))
-            ImageCompositeView(document: document,
-                               size: CGSize(width: side, height: side))
+            ImageCompositeView(document: document, size: size)
         }
-        .frame(width: side, height: side)
+        .frame(width: size.width, height: size.height)
         .clipped()
         .overlay(Rectangle().stroke(.secondary.opacity(0.35), lineWidth: 1))
         .accessibilityLabel("Production icon preview at \(Int(side)) points")
@@ -176,18 +187,18 @@ enum PiPCorner: Int, CaseIterable {
     case topLeading, topTrailing, bottomLeading, bottomTrailing
 
     /// Centre point for a panel of `size` inside `bounds`, with a margin.
-    func point(in bounds: CGSize, panel: CGFloat, margin: CGFloat = 16) -> CGPoint {
-        let half = panel / 2 + margin
+    func point(in bounds: CGSize, panel: CGSize, margin: CGFloat = 16) -> CGPoint {
+        let hx = panel.width / 2 + margin, hy = panel.height / 2 + margin
         switch self {
-        case .topLeading:     return CGPoint(x: half, y: half)
-        case .topTrailing:    return CGPoint(x: bounds.width - half, y: half)
-        case .bottomLeading:  return CGPoint(x: half, y: bounds.height - half)
-        case .bottomTrailing: return CGPoint(x: bounds.width - half, y: bounds.height - half)
+        case .topLeading:     return CGPoint(x: hx, y: hy)
+        case .topTrailing:    return CGPoint(x: bounds.width - hx, y: hy)
+        case .bottomLeading:  return CGPoint(x: hx, y: bounds.height - hy)
+        case .bottomTrailing: return CGPoint(x: bounds.width - hx, y: bounds.height - hy)
         }
     }
 
     /// The corner nearest an arbitrary point — where a drag should land.
-    static func nearest(to p: CGPoint, in bounds: CGSize, panel: CGFloat) -> PiPCorner {
+    static func nearest(to p: CGPoint, in bounds: CGSize, panel: CGSize) -> PiPCorner {
         allCases.min(by: { a, b in
             let pa = a.point(in: bounds, panel: panel), pb = b.point(in: bounds, panel: panel)
             return hypot(pa.x - p.x, pa.y - p.y) < hypot(pb.x - p.x, pb.y - p.y)
@@ -213,7 +224,12 @@ struct ProductionPiP: View {
 
     private var side: CGFloat { CGFloat(storedSide) }
     private var corner: PiPCorner { PiPCorner(rawValue: cornerRaw) ?? .bottomLeading }
-    private var home: CGPoint { corner.point(in: bounds, panel: side) }
+    /// The panel as drawn: the canvas-shaped thumbnail plus its 8-pt padding.
+    private var panel: CGSize {
+        let t = ProductionThumbnail.fitted(document.canvasPixelSize, side: side)
+        return CGSize(width: t.width + 16, height: t.height + 16)
+    }
+    private var home: CGPoint { corner.point(in: bounds, panel: panel) }
 
     var body: some View {
         // NO CAPTION, and his reasoning is the point — Michael, 2026-08-24:
@@ -240,7 +256,7 @@ struct ProductionPiP: View {
                 .onEnded { v in
                     let dropped = CGPoint(x: home.x + v.translation.width,
                                           y: home.y + v.translation.height)
-                    let target = PiPCorner.nearest(to: dropped, in: bounds, panel: side)
+                    let target = PiPCorner.nearest(to: dropped, in: bounds, panel: panel)
                     // Snap: zero the offset and change corner in one animation, so it
                     // flies to the corner rather than jumping.
                     withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
