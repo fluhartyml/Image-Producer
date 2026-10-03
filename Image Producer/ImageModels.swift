@@ -1508,6 +1508,9 @@ extension ImageDocument {
 /// Per-frame data — `CameraFrame`, exposure counts — DOES belong on the document, because
 /// that is the film.
 final class CameraState: ObservableObject {
+    /// Bumped each time a capture lands on the clipboard; the window's "Copied" popup
+    /// watches it. A counter, not a Bool, so two captures in a row both flash.
+    @Published var copiedFlash = 0
     // ── What a press captures
     /// Off by default, so a plain first press gives a transparent stamp of just the art.
     /// The Light/Dark layers are a PREVIEW CONTROL, not artwork, so baking whichever one

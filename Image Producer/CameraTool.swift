@@ -119,9 +119,42 @@ func captureCameraFrame(_ document: ImageDocument, camera: CameraState,
     // line — his ruling, 2026-10-03. Said last, after recordHistory, so it is the line
     // left showing.
     if copied {
+        camera.copiedFlash += 1
         document.say("Camera capture copied to the clipboard", kind: .info)
     } else {
         document.say("Camera capture could not be copied to the clipboard", kind: .warning)
+    }
+}
+
+/// The brief "Copied" popup over the window. Michael, 2026-10-03: "it should do a
+/// brief popup that says copied and then disapears" — the status line alone was missed,
+/// because the autosave's own note replaced it a moment later.
+struct CopiedPopup: View {
+    let trigger: Int
+    @State private var showing = false
+    @State private var hide: Task<Void, Never>?
+
+    var body: some View {
+        ZStack {
+            if showing {
+                Label("Copied", systemImage: "doc.on.clipboard")
+                    .font(.system(size: 18, weight: .semibold))
+                    .padding(.horizontal, 18).padding(.vertical, 10)
+                    .background(.regularMaterial, in: Capsule())
+                    .shadow(radius: 8)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+        }
+        .allowsHitTesting(false)
+        .onChange(of: trigger) { _, _ in
+            withAnimation(.easeOut(duration: 0.15)) { showing = true }
+            hide?.cancel()
+            hide = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.2))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeIn(duration: 0.3)) { showing = false }
+            }
+        }
     }
 }
 

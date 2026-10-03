@@ -277,6 +277,7 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             editorBody
+                .overlay { CopiedPopup(trigger: camera.copiedFlash) }
             Divider()
             // THE STATUS LINE — his ask, 2026-09-06. Outside every layout branch on
             // purpose: focus mode, phone, portrait and wide all get the same bar in
