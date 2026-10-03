@@ -58,7 +58,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .colorPalette: "Color Palette"
         case .move:       "Move / Transform"
         case .mask:       "Mask"
-        case .fill:       "Paint Bucket"
+        case .fill:       "Paint Drop / Bucket"   // his name, 2026-10-03
         case .pen:        "Pen (Pixels)"
         case .eraser:     "Eraser"
         case .eyedropper: "Eyedropper"
