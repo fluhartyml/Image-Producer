@@ -2478,7 +2478,7 @@ struct FontPickerInspector: View {
             layer.transform.center = CGPoint(x: prev.x, y: min(prev.y + 0.18, 0.95))
             lastLineCenter = nil
         }
-        document.layers.append(layer)
+        document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
         currentTextLayerID = layer.id
         textInput = draft
         document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
@@ -2588,8 +2588,7 @@ struct ImageImportInspector: View {
         layer.nameLinkedToText = false   // the name is the file's, not a text mirror
         document.captureHistoryBaselineIfNeeded()
         // Directly above the selected layer — where the user is working — or on top.
-        let at = activeIndex.map { $0 + 1 } ?? document.layers.count
-        document.layers.insert(layer, at: at)
+        document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
         activeLayerID = layer.id
         document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
                                actionLabel: "Import \(layer.name)", layerID: layer.id)
@@ -4486,7 +4485,7 @@ struct CanvasView: View {
         var layer = ImageLayer(name: "Text", role: .content)
         layer.setText("", fontName: "Helvetica", tintHex: pen.color.hexString() ?? "#000000")
         layer.transform.center = CGPoint(x: min(max(n.x, 0), 1), y: min(max(n.y, 0), 1))
-        document.layers.append(layer)
+        document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
         activeLayerID = layer.id
     }
 
@@ -4639,7 +4638,7 @@ struct CanvasView: View {
                 // pixel layer at the chosen resolution rather than altering the old art.
                 if let i = activeIndex, document.layers[i].pixelData != nil {
                     let layer = ImageLayer(name: "Pixels @\(pen.resolution)", role: .content)
-                    document.layers.append(layer)
+                    document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
                     activeLayerID = layer.id
                 }
                 pen.load(nil)   // fresh blank bitmap at the new resolution
@@ -5370,11 +5369,11 @@ struct LayerPanel: View {
                                layerID: id)
     }
 
-    /// L3 — add a new blank content layer on TOP of the stack, and select it.
+    /// L3 — add a new blank content layer ABOVE the selected one (top if none), and select it.
     private func addLayer() {
         let layer = ImageLayer(name: "Layer \(document.layers.count + 1)", role: .content)
         document.captureHistoryBaselineIfNeeded()
-        document.layers.append(layer)          // end of array = top of the visual stack
+        document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
         activeLayerID = layer.id
         document.recordHistory(toolID: "layers", groupTitle: "Layers",
                                actionLabel: "Add \(layer.name)", layerID: layer.id)

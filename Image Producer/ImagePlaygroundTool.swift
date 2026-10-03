@@ -244,7 +244,8 @@ struct ImagePlaygroundInspector: View {
         var layer = ImageLayer(name: layerName(from: drawn), role: .content)
         layer.setImage(png)
         layer.transform = document.coveringTransform(forPNG: png)
-        document.layers.append(layer)   // end of array = top of the visual stack
+        // Above the selected layer, like every tool that makes one (Michael, 2026-10-03).
+        document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
     }
 
     /// "Background · a teal safe" — the slot it fills, then what made it.

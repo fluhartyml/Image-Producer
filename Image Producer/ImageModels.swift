@@ -43,6 +43,18 @@ final class ImageDocument: ObservableObject {
     @Published var canvasHeight: Int
     /// Pixel size as a CGSize — the export / render reference.
     var canvasPixelSize: CGSize { CGSize(width: canvasWidth, height: canvasHeight) }
+
+    /// Where a NEW layer goes: directly above the selected one. Michael, 2026-10-03: "when
+    /// i am on a selected layer and i choose a tool that makes a new layer like text, i want
+    /// it to create the new layer above the selected layer." Nothing selected → the top.
+    /// Never between the Light / Dark floors, which are renditions, not a stack.
+    func newLayerIndex(above selected: ImageLayer.ID?) -> Int {
+        let afterFloors = (layers.lastIndex(where: { $0.isBackgroundFloor }) ?? -1) + 1
+        guard let id = selected, let i = layers.firstIndex(where: { $0.id == id }) else {
+            return layers.count
+        }
+        return max(i + 1, afterFloors)
+    }
     /// Bottom-to-top draw order.
     @Published var layers: [ImageLayer]
     /// The 8-slot brand palette (hex), saved WITH the document so it travels per-project.
