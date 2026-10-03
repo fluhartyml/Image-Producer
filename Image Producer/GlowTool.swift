@@ -371,9 +371,10 @@ struct LayerInspector: View {
     @ObservedObject var document: ImageDocument
     var activeLayerID: ImageLayer.ID?
 
-    /// Which layer is being dressed. Starts on the active layer and can be pointed
-    /// anywhere — his spec: "user picks the layer and the color or colrs."
-    @State private var targetID: ImageLayer.ID?
+    /// Which layer is being dressed: ALWAYS the one selected in the Layers list. There
+    /// was a Layer picker here; once it followed the selection it only repeated the
+    /// header — Michael, 2026-10-03: "that layer picker is redundant if the layer you
+    /// choose is what also changes the picker" → "yes remove the picker".
     @State private var showTranslucent = false
     @State private var showGlow = false
     @State private var showGreenKey = false
@@ -381,7 +382,7 @@ struct LayerInspector: View {
     @State private var showBlend = false
 
     private var targetIndex: Int? {
-        guard let id = targetID ?? activeLayerID else { return nil }
+        guard let id = activeLayerID else { return nil }
         return document.layers.firstIndex(where: { $0.id == id })
     }
 
@@ -394,11 +395,6 @@ struct LayerInspector: View {
     /// rather than a halo. That is what it looks like, not a reason to forbid it.
     private var dressableLayers: [ImageLayer] { document.layers }
 
-    private var targetSelection: Binding<ImageLayer.ID?> {
-        Binding(get: { self.targetID ?? self.activeLayerID ?? self.dressableLayers.first?.id },
-                set: { self.targetID = $0 })
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -408,7 +404,6 @@ struct LayerInspector: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } else {
-                    layerPicker
                     if let i = targetIndex, document.layers.indices.contains(i) {
                         Divider()
                         translucentReveal(i)
@@ -420,15 +415,6 @@ struct LayerInspector: View {
                 }
             }
             .padding(14)
-        }
-        // THE PICKER FOLLOWS THE SELECTION — every time, not just the first. Michael,
-        // 2026-10-03: "glow isnt working" — he had selected Stars, but the picker was
-        // still on Light from earlier, so the glow went onto a full-canvas white layer
-        // with no edge to show. Picking from the menu still overrides, until the next
-        // selection.
-        .onAppear { if let id = activeLayerID { targetID = id } }
-        .onChange(of: activeLayerID) { _, new in
-            if let new { targetID = new }
         }
     }
 
@@ -459,19 +445,6 @@ struct LayerInspector: View {
             || (layer.greenKey?.isEnabled ?? false)
             || (layer.gradient?.isEnabled ?? false)
             || (layer.blend ?? .normal) != .normal
-    }
-
-    private var layerPicker: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Layer").font(.subheadline).foregroundStyle(.secondary)
-            Picker("Layer", selection: targetSelection) {
-                ForEach(dressableLayers) { layer in
-                    Text(layer.name).tag(Optional(layer.id))
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-        }
     }
 
     // MARK: Child — Translucent
@@ -1003,6 +976,5 @@ struct LayerInspector: View {
                                actionLabel: "Apply \(suffix) — \(candidate(n))",
                                layerID: bakedID)
 
-        targetID = bakedID
     }
 }
