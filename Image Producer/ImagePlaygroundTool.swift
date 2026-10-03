@@ -34,8 +34,6 @@
 
 import SwiftUI
 import ImagePlayground
-import ImageIO
-import os
 
 /// Tool #11's inspector — a prompt box + Make/Restyle buttons that seed Apple's sheet.
 struct ImagePlaygroundInspector: View {
@@ -215,12 +213,12 @@ struct ImagePlaygroundInspector: View {
             return
         }
         failed = false
-        // NAME THE LAYER FOR WHAT IT WAS TASKED WITH DRAWING. Michael, 2026-10-03: the
-        // sheet said "illuminated B" and the layer came out "AI Image", because our own
-        // prompt box was empty — he had typed in Apple's sheet instead. The sheet returns
-        // only a file URL, never its text, so the file's own metadata is the one place
-        // the sheet's prompt could survive. Read it first; our box is the fallback.
-        let drawn = promptFromSheetFile(url) ?? prompt
+        // THE NAME COMES FROM OUR BOX, NEVER FROM APPLE'S SHEET. Measured 2026-10-03:
+        // the sheet returns only a file URL, and the HEIC it writes carries no prompt —
+        // just "Apple Image Playground" as credit and an IPTC trainedAlgorithmicMedia
+        // tag, under a generic name (PlaygroundImage2-….heic). Text typed in the sheet
+        // cannot reach the layer, which is why the prompt is typed in this inspector.
+        let drawn = prompt
         document.say("Image Playground — placed a new layer", kind: .edit)
 
         // SELECTING AN EMPTY LAYER IS AN INSTRUCTION. Michael, 2026-08-22, while
@@ -251,8 +249,7 @@ struct ImagePlaygroundInspector: View {
 
     /// "Background · a teal safe" — the slot it fills, then what made it.
     private func slotLayerName(slot: String, drawn: String) -> String {
-        let t = drawn.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.isEmpty ? "\(slot) · SI" : "\(slot) · \(String(t.prefix(18)))"
+        "\(slot) · \(Self.fewWords(drawn) ?? "Image Playground")"
     }
 
     /// Filter result -> NON-DESTRUCTIVE: the AI edit lands on a new layer above the
@@ -287,7 +284,7 @@ struct ImagePlaygroundInspector: View {
         } else {
             t.contentAspect = ImageDocument.pixelAspect(ofPNG: png) ?? t.contentAspect
         }
-        document.addResultLayer(png, above: i, nameSuffix: "SI edit", transform: t)
+        document.addResultLayer(png, above: i, nameSuffix: "Image Playground edit", transform: t)
     }
 
     /// The sheet hands back a file URL to the generated image (not necessarily PNG);
@@ -297,69 +294,24 @@ struct ImagePlaygroundInspector: View {
         return pngData(fromImageData: raw)
     }
 
-    /// Auto-name a new layer from its prompt (content names the layer).
-    /// "SI", not "AI" — Michael, 2026-10-03: "it has officially been renmed super
-    /// intellegence and is no longer called artificial intellegence."
+    /// Auto-name a new layer from its prompt (content names the layer) — a few words,
+    /// not the whole sentence. Michael, 2026-10-03: "it should use a few words and not
+    /// the whole sentence for the layer name." Falls back to the tool's own name
+    /// ("spell out Apple i or image playground") — never "AI".
     private func layerName(from prompt: String) -> String {
-        let t = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.isEmpty ? "SI Image" : String(t.prefix(24))
+        Self.fewWords(prompt) ?? "Image Playground"
     }
 
-    // MARK: - Diagnostic: does the sheet's file carry its prompt?
-
-    private static let diagLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ImageProducer",
-                                        category: "PlaygroundDiag")
-
-    /// DIAGNOSTIC (2026-10-03). Dumps every string in the returned file's metadata to
-    /// the system log (category `PlaygroundDiag`) and reports the verdict on the status
-    /// bar, then returns the prompt if one of the caption/description/title fields
-    /// holds it. Remove the dump once the answer is known; keep the lookup if it works.
-    private func promptFromSheetFile(_ url: URL) -> String? {
-        let log = Self.diagLog
-        log.notice("file name: \(url.lastPathComponent, privacy: .public)")
-        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-            log.notice("could not open the file as an image")
-            document.say("Diagnostic: could not read the file's metadata", kind: .warning)
-            return nil
+    /// "a vase of sunflowers, no background" -> "vase of sunflowers": the first clause,
+    /// a leading article dropped, at most three words. nil when nothing is left.
+    static func fewWords(_ prompt: String, max: Int = 3) -> String? {
+        let clause = prompt.split(whereSeparator: { ",.;:!?\n".contains($0) })
+            .first.map(String.init) ?? ""
+        var words = clause.split(whereSeparator: \.isWhitespace).map(String.init)
+        if let first = words.first, ["a", "an", "the"].contains(first.lowercased()), words.count > 1 {
+            words.removeFirst()
         }
-        log.notice("type: \((CGImageSourceGetType(src) as String?) ?? "?", privacy: .public)")
-
-        var found: [(String, String)] = []
-        func walk(_ value: Any, _ path: String) {
-            if let d = value as? [String: Any] {
-                for (k, v) in d { walk(v, path.isEmpty ? k : "\(path).\(k)") }
-            } else if let a = value as? [Any] {
-                for (n, v) in a.enumerated() { walk(v, "\(path)[\(n)]") }
-            } else if let str = value as? String {
-                found.append((path, str))
-            }
-        }
-        if let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any] {
-            walk(props, "")
-        }
-        if let meta = CGImageSourceCopyMetadataAtIndex(src, 0, nil),
-           let tags = CGImageMetadataCopyTags(meta) as? [CGImageMetadataTag] {
-            for tag in tags {
-                let name = (CGImageMetadataTagCopyName(tag) as String?) ?? "?"
-                let prefix = (CGImageMetadataTagCopyPrefix(tag) as String?) ?? "?"
-                if let v = CGImageMetadataTagCopyValue(tag) { walk(v, "XMP \(prefix):\(name)") }
-            }
-        }
-        for (path, value) in found {
-            log.notice("\(path, privacy: .public) = \(value, privacy: .public)")
-        }
-
-        // Fields a prompt would plausibly live in, best first.
-        let wanted = ["caption", "description", "title", "objectname", "usercomment", "comment", "subject"]
-        let hit = wanted.lazy.compactMap { key in
-            found.first { $0.0.lowercased().contains(key) && !$0.1.trimmingCharacters(in: .whitespaces).isEmpty }
-        }.first
-
-        if let hit {
-            document.say("Diagnostic: prompt found in \(hit.0) — \"\(hit.1)\"", kind: .edit)
-            return hit.1
-        }
-        document.say("Diagnostic: no prompt in the file (\(found.count) text fields) — name is \(url.lastPathComponent)", kind: .warning)
-        return nil
+        let few = words.prefix(max).joined(separator: " ")
+        return few.isEmpty ? nil : few
     }
 }
