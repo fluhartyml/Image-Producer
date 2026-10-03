@@ -2215,19 +2215,22 @@ struct FontPickerInspector: View {
             // Starting text is unusual, so the initiator is line #1 and prominent (Michael
             // 2026-06-22). Primary way: tap the canvas to start text there; this button is the
             // explicit alternative and always creates a fresh layer.
-            Button { newText() } label: {
-                Label("New Text Layer", systemImage: "plus.rectangle").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            Text("Tap the canvas to start text there — or tap this. Then type below.")
-                .font(.system(size: 18)).foregroundStyle(.secondary)
-
+            // TYPE FIRST, THEN PRESS (Michael, 2026-10-03). Once the layer exists, typing
+            // edits it live, and its name follows the text both ways.
             Text("Text").font(.system(size: 18)).foregroundStyle(.secondary)
             TextField("Type your text…", text: textBinding, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 18))
                 .lineLimit(1...4)
                 .autocorrectionDisabled()
+            Button { newText() } label: {
+                Label("New Text Layer", systemImage: "plus.rectangle").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            Text("Type your text, then press New Text Layer. The layer is named for its text — "
+                 + "rename the layer and the text changes too. (Emoji get their written name.)")
+                .font(.system(size: 18)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 8) {
                 styleToggle("bold", "Bold", $bold)
@@ -2282,6 +2285,9 @@ struct FontPickerInspector: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .onAppear { tint = pen.color; if glyphs.isEmpty { recomputeGlyphs() }; adoptActiveLayer() }
         .onChange(of: activeLayerID) { adoptActiveLayer() }
+        .onChange(of: editingLayerText) { _, new in
+            if let new, new != textInput { textInput = new }
+        }
     }
 
     @ViewBuilder
@@ -2321,27 +2327,14 @@ struct FontPickerInspector: View {
             // rename severs it (see commitRename), after which typed text no longer
             // renames the layer.
             if document.layers[i].isNameLinkedToText {
-                document.layers[i].name = textInput.isEmpty ? "Text" : textInput
+                document.layers[i].name = ImageLayer.nameForText(textInput)
             }
             // Coalesce a typing session into one "Text" step (not one per keystroke).
             document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
                                    actionLabel: "Text", layerID: id, coalesce: true)
-        } else if !textInput.isEmpty {
-            document.captureHistoryBaselineIfNeeded()
-            var layer = ImageLayer(name: textInput, role: .content)
-            layer.setText(textInput, fontName: family, tintHex: tint.hexString() ?? "#000000",
-                          bold: bold, italic: italic, underline: underline, outline: outline)
-            // A new Enter-made line spawns slightly BELOW the previous one so stacked lines
-            // are visible/separable instead of piling up dead-center.
-            if let prev = lastLineCenter {
-                layer.transform.center = CGPoint(x: prev.x, y: min(prev.y + 0.18, 0.95))
-                lastLineCenter = nil
-            }
-            document.layers.append(layer)
-            currentTextLayerID = layer.id
-            document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
-                                   actionLabel: "Text", layerID: layer.id, coalesce: true)
         }
+        // No layer yet: the field is a DRAFT. Michael, 2026-10-03: "type the text in the
+        // tool inspector and press new text layer" — the button makes the layer.
     }
 
     /// Selecting a text layer (in the Layers panel) loads it here for editing; selecting a
@@ -2359,12 +2352,32 @@ struct FontPickerInspector: View {
 
     /// Start a fresh text layer NOW — eagerly create an empty, centered text layer and adopt
     /// it, so the button always produces a visible new layer (it was a dead button before).
+    /// Makes the layer FROM THE DRAFT in the field — type first, then press. With an empty
+    /// field it makes an empty "Text" layer to type into, as before.
     private func newText() {
-        var layer = ImageLayer(name: "Text", role: .content)
-        layer.setText("", fontName: family, tintHex: tint.hexString() ?? "#000000")
+        document.captureHistoryBaselineIfNeeded()
+        let draft = (currentTextLayerID == nil) ? textInput : ""
+        var layer = ImageLayer(name: ImageLayer.nameForText(draft), role: .content)
+        layer.setText(draft, fontName: family, tintHex: tint.hexString() ?? "#000000",
+                      bold: bold, italic: italic, underline: underline, outline: outline)
+        // A line finished with Return spawns the next one slightly BELOW it.
+        if let prev = lastLineCenter {
+            layer.transform.center = CGPoint(x: prev.x, y: min(prev.y + 0.18, 0.95))
+            lastLineCenter = nil
+        }
         document.layers.append(layer)
         currentTextLayerID = layer.id
-        textInput = ""
+        textInput = draft
+        document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
+                               actionLabel: "New Text Layer", layerID: layer.id)
+    }
+
+    /// The text of the layer this inspector is editing — watched so a rename in the
+    /// Layers panel (which now rewrites the text) shows up in the field.
+    private var editingLayerText: String? {
+        guard let id = currentTextLayerID,
+              let i = document.layers.firstIndex(where: { $0.id == id }) else { return nil }
+        return document.layers[i].textString
     }
 }
 
@@ -5163,8 +5176,18 @@ struct LayerPanel: View {
             // and does not record leaves a snapshot that will later overwrite it. The
             // rename is fixed here; the rest of the Layers panel has the same hole.
             document.captureHistoryBaselineIfNeeded()
-            document.layers[index].name = trimmed
-            document.layers[index].nameLinkedToText = false
+            // TWO-WAY FOR WORDS, emoji the exception (his ruling 2026-10-03, see
+            // `ImageLayer.nameLinkedToText`). Renaming a word layer rewrites its text and
+            // keeps the link; renaming an emoji layer only relabels it.
+            if let current = document.layers[index].textString, !current.isEmojiOnly,
+               !trimmed.isEmojiOnly {
+                document.layers[index].setTextString(trimmed)
+                document.layers[index].name = trimmed
+                document.layers[index].nameLinkedToText = true
+            } else {
+                document.layers[index].name = trimmed
+                document.layers[index].nameLinkedToText = false
+            }
             document.recordHistory(toolID: "layers",
                                    groupTitle: "Layers",
                                    actionLabel: "Rename to “\(trimmed)”",

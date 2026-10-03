@@ -555,12 +555,25 @@ struct ImageLayer: Identifiable, Codable {
     var id = UUID()
     /// User-editable; auto-named from its content ("content names the layer").
     var name: String
-    /// Text→name link (one-way: content names the layer, NEVER the reverse). While
-    /// intact, editing a text layer with the Text tool keeps `name` mirrored to the
-    /// typed text. A MANUAL rename severs the link — after that the name is frozen and
-    /// independent, and renaming never writes back to the canvas text. Optional so old
-    /// documents (no key) decode as still-linked. Read it via `isNameLinkedToText`.
+    /// Text ⇄ name link — TWO-WAY for words, with EMOJI the exception. Michael,
+    /// 2026-10-03: "the layer name equals the layer name even if the text changes so if
+    /// you rename the layer it changes the text" → "how about the emoji be the
+    /// exception?" (This reverses his 2026-07-12 one-way ruling, which existed because
+    /// renaming an emoji layer corrupted its glyph — emoji stay one-way for that reason.)
+    /// • Typing renames the layer (an emoji gets its written name, see `nameForText`).
+    /// • Renaming a WORD layer rewrites its text; renaming an EMOJI layer only relabels
+    ///   it and severs the link, never touching the glyph.
+    /// Optional so old documents (no key) decode as still-linked. Read via `isNameLinkedToText`.
     var nameLinkedToText: Bool?
+
+    /// The layer name for a piece of text: the text itself, or for an emoji-only string
+    /// its written name — "🌻" → "Sunflower", "🇺🇸" → "Flag United States". An emoji is
+    /// hard to read in the Layers list and hard to type in a rename.
+    static func nameForText(_ text: String) -> String {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty { return "Text" }
+        return t.isEmojiOnly ? t.emojiWrittenName : t
+    }
 
     /// Whether the text→name auto-mirror is still active (nil legacy value = linked).
     var isNameLinkedToText: Bool { nameLinkedToText ?? true }
@@ -1618,5 +1631,48 @@ extension ImageDocument {
             guard let f = layer.cameraFrame else { return [] }
             return Array(repeating: f.index, count: max(1, f.exposures))
         }
+    }
+}
+
+
+// MARK: - Emoji names for text layers
+
+extension Character {
+    /// An emoji as people mean it — a picture glyph, not a digit or # that happens to
+    /// have an emoji variant.
+    var isEmojiGlyph: Bool {
+        guard let f = unicodeScalars.first else { return false }
+        return f.properties.isEmojiPresentation || (f.properties.isEmoji && unicodeScalars.count > 1)
+    }
+
+    /// Unicode's official name, title-cased: "🌻" → "Sunflower". Flags read as their
+    /// country; joined sequences list every member ("Man Woman Girl"); skin tones and
+    /// joiners are dropped. Some official names are old-fashioned — ❤️ is "Heavy Black Heart".
+    var emojiWrittenName: String {
+        let scalars = Array(unicodeScalars)
+        let flags = scalars.filter { (0x1F1E6...0x1F1FF).contains($0.value) }
+        if flags.count == 2,
+           let a = Unicode.Scalar(flags[0].value - 0x1F1E6 + 65),
+           let b = Unicode.Scalar(flags[1].value - 0x1F1E6 + 65) {
+            let code = String([Character(a), Character(b)])
+            return "Flag " + (Locale(identifier: "en_US").localizedString(forRegionCode: code) ?? code)
+        }
+        return scalars.filter { s in
+            s.value != 0x200D && s.value != 0xFE0F && !(0x1F3FB...0x1F3FF).contains(s.value)
+                && (s.properties.isEmojiPresentation || s.properties.isEmoji)
+        }.compactMap { $0.properties.name?.lowercased().capitalized }
+         .joined(separator: " ")
+    }
+}
+
+extension String {
+    /// Nothing but emoji (spaces ignored).
+    var isEmojiOnly: Bool {
+        let t = filter { !$0.isWhitespace }
+        return !t.isEmpty && t.allSatisfy(\.isEmojiGlyph)
+    }
+    var emojiWrittenName: String {
+        let n = filter { !$0.isWhitespace }.map(\.emojiWrittenName).joined(separator: " ")
+        return n.isEmpty ? "Emoji" : n
     }
 }
