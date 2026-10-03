@@ -496,7 +496,7 @@ struct LayerInspector: View {
             }
             .padding(.top, 4)
         } label: {
-            revealLabel("Translucent",
+            revealLabel("Translucent", expanded: $showTranslucent,
                         on: document.layers[i].opacity < 1.0,
                         detail: document.layers[i].opacity < 1.0
                             ? String(format: "%.0f%%", document.layers[i].opacity * 100)
@@ -520,7 +520,7 @@ struct LayerInspector: View {
             .padding(.top, 4)
         } label: {
             let g = document.layers[i].glow
-            revealLabel("Glow",
+            revealLabel("Glow", expanded: $showGlow,
                         on: g?.isEnabled ?? false,
                         detail: (g?.isEnabled ?? false) ? g?.style.title : nil)
         }
@@ -528,7 +528,11 @@ struct LayerInspector: View {
 
     /// A reveal's own row: name, a dot when the child is doing something, and a short
     /// readout so the state is legible with every reveal shut.
-    private func revealLabel(_ name: String, on: Bool, detail: String?) -> some View {
+    /// The whole title row opens and closes its section, not only the caret. Michael,
+    /// 2026-10-03, clicking "Green Key" and getting nothing: "i didnt know you had to
+    /// click the carrat" → "yes make the words clickable too on all of the reveals."
+    private func revealLabel(_ name: String, expanded: Binding<Bool>, on: Bool,
+                             detail: String?) -> some View {
         HStack(spacing: 6) {
             Circle()
                 .fill(on ? Color.accentColor : Color.secondary.opacity(0.35))
@@ -540,6 +544,9 @@ struct LayerInspector: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { withAnimation { expanded.wrappedValue.toggle() } }
     }
 
     // MARK: Glow controls
@@ -664,7 +671,7 @@ struct LayerInspector: View {
             .padding(.top, 4)
         } label: {
             let k = document.layers[i].greenKey
-            revealLabel("Green Key",
+            revealLabel("Green Key", expanded: $showGreenKey,
                         on: k?.isEnabled ?? false,
                         detail: (k?.isEnabled ?? false) ? k?.colorHex : nil)
         }
@@ -800,7 +807,7 @@ struct LayerInspector: View {
             .padding(.top, 4)
         } label: {
             let g = document.layers[i].gradient
-            revealLabel("Gradient",
+            revealLabel("Gradient", expanded: $showGradient,
                         on: g?.isEnabled ?? false,
                         detail: (g?.isEnabled ?? false)
                             ? "\(g?.direction.label ?? "") · \(pristine ? "draws" : "fades")"
@@ -899,7 +906,7 @@ struct LayerInspector: View {
             }
             .padding(.top, 4)
         } label: {
-            revealLabel("Blend",
+            revealLabel("Blend", expanded: $showBlend,
                         on: current != .normal,
                         detail: current != .normal ? current.title : nil)
         }
