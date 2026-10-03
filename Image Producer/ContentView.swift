@@ -5987,12 +5987,16 @@ struct ExportSheet: View {
     /// the preview did. Changing them here does not change the Camera.
     @State private var gifFPS: Double
     @State private var gifLoop: Bool
+    /// On by default when the project has Camera frames — a stop-motion export wants the
+    /// shots, not the puppet layers they were shot from.
+    @State private var gifCameraOnly: Bool
     init(document: ImageDocument, gifFPS: Double = 8, gifLoop: Bool = true,
          onIconSet: (() -> Void)? = nil) {
         self.document = document
         self.onIconSet = onIconSet
         _gifFPS = State(initialValue: gifFPS)
         _gifLoop = State(initialValue: gifLoop)
+        _gifCameraOnly = State(initialValue: !document.cameraFrames.isEmpty)
     }
 
     /// A single file in some format, or the Xcode icon set — which is a folder, not a file,
@@ -6030,9 +6034,15 @@ struct ExportSheet: View {
                 Spacer()
             }
             if format == .gifAnimated {
-                let n = flipbookFrameLayers(document).count
-                Text("Each layer with artwork is one frame, bottom to top — a flipbook. "
-                     + "Hidden layers are included; Light and Dark are left out. \(n) frame\(n == 1 ? "" : "s").")
+                let n = flipbookFrameLayers(document, cameraOnly: gifCameraOnly).count
+                if !document.cameraFrames.isEmpty {
+                    Toggle("Camera frames only", isOn: $gifCameraOnly).font(.system(size: 18))
+                }
+                Text((gifCameraOnly
+                      ? "Each Camera frame is one frame, in shot order."
+                      : "Each layer with artwork is one frame, bottom to top — a flipbook. "
+                        + "Hidden layers are included; Light and Dark are left out.")
+                     + " \(n) frame\(n == 1 ? "" : "s").")
                     .font(.system(size: 18))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -6062,7 +6072,8 @@ struct ExportSheet: View {
                     }
                     guard let format else { return }
                     let m = (format == .pdfLayers && flattenMatte) ? matte.cgColorResolved : nil
-                    if let d = format.data(from: document, matte: m, fps: gifFPS, loop: gifLoop) {
+                    if let d = format.data(from: document, matte: m, fps: gifFPS, loop: gifLoop,
+                                           cameraOnly: gifCameraOnly) {
                         payload = d
                         exporting = true
                     }

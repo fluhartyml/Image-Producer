@@ -402,8 +402,12 @@ func encodedImageData(_ cg: CGImage, as type: UTType) -> Data? {
 /// bottom to top, visible or not — Camera frames are hidden by design and are exactly
 /// the ones that must play. Light and Dark are left out: they are the preview floor,
 /// not frames.
-@MainActor func flipbookFrameLayers(_ document: ImageDocument) -> [ImageLayer] {
-    document.layers.filter { layer in
+///
+/// `cameraOnly`: just the Camera's frames, in shot order. Without it, a stop-motion
+/// project's own puppet and scenery layers would play as frames between the shots.
+@MainActor func flipbookFrameLayers(_ document: ImageDocument, cameraOnly: Bool = false) -> [ImageLayer] {
+    if cameraOnly { return document.cameraFrames }
+    return document.layers.filter { layer in
         guard case .content = layer.role else { return false }
         return !layer.elements.isEmpty
     }
@@ -415,8 +419,9 @@ func encodedImageData(_ cg: CGImage, as type: UTType) -> Data? {
 /// render the per-layer PDF uses). Timing is the Camera's: a frame lasts its hold
 /// (exposures, 1 for an ordinary layer) divided by the fps. `loop` writes the
 /// "repeat forever" marker; without it the GIF plays once and stops on the last frame.
-@MainActor func makeAnimatedGIF(_ document: ImageDocument, fps: Double, loop: Bool) -> Data? {
-    let frames = flipbookFrameLayers(document)
+@MainActor func makeAnimatedGIF(_ document: ImageDocument, fps: Double, loop: Bool,
+                                cameraOnly: Bool = false) -> Data? {
+    let frames = flipbookFrameLayers(document, cameraOnly: cameraOnly)
     guard !frames.isEmpty else { return nil }
     let out = NSMutableData()
     guard let dest = CGImageDestinationCreateWithData(out, UTType.gif.identifier as CFString,
@@ -470,11 +475,11 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     /// Render the project to this format. `matte` only applies to the layer PDF (flatten);
     /// `fps` and `loop` only to the animated GIF.
     @MainActor func data(from document: ImageDocument, matte: CGColor? = nil,
-                         fps: Double = 8, loop: Bool = true) -> Data? {
+                         fps: Double = 8, loop: Bool = true, cameraOnly: Bool = false) -> Data? {
         switch self {
         case .pdfFlat:   return makeFlatPDF(document)
         case .pdfLayers: return makeLayerPDF(document, matte: matte)
-        case .gifAnimated: return makeAnimatedGIF(document, fps: fps, loop: loop)
+        case .gifAnimated: return makeAnimatedGIF(document, fps: fps, loop: loop, cameraOnly: cameraOnly)
         default:
             guard let cg = renderCanvasImage(document) else { return nil }
             return encodedImageData(cg, as: utType)
