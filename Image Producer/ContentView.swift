@@ -401,7 +401,8 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showExportSheet) {
-            ExportSheet(document: document, onIconSet: { exportIconSet() })
+            ExportSheet(document: document, gifFPS: camera.fps, gifLoop: camera.loop,
+                        onIconSet: { exportIconSet() })
         }
         .alert("Image Producer", isPresented: Binding(get: { iconSetResult != nil },
                                                 set: { if !$0 { iconSetResult = nil } })) {
@@ -5982,6 +5983,18 @@ struct ExportSheet: View {
     var onIconSet: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
+    /// Animated GIF timing, seeded from the Camera's playback so the file plays the way
+    /// the preview did. Changing them here does not change the Camera.
+    @State private var gifFPS: Double
+    @State private var gifLoop: Bool
+    init(document: ImageDocument, gifFPS: Double = 8, gifLoop: Bool = true,
+         onIconSet: (() -> Void)? = nil) {
+        self.document = document
+        self.onIconSet = onIconSet
+        _gifFPS = State(initialValue: gifFPS)
+        _gifLoop = State(initialValue: gifLoop)
+    }
+
     /// A single file in some format, or the Xcode icon set — which is a folder, not a file,
     /// so it cannot go through `fileExporter` and needs its own case.
     private enum Choice: Hashable { case file(ExportFormat), iconSet }
@@ -6016,6 +6029,19 @@ struct ExportSheet: View {
                 .labelsHidden()
                 Spacer()
             }
+            if format == .gifAnimated {
+                let n = flipbookFrameLayers(document).count
+                Text("Each layer with artwork is one frame, bottom to top — a flipbook. "
+                     + "Hidden layers are included; Light and Dark are left out. \(n) frame\(n == 1 ? "" : "s").")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(Int(gifFPS)) frames a second").font(.system(size: 18))
+                    Slider(value: $gifFPS, in: 1...24, step: 1)
+                }
+                Toggle("Loop", isOn: $gifLoop).font(.system(size: 18))
+            }
             if format == .pdfLayers {
                 Toggle("Flatten transparency onto a matte", isOn: $flattenMatte)
                 if flattenMatte {
@@ -6036,7 +6062,7 @@ struct ExportSheet: View {
                     }
                     guard let format else { return }
                     let m = (format == .pdfLayers && flattenMatte) ? matte.cgColorResolved : nil
-                    if let d = format.data(from: document, matte: m) {
+                    if let d = format.data(from: document, matte: m, fps: gifFPS, loop: gifLoop) {
                         payload = d
                         exporting = true
                     }

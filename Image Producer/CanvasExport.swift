@@ -398,6 +398,47 @@ func encodedImageData(_ cg: CGImage, as type: UTType) -> Data? {
     return data as Data
 }
 
+/// The layers that become frames of the flipbook GIF: every CONTENT layer that has art,
+/// bottom to top, visible or not — Camera frames are hidden by design and are exactly
+/// the ones that must play. Light and Dark are left out: they are the preview floor,
+/// not frames.
+@MainActor func flipbookFrameLayers(_ document: ImageDocument) -> [ImageLayer] {
+    document.layers.filter { layer in
+        guard case .content = layer.role else { return false }
+        return !layer.elements.isEmpty
+    }
+}
+
+/// AN ANIMATED GIF WHERE EACH LAYER IS ONE FRAME — the layers as a flipbook. Michael,
+/// 2026-10-03: "each frame should corespond to a layer and the layers act like a
+/// flipbook." Each frame is that layer rendered on its own at canvas size (the same
+/// render the per-layer PDF uses). Timing is the Camera's: a frame lasts its hold
+/// (exposures, 1 for an ordinary layer) divided by the fps. `loop` writes the
+/// "repeat forever" marker; without it the GIF plays once and stops on the last frame.
+@MainActor func makeAnimatedGIF(_ document: ImageDocument, fps: Double, loop: Bool) -> Data? {
+    let frames = flipbookFrameLayers(document)
+    guard !frames.isEmpty else { return nil }
+    let out = NSMutableData()
+    guard let dest = CGImageDestinationCreateWithData(out, UTType.gif.identifier as CFString,
+                                                      frames.count, nil) else { return nil }
+    if loop {
+        let file = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
+        CGImageDestinationSetProperties(dest, file as CFDictionary)
+    }
+    let beat = 1.0 / max(1, fps)
+    var added = 0
+    for layer in frames {
+        guard let cg = renderLayerImage(layer, in: document) else { continue }
+        let delay = Double(max(1, layer.cameraFrame?.exposures ?? 1)) * beat
+        let props = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: delay,
+                                                     kCGImagePropertyGIFUnclampedDelayTime: delay]]
+        CGImageDestinationAddImage(dest, cg, props as CFDictionary)
+        added += 1
+    }
+    guard added == frames.count, CGImageDestinationFinalize(dest) else { return nil }
+    return out as Data
+}
+
 /// Formats the unified Export sheet (⌘E) offers — the project rendered out to a file.
 /// No legacy multi-size app-icon PNG set (deprecated: modern Xcode takes a single 1024
 /// PNG or an Icon Composer .icon, both covered by "PNG" / the layer PDF here).
@@ -410,6 +451,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     case bmp = "BMP"
     case pdfFlat = "PDF (flat)"
     case pdfLayers = "PDF (one page per layer)"
+    case gifAnimated = "Animated GIF (one frame per layer)"
 
     var id: String { rawValue }
 
@@ -419,17 +461,20 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .jpeg: return .jpeg
         case .tiff: return .tiff
         case .heic: return UTType("public.heic") ?? .png
-        case .gif:  return .gif
+        case .gif, .gifAnimated:  return .gif
         case .bmp:  return .bmp
         case .pdfFlat, .pdfLayers: return .pdf
         }
     }
 
-    /// Render the project to this format. `matte` only applies to the layer PDF (flatten).
-    @MainActor func data(from document: ImageDocument, matte: CGColor? = nil) -> Data? {
+    /// Render the project to this format. `matte` only applies to the layer PDF (flatten);
+    /// `fps` and `loop` only to the animated GIF.
+    @MainActor func data(from document: ImageDocument, matte: CGColor? = nil,
+                         fps: Double = 8, loop: Bool = true) -> Data? {
         switch self {
         case .pdfFlat:   return makeFlatPDF(document)
         case .pdfLayers: return makeLayerPDF(document, matte: matte)
+        case .gifAnimated: return makeAnimatedGIF(document, fps: fps, loop: loop)
         default:
             guard let cg = renderCanvasImage(document) else { return nil }
             return encodedImageData(cg, as: utType)
