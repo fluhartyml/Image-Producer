@@ -4922,6 +4922,14 @@ struct TransformBox: View {
                     .frame(width: grabVisual, height: grabVisual)
                     .frame(width: grabTarget, height: grabTarget)   // invisible margin
                     .contentShape(Rectangle())
+                    #if os(macOS)
+                    // A diagonal double-arrow for the corner under the pointer — his ask,
+                    // 2026-10-03: "the graber pointer should change to a 45 degree double arrow
+                    // depending on which corner".
+                    .pointerStyle(.frameResize(position: off.width < 0
+                        ? (off.height < 0 ? .topLeading : .bottomLeading)
+                        : (off.height < 0 ? .topTrailing : .bottomTrailing)))
+                    #endif
                     .position(center.offsetBy(
                         rotate(CGSize(width: off.width * boxW / 2,
                                       height: off.height * boxH / 2), by: radians)))
