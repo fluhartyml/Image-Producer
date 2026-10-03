@@ -2251,6 +2251,13 @@ struct FontPickerInspector: View {
                     Spacer()
                     Text("\(Int((size * 100).rounded()))%").font(.system(size: 18).monospacedDigit())
                         .foregroundStyle(.secondary)
+                    // Fine tune, 1% a click — his ask, 2026-10-03: "the size slider needs an
+                    // arrow fine tune adjuster." Same jog-stepper idea as Move's Scale.
+                    Stepper("", value: Binding(get: { (size * 100).rounded() },
+                                               set: { size = min(1.0, max(0.05, $0 / 100)) }),
+                            in: 5...100, step: 1)
+                        .labelsHidden()
+                        .help("Jog the text size by 1%")
                 }
                 Slider(value: $size, in: 0.05...1.0)
             }
