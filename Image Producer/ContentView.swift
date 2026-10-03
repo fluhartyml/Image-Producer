@@ -6802,6 +6802,7 @@ struct AboutView: View {
     private let contact = URL(string: "mailto:michael.fluharty@mac.com")!
     private let portfolio = URL(string: "https://fluharty.me")!
     private let github = URL(string: "https://github.com/fluhartyml")!
+    private let support = URL(string: "https://fluharty.me/support/imageproducer.html")!
     private let privacy = URL(string: "https://fluharty.me/privacy")!
 
     var body: some View {
@@ -6827,6 +6828,8 @@ struct AboutView: View {
                     linkRow("Email", "michael.fluharty@mac.com", contact)
                     linkRow("Portfolio", "fluharty.me", portfolio)
                     linkRow("GitHub", "github.com/fluhartyml", github)
+                    // Support above Privacy — his ask, 2026-10-03.
+                    linkRow("Support", "fluharty.me/support", support)
                     linkRow("Privacy", "fluharty.me/privacy", privacy)
                 }
 
