@@ -333,7 +333,7 @@ struct ContentView: View {
                     ToolInspector(document: document,
                                   camera: camera,
                                   activeTool: activeTool,
-                                  activeLayerID: activeLayerID,
+                                  activeLayerID: $activeLayerID,
                                   fillColor: $fillColor,
                                   fileURL: fileURL)
                         .frame(width: 300)
@@ -931,7 +931,8 @@ struct ToolInspector: View {
     @ObservedObject var document: ImageDocument
     @ObservedObject var camera: CameraState
     let activeTool: Tool
-    let activeLayerID: ImageLayer.ID?
+    /// A binding (not a value) so an inspector can select what it creates — Image import.
+    @Binding var activeLayerID: ImageLayer.ID?
     @Binding var fillColor: Color
     /// Open document's file on disk — for the Canvas hub's Project/File section.
     var fileURL: URL? = nil
@@ -991,7 +992,7 @@ struct ToolInspector: View {
         case .text:
             FontPickerInspector(document: document, activeLayerID: activeLayerID)
         case .image:
-            ImageImportInspector(document: document, activeLayerID: activeLayerID)
+            ImageImportInspector(document: document, activeLayerID: $activeLayerID)
         case .imagePlayground:
             ImagePlaygroundInspector(document: document, activeLayerID: activeLayerID)
         case .layer:
@@ -2499,33 +2500,43 @@ struct FontPickerInspector: View {
 /// native resolution; the canvas scales it to fit the icon (Move tool re-sizes it).
 /// v1 stores the bytes in the manifest; sibling-file storage in the package is a
 /// follow-up. (Seatrial: the resolution/scaling behavior is the part to shake down.)
+/// IMPORT ALWAYS MAKES A NEW LAYER, NAMED FOR THE FILE. Michael, 2026-10-03: "i want a
+/// new layer with the image file name as the layer name." It used to replace the selected
+/// layer's content, which needed a blank layer made first and threw away the file's name.
 struct ImageImportInspector: View {
     @ObservedObject var document: ImageDocument
-    let activeLayerID: ImageLayer.ID?
+    @Binding var activeLayerID: ImageLayer.ID?
     @State private var importing = false
     @State private var failed = false
+    @State private var showInfo = false
 
     private var activeIndex: Int? {
         guard let id = activeLayerID else { return nil }
         return document.layers.firstIndex(where: { $0.id == id })
     }
-    private var activeIsContent: Bool {
-        guard let i = activeIndex else { return false }
-        if case .content = document.layers[i].role { return true }
-        return false
-    }
 
     var body: some View {
-        if activeIsContent {
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
                 Button { importing = true } label: {
                     Label("Import Image…", systemImage: "photo.badge.plus")
                 }
                 .buttonStyle(.borderedProminent)
-                Text("Drops an image onto this layer at native resolution, scaled to fit the icon. Use Move to resize/position it.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
-                Text("Opens PNG, JPEG, HEIC, TIFF, GIF, BMP — and PSD on Mac (imported flattened).")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                // Concise on screen, detail behind (i) — Michael, 2026-10-03: "the text on
+                // the screen should be concise or behind (i)".
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Adds a new layer named for the file.")
+                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                    Button { showInfo.toggle() } label: { Image(systemName: "info.circle") }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .help("More about importing")
+                        .popover(isPresented: $showInfo) {
+                            Text("Opens PNG, JPEG, HEIC, TIFF, GIF and BMP, plus PSD on Mac (flattened). The new layer goes above the selected one. Use Move to size and place it.")
+                                .font(.system(size: 18))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(width: 300)
+                                .padding()
+                        }
+                }
                 if failed {
                     Text("Couldn't read that image.").font(.system(size: 18)).foregroundStyle(.red)
                 }
@@ -2538,27 +2549,28 @@ struct ImageImportInspector: View {
                 guard case .success(let url) = result else { return }
                 load(url)
             }
-        } else {
-            PanelPlaceholder(systemImage: "photo",
-                             title: "Image",
-                             subtitle: "Select the Icon layer (a content layer) to import an image")
-        }
     }
 
     private func load(_ url: URL) {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         guard let raw = try? Data(contentsOf: url),
-              let png = pngData(fromImageData: raw),
-              let i = activeIndex else {
+              let png = pngData(fromImageData: raw) else {
             failed = true
             document.say("Image not imported — \(url.lastPathComponent) could not be read", kind: .warning)
             return
         }
+        let name = url.deletingPathExtension().lastPathComponent
+        var layer = ImageLayer(name: name.isEmpty ? "Image" : name, role: .content)
+        layer.setImage(png)
+        layer.nameLinkedToText = false   // the name is the file's, not a text mirror
         document.captureHistoryBaselineIfNeeded()
-        document.layers[i].setImage(png)
+        // Directly above the selected layer — where the user is working — or on top.
+        let at = activeIndex.map { $0 + 1 } ?? document.layers.count
+        document.layers.insert(layer, at: at)
+        activeLayerID = layer.id
         document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
-                               actionLabel: "Import Image", layerID: document.layers[i].id)
+                               actionLabel: "Import \(layer.name)", layerID: layer.id)
     }
 }
 
@@ -2818,7 +2830,7 @@ enum BottomPanel: String, CaseIterable, Identifiable {
             ToolInspector(document: document,
                           camera: camera,
                           activeTool: activeTool,
-                          activeLayerID: activeLayerID,
+                          activeLayerID: $activeLayerID,
                           fillColor: $fillColor,
                           fileURL: fileURL)
         }
