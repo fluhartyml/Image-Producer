@@ -2535,11 +2535,11 @@ struct ImageImportInspector: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                // Hover text, not a caption — his call, 2026-10-03.
+                .help("Adds a new layer above the selected one, named with the file name.")
                 // Concise on screen, detail behind (i) — Michael, 2026-10-03: "the text on
                 // the screen should be concise or behind (i)".
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("New Layer is named for the file.")
-                        .font(.system(size: 18)).foregroundStyle(.secondary)
                     Button { showInfo.toggle() } label: { Image(systemName: "info.circle") }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                         .help("More about importing")
