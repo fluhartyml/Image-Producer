@@ -114,8 +114,15 @@ func captureCameraFrame(_ document: ImageDocument, camera: CameraState,
     if s.trimToArt { bits.append("trimmed") }
     if s.exposures > 1 { bits.append("on \(s.exposures)s") }
     if s.animationMode { bits.append("hidden (Animation)") }
-    bits.append(copied ? "copied" : "not copied")
     camera.lastResult = bits.joined(separator: " · ")
+    // The clipboard is reported on the window's status bar, not in the camera's result
+    // line — his ruling, 2026-10-03. Said last, after recordHistory, so it is the line
+    // left showing.
+    if copied {
+        document.say("Camera capture copied to the clipboard", kind: .info)
+    } else {
+        document.say("Camera capture could not be copied to the clipboard", kind: .warning)
+    }
 }
 
 /// Put a capture on the system clipboard as PNG. Returns whether it took.
