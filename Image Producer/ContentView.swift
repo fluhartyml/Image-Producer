@@ -2234,8 +2234,8 @@ struct FontPickerInspector: View {
                 Label("New Text Layer", systemImage: "plus.rectangle").frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            Text("Type your text, then press New Text Layer. The layer is named for its text — "
-                 + "rename the layer and the text changes too. (Emoji get their written name.)")
+            // Kept to one line at his word, 2026-10-03: "the blurb under new text layer is too long".
+            Text("Type, then press New Text Layer. Renaming the layer changes its text.")
                 .font(.system(size: 18)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
