@@ -597,6 +597,12 @@ struct ImageLayer: Identifiable, Codable {
     /// 0...1.
     var opacity = 1.0
     var transform = LayerTransform()
+    /// LINK GROUP — layers sharing an id move, scale and rotate as ONE object while each
+    /// stays fully editable (live text stays text). Michael, 2026-10-03: "lock the two
+    /// layers together so you move one and they both move simultaniously as if one object"
+    /// and "no rasterization please unless specifically asked to by the user."
+    /// nil = not linked; optional so older documents decode. See `followLinkedLayers`.
+    var linkGroup: UUID?
     /// Set only on layers made by the Camera tool. nil on every hand-made layer, and
     /// optional so documents written before the Camera shipped still decode.
     var cameraFrame: CameraFrame?

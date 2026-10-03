@@ -38,6 +38,8 @@ struct ContentView: View {
     /// hub's Project/File section. nil while the document is untitled / not yet saved.
     var fileURL: URL? = nil
     @State private var activeTool: Tool = .move
+    /// The placement of every layer as last seen — what `followLinkedLayers` diffs against.
+    @State private var linkBaseline: LinkSnapshot?
     @State private var activeLayerID: ImageLayer.ID?
     /// Move/Transform is a LIVE SESSION, not an immediate edit. The layer is manipulated
     /// freely, and the edit COMMITS when the user leaves it — by changing tool or by
@@ -283,6 +285,12 @@ struct ContentView: View {
             // purpose: focus mode, phone, portrait and wide all get the same bar in
             // the same place, so it is never the thing that moved.
             StatusBar(window: window)
+        }
+        // LINKED LAYERS follow each other — one rule for every control that places a
+        // layer. See LayerLink.swift.
+        .onChange(of: LinkSnapshot(document), initial: true) {
+            if let base = linkBaseline { followLinkedLayers(from: base, in: document) }
+            linkBaseline = LinkSnapshot(document)
         }
     }
 
@@ -705,6 +713,9 @@ struct ContentView: View {
         original.id = UUID()
         original.transform = before
         original.isVisible = false
+        // The kept copy records where the layer WAS. Linked, it would be dragged along by
+        // the next move of the object and stop recording anything.
+        original.linkGroup = nil
 
         // Naming follows the pen's rule — strip any existing "(Move)" / "(Move n)" first so
         // repeat sessions never compound into "Foreground (Move) (Move)".
@@ -5086,7 +5097,10 @@ struct LayerPanel: View {
 
     /// Shown only when a multi-layer action is actually available.
     @ViewBuilder private var mergeBar: some View {
-        if checkedLayerIDs.count >= 2 {
+        let anyCheckedLinked = document.layers.contains { checkedLayerIDs.contains($0.id) && $0.linkGroup != nil }
+        let checkedGroups = Set(document.layers.filter { checkedLayerIDs.contains($0.id) }.map(\.linkGroup))
+        let alreadyOneObject = checkedGroups.count == 1 && checkedGroups.first! != nil
+        if checkedLayerIDs.count >= 2 || anyCheckedLinked {
             Divider()
             HStack {
                 Text("\(checkedLayerIDs.count) checked")
@@ -5096,9 +5110,20 @@ struct LayerPanel: View {
                 Button("Uncheck") { checkedLayerIDs.removeAll(); activeLayerID = nil }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                if anyCheckedLinked {
+                    Button("Unlink") { unlinkLayers(checkedLayerIDs, in: document); checkedLayerIDs.removeAll() }
+                        .controlSize(.small)
+                        .help("Let the checked layers move on their own again. Nothing else changes.")
+                }
+                if checkedLayerIDs.count >= 2 && !alreadyOneObject {
+                    Button("Link") { linkLayers(checkedLayerIDs, in: document); checkedLayerIDs.removeAll() }
+                        .controlSize(.small)
+                        .help("Move, scale and rotate the checked layers as one object. Each stays editable — nothing is turned into pixels.")
+                }
                 Button("Merge") { mergeChecked() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    .disabled(checkedLayerIDs.count < 2)
                     .help("Combine the checked layers into a new layer above them. The originals are kept, switched off.")
             }
             .padding(.horizontal)
@@ -5469,6 +5494,12 @@ struct LayerRow: View {
                 Text(layer.name)
                     .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
                     .lineLimit(2)
+                if layer.linkGroup != nil {
+                    Image(systemName: "link")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .help("Linked — moves with its partners")
+                }
                 Spacer()
             }
             .contentShape(Rectangle())
@@ -5482,6 +5513,12 @@ struct LayerRow: View {
                     Text(layer.name)
                         .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
                         .lineLimit(2)
+                    if layer.linkGroup != nil {
+                        Image(systemName: "link")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .help("Linked — moves with its partners")
+                    }
                     Spacer()
                 }
                 .contentShape(Rectangle())
