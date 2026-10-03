@@ -2500,15 +2500,23 @@ struct FontPickerInspector: View {
 /// native resolution; the canvas scales it to fit the icon (Move tool re-sizes it).
 /// v1 stores the bytes in the manifest; sibling-file storage in the package is a
 /// follow-up. (Seatrial: the resolution/scaling behavior is the part to shake down.)
-/// IMPORT ALWAYS MAKES A NEW LAYER, NAMED FOR THE FILE. Michael, 2026-10-03: "i want a
-/// new layer with the image file name as the layer name." It used to replace the selected
-/// layer's content, which needed a blank layer made first and threw away the file's name.
+/// TWO WAYS IN, his layout 2026-10-03: "import image (to selected layer) or Import image to
+/// new layer (button below)". To Selected replaces that layer's content, as import always
+/// did. To New makes a layer above the selection named for the file — "i want a new layer
+/// with the image file name as the layer name."
 struct ImageImportInspector: View {
     @ObservedObject var document: ImageDocument
     @Binding var activeLayerID: ImageLayer.ID?
     @State private var importing = false
     @State private var failed = false
     @State private var showInfo = false
+    @State private var toNewLayer = true
+
+    private var activeIsContent: Bool {
+        guard let i = activeIndex else { return false }
+        if case .content = document.layers[i].role { return true }
+        return false
+    }
 
     private var activeIndex: Int? {
         guard let id = activeLayerID else { return nil }
@@ -2517,20 +2525,26 @@ struct ImageImportInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-                Button { importing = true } label: {
-                    Label("Import Image…", systemImage: "photo.badge.plus")
+                Button { toNewLayer = false; importing = true } label: {
+                    Label("Import Image to Selected Layer…", systemImage: "photo")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(!activeIsContent)
+                Button { toNewLayer = true; importing = true } label: {
+                    Label("Import Image to New Layer…", systemImage: "photo.badge.plus")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 // Concise on screen, detail behind (i) — Michael, 2026-10-03: "the text on
                 // the screen should be concise or behind (i)".
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Adds a new layer named for the file.")
+                    Text("New Layer is named for the file.")
                         .font(.system(size: 18)).foregroundStyle(.secondary)
                     Button { showInfo.toggle() } label: { Image(systemName: "info.circle") }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                         .help("More about importing")
                         .popover(isPresented: $showInfo) {
-                            Text("Opens PNG, JPEG, HEIC, TIFF, GIF and BMP, plus PSD on Mac (flattened). The new layer goes above the selected one. Use Move to size and place it.")
+                            Text("Selected Layer replaces that layer's picture. New Layer goes above the selected one. Opens PNG, JPEG, HEIC, TIFF, GIF and BMP, plus PSD on Mac (flattened). Use Move to size and place it.")
                                 .font(.system(size: 18))
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(width: 300)
@@ -2558,6 +2572,14 @@ struct ImageImportInspector: View {
               let png = pngData(fromImageData: raw) else {
             failed = true
             document.say("Image not imported — \(url.lastPathComponent) could not be read", kind: .warning)
+            return
+        }
+        if !toNewLayer {
+            guard let i = activeIndex, activeIsContent else { failed = true; return }
+            document.captureHistoryBaselineIfNeeded()
+            document.layers[i].setImage(png)
+            document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
+                                   actionLabel: "Import Image", layerID: document.layers[i].id)
             return
         }
         let name = url.deletingPathExtension().lastPathComponent
