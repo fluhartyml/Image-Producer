@@ -4890,11 +4890,13 @@ struct TransformBox: View {
                 rotate(CGSize(width: (art.midX - 0.5) * side,
                               height: (art.midY - 0.5) * side), by: radians))
 
-            // The movable box.
+            // The movable box — MARCHING ANTS, his ask 2026-10-03: "on any move ants go
+            // marching on container". White + black strokes half a period apart, so the box
+            // reads over any artwork (Skills Lab: dash-phase offset, not a redraw).
             Rectangle()
-                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                .background(Color.accentColor.opacity(0.06))
+                .fill(Color.accentColor.opacity(0.06))
                 .frame(width: boxW, height: boxH)
+                .marchingAnts(dash: 5)
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(center)
                 .contentShape(Rectangle())
