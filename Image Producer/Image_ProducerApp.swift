@@ -267,9 +267,12 @@ struct Image_ProducerApp: App {
         DocumentGroupLaunchScene("Image Producer") {
             NewDocumentButton("New Image", contentType: .imageProject)
         } background: {
+            // FOLLOWS LIGHT / DARK MODE — Michael, 2026-10-03, on his iPad in light mode:
+            // "the background is too dark and im in lightmode". It was a fixed navy, which
+            // also put the system's black title on near-black.
             LinearGradient(
-                colors: [Color(red: 0.11, green: 0.14, blue: 0.22),
-                         Color(red: 0.05, green: 0.06, blue: 0.10)],
+                colors: [Color(uiColor: .systemBackground),
+                         Color(uiColor: .secondarySystemBackground)],
                 startPoint: .top,
                 endPoint: .bottom
             )
