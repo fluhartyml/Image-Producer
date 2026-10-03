@@ -25,6 +25,12 @@
 import SwiftUI
 import Combine
 import CoreGraphics
+import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 // MARK: - Capture
 
@@ -96,13 +102,33 @@ func captureCameraFrame(_ document: ImageDocument, camera: CameraState,
                            actionLabel: "Capture",
                            layerID: layer.id)
 
+    // THE SHOT ALSO GOES ON THE CLIPBOARD — the layer stays too. Michael, 2026-10-03:
+    // "it made the top layer, i think that should stay BUT i also think it should
+    // populate the clipboard with what was capyured." Exactly the captured pixels, so
+    // a paste anywhere matches the new layer.
+    let copied = copyCapturedPNGToClipboard(png)
+
     var bits = ["Frame \(index)", "\(w)×\(h)"]
     if !s.includeBackground { bits.append("transparent") }
     if s.scale != 1 { bits.append("\(Int(s.scale))×") }
     if s.trimToArt { bits.append("trimmed") }
     if s.exposures > 1 { bits.append("on \(s.exposures)s") }
     if s.animationMode { bits.append("hidden (Animation)") }
+    bits.append(copied ? "copied" : "not copied")
     camera.lastResult = bits.joined(separator: " · ")
+}
+
+/// Put a capture on the system clipboard as PNG. Returns whether it took.
+@MainActor
+private func copyCapturedPNGToClipboard(_ png: Data) -> Bool {
+    #if os(macOS)
+    let pb = NSPasteboard.general
+    pb.clearContents()
+    return pb.setData(png, forType: .png)
+    #else
+    UIPasteboard.general.setData(png, forPasteboardType: UTType.png.identifier)
+    return UIPasteboard.general.hasImages
+    #endif
 }
 
 // MARK: - In-betweening
