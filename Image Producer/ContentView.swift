@@ -6432,27 +6432,106 @@ var appVersionLine: String {
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
 
+    // THE STANDARD ABOUT (Mind 05 · feedback_about_page_standard): icon, name + version,
+    // contact, portfolio, Claude credit, GPL v3 — plus the acknowledgments disclaimer
+    // every app carries (feedback_every_app_credits_others_code_and_disclaims_ownership).
+    // Michael, 2026-10-03: "the apout image producer should have contact me stuff, i think
+    // we have a standard about format." Nothing under 18 pt (his rule). No support page
+    // exists for this app yet, so none is linked.
+    private let contact = URL(string: "mailto:michael.fluharty@mac.com")!
+    private let portfolio = URL(string: "https://fluharty.me")!
+    private let github = URL(string: "https://github.com/fluhartyml")!
+    private let privacy = URL(string: "https://fluharty.me/privacy")!
+
     var body: some View {
-        VStack(spacing: 10) {
-            Spacer()
-            Text("Image Producer")
-                .font(.system(size: 40, weight: .semibold, design: .serif))
-                .multilineTextAlignment(.center)
-            Text("GRAPHIC ARTS")
-                .font(.subheadline)
-                .tracking(4)
-                .foregroundStyle(.secondary)
-            Text(appVersionLine)
-                .font(.footnote)
-                .foregroundStyle(.tertiary)
-            Spacer()
+        ScrollView {
+            VStack(spacing: 14) {
+                appIcon
+                    .frame(width: 128, height: 128)
+                    .padding(.top, 24)
+                Text("Image Producer")
+                    .font(.system(size: 40, weight: .semibold, design: .serif))
+                    .multilineTextAlignment(.center)
+                Text("GRAPHIC ARTS")
+                    .font(.system(size: 18))
+                    .tracking(4)
+                    .foregroundStyle(.secondary)
+                Text(appVersionLine)
+                    .font(.system(size: 18))
+                    .foregroundStyle(.secondary)
+
+                Divider().padding(.vertical, 6)
+
+                section("Contact") {
+                    linkRow("Email", "michael.fluharty@mac.com", contact)
+                    linkRow("Portfolio", "fluharty.me", portfolio)
+                    linkRow("GitHub", "github.com/fluhartyml", github)
+                    linkRow("Privacy", "fluharty.me/privacy", privacy)
+                }
+
+                section("Acknowledgments") {
+                    para("Engineered with Claude by Anthropic.")
+                    para("Image generation uses Apple's Image Playground. Image Playground and "
+                         + "Apple Intelligence are trademarks of Apple Inc. Image Producer is not "
+                         + "affiliated with or endorsed by Apple.")
+                }
+
+                section("License") {
+                    para("Copyright © 2026 Michael Fluharty. Licensed under the GNU General Public "
+                         + "License, version 3.")
+                    para("This copyright covers Michael Fluharty's original work only. It does not "
+                         + "claim or intend ownership of the work of the original developers named here.")
+                }
+            }
+            .frame(maxWidth: 560)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 32)
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(40)
         .overlay(alignment: .topTrailing) {
             Button("Done") { dismiss() }
+                .font(.system(size: 18))
                 .padding()
         }
+        #if os(macOS)
+        .frame(minWidth: 600, minHeight: 720)
+        #endif
+    }
+
+    @ViewBuilder private var appIcon: some View {
+        #if os(macOS)
+        Image(nsImage: NSApplication.shared.applicationIconImage)
+            .resizable().scaledToFit()
+        #else
+        if let ui = UIImage(named: "AppIcon") {
+            Image(uiImage: ui).resizable().scaledToFit()
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        }
+        #endif
+    }
+
+    private func section<Content: View>(_ title: String,
+                                        @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.system(size: 20, weight: .semibold))
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 6)
+    }
+
+    private func linkRow(_ label: String, _ shown: String, _ url: URL) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label).font(.system(size: 18)).foregroundStyle(.secondary)
+                .frame(width: 100, alignment: .leading)
+            Link(shown, destination: url).font(.system(size: 18))
+        }
+    }
+
+    private func para(_ text: String) -> some View {
+        Text(text).font(.system(size: 18))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
