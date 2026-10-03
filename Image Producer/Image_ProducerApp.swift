@@ -150,11 +150,10 @@ struct Image_ProducerApp: App {
                 .autosave(document: configuration.document,
                           fileURL: configuration.fileURL,
                           isEditable: configuration.isEditable)
-                #if os(macOS)
                 // BUILD NUMBER IN THE TITLE BAR — his ask, 2026-10-03: "put the build number
-                // in the title bar", so which build is running reads off the window itself.
+                // in the title bar", then on the iPad: "the main page should show the build
+                // number on the titlebar". Mac window subtitle; iPad/iPhone navigation subtitle.
                 .navigationSubtitle("Build \(appBuildNumber)")
-                #endif
         }
         // Turn off undo/redo. ImageDocument is a ReferenceFileDocument that never registers
         // undo actions — undo/redo belongs to the future linear History system, not the
