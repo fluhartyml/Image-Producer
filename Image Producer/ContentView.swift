@@ -4628,7 +4628,8 @@ struct CanvasView: View {
             if let key = greenKey,
                let keyed = GreenKeyCache.keyed(imageContent.pngData,
                                                colorHex: key.colorHex,
-                                               tolerance: key.tolerance) {
+                                               tolerance: key.tolerance,
+                                               softness: key.softness) {
                 Image(decorative: keyed, scale: 1)
                     .resizable()
                     .scaledToFit()
@@ -6168,7 +6169,8 @@ struct ImageCompositeView: View {
             if let key = greenKey,
                let keyed = GreenKeyCache.keyed(imageContent.pngData,
                                                colorHex: key.colorHex,
-                                               tolerance: key.tolerance) {
+                                               tolerance: key.tolerance,
+                                               softness: key.softness) {
                 Image(decorative: keyed, scale: 1)
                     .resizable()
                     .scaledToFit()

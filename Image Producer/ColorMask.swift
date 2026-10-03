@@ -119,6 +119,54 @@ func colorMaskedImage(_ cg: CGImage, target: (r: UInt8, g: UInt8, b: UInt8),
     return cgImage(fromRGBA: bytes, w: w, h: h)
 }
 
+/// The Green Key's math: GLOBAL, like `colorMaskedImage(contiguous: false)`, plus a
+/// soft band. Distance is the largest per-channel difference from the key, so the
+/// tolerance means what it always meant.
+///   • within `tolerance`               → fully clear (the swiss cheese, unchanged)
+///   • within `tolerance + softness`    → partly clear, alpha ramping 0 → 1 across the band,
+///                                        and the key color UNMIXED out of what is left:
+///                                        c' = k + (c − k) / α
+///   • beyond                           → untouched
+/// Unmixing is what keeps a glow a glow. A 60-gray beam pixel on black, kept at 36%
+/// opacity without unmixing, is a darker smear over whatever is below; unmixed it is a
+/// lighter gray at 36%, which over black recomposites to exactly the 60 it was.
+/// Bytes are premultiplied, so each pixel is un-premultiplied first and re-premultiplied
+/// after. `softness: 0` gives exactly the old hard key.
+func colorKeyedImage(_ cg: CGImage, target: (r: UInt8, g: UInt8, b: UInt8),
+                     tolerance: Int, softness: Int) -> CGImage? {
+    guard let (src, w, h) = rgbaBytes(from: cg) else { return nil }
+    var bytes = src
+    let k = (Double(target.r), Double(target.g), Double(target.b))
+    let tol = Double(tolerance), soft = Double(max(0, softness))
+    var i = 0
+    while i < bytes.count {
+        let a0 = Double(bytes[i + 3])
+        if a0 > 0 {
+            let un = 255 / a0
+            let c = (min(255, Double(bytes[i]) * un),
+                     min(255, Double(bytes[i + 1]) * un),
+                     min(255, Double(bytes[i + 2]) * un))
+            let d = max(abs(c.0 - k.0), abs(c.1 - k.1), abs(c.2 - k.2))
+            if d <= tol {
+                bytes[i] = 0; bytes[i + 1] = 0; bytes[i + 2] = 0; bytes[i + 3] = 0
+            } else if soft > 0, d < tol + soft {
+                let t = (d - tol) / soft                       // 0 at the tolerance, 1 at the far edge
+                @inline(__always) func unmix(_ c: Double, _ k: Double) -> Double {
+                    min(255, max(0, k + (c - k) / t))
+                }
+                let aOut = a0 * t                              // 0…255
+                let f = aOut / 255
+                bytes[i]     = UInt8((unmix(c.0, k.0) * f).rounded())
+                bytes[i + 1] = UInt8((unmix(c.1, k.1) * f).rounded())
+                bytes[i + 2] = UInt8((unmix(c.2, k.2) * f).rounded())
+                bytes[i + 3] = UInt8(aOut.rounded())
+            }
+        }
+        i += 4
+    }
+    return cgImage(fromRGBA: bytes, w: w, h: h)
+}
+
 /// Downscale a CGImage so its longest side ≤ `maxDimension` (aspect preserved) — used
 /// to make the live preview cheap. Returns the original if it's already small enough.
 func downscaledCGImage(_ cg: CGImage, maxDimension: Int) -> CGImage? {
@@ -456,14 +504,17 @@ enum GreenKeyCache {
         let source: Int          // hashValue of the source PNG bytes
         let colorHex: String
         let tolerance: Int
+        let softness: Int
     }
     private static var store: [Key: CGImage] = [:]
     /// Bounded so a long session cannot grow it without limit. Small on purpose —
     /// a document has a handful of keyed layers, not hundreds.
     private static let limit = 24
 
-    @MainActor static func keyed(_ png: Data, colorHex: String, tolerance: Int) -> CGImage? {
-        let k = Key(source: png.hashValue, colorHex: colorHex, tolerance: tolerance)
+    @MainActor static func keyed(_ png: Data, colorHex: String, tolerance: Int,
+                                 softness: Int = 0) -> CGImage? {
+        let k = Key(source: png.hashValue, colorHex: colorHex, tolerance: tolerance,
+                    softness: softness)
         if let hit = store[k] { return hit }
         guard let rgb = RGB(hex: colorHex),
               let src = CGImageSourceCreateWithData(png as CFData, nil),
@@ -471,8 +522,8 @@ enum GreenKeyCache {
         let target = (r: UInt8(rgb.r * 255), g: UInt8(rgb.g * 255), b: UInt8(rgb.b * 255))
         // contiguous: false — GLOBAL. Every matching pixel anywhere in the layer, which
         // is exactly the "swiss cheese is acceptable" behavior he specified.
-        guard let out = colorMaskedImage(cg, target: target, tolerance: tolerance,
-                                         contiguous: false) else { return nil }
+        guard let out = colorKeyedImage(cg, target: target, tolerance: tolerance,
+                                        softness: softness) else { return nil }
         if store.count >= limit { store.removeAll() }   // cheap eviction; correctness only
         store[k] = out
         return out

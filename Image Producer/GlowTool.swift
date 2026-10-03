@@ -166,6 +166,22 @@ struct LayerGreenKey: Codable, Equatable {
     var colorHex = "#00B140"          // broadcast chroma green, as a starting point
     /// How far from that color still counts as a match, per channel (0…128).
     var tolerance: Int = 24
+    /// How far PAST the tolerance a color fades out instead of cutting off (0…128).
+    /// 0 is the original hard key. Michael, 2026-10-03, keying a sunflower under a
+    /// white spotlight on black: "the swiss cheese effect is awesome but the gradient
+    /// is what needs work" — the beam's soft falloff came out as a ragged cut-out.
+    var softness: Int = 0
+}
+
+extension LayerGreenKey {
+    /// Files saved before `softness` existed have no such key; they open as a hard key.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        colorHex  = try c.decodeIfPresent(String.self, forKey: .colorHex) ?? "#00B140"
+        tolerance = try c.decodeIfPresent(Int.self, forKey: .tolerance) ?? 24
+        softness  = try c.decodeIfPresent(Int.self, forKey: .softness) ?? 0
+    }
 }
 
 
@@ -642,6 +658,7 @@ struct LayerInspector: View {
                     swatches(title: "", selection: greenKeyBinding(i).colorHex)
                     eyedropperRow(i)
                     greenKeyTolerance(i)
+                    greenKeySoftness(i)
                 }
             }
             .padding(.top, 4)
@@ -736,6 +753,27 @@ struct LayerInspector: View {
         }
     }
 
+
+    @ViewBuilder
+    private func greenKeySoftness(_ i: Int) -> some View {
+        let soft = Binding<Double>(
+            get: { Double(self.document.layers[i].greenKey?.softness ?? 0) },
+            set: { self.greenKeyBinding(i).wrappedValue.softness = Int($0) }
+        )
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Softness").font(.subheadline).foregroundStyle(.secondary)
+                Spacer()
+                Text("\(Int(soft.wrappedValue))")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            Slider(value: soft, in: 0...128)
+            Text("Shades just past the tolerance fade out instead of cutting off, with the "
+                 + "key color taken out of them — so a glow on black stays a glow. 0 is a hard edge.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
 
     // MARK: Child — Gradient
 
