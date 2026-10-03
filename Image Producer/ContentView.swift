@@ -2171,6 +2171,11 @@ struct FontPickerInspector: View {
     @State private var italic = false
     @State private var underline = false
     @State private var outline = false
+    /// Text size as a fraction of the canvas's master edge — the model's `sizeFraction`.
+    @State private var size: Double = 0.8
+    /// True while the controls are being LOADED from a selected layer, so loading does
+    /// not write straight back and record a style change nobody made.
+    @State private var adopting = false
     @State private var textInput: String = ""
     @State private var glyphs: [String] = []
     /// The live text layer this inspector is creating/editing (its name == its text).
@@ -2239,6 +2244,17 @@ struct FontPickerInspector: View {
                 styleToggle("character.textbox", "Outline", $outline)
             }
 
+            // SIZE — his ask, 2026-10-03: "font size (it is not shown and needs to be added)".
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Size").font(.system(size: 18)).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int((size * 100).rounded()))%").font(.system(size: 18).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: $size, in: 0.05...1.0)
+            }
+
             Text("Font").font(.system(size: 18)).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
@@ -2288,6 +2304,30 @@ struct FontPickerInspector: View {
         .onChange(of: editingLayerText) { _, new in
             if let new, new != textInput { textInput = new }
         }
+        // LIVE: with a text layer selected and this tool open, every control changes that
+        // layer as you touch it. Michael, 2026-10-03: "if i change font weight font size …
+        // change the font type change tint whatever options are available should change
+        // real time when the text layer and text tool inspectors are both chosen."
+        .onChange(of: family) { applyStyle() }
+        .onChange(of: bold) { applyStyle() }
+        .onChange(of: italic) { applyStyle() }
+        .onChange(of: underline) { applyStyle() }
+        .onChange(of: outline) { applyStyle() }
+        .onChange(of: size) { applyStyle() }
+        .onChange(of: tint) { applyStyle() }
+    }
+
+    /// Write the controls' style onto the text layer being edited. One coalesced History
+    /// step per run of adjustments, like typing.
+    private func applyStyle() {
+        guard !adopting, let id = currentTextLayerID,
+              let i = document.layers.firstIndex(where: { $0.id == id }) else { return }
+        document.captureHistoryBaselineIfNeeded()
+        document.layers[i].setTextStyle(fontName: family, tintHex: tint.hexString() ?? "#000000",
+                                        sizeFraction: size, bold: bold, italic: italic,
+                                        underline: underline, outline: outline)
+        document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
+                               actionLabel: "Text style", layerID: id, coalesce: true)
     }
 
     @ViewBuilder
@@ -2321,8 +2361,9 @@ struct FontPickerInspector: View {
     private func syncText() {
         if let id = currentTextLayerID, let i = document.layers.firstIndex(where: { $0.id == id }) {
             document.captureHistoryBaselineIfNeeded()
-            document.layers[i].setText(textInput, fontName: family, tintHex: tint.hexString() ?? "#000000",
-                                       bold: bold, italic: italic, underline: underline, outline: outline)
+            // String only — the layer's style (font, size, tint, toggles) is the inspector's
+            // controls, applied live by `applyStyle`. setText would reset the size.
+            document.layers[i].setTextString(textInput)
             // Canvas → name mirror, ONE-WAY and only while the link is intact. A manual
             // rename severs it (see commitRename), after which typed text no longer
             // renames the layer.
@@ -2344,6 +2385,17 @@ struct FontPickerInspector: View {
            let s = document.layers[i].textString {
             currentTextLayerID = id
             textInput = s
+            // Load the layer's own style into the controls, so the inspector shows what
+            // the layer IS — and so the next adjustment starts from it, not from defaults.
+            if let t = document.layers[i].textContent {
+                adopting = true
+                family = t.fontName
+                if let c = Color(hex: t.colorHex) { tint = c }
+                size = t.sizeFraction
+                bold = t.bold; italic = t.italic; underline = t.underline; outline = t.outline
+                recomputeGlyphs()
+                DispatchQueue.main.async { adopting = false }
+            }
         } else {
             currentTextLayerID = nil
             textInput = ""
@@ -2360,6 +2412,9 @@ struct FontPickerInspector: View {
         var layer = ImageLayer(name: ImageLayer.nameForText(draft), role: .content)
         layer.setText(draft, fontName: family, tintHex: tint.hexString() ?? "#000000",
                       bold: bold, italic: italic, underline: underline, outline: outline)
+        layer.setTextStyle(fontName: family, tintHex: tint.hexString() ?? "#000000",
+                           sizeFraction: size, bold: bold, italic: italic,
+                           underline: underline, outline: outline)
         // A line finished with Return spawns the next one slightly BELOW it.
         if let prev = lastLineCenter {
             layer.transform.center = CGPoint(x: prev.x, y: min(prev.y + 0.18, 0.95))

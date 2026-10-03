@@ -705,6 +705,28 @@ struct ImageLayer: Identifiable, Codable {
         return nil
     }
 
+    /// The text element itself — string and style — if this is a text layer.
+    var textContent: TextContent? {
+        for element in elements {
+            if case .text(let t) = element.content { return t }
+        }
+        return nil
+    }
+
+    /// Rewrite the text element's STYLE, keeping its string. For the Text inspector's
+    /// live editing of a selected text layer. No-op if there is no text element.
+    mutating func setTextStyle(fontName: String, tintHex: String, sizeFraction: Double,
+                               bold: Bool, italic: Bool, underline: Bool, outline: Bool) {
+        for i in elements.indices {
+            if case .text(var t) = elements[i].content {
+                t.fontName = fontName; t.colorHex = tintHex; t.sizeFraction = sizeFraction
+                t.bold = bold; t.italic = italic; t.underline = underline; t.outline = outline
+                elements[i] = LayerElement(content: .text(t))
+                return
+            }
+        }
+    }
+
     /// Rewrite just the text element's string (keeps font/style/color), for the layer-name
     /// → text link. No-op if the layer has no text element.
     mutating func setTextString(_ string: String) {
