@@ -6693,6 +6693,11 @@ var appVersionLine: String {
     return "Version \(short) · Build \(build)"
 }
 
+/// The build number alone (= the git commit count, stamped by the post-commit hook).
+var appBuildNumber: String {
+    Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+}
+
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
 
