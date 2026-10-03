@@ -421,9 +421,14 @@ struct LayerInspector: View {
             }
             .padding(14)
         }
-        .onAppear { if targetID == nil { targetID = activeLayerID } }
+        // THE PICKER FOLLOWS THE SELECTION — every time, not just the first. Michael,
+        // 2026-10-03: "glow isnt working" — he had selected Stars, but the picker was
+        // still on Light from earlier, so the glow went onto a full-canvas white layer
+        // with no edge to show. Picking from the menu still overrides, until the next
+        // selection.
+        .onAppear { if let id = activeLayerID { targetID = id } }
         .onChange(of: activeLayerID) { _, new in
-            if targetID == nil { targetID = new }
+            if let new { targetID = new }
         }
     }
 
