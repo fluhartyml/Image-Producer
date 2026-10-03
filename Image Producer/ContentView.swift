@@ -717,9 +717,8 @@ struct ContentView: View {
         func name(_ k: Int) -> String { k == 1 ? "\(base) (Move)" : "\(base) (Move \(k))" }
         while taken.contains(name(n)) { n += 1 }
         document.layers[i].name = name(n)
-        // A text layer mirrors its name from its typed text; leaving that link intact would
-        // let the next keystroke silently wipe the "(Move)" suffix off the committed layer.
-        document.layers[i].nameLinkedToText = false
+        // The "(Move)" suffix is a LABEL (see `ImageLayer.splitLabel`): typing keeps it and
+        // a rename never prints it, so a moved text layer stays linked to its words.
 
         let committedID = document.layers[i].id
         document.layers.insert(original, at: i)   // directly BELOW the committed copy
@@ -2375,7 +2374,9 @@ struct FontPickerInspector: View {
             // rename severs it (see commitRename), after which typed text no longer
             // renames the layer.
             if document.layers[i].isNameLinkedToText {
-                document.layers[i].name = ImageLayer.nameForText(textInput)
+                // Keep the layer's label — "(Dark)", "(copy)" — while its words follow the text.
+                let label = ImageLayer.splitLabel(document.layers[i].name).label
+                document.layers[i].name = ImageLayer.nameForText(textInput) + label
             }
             // Coalesce a typing session into one "Text" step (not one per keystroke).
             document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
@@ -5241,9 +5242,11 @@ struct LayerPanel: View {
             // TWO-WAY FOR WORDS, emoji the exception (his ruling 2026-10-03, see
             // `ImageLayer.nameLinkedToText`). Renaming a word layer rewrites its text and
             // keeps the link; renaming an emoji layer only relabels it.
+            let words = ImageLayer.splitLabel(trimmed).words
             if let current = document.layers[index].textString, !current.isEmojiOnly,
-               !trimmed.isEmojiOnly {
-                document.layers[index].setTextString(trimmed)
+               !words.isEmpty, !words.isEmojiOnly {
+                // Only the WORDS reach the canvas; a trailing "(…)" is a label.
+                document.layers[index].setTextString(words)
                 document.layers[index].name = trimmed
                 document.layers[index].nameLinkedToText = true
             } else {
@@ -5301,7 +5304,7 @@ struct LayerPanel: View {
         guard let i = document.layers.firstIndex(where: { $0.id == id }) else { return }
         var copy = document.layers[i]
         copy.id = UUID()
-        copy.name = document.layers[i].name + " copy"
+        copy.name = document.layers[i].name + " (copy)"   // a label — never typed onto the canvas
         document.captureHistoryBaselineIfNeeded()
         document.layers.insert(copy, at: i + 1)   // i+1 = one step toward the top
         activeLayerID = copy.id

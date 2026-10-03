@@ -569,6 +569,20 @@ struct ImageLayer: Identifiable, Codable {
     /// The layer name for a piece of text: the text itself, or for an emoji-only string
     /// its written name — "🌻" → "Sunflower", "🇺🇸" → "Flag United States". An emoji is
     /// hard to read in the Layers list and hard to type in a rename.
+    /// PARENTHESES ARE A LABEL, NOT TEXT. Michael, 2026-10-03: "build the parentheses
+    /// label because a text copy would type (copy) if it wasnt addressed." Trailing
+    /// "(…)" groups on a name — "(copy)", "(Move)", "(Dark)" — describe the layer and
+    /// never reach the canvas: "Image Producer (Dark)" keeps the words "Image Producer".
+    /// Returns the words and the label (with its leading space), e.g. ("Image Producer", " (Dark)").
+    static func splitLabel(_ name: String) -> (words: String, label: String) {
+        var words = name.trimmingCharacters(in: .whitespaces)
+        while let r = words.range(of: #"\s*\([^()]*\)$"#, options: .regularExpression) {
+            words.removeSubrange(r)
+        }
+        let label = String(name.trimmingCharacters(in: .whitespaces).dropFirst(words.count))
+        return (words, label)
+    }
+
     static func nameForText(_ text: String) -> String {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if t.isEmpty { return "Text" }
