@@ -988,7 +988,7 @@ struct ToolInspector: View {
                                  activeLayerID: activeLayerID,
                                  fillColor: $fillColor)
         case .symbol:
-            SymbolPickerInspector(document: document, activeLayerID: activeLayerID)
+            SymbolPickerInspector(document: document, activeLayerID: $activeLayerID)
         case .text:
             FontPickerInspector(document: document, activeLayerID: activeLayerID)
         case .image:
@@ -1978,10 +1978,15 @@ struct ColorPaletteInspector: View {
 /// Pick an SF Symbol and place it on the active CONTENT layer (single-glyph icon is
 /// the primary case). Tint is user-chosen; picking replaces the layer's symbol so
 /// the user can change their mind. Scale/position via the Move tool.
+/// A SYMBOL GETS ITS OWN LAYER. Michael, 2026-10-03: "the glyph didnt create a new layer" —
+/// picking a tile used to REPLACE the selected layer's content, which wiped his tagline.
+/// Now a pick makes a new layer above the selection, named for the symbol, and selects it;
+/// further picks while that symbol layer is selected swap it in place, so browsing the grid
+/// does not litter the stack.
 struct SymbolPickerInspector: View {
     @EnvironmentObject var pen: PixelPen
     @ObservedObject var document: ImageDocument
-    let activeLayerID: ImageLayer.ID?
+    @Binding var activeLayerID: ImageLayer.ID?
     @State private var search = ""
     @State private var tint: Color = .black
 
@@ -2037,10 +2042,38 @@ struct SymbolPickerInspector: View {
         return document.layers.firstIndex(where: { $0.id == id })
     }
 
-    private var activeIsContent: Bool {
-        guard let i = activeIndex else { return false }
-        if case .content = document.layers[i].role { return true }
-        return false
+    /// The selected layer is one this tool made (a lone SF Symbol or a lone Apple Symbols
+    /// glyph), so a new pick swaps it rather than stacking another layer.
+    private var activeIsSymbolLayer: Bool {
+        guard let i = activeIndex, document.layers[i].elements.count == 1 else { return false }
+        switch document.layers[i].elements[0].content {
+        case .symbol: return true
+        case .text(let t): return t.fontName == "Apple Symbols" && t.string.count == 1
+        default: return false
+        }
+    }
+
+    /// Index of the layer to write into — the selected symbol layer, or a fresh one above
+    /// the selection, named `name` and selected.
+    private func targetIndex(named name: String) -> Int {
+        if activeIsSymbolLayer, let i = activeIndex {
+            document.layers[i].name = name
+            return i
+        }
+        var layer = ImageLayer(name: name, role: .content)
+        layer.nameLinkedToText = false   // the name labels the symbol; it is not typed text
+        let at = document.newLayerIndex(above: activeLayerID)
+        document.layers.insert(layer, at: at)
+        activeLayerID = layer.id
+        return at
+    }
+
+    /// "apple.image.playground.fill" → "Apple Image Playground".
+    private func symbolLayerName(_ systemName: String) -> String {
+        systemName.split(separator: ".")
+            .filter { !["fill", "circle", "square"].contains($0) }
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
     }
 
     private var currentSymbol: String? {
@@ -2090,7 +2123,6 @@ struct SymbolPickerInspector: View {
     private let columns = [GridItem(.adaptive(minimum: 44), spacing: 8)]
 
     var body: some View {
-        if activeIsContent {
             VStack(alignment: .leading, spacing: 12) {
                 PaletteSwatchRow(document: document, color: $tint, label: "Color")
                 TextField("Search SF & Unicode", text: $search)
@@ -2111,11 +2143,6 @@ struct SymbolPickerInspector: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .onAppear { tint = pen.color }   // default the tint to the active palette color
-        } else {
-            PanelPlaceholder(systemImage: "star",
-                             title: "Symbol",
-                             subtitle: "Select the Icon layer (a content layer) to place a symbol")
-        }
     }
 
     /// One tile in the blended grid — an SF Symbol (Image) or a Unicode character (Text),
@@ -2144,8 +2171,8 @@ struct SymbolPickerInspector: View {
     }
 
     private func place(_ name: String) {
-        guard let i = activeIndex else { return }
         document.captureHistoryBaselineIfNeeded()
+        let i = targetIndex(named: symbolLayerName(name))
         document.layers[i].setSymbol(name, tintHex: tint.hexString() ?? "#000000")
         document.recordHistory(toolID: Tool.symbol.rawValue, groupTitle: Tool.symbol.title,
                                actionLabel: "Place Symbol", layerID: document.layers[i].id)
@@ -2156,8 +2183,8 @@ struct SymbolPickerInspector: View {
     /// anything it lacks (e.g. emoji → Apple Color Emoji). Monochrome symbols take the
     /// chosen tint; color emoji keep their own colors.
     private func placeUnicode(_ char: String) {
-        guard let i = activeIndex else { return }
         document.captureHistoryBaselineIfNeeded()
+        let i = targetIndex(named: ImageLayer.nameForText(char))
         document.layers[i].setText(char, fontName: "Apple Symbols",
                                    tintHex: tint.hexString() ?? "#000000")
         document.recordHistory(toolID: Tool.symbol.rawValue, groupTitle: Tool.symbol.title,
