@@ -74,7 +74,7 @@ struct ContentView: View {
     @State private var iconSetResult: String?
     /// A revert awaiting confirmation — it replaces everything done since that point.
     @State private var pendingRevert: Cryochamber.Point?
-    /// Share (roadmap 2.5): a flat 1024 PNG of the visible layers, snapshot at tap.
+    /// Share (roadmap 2.5): a flat PNG of the visible layers at canvas size, snapshot at tap.
     /// About / wordmark sheet — shows the "Image Producer / Graphic Arts" brand inside the app
     /// (the home-screen + App Store name can't carry the subheading).
     @State private var showAbout = false
@@ -513,7 +513,7 @@ struct ContentView: View {
     ///                         not mine, and nothing is destroyed by declining.
     /// → Skills Lab, "Compare on collision; never suffix" · [[feedback_fail_safe_principle]]
     private func saveToDesktop() {
-        guard let png = ContentView.renderIconPNG(document: document, px: 1024) else {
+        guard let png = ContentView.renderCanvasPNG(document: document) else {
             iconSetResult = "The canvas could not be rendered."
             return
         }
@@ -564,13 +564,24 @@ struct ContentView: View {
 
     /// On-demand flat PNG of the visible layers (crop-trimmed) for the native ShareLink.
     private var shareItem: ImageShare {
-        ImageShare(pngData: ContentView.renderIconPNG(document: document, px: 1024) ?? Data(),
+        ImageShare(pngData: ContentView.renderCanvasPNG(document: document) ?? Data(),
                   filename: exportFilename)
     }
 
     /// Pixel sizes still used by the Canvas hub's Web-folder export.
     static let exportPixelSizes: [Int] =
         [16, 20, 29, 32, 40, 58, 60, 64, 76, 80, 87, 120, 128, 152, 167, 180, 256, 512, 1024]
+
+    /// Flatten the visible layers at the CANVAS's own pixel size — what Save to Desktop and
+    /// Share write. They used the square icon render below, so a 1500×500 banner came out a
+    /// 1024×1024 close-up of its middle (found 2026-10-03 on his banner). Mask trim applies.
+    @MainActor static func renderCanvasPNG(document: ImageDocument) -> Data? {
+        guard let cg = renderCanvasImage(document) else { return nil }
+        if let mask = document.cropMask, let cut = mask.clip(cg) {
+            return pngData(from: cut)
+        }
+        return pngData(from: cg)
+    }
 
     /// Flatten the visible layers to a px×px PNG (1024 master; PNG per 2.5.1).
     @MainActor static func renderIconPNG(document: ImageDocument, px: Int) -> Data? {
