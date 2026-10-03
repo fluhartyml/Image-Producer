@@ -729,12 +729,14 @@ struct ImageLayer: Identifiable, Codable {
 
     /// Rewrite the text element's STYLE, keeping its string. For the Text inspector's
     /// live editing of a selected text layer. No-op if there is no text element.
-    mutating func setTextStyle(fontName: String, tintHex: String, sizeFraction: Double,
-                               bold: Bool, italic: Bool, underline: Bool, outline: Bool) {
+    mutating func setTextStyle(fontName: String, tintHex: String,
+                               bold: Bool, italic: Bool, underline: Bool, outline: Bool,
+                               outlineWidth: Double, outlineColorHex: String) {
         for i in elements.indices {
             if case .text(var t) = elements[i].content {
-                t.fontName = fontName; t.colorHex = tintHex; t.sizeFraction = sizeFraction
+                t.fontName = fontName; t.colorHex = tintHex
                 t.bold = bold; t.italic = italic; t.underline = underline; t.outline = outline
+                t.outlineWidth = outlineWidth; t.outlineColorHex = outlineColorHex
                 elements[i] = LayerElement(content: .text(t))
                 return
             }
@@ -958,12 +960,34 @@ struct TextContent: Codable {
     /// Point size as a fraction of the master edge (can reach 1.0 = canvas-filling).
     var sizeFraction = 0.8
     var colorHex = "#000000"
-    /// Style toggles (F tool). `outline` is stored now; its rendering is a follow-up
-    /// (no stock SwiftUI text-outline — needs custom glyph stroking).
+    /// Style toggles (F tool).
     var bold = false
     var italic = false
     var underline = false
+    /// OUTLINE — a stroke around the letters, drawn live on this same layer (no copy, no
+    /// rasterizing). Michael, 2026-10-03, wanting a 1–2 px black edge around white text.
     var outline = false
+    /// Stroke width in CANVAS PIXELS — the unit he asked about ("per pixel or my point?").
+    var outlineWidth: Double = 2
+    var outlineColorHex = "#000000"
+}
+
+extension TextContent {
+    /// Tolerant load: files saved before a field existed open with its default instead of
+    /// failing. (outlineWidth / outlineColorHex arrived 2026-10-03.)
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        string = try c.decodeIfPresent(String.self, forKey: .string) ?? "A"
+        fontName = try c.decodeIfPresent(String.self, forKey: .fontName) ?? "SF Pro"
+        sizeFraction = try c.decodeIfPresent(Double.self, forKey: .sizeFraction) ?? 0.8
+        colorHex = try c.decodeIfPresent(String.self, forKey: .colorHex) ?? "#000000"
+        bold = try c.decodeIfPresent(Bool.self, forKey: .bold) ?? false
+        italic = try c.decodeIfPresent(Bool.self, forKey: .italic) ?? false
+        underline = try c.decodeIfPresent(Bool.self, forKey: .underline) ?? false
+        outline = try c.decodeIfPresent(Bool.self, forKey: .outline) ?? false
+        outlineWidth = try c.decodeIfPresent(Double.self, forKey: .outlineWidth) ?? 2
+        outlineColorHex = try c.decodeIfPresent(String.self, forKey: .outlineColorHex) ?? "#000000"
+    }
 }
 
 struct SymbolContent: Codable {

@@ -2170,8 +2170,11 @@ struct FontPickerInspector: View {
     @State private var italic = false
     @State private var underline = false
     @State private var outline = false
-    /// Text size as a fraction of the canvas's master edge — the model's `sizeFraction`.
-    @State private var size: Double = 0.8
+    /// Text SIZE = the text box's scale (`transform.scale`), because the box is what
+    /// sizes the letters (Model B). Resizing it keeps the center. 1.0 = the short edge.
+    @State private var size: Double = 1.0
+    @State private var outlineWidth: Double = 2
+    @State private var outlineColor: Color = .black
     /// True while the controls are being LOADED from a selected layer, so loading does
     /// not write straight back and record a style change nobody made.
     @State private var adopting = false
@@ -2253,12 +2256,29 @@ struct FontPickerInspector: View {
                     // Fine tune, 1% a click — his ask, 2026-10-03: "the size slider needs an
                     // arrow fine tune adjuster." Same jog-stepper idea as Move's Scale.
                     Stepper("", value: Binding(get: { (size * 100).rounded() },
-                                               set: { size = min(1.0, max(0.05, $0 / 100)) }),
-                            in: 5...100, step: 1)
+                                               set: { size = min(4.0, max(0.05, $0 / 100)) }),
+                            in: 5...400, step: 1)
                         .labelsHidden()
                         .help("Jog the text size by 1%")
                 }
-                Slider(value: $size, in: 0.05...1.0)
+                Slider(value: $size, in: 0.05...4.0)
+            }
+
+            // OUTLINE — a stroke around the letters, live, on this same layer.
+            if outline {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Outline width").font(.system(size: 18)).foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(Int(outlineWidth)) px").font(.system(size: 18).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                        Stepper("", value: $outlineWidth, in: 1...40, step: 1)
+                            .labelsHidden()
+                            .help("Jog the outline by one pixel")
+                    }
+                    Slider(value: $outlineWidth, in: 1...40, step: 1)
+                    PaletteSwatchRow(document: document, color: $outlineColor, label: "Outline color")
+                }
             }
 
             Text("Font").font(.system(size: 18)).foregroundStyle(.secondary)
@@ -2319,7 +2339,9 @@ struct FontPickerInspector: View {
         .onChange(of: italic) { applyStyle() }
         .onChange(of: underline) { applyStyle() }
         .onChange(of: outline) { applyStyle() }
-        .onChange(of: size) { applyStyle() }
+        .onChange(of: size) { applySize() }
+        .onChange(of: outlineWidth) { applyStyle() }
+        .onChange(of: outlineColor) { applyStyle() }
         .onChange(of: tint) { applyStyle() }
     }
 
@@ -2330,10 +2352,22 @@ struct FontPickerInspector: View {
               let i = document.layers.firstIndex(where: { $0.id == id }) else { return }
         document.captureHistoryBaselineIfNeeded()
         document.layers[i].setTextStyle(fontName: family, tintHex: tint.hexString() ?? "#000000",
-                                        sizeFraction: size, bold: bold, italic: italic,
-                                        underline: underline, outline: outline)
+                                        bold: bold, italic: italic, underline: underline,
+                                        outline: outline, outlineWidth: outlineWidth,
+                                        outlineColorHex: outlineColor.hexString() ?? "#000000")
         document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
                                actionLabel: "Text style", layerID: id, coalesce: true)
+    }
+
+    /// Size resizes the text BOX around its center — the box is what sizes the letters.
+    /// (The first Size slider wrote a field the renderer never read; it did nothing.)
+    private func applySize() {
+        guard !adopting, let id = currentTextLayerID,
+              let i = document.layers.firstIndex(where: { $0.id == id }) else { return }
+        document.captureHistoryBaselineIfNeeded()
+        document.layers[i].transform.scale = size
+        document.recordHistory(toolID: Tool.text.rawValue, groupTitle: Tool.text.title,
+                               actionLabel: "Text size", layerID: id, coalesce: true)
     }
 
     @ViewBuilder
@@ -2399,8 +2433,10 @@ struct FontPickerInspector: View {
                 adopting = true
                 family = t.fontName
                 if let c = Color(hex: t.colorHex) { tint = c }
-                size = t.sizeFraction
+                size = document.layers[i].transform.scale
                 bold = t.bold; italic = t.italic; underline = t.underline; outline = t.outline
+                outlineWidth = t.outlineWidth
+                if let c = Color(hex: t.outlineColorHex) { outlineColor = c }
                 recomputeGlyphs()
                 DispatchQueue.main.async { adopting = false }
             }
@@ -2421,8 +2457,10 @@ struct FontPickerInspector: View {
         layer.setText(draft, fontName: family, tintHex: tint.hexString() ?? "#000000",
                       bold: bold, italic: italic, underline: underline, outline: outline)
         layer.setTextStyle(fontName: family, tintHex: tint.hexString() ?? "#000000",
-                           sizeFraction: size, bold: bold, italic: italic,
-                           underline: underline, outline: outline)
+                           bold: bold, italic: italic, underline: underline,
+                           outline: outline, outlineWidth: outlineWidth,
+                           outlineColorHex: outlineColor.hexString() ?? "#000000")
+        layer.transform.scale = size
         // A line finished with Return spawns the next one slightly BELOW it.
         if let prev = lastLineCenter {
             layer.transform.center = CGPoint(x: prev.x, y: min(prev.y + 0.18, 0.95))
@@ -4682,23 +4720,8 @@ struct CanvasView: View {
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .text(let text):
-            Text(text.string)
-                // Model B: text FILLS its box (the Move transform box = center + contentSize).
-                // Font starts at the box height; the text wraps to the box WIDTH and scales
-                // down (minimumScaleFactor) so the whole string fits the rectangle. Reshape
-                // the box → text re-wraps AND re-sizes. Box defaults to the full canvas.
-                .font(.custom(text.fontName, size: max(1, t.contentSize.height * ref)))
-                .bold(text.bold)
-                .italic(text.italic)
-                .underline(text.underline)
-                .foregroundStyle(Color(hex: text.colorHex) ?? .primary)
-                .multilineTextAlignment(.center)
-                .lineLimit(nil)
-                .minimumScaleFactor(0.01)
-                .frame(width: max(1, t.contentSize.width * ref),
-                       height: max(1, t.contentSize.height * ref))
-                .rotationEffect(.degrees(t.rotationDegrees))
-                .position(x: t.center.x * size.width, y: t.center.y * size.height)
+            TextElementView(text: text, t: t, size: size,
+                            pxScale: size.width / max(1, document.canvasPixelSize.width))
         case .image(let imageContent):
             // GREEN KEY, if this layer has one armed: draw the keyed raster instead of
             // the stored one. The stored bytes are never touched — switch the child off
@@ -6189,6 +6212,67 @@ struct ExportSheet: View {
     }
 }
 
+/// A text element as drawn — shared by the editor canvas and the compositor so the two
+/// can never disagree. Model B: the text FILLS its box (the Move transform box); the
+/// font starts at the box height, wraps to the box width and scales down to fit.
+///
+/// OUTLINE: SwiftUI has no text stroke, so the letters are drawn again in the outline
+/// color at every offset on rings out to the width, underneath the fill. Width is in
+/// CANVAS PIXELS; `pxScale` converts to this render's points.
+struct TextElementView: View {
+    let text: TextContent
+    let t: LayerTransform
+    let size: CGSize
+    let pxScale: CGFloat
+
+    var body: some View {
+        let ref = min(size.width, size.height)
+        ZStack {
+            if text.outline, text.outlineWidth > 0 {
+                let c = Color(hex: text.outlineColorHex) ?? .black
+                ForEach(Array(Self.ring(CGFloat(text.outlineWidth) * pxScale).enumerated()),
+                        id: \.offset) { _, p in
+                    glyphs(c, ref).offset(x: p.x, y: p.y)
+                }
+            }
+            glyphs(Color(hex: text.colorHex) ?? .primary, ref)
+        }
+        .rotationEffect(.degrees(t.rotationDegrees))
+        .position(x: t.center.x * size.width, y: t.center.y * size.height)
+    }
+
+    private func glyphs(_ color: Color, _ ref: CGFloat) -> some View {
+        Text(text.string)
+            .font(.custom(text.fontName, size: max(1, t.contentSize.height * ref)))
+            .bold(text.bold)
+            .italic(text.italic)
+            .underline(text.underline)
+            .foregroundStyle(color)
+            .multilineTextAlignment(.center)
+            .lineLimit(nil)
+            .minimumScaleFactor(0.01)
+            .frame(width: max(1, t.contentSize.width * ref),
+                   height: max(1, t.contentSize.height * ref))
+    }
+
+    /// Offsets filling a disc of radius `r`: rings every point out to the edge, with
+    /// enough directions on each ring that no gap opens at that radius. Capped.
+    static func ring(_ r: CGFloat) -> [CGPoint] {
+        guard r > 0 else { return [] }
+        var out: [CGPoint] = []
+        var radius = r
+        while radius > 0 {
+            let n = min(48, max(8, Int((2 * .pi * radius).rounded(.up))))
+            for k in 0..<n {
+                let a = 2 * Double.pi * Double(k) / Double(n)
+                out.append(CGPoint(x: radius * cos(a), y: radius * sin(a)))
+            }
+            radius -= 1
+        }
+        return out
+    }
+}
+
 struct ImageCompositeView: View {
     let document: ImageDocument
     let size: CGSize
@@ -6271,23 +6355,8 @@ struct ImageCompositeView: View {
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .text(let text):
-            Text(text.string)
-                // Model B: text FILLS its box (the Move transform box = center + contentSize).
-                // Font starts at the box height; the text wraps to the box WIDTH and scales
-                // down (minimumScaleFactor) so the whole string fits the rectangle. Reshape
-                // the box → text re-wraps AND re-sizes. Box defaults to the full canvas.
-                .font(.custom(text.fontName, size: max(1, t.contentSize.height * ref)))
-                .bold(text.bold)
-                .italic(text.italic)
-                .underline(text.underline)
-                .foregroundStyle(Color(hex: text.colorHex) ?? .primary)
-                .multilineTextAlignment(.center)
-                .lineLimit(nil)
-                .minimumScaleFactor(0.01)
-                .frame(width: max(1, t.contentSize.width * ref),
-                       height: max(1, t.contentSize.height * ref))
-                .rotationEffect(.degrees(t.rotationDegrees))
-                .position(x: t.center.x * size.width, y: t.center.y * size.height)
+            TextElementView(text: text, t: t, size: size,
+                            pxScale: size.width / max(1, document.canvasPixelSize.width))
         case .image(let imageContent):
             // GREEN KEY in the EXPORT path too. Missing it here would key the canvas and
             // ship the unkeyed image — the worst kind of bug, because it looks right
