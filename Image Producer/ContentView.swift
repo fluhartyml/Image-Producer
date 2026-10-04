@@ -370,7 +370,10 @@ struct ContentView: View {
                 showNewImageSheet = true
             }
         }
-        .sheet(isPresented: $showNewImageSheet) { NewImageSheet(document: document) }
+        // Sized to its contents — the iPad's default sheet left most of it empty (his note).
+        .sheet(isPresented: $showNewImageSheet) {
+            NewImageSheet(document: document).presentationSizing(.fitted)
+        }
         // ⚠️ ALL .primaryAction, AND THAT IS THE FIX, NOT A STYLE CHOICE.
         //
         // These were .secondaryAction and their .help() tooltips never appeared — only the
