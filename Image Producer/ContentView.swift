@@ -1620,6 +1620,63 @@ struct CanvasInspector: View {
         // and renaming it from the New Image sheet must not leave an Untitled copy behind.
         let isStillAutoNamed = current.range(of: #"^(ImageProducer\d{4}|Untitled( \d+)?)$"#,
                                              options: .regularExpression) != nil
+
+        #if os(iOS)
+        // ⛔ ON iPAD/iPHONE THE SYSTEM OWNS THE OPEN FILE. The DocumentGroup keeps a UIDocument
+        // on it, and moving the file out from under that document does NOT move the
+        // document: on leaving the editor it saved itself back under the OLD name, so
+        // "Untitled" came back beside the renamed file (2026-10-03 and again 10-04 — his
+        // report: "it saved both and didnt delete untitled"). So the rename goes THROUGH the
+        // system document — the same rename as the title-bar menu — and it follows itself.
+        if let (systemDoc, navItem) = Self.systemDocument(at: url) {
+            if isStillAutoNamed {
+                systemRename(systemDoc, navItem: navItem, to: clean) { ok in
+                    if ok { document.say("Renamed to \(clean)", kind: .info) }
+                }
+            } else {
+                // Keep the previous file (his rule above): copy it aside, rename the open
+                // document, then put the copy back under the old name, which is free again.
+                let keepURL = url.deletingLastPathComponent()
+                    .appendingPathComponent("\(current) keep-\(UUID().uuidString.prefix(8))")
+                    .appendingPathExtension(url.pathExtension)
+                work.async {
+                    var coordErr: NSError?
+                    var copied = false
+                    coordinator.coordinate(readingItemAt: url, options: [],
+                                           writingItemAt: keepURL, options: .forReplacing, error: &coordErr) { src, dst in
+                        copied = (try? FileManager.default.copyItem(at: src, to: dst)) != nil
+                    }
+                    DispatchQueue.main.async {
+                        guard copied, coordErr == nil else {
+                            renameError = true; draftName = displayName
+                            document.say("Save As failed — could not keep a copy of \(current)", kind: .warning)
+                            return
+                        }
+                        systemRename(systemDoc, navItem: navItem, to: clean) { ok in
+                            work.async {
+                                var putBackErr: NSError?
+                                NSFileCoordinator().coordinate(writingItemAt: keepURL, options: .forMoving,
+                                                               writingItemAt: url, options: .forReplacing,
+                                                               error: &putBackErr) { src, dst in
+                                    // Renamed: the old name is free, the copy takes it back.
+                                    // Not renamed: the original is still there, the copy is litter.
+                                    if ok { try? FileManager.default.moveItem(at: src, to: dst) }
+                                    else { try? FileManager.default.removeItem(at: src) }
+                                }
+                                if ok {
+                                    DispatchQueue.main.async {
+                                        document.say("Saved as \(clean) — \(current) kept", kind: .info)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return
+        }
+        #endif
+
         if isStillAutoNamed {
           work.async {
             var coordErr: NSError?
@@ -1705,6 +1762,50 @@ struct CanvasInspector: View {
         }
       }
     }
+
+    #if os(iOS)
+    /// The system's own UIDocument for `url` — the one the DocumentGroup opened — found by
+    /// walking the window's view controllers to the UIDocumentViewController that holds it.
+    /// Paths are compared after resolving symlinks (/var vs /private/var).
+    static func systemDocument(at url: URL) -> (UIDocument, UINavigationItem)? {
+        let target = url.standardizedFileURL.resolvingSymlinksInPath().path
+        func search(_ vc: UIViewController?) -> (UIDocument, UINavigationItem)? {
+            guard let vc else { return nil }
+            if let dvc = vc as? UIDocumentViewController, let doc = dvc.document,
+               doc.fileURL.standardizedFileURL.resolvingSymlinksInPath().path == target {
+                return (doc, dvc.navigationItem)
+            }
+            for child in vc.children { if let hit = search(child) { return hit } }
+            return search(vc.presentedViewController)
+        }
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            for window in scene.windows { if let hit = search(window.rootViewController) { return hit } }
+        }
+        return nil
+    }
+
+    /// Rename through the system document — UIDocument's own rename (iOS 17+), the one the
+    /// title-bar menu uses — so the open document moves WITH its file. Reports success only
+    /// once the document's URL actually carries the new name: a rename that was asked for is
+    /// not a rename that happened.
+    private func systemRename(_ systemDoc: UIDocument, navItem: UINavigationItem,
+                              to clean: String, completion: @escaping (Bool) -> Void) {
+        systemDoc.navigationItem(navItem, didEndRenamingWithTitle: clean)
+        Task { @MainActor in
+            for _ in 0..<50 {                                   // up to 5 s for iCloud
+                if systemDoc.fileURL.deletingPathExtension().lastPathComponent == clean {
+                    document.movedFileURL = systemDoc.fileURL   // autosave follows it
+                    completion(true)
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            renameError = true; draftName = displayName
+            document.say("Rename to \(clean) did not happen — the file keeps its name", kind: .warning)
+            completion(false)
+        }
+    }
+    #endif
 
     /// The name to show: the FILE name when the project is saved (authoritative), else
     /// the working/internal name. Fixes "shows Untitled when I opened erasertime.picprod."

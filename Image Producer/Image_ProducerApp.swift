@@ -264,7 +264,16 @@ struct Image_ProducerApp: App {
         // docs are created as .imageProject (the first writable content type).
         #if !os(macOS)
         DocumentGroupLaunchScene("Image Producer") {
-            NewDocumentButton("New Image", contentType: .imageProject)
+            // NUMBERED, LIKE THE MAC — his report, 2026-10-04: New Image made "Untitled" where
+            // the Mac makes ImageProducer{number}. The system creates the new document from
+            // the file returned here, under that file's name.
+            NewDocumentButton("New Image", contentType: .imageProject) {
+                guard let numbered = ImageDocument.nextProjectURL() else { return nil }
+                let template = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(numbered.lastPathComponent)
+                try? FileManager.default.removeItem(at: template)
+                return await ImageDocument.writeNewProject(at: template) ? template : nil
+            }
         } background: {
             // FOLLOWS LIGHT / DARK MODE — Michael, 2026-10-03, on his iPad in light mode:
             // "the background is too dark and im in lightmode". It was a fixed navy, which
