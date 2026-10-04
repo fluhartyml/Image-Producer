@@ -335,25 +335,32 @@ struct ContentView: View {
                 // visible at once, using the gap the square canvas leaves to the
                 // right (Michael 2026-06-11: iPad is landscape-locked in a Magic
                 // Keyboard, so landscape needs full tooling, not the bare layout).
+                // HALF AND HALF (his rule, 2026-10-04): the canvas takes the first half of
+                // the window; tool box, inspector and layers share the other half. Proportional,
+                // not fixed widths, so it holds on any window size — iPhone Duo included.
                 HStack(spacing: 0) {
                     canvasArea
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(width: geo.size.width / 2)
+                        .frame(maxHeight: .infinity)
                     Divider()
-                    ToolRail(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
-                    Divider()
-                    ToolInspector(document: document,
-                                  camera: camera,
-                                  activeTool: activeTool,
-                                  activeLayerID: $activeLayerID,
-                                  fillColor: $fillColor,
-                                  fileURL: fileURL)
-                        .frame(width: 300)
-                    Divider()
-                    // Right column: Layers with History "behind" it (spec: undo is the History
-                    // panel sitting behind the layer list). The wide/Mac layout used to hardcode
-                    // only LayerPanel, so History was unreachable on Mac — this restores it.
-                    LayersHistoryColumn(document: document, activeLayerID: $activeLayerID)
-                        .frame(width: 320)
+                    HStack(spacing: 0) {
+                        ToolRail(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
+                        Divider()
+                        ToolInspector(document: document,
+                                      camera: camera,
+                                      activeTool: activeTool,
+                                      activeLayerID: $activeLayerID,
+                                      fillColor: $fillColor,
+                                      fileURL: fileURL)
+                            .frame(maxWidth: .infinity)
+                        Divider()
+                        // Right column: Layers with History "behind" it (spec: undo is the History
+                        // panel sitting behind the layer list). The wide/Mac layout used to hardcode
+                        // only LayerPanel, so History was unreachable on Mac — this restores it.
+                        LayersHistoryColumn(document: document, activeLayerID: $activeLayerID)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
