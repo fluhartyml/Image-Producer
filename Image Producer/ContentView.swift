@@ -3613,6 +3613,14 @@ struct HistoryPanel: View {
                             isPresented: $confirmingPurge, titleVisibility: .visible) {
             Button("Purge History", role: .destructive) { document.purgeHistory() }
             Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Keeps the current image and clears the entire edit trail. This can't be undone.")
+        }
+        // ⛔ A SIBLING OF THE PURGE DIALOG, NEVER INSIDE IT. It was nested in Purge's action
+        // list — attached to its Cancel button — so it only existed while Purge was open.
+        // It compiled, and every Restore / Delete / Keep this step silently did nothing
+        // (his iPad, 2026-10-04: "delete this step did nothing and restore from this step
+        // did nothing"). The status bar proved it: no "History —" line was ever posted.
         .confirmationDialog(pending?.title ?? "",
                             isPresented: Binding(get: { pending != nil },
                                                  set: { if !$0 { pending = nil } }),
@@ -3621,9 +3629,6 @@ struct HistoryPanel: View {
             Button("Cancel", role: .cancel) { pending = nil }
         } message: { edit in
             Text(edit.message)
-        }
-        } message: {
-            Text("Keeps the current image and clears the entire edit trail. This can't be undone.")
         }
     }
 
