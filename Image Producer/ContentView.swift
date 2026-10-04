@@ -1294,18 +1294,19 @@ struct CanvasInspector: View {
         VStack(alignment: .leading, spacing: 16) {
             // --- Project name ---
             VStack(alignment: .leading, spacing: 6) {
-                Text("Project name").font(.system(size: 18)).foregroundStyle(.secondary)
+                // The LABEL is lighter than the NAME it labels (his rule, 2026-10-04).
+                Text("Project name").font(.system(size: 18, weight: .light)).foregroundStyle(.secondary)
                 if fileURL == nil {
                     // Untitled: editable working name (becomes the manifest name on first save).
                     TextField("Project name", text: $draftName)
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18))
+                        .textFieldStyle(.roundedBorder).font(.system(size: 18, weight: .semibold))
                         .onSubmit { commitName() }
                     Text("Working name for this untitled project.")
                         .font(.system(size: 18)).foregroundStyle(.primary)
                 } else {
                     // Saved: editing here renames the FILE on disk (one-stop — no trip to Finder).
                     TextField("Project name", text: $draftName)
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18))
+                        .textFieldStyle(.roundedBorder).font(.system(size: 18, weight: .semibold))
                         .onSubmit { renameFile() }
                     Text("Renames the file on disk. Press Return to apply.")
                         .font(.system(size: 18)).foregroundStyle(.primary)
