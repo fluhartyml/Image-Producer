@@ -357,13 +357,21 @@ struct ContentView: View {
                 // the window; tool box, inspector and layers share the other half. Proportional,
                 // not fixed widths, so it holds on any window size — iPhone Duo included.
                 HStack(spacing: 0) {
-                    canvasArea
-                        .frame(width: geo.size.width / 2)
-                        .frame(maxHeight: .infinity)
+                    // THE TOOL BOX SITS UNDER THE CANVAS — his call, 2026-10-04: "can it be
+                    // horizontal at the bottom below the canvas? the layout is probably what
+                    // needs attention." The canvas is width-limited in this half, so the strip
+                    // uses height that was empty anyway, and its old column goes back to the
+                    // inspector and layers, which were starved for width.
+                    VStack(spacing: 0) {
+                        canvasArea
+                            .frame(maxHeight: .infinity)
+                        Divider()
+                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
+                            .frame(height: 104)
+                    }
+                    .frame(width: geo.size.width / 2)
                     Divider()
                     HStack(spacing: 0) {
-                        ToolRail(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
-                        Divider()
                         // FOCUS-DRIVEN DIVIDER (his spec, 2026-10-04): 50/50 to start, then
                         // whichever panel was last tapped gets 66/33. A simultaneous TAP only,
                         // so it never fires mid-drag and never steals the tap from a control.
