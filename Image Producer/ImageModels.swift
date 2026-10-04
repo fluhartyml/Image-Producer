@@ -57,6 +57,9 @@ final class ImageDocument: ObservableObject {
     /// The Canvas inspector's "Single image…" button asks the editor to open its Export
     /// sheet. Not saved; consumed at once.
     @Published var exportSheetRequested = false
+    /// Set by a fluid canvas resize, which rewrites every layer's placement at once:
+    /// tells the linked-layer follower to skip that one change. Not saved; consumed once.
+    var skipLinkFollowOnce = false
     /// Nothing has happened to this document yet: no recorded edits and every layer blank.
     /// iPad/iPhone "New Image" writes the new file and then OPENS it from disk, so the
     /// in-memory `openedAsNew` flag never survives there — this is how the editor still

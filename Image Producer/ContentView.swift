@@ -315,7 +315,10 @@ struct ContentView: View {
         // LINKED LAYERS follow each other — one rule for every control that places a
         // layer. See LayerLink.swift.
         .onChange(of: LinkSnapshot(document), initial: true) {
-            if let base = linkBaseline { followLinkedLayers(from: base, in: document) }
+            // A fluid canvas resize moves EVERY layer at once; that is not a user move,
+            // so linked partners must not follow it a second time.
+            if document.skipLinkFollowOnce { document.skipLinkFollowOnce = false }
+            else if let base = linkBaseline { followLinkedLayers(from: base, in: document) }
             linkBaseline = LinkSnapshot(document)
         }
     }
@@ -1281,6 +1284,9 @@ struct CanvasInspector: View {
     @State private var renameError = false
     /// Set when an aspect preset leaves the canvas below a target's stated minimum.
     @State private var aspectWarning: String?
+    /// How the Pixels fields reshape the canvas. Set by the last preset applied, or by
+    /// hand. Per window, not saved with the project.
+    @State private var sizeRule: CanvasSizeRule = .exact
     // Export (sections C/D)
     @State private var exportData = Data()
     @State private var exportType: UTType = .pdf
@@ -1351,12 +1357,24 @@ struct CanvasInspector: View {
                 // art scales-to-fit the new shape, letterboxed on the background.
                 HStack(spacing: 6) {
                     Text("Pixels").font(.system(size: 18)).frame(width: 92, alignment: .leading)
-                    TextField("W", value: $document.canvasWidth, format: .number)
+                    TextField("W", value: widthBinding, format: .number)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
+                        .disabled(sizeRule == .fluidHeight)
                     Text("×").font(.system(size: 18))
-                    TextField("H", value: $document.canvasHeight, format: .number)
+                    TextField("H", value: heightBinding, format: .number)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
+                        .disabled(sizeRule == .fluidWidth)
                     Text("px").font(.system(size: 18)).foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 8) {
+                    Text("Size rule").font(.system(size: 18)).frame(width: 92, alignment: .leading)
+                    Picker("Size rule", selection: $sizeRule) {
+                        ForEach(CanvasSizeRule.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.menu).labelsHidden().font(.system(size: 18)).fixedSize()
+                    InfoTip("What is the size rule?",
+                            "Exact: type any width and height. Fixed ratio: the shape is locked — change one side and the other follows. Fluid width: the height stays put and the width is free; fluid height is the reverse. A fluid change adds or removes canvas on that side and the artwork keeps its size and stays centered — nothing is letterboxed.")
                 }
 
                 Picker("Units", selection: $unitRaw) {
@@ -1387,15 +1405,22 @@ struct CanvasInspector: View {
 
                 // Standard non-square shapes. A preset sets pixels = physical × current PPI.
                 Toggle("Landscape", isOn: landscapeBinding).font(.system(size: 18)).fixedSize()
+                // The catalog, by job, in subsets (CanvasPresets.swift). Each item shows its
+                // numbers, shape and size rule on a second line.
                 Menu("Canvas size presets") {
-                    Section("Photo")          { presetButtons(Self.photoPresets) }
-                    Section("Paper")          { presetButtons(Self.paperPresets) }
-                    Section("Index card")     { presetButtons(Self.indexPresets) }
-                    Section("Business card")  { presetButtons(Self.businessPresets) }
-                    Section("Envelope")       { presetButtons(Self.envelopePresets) }
-                    Section("Screen") {
-                        aspectPresetButtons(Self.screenAspectPresets)
-                        pixelPresetButtons(Self.screenPresets)
+                    ForEach(CanvasPreset.catalog) { group in
+                        Menu(group.title) {
+                            ForEach(group.subsets) { subset in
+                                Section(subset.title) {
+                                    ForEach(subset.presets) { preset in
+                                        Button { applyCatalogPreset(preset) } label: {
+                                            Text(preset.label)
+                                            Text(preset.subtitle)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 .font(.system(size: 18)).fixedSize()
@@ -1886,6 +1911,77 @@ struct CanvasInspector: View {
         let w = unit.fromInches(Double(document.canvasWidth) / max(1, document.ppi))
         let h = unit.fromInches(Double(document.canvasHeight) / max(1, document.ppi))
         return String(format: "%.2f × %.2f %@", w, h, unit.label)
+    }
+
+    /// Apply a catalog preset, then adopt its size rule for later Pixels edits.
+    private func applyCatalogPreset(_ p: CanvasPreset) {
+        switch p.size {
+        case .inches(let w, let h):
+            document.canvasWidth = max(1, Int((w * document.ppi).rounded()))
+            document.canvasHeight = max(1, Int((h * document.ppi).rounded()))
+            aspectWarning = nil
+        case .pixels(let w, let h):
+            document.canvasWidth = max(1, w)
+            document.canvasHeight = max(1, h)
+            aspectWarning = nil
+        case .ratio(let w, let h, let min):
+            applyAspectPreset(CanvasAspectPreset(label: p.label, ratioW: w, ratioH: h, minLongEdge: min))
+        }
+        sizeRule = p.rule
+    }
+
+    /// The Pixels fields, routed through the size rule.
+    private var widthBinding: Binding<Int> {
+        Binding(get: { document.canvasWidth }, set: { w in
+            let w = max(1, w)
+            switch sizeRule {
+            case .exact, .fluidHeight:
+                document.canvasWidth = w
+            case .ratio:
+                let h = Int((Double(w) * Double(document.canvasHeight) / Double(max(1, document.canvasWidth))).rounded())
+                document.canvasWidth = w; document.canvasHeight = max(1, h)
+            case .fluidWidth:
+                extendCanvas(width: w, height: document.canvasHeight)
+            }
+        })
+    }
+    private var heightBinding: Binding<Int> {
+        Binding(get: { document.canvasHeight }, set: { h in
+            let h = max(1, h)
+            switch sizeRule {
+            case .exact, .fluidWidth:
+                document.canvasHeight = h
+            case .ratio:
+                let w = Int((Double(h) * Double(document.canvasWidth) / Double(max(1, document.canvasHeight))).rounded())
+                document.canvasHeight = h; document.canvasWidth = max(1, w)
+            case .fluidHeight:
+                extendCanvas(width: document.canvasWidth, height: h)
+            }
+        })
+    }
+
+    /// FLUID RESIZE — add or remove canvas without touching the artwork (his ruling,
+    /// 2026-10-04: fluid, "no letterbox"). Layers are sized against the canvas's SHORT
+    /// edge and placed as fractions of width × height, so a plain size change would
+    /// rescale or spread them. This rewrites every layer's transform so each keeps its
+    /// pixel size and its pixel offset from the canvas center: the new space grows evenly
+    /// on both sides and the art stays put in the middle.
+    private func extendCanvas(width w1: Int, height h1: Int) {
+        let w0 = Double(document.canvasWidth), h0 = Double(document.canvasHeight)
+        let W1 = Double(w1), H1 = Double(h1)
+        guard w0 > 0, h0 > 0, W1 > 0, H1 > 0, (W1, H1) != (w0, h0) else { return }
+        let ref0 = min(w0, h0), ref1 = min(W1, H1)
+        for i in document.layers.indices {
+            var t = document.layers[i].transform
+            t.scale = t.scale * ref0 / ref1
+            t.center = CGPoint(x: (t.center.x * w0 + (W1 - w0) / 2) / W1,
+                               y: (t.center.y * h0 + (H1 - h0) / 2) / H1)
+            document.layers[i].transform = t
+        }
+        // Every layer moved together on purpose — linked partners must not "follow" it.
+        document.skipLinkFollowOnce = true
+        document.canvasWidth = w1
+        document.canvasHeight = h1
     }
 
     @ViewBuilder private func presetButtons(_ list: [CanvasSizePreset]) -> some View {
