@@ -517,6 +517,10 @@ struct ContentView: View {
         // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
         // targeting the focused document.
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
+        // The Canvas inspector's "Single image…" button asks for the same sheet.
+        .onChange(of: document.exportSheetRequested) {
+            if document.exportSheetRequested { document.exportSheetRequested = false; showExportSheet = true }
+        }
         // File ▸ Revert to Open / Revert to Last Save — nil (disabled) until frozen.
         .focusedSceneValue(\.revertToOpenAction,
                            window.hasFrozenOpen ? { pendingRevert = .open } : nil)
@@ -1289,7 +1293,19 @@ struct CanvasInspector: View {
     @State private var flattenLayerPDF = false
     @State private var layerMatte: Color = .white
     @State private var importingPDF = false
-    @State private var showNameInfo = false
+    /// FedEx Office's per-file upload limit. Used to WARN only — never to stop an export.
+    static let printShopUploadLimit = 150 * 1024 * 1024
+
+    /// The Export (i). The iPad has no ⌘ key, so it names the button instead (his catch,
+    /// 2026-10-04: "on an ipad there is no command key").
+    static var exportInfo: String {
+        #if os(macOS)
+        let single = "Single image makes one PNG, JPEG, TIFF or PDF (also File ▸ Export, ⌘E)."
+        #else
+        let single = "Single image makes one PNG, JPEG, TIFF or PDF (also the Export button at the top right)."
+        #endif
+        return "Print PDF is the trim size plus bleed and crop marks, for a printer. Web folder is PNGs at 1x, 2x and 3x. Icon — all sizes is every app-icon size from 16 to 1024 as PNGs. " + single
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1300,18 +1316,9 @@ struct CanvasInspector: View {
                 // "renames the file on disk is cluttered and should be behind (i)".
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("Project name").font(.system(size: 18, weight: .light)).foregroundStyle(.secondary)
-                    Button { showNameInfo.toggle() } label: { Image(systemName: "info.circle") }
-                        .buttonStyle(.plain).foregroundStyle(.secondary)
-                        .help("More about the project name")
-                        .popover(isPresented: $showNameInfo) {
-                            Text(fileURL == nil
-                                 ? "Working name for this untitled project."
-                                 : "Renames the file on disk. Press Return to apply.")
-                                .font(.system(size: 18))
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(width: 300)
-                                .padding()
-                        }
+                    InfoTip("More about the project name",
+                            fileURL == nil ? "Working name for this untitled project."
+                                           : "Renames the file on disk. Press Return to apply.")
                 }
                 if fileURL == nil {
                     // Untitled: editable working name (becomes the manifest name on first save).
@@ -1334,7 +1341,11 @@ struct CanvasInspector: View {
 
             // --- B · Dimensions & Resolution ---
             VStack(alignment: .leading, spacing: 10) {
-                Text("Dimensions & Resolution").font(.system(size: 20, weight: .semibold))
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Dimensions & Resolution").font(.system(size: 20, weight: .semibold))
+                    InfoTip("More about size and resolution",
+                            "Resolution (PPI) changes the print size losslessly — pixels stay. Editing Pixels or applying a size preset changes the pixel count; existing art scales to fit, letterboxed on the background. Set Resolution first (300 for print), then pick a size.")
+                }
 
                 // Pixels — editable W × H. This is the explicit pixel-count change; existing
                 // art scales-to-fit the new shape, letterboxed on the background.
@@ -1393,34 +1404,13 @@ struct CanvasInspector: View {
                     Text(aspectWarning)
                         .font(.system(size: 18)).foregroundStyle(.orange)
                 }
-
-                Text("Resolution (PPI) changes the print size losslessly — pixels stay. Editing Pixels or applying a size preset changes the pixel count; existing art scales to fit, letterboxed on the background. Set Resolution first (300 for print), then pick a size.")
-                    .font(.system(size: 18)).foregroundStyle(.primary)
-            }
-
-            Divider()
-
-            // --- File attributes ---
-            VStack(alignment: .leading, spacing: 8) {
-                Text("File").font(.system(size: 20, weight: .semibold))
-                attrRow("Location", locationText)
-                #if os(macOS)
-                if let url = fileURL {
-                    Button { NSWorkspace.shared.activateFileViewerSelecting([url]) } label: {
-                        Label("Reveal in Finder", systemImage: "folder").font(.system(size: 18))
-                    }
-                    .buttonStyle(.bordered)
-                }
-                #endif
-                attrRow("Type", typeText)
-                attrRow("Last saved", savedText)
-                attrRow("Size", sizeText)
-                attrRow("State", stateText)
             }
 
             Divider()
 
             // --- C · Print setup ---
+            // Every term is explained behind (i), in words for someone new to printing —
+            // his call, 2026-10-04. The screen keeps only the controls.
             VStack(alignment: .leading, spacing: 10) {
                 Text("Print setup").font(.system(size: 20, weight: .semibold))
                 HStack(spacing: 8) {
@@ -1434,25 +1424,35 @@ struct CanvasInspector: View {
                         Button("3 mm") { document.bleedInches = 3.0 / 25.4 }
                     } label: { Image(systemName: "chevron.down.circle").font(.system(size: 18)) }
                     .fixedSize()
+                    InfoTip("What is bleed?",
+                            "Extra picture past the edge of the page. The shop trims just inside it, so the color runs right to the edge with no white sliver. 1/8 inch is the U.S. standard; 3 mm is metric.")
                 }
                 HStack(spacing: 8) {
                     Text("Safe margin").font(.system(size: 18)).frame(width: 92, alignment: .leading)
                     TextField("in", value: $document.safeMarginInches, format: .number.precision(.fractionLength(0...3)))
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
                     Text("in").font(.system(size: 18)).foregroundStyle(.secondary)
+                    InfoTip("What is the safe margin?",
+                            "Keep text and faces inside this line. The cut can drift a little, and anything too close to the edge may get trimmed off.")
                 }
-                Toggle("Crop / trim marks", isOn: $document.cropMarks).font(.system(size: 18))
-                Toggle("Registration marks", isOn: $document.registrationMarks).font(.system(size: 18))
+                HStack(spacing: 6) {
+                    Toggle("Crop / trim marks", isOn: $document.cropMarks).font(.system(size: 18))
+                    InfoTip("What are crop marks?",
+                            "Small lines at the corners that show the shop exactly where to cut.")
+                }
+                HStack(spacing: 6) {
+                    Toggle("Registration marks", isOn: $document.registrationMarks).font(.system(size: 18))
+                    InfoTip("What are registration marks?",
+                            "Target marks a printing press uses to line up each ink. Home and copy-shop printers don't need them.")
+                }
                 HStack(spacing: 8) {
                     Text("Color").font(.system(size: 18)).frame(width: 92, alignment: .leading)
                     Picker("Color", selection: $document.colorSpaceCMYK) {
                         Text("RGB").tag(false); Text("CMYK").tag(true)
                     }
                     .pickerStyle(.segmented).labelsHidden()
-                }
-                if document.colorSpaceCMYK {
-                    Text("CMYK is saved on the project; the PDF currently exports RGB (a true ICC RGB→CMYK conversion is a later step).")
-                        .font(.system(size: 18)).foregroundStyle(.primary)
+                    InfoTip("RGB or CMYK?",
+                            "RGB is screen color, made of light. CMYK is printing ink: cyan, magenta, yellow and black. Shops convert RGB for you, so pick CMYK only if the printer asks for it.\n\nFor now the PDF always exports RGB; CMYK is saved with the project for later.")
                 }
             }
 
@@ -1460,9 +1460,18 @@ struct CanvasInspector: View {
 
             // --- D · Export ---
             VStack(alignment: .leading, spacing: 10) {
-                Text("Export").font(.system(size: 20, weight: .semibold))
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Export").font(.system(size: 20, weight: .semibold))
+                    InfoTip("More about exporting", Self.exportInfo)
+                }
                 Button {
                     if let data = makePrintPDF(document) {
+                        // A WARNING, NEVER A GATE — his ruling, 2026-10-04: "it warns but is NOT
+                        // a gate keeper, we dont work for fedex kinkos". The export always runs.
+                        if data.count > Self.printShopUploadLimit {
+                            let size = ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
+                            document.say("Print PDF is \(size) — over 150 MB, FedEx Office's upload limit", kind: .warning)
+                        }
                         exportData = data; exportType = .pdf
                         exportFilename = displayName; showDataExporter = true
                     }
@@ -1481,15 +1490,23 @@ struct CanvasInspector: View {
                 } label: { Label("Icon — all sizes (PNG folder)", systemImage: "square.and.arrow.up.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
                 .help("Every app-icon size from 16 to 1024, as a folder of PNGs")
-                Text("Print PDF = trim + bleed. Web = PNGs @1x/2x/3x. Icon — all sizes = every app-icon size (16→1024) as a PNG folder. For a single PNG/JPEG/TIFF/PDF, use Export (⌘E) and pick the format.")
-                    .font(.system(size: 18)).foregroundStyle(.primary)
+                // Every export from right here — no shortcut needed (an iPad has no ⌘ key).
+                Button { document.exportSheetRequested = true } label: {
+                    Label("Single image…", systemImage: "photo").font(.system(size: 18)).frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .help("One PNG, JPEG, TIFF or PDF — pick the format")
             }
 
             Divider()
 
             // --- E · Layer PDF (round-trips with the importer below) ---
             VStack(alignment: .leading, spacing: 10) {
-                Text("Layer PDF").font(.system(size: 20, weight: .semibold))
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Layer PDF").font(.system(size: 20, weight: .semibold))
+                    InfoTip("More about layer PDFs",
+                            "Export writes page 1 as the finished picture, then one page per layer, with see-through areas kept. Import brings each page of a PDF in as its own editable layer.\n\nFlatten puts a matte behind the see-through parts: a solid color, because most printers can't print \"nothing\". Flatten only for print.")
+                }
                 Button {
                     let matte = flattenLayerPDF ? layerMatte.cgColorResolved : nil
                     if let data = makeLayerPDF(document, matte: matte) {
@@ -1507,15 +1524,33 @@ struct CanvasInspector: View {
                         Text("Matte color").font(.system(size: 18))
                     }
                 }
-                Text("Export writes page 1 = the composite, then one page per layer — transparency preserved (flatten only for print).")
-                    .font(.system(size: 18)).foregroundStyle(.primary)
                 Button {
                     importingPDF = true
                 } label: { Label("Import PDF as layers…", systemImage: "square.and.arrow.down.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .help("Bring each page of a PDF in as its own editable image layer")
                 .buttonStyle(.bordered)
-                Text("Import brings each page in as its own editable image layer.")
-                    .font(.system(size: 18)).foregroundStyle(.primary)
+            }
+
+            Divider()
+
+            // File sits at the BOTTOM — his call, 2026-10-04: "file section should be near
+            // the bottom". It is reference, not something you work in.
+            // --- File attributes ---
+            VStack(alignment: .leading, spacing: 8) {
+                Text("File").font(.system(size: 20, weight: .semibold))
+                attrRow("Location", locationText)
+                #if os(macOS)
+                if let url = fileURL {
+                    Button { NSWorkspace.shared.activateFileViewerSelecting([url]) } label: {
+                        Label("Reveal in Finder", systemImage: "folder").font(.system(size: 18))
+                    }
+                    .buttonStyle(.bordered)
+                }
+                #endif
+                attrRow("Type", typeText)
+                attrRow("Last saved", savedText)
+                attrRow("Size", sizeText)
+                attrRow("State", stateText)
             }
 
         }
@@ -6444,6 +6479,31 @@ final class PixelPen: ObservableObject {
 /// menu in the menu bar; Michael, 2026-09-16, standing in the ⌘E sheet looking for it:
 /// *"why are there two locations? can you remove the drop down menu and relocate to the
 /// command e dialog popup?"* One place to export from.
+/// THE (i) — the one way this app tucks an explanation away. His rule, 2026-10-03/04:
+/// text on screen is concise, and the detail lives behind (i). One control, so every
+/// (i) looks and behaves the same.
+struct InfoTip: View {
+    let help: String
+    let text: String
+    @State private var shown = false
+    init(_ help: String, _ text: String) { self.help = help; self.text = text }
+
+    var body: some View {
+        Button { shown.toggle() } label: { Image(systemName: "info.circle").font(.system(size: 18)) }
+            .buttonStyle(.plain).foregroundStyle(.secondary)
+            .help(help)
+            .accessibilityLabel(help)
+            .popover(isPresented: $shown) {
+                Text(text)
+                    .font(.system(size: 18))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: 320)
+                    .padding()
+                    .presentationCompactAdaptation(.popover)
+            }
+    }
+}
+
 struct ExportSheet: View {
     @ObservedObject var document: ImageDocument
     /// Runs the icon-set export (it brings up its own folder panel and reports the result).
