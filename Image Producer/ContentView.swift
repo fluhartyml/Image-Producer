@@ -91,6 +91,10 @@ struct ContentView: View {
     @State private var canvasZoom: CGFloat = 1
     /// Focus mode: hide the tool strip + panel so the canvas fills the whole editor.
     @State private var canvasFocused = false
+    /// Which side panel was touched last — it gets two-thirds of the inspector/layers
+    /// space, the other one-third. nil = 50/50, the opening state (his spec, 2026-10-04).
+    @State private var sidePanelFocus: SidePanelFocus?
+    enum SidePanelFocus { case inspector, layers }
     /// Fit Width: fill the working area's WIDTH and scroll vertically for any overflow,
     /// re-fitting as the window resizes — without entering full-screen focus. Sticky
     /// toggle; turns itself off on manual zoom or on an incompatible tool (Michael
@@ -239,6 +243,13 @@ struct ContentView: View {
         }
     }
 
+    /// Gives the tapped side panel the larger share. Only animates on a real change, so
+    /// repeated taps inside the same panel never make it twitch.
+    private func focusSidePanel(_ panel: SidePanelFocus) {
+        guard sidePanelFocus != panel else { return }
+        withAnimation(.easeInOut(duration: 0.25)) { sidePanelFocus = panel }
+    }
+
     /// True when the window is phone-sized — gates the phone-only layout. Decided by
     /// SIZE CLASS, not device idiom: an opened iPhone Duo reports idiom `.phone` but has
     /// an iPad-sized screen, and must get the full layout (his rule, 2026-10-04: build
@@ -350,19 +361,34 @@ struct ContentView: View {
                     HStack(spacing: 0) {
                         ToolRail(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
                         Divider()
-                        ToolInspector(document: document,
-                                      camera: camera,
-                                      activeTool: activeTool,
-                                      activeLayerID: $activeLayerID,
-                                      fillColor: $fillColor,
-                                      fileURL: fileURL)
-                            .frame(maxWidth: .infinity)
-                        Divider()
-                        // Right column: Layers with History "behind" it (spec: undo is the History
-                        // panel sitting behind the layer list). The wide/Mac layout used to hardcode
-                        // only LayerPanel, so History was unreachable on Mac — this restores it.
-                        LayersHistoryColumn(document: document, activeLayerID: $activeLayerID)
-                            .frame(maxWidth: .infinity)
+                        // FOCUS-DRIVEN DIVIDER (his spec, 2026-10-04): 50/50 to start, then
+                        // whichever panel was last tapped gets 66/33. A simultaneous TAP only,
+                        // so it never fires mid-drag and never steals the tap from a control.
+                        GeometryReader { pair in
+                            let room = max(pair.size.width - 1, 0)   // less the 1pt divider
+                            let share: CGFloat = switch sidePanelFocus {
+                                case .inspector: 2.0 / 3.0
+                                case .layers:    1.0 / 3.0
+                                case nil:        0.5
+                            }
+                            HStack(spacing: 0) {
+                                ToolInspector(document: document,
+                                              camera: camera,
+                                              activeTool: activeTool,
+                                              activeLayerID: $activeLayerID,
+                                              fillColor: $fillColor,
+                                              fileURL: fileURL)
+                                    .frame(width: room * share)
+                                    .simultaneousGesture(TapGesture().onEnded { focusSidePanel(.inspector) })
+                                Divider()
+                                // Right column: Layers with History "behind" it (spec: undo is the History
+                                // panel sitting behind the layer list). The wide/Mac layout used to hardcode
+                                // only LayerPanel, so History was unreachable on Mac — this restores it.
+                                LayersHistoryColumn(document: document, activeLayerID: $activeLayerID)
+                                    .frame(width: room * (1 - share))
+                                    .simultaneousGesture(TapGesture().onEnded { focusSidePanel(.layers) })
+                            }
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
