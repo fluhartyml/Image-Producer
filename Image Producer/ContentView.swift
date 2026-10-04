@@ -239,11 +239,15 @@ struct ContentView: View {
         }
     }
 
-    /// True on iPhone (any orientation) — gates the phone-only layout so it never
-    /// touches the iPad/Mac views. Size class can't decide this: an iPhone Pro Max in
-    /// landscape reports `.regular` width, same as an iPad — so use the device idiom.
+    /// True when the window is phone-sized — gates the phone-only layout. Decided by
+    /// SIZE CLASS, not device idiom: an opened iPhone Duo reports idiom `.phone` but has
+    /// an iPad-sized screen, and must get the full layout (his rule, 2026-10-04: build
+    /// with the Duo in mind). Width alone is not enough — an iPhone Pro Max in landscape
+    /// reports `.regular` width — but every iPhone in landscape reports `.compact` HEIGHT.
     #if os(iOS)
-    private var isPhone: Bool { UIDevice.current.userInterfaceIdiom == .phone }
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    @Environment(\.verticalSizeClass) private var vSizeClass
+    private var isPhone: Bool { hSizeClass == .compact || vSizeClass == .compact }
     #else
     private var isPhone: Bool { false }
     #endif
