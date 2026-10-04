@@ -5539,8 +5539,12 @@ struct LayerPanel: View {
             .listStyle(.plain)
             #else
             // iOS: always-on edit mode gives explicit drag handles; the row Button activates.
+            // ⛔ NO .onDelete HERE. In edit mode it puts a red delete circle on EVERY row —
+            // on a narrow panel that circle, the checkbox, glyph, eye and handle left the
+            // layer NAME no room at all (his iPad, 2026-10-04: "get rid of them and bring
+            // back the long press"). Delete lives in the row's long-press menu instead.
             List {
-                layerRows().onMove(perform: move).onDelete(perform: deleteAt)
+                layerRows().onMove(perform: move)
             }
             .listStyle(.plain)
             .environment(\.editMode, .constant(.active))
