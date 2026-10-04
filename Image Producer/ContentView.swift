@@ -91,8 +91,8 @@ struct ContentView: View {
     @State private var canvasZoom: CGFloat = 1
     /// Focus mode: hide the tool strip + panel so the canvas fills the whole editor.
     @State private var canvasFocused = false
-    /// Which side panel was touched last — it gets two-thirds of the inspector/layers
-    /// space, the other one-third. nil = 50/50, the opening state (his spec, 2026-10-04).
+    /// Which side panel was touched last — it gets 60% of the inspector/layers space, the
+    /// other 40%. nil = 50/50, the opening state (his spec, 2026-10-04).
     @State private var sidePanelFocus: SidePanelFocus?
     enum SidePanelFocus { case inspector, layers }
     /// Fit Width: fill the working area's WIDTH and scroll vertically for any overflow,
@@ -369,9 +369,11 @@ struct ContentView: View {
                         // so it never fires mid-drag and never steals the tap from a control.
                         GeometryReader { pair in
                             let room = max(pair.size.width - 1, 0)   // less the 1pt divider
+                            // 60/40, not 66/33 — his call, 2026-10-04: at a third the layer
+                            // names truncated; "it may need to expand to 40%".
                             let wanted: CGFloat = switch sidePanelFocus {
-                                case .inspector: 2.0 / 3.0
-                                case .layers:    1.0 / 3.0
+                                case .inspector: 0.6
+                                case .layers:    0.4
                                 case nil:        0.5
                             }
                             // FLOORS, so the narrow side stays readable. At a third, the
