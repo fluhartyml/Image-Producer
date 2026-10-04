@@ -1293,7 +1293,7 @@ struct CanvasInspector: View {
     @State private var flattenLayerPDF = false
     @State private var layerMatte: Color = .white
     @State private var importingPDF = false
-    /// FedEx Office's per-file upload limit. Used to WARN only — never to stop an export.
+    /// A common print-shop per-file upload limit. Used to WARN only — never to stop an export.
     static let printShopUploadLimit = 150 * 1024 * 1024
 
     /// The Export (i). The iPad has no ⌘ key, so it names the button instead (his catch,
@@ -1467,10 +1467,11 @@ struct CanvasInspector: View {
                 Button {
                     if let data = makePrintPDF(document) {
                         // A WARNING, NEVER A GATE — his ruling, 2026-10-04: "it warns but is NOT
-                        // a gate keeper, we dont work for fedex kinkos". The export always runs.
+                        // a gate keeper". The export always runs. No print shop is named — the
+                        // app is not associated with any of them.
                         if data.count > Self.printShopUploadLimit {
                             let size = ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
-                            document.say("Print PDF is \(size) — over 150 MB, FedEx Office's upload limit", kind: .warning)
+                            document.say("Print PDF is \(size) — over 150 MB, a common print-shop upload limit", kind: .warning)
                         }
                         exportData = data; exportType = .pdf
                         exportFilename = displayName; showDataExporter = true
