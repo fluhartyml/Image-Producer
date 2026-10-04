@@ -6000,8 +6000,13 @@ struct LayerRow: View {
                     .frame(width: 18)
                     .foregroundStyle(.secondary)
                 Text(layer.name)
+                    .font(.system(size: 18))
                     .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
-                    .lineLimit(2)
+                    // SHRINK TO FIT, 18 → 10 pt — his explicit exception to the 18 pt rule,
+                    // 2026-10-04: "shrink to fit with a minimum of 10? because it gets bigger
+                    // when you change focus from the tool inspector back to layers".
+                    .lineLimit(1)
+                    .minimumScaleFactor(10.0 / 18.0)
                 if layer.linkGroup != nil {
                     Image(systemName: "link")
                         .font(.system(size: 12))
@@ -6019,8 +6024,11 @@ struct LayerRow: View {
                         .frame(width: 18)
                         .foregroundStyle(.secondary)
                     Text(layer.name)
+                        .font(.system(size: 18))
                         .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
-                        .lineLimit(2)
+                        // SHRINK TO FIT, 18 → 10 pt — his explicit exception (see macOS twin).
+                        .lineLimit(1)
+                        .minimumScaleFactor(10.0 / 18.0)
                     if layer.linkGroup != nil {
                         Image(systemName: "link")
                             .font(.system(size: 12))
