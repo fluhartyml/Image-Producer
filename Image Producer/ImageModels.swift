@@ -54,6 +54,14 @@ final class ImageDocument: ObservableObject {
     /// The name typed in the New Image sheet, waiting for the Canvas tool to apply it
     /// (it owns the rename-on-disk path). nil once applied.
     @Published var pendingNewName: String?
+    /// Nothing has happened to this document yet: no recorded edits and every layer blank.
+    /// iPad/iPhone "New Image" writes the new file and then OPENS it from disk, so the
+    /// in-memory `openedAsNew` flag never survives there — this is how the editor still
+    /// recognizes a brand-new image. (An untouched blank project reopened later also
+    /// counts, and asking for its name and size then is harmless.)
+    var isUntouchedBlank: Bool {
+        history.entries.isEmpty && layers.allSatisfy(\.isPristine)
+    }
 
     /// Where a NEW layer goes: directly above the selected one. Michael, 2026-10-03: "when
     /// i am on a selected layer and i choose a tool that makes a new layer like text, i want

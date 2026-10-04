@@ -362,6 +362,7 @@ struct ContentView: View {
         .onAppear {
             if fileURL == nil
                 || document.openedAsNew
+                || document.isUntouchedBlank
                 || fileURL?.lastPathComponent == ImageDocument.pendingNewProjectURL?.lastPathComponent {
                 activeTool = .canvas
                 ImageDocument.pendingNewProjectURL = nil
