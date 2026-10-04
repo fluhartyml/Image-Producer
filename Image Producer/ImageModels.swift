@@ -57,6 +57,8 @@ final class ImageDocument: ObservableObject {
     /// The Canvas inspector's "Single image…" button asks the editor to open its Export
     /// sheet. Not saved; consumed at once.
     @Published var exportSheetRequested = false
+    /// Move / Transform's Apply button asks the editor to commit the placement. Not saved.
+    @Published var moveApplyRequested = false
     /// Set by a fluid canvas resize, which rewrites every layer's placement at once:
     /// tells the linked-layer follower to skip that one change. Not saved; consumed once.
     var skipLinkFollowOnce = false

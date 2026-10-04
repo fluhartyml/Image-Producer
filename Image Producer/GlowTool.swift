@@ -432,7 +432,7 @@ struct LayerInspector: View {
                 header
                 if dressableLayers.isEmpty {
                     Text("No artwork layers yet. These effects need something to dress.")
-                        .font(.callout)
+                        .font(.system(size: 18))
                         .foregroundStyle(.secondary)
                 } else {
                     if let i = targetIndex, document.layers.indices.contains(i) {
@@ -442,10 +442,16 @@ struct LayerInspector: View {
                         greenKeyReveal(i)
                         gradientReveal(i)
                         blendReveal(i)
+                    } else {
+                        // Every other tool says what it needs; this one used to show nothing.
+                        Text("Select a layer to use these effects.")
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
             .padding(14)
+            // 18 pt — his minimum. Section names, switches and pickers inherit it.
+            .font(.system(size: 18))
         }
     }
 
@@ -454,7 +460,7 @@ struct LayerInspector: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             Text("Layer…")
-                .font(.headline)
+                .font(.system(size: 18, weight: .semibold))
             Spacer()
             Button("Apply") {
                 if let i = targetIndex { apply(at: i) }
@@ -492,15 +498,15 @@ struct LayerInspector: View {
         DisclosureGroup(isExpanded: $showTranslucent) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("Opacity").font(.subheadline).foregroundStyle(.secondary)
+                    Text("Opacity").font(.system(size: 18)).foregroundStyle(.secondary)
                     Spacer()
                     Text(String(format: "%.0f%%", opacity.wrappedValue * 100))
-                        .font(.caption.monospacedDigit())
+                        .font(.system(size: 18).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
                 Slider(value: opacity, in: 0...1)
                 Text("The whole layer, artwork and glow together.")
-                    .font(.caption)
+                    .font(.system(size: 18))
                     .foregroundStyle(.secondary)
             }
             .padding(.top, 4)
@@ -549,7 +555,7 @@ struct LayerInspector: View {
             Text(name)
             if let detail {
                 Text(detail)
-                    .font(.caption)
+                    .font(.system(size: 18))
                     .foregroundStyle(.secondary)
             }
         }
@@ -610,10 +616,10 @@ struct LayerInspector: View {
     /// for every color, so a glow does not get its own private color well.
     private func swatches(title: String, selection: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Text(title).font(.system(size: 18)).foregroundStyle(.secondary)
             if document.palette.isEmpty {
                 Text("The palette is empty — add colors in Color Palette first.")
-                    .font(.caption)
+                    .font(.system(size: 18))
                     .foregroundStyle(.secondary)
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 34), spacing: 8)], spacing: 8) {
@@ -641,9 +647,9 @@ struct LayerInspector: View {
                                 readout: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(title).font(.subheadline).foregroundStyle(.secondary)
+                Text(title).font(.system(size: 18)).foregroundStyle(.secondary)
                 Spacer()
-                Text(readout).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                Text(readout).font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
             }
             Slider(value: value, in: range)
         }
@@ -668,7 +674,7 @@ struct LayerInspector: View {
                 Toggle("Key this layer", isOn: greenKeyEnabled(i))
                 if document.layers[i].greenKey?.isEnabled == true {
                     Text("Color Key")
-                        .font(.subheadline)
+                        .font(.system(size: 18))
                         .foregroundStyle(.secondary)
                     greenKeySwatch(i)
                     swatches(title: "", selection: greenKeyBinding(i).colorHex)
@@ -709,7 +715,7 @@ struct LayerInspector: View {
                 .fill(Color(hex: hex) ?? .green)
                 .frame(width: 44, height: 28)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.35)))
-            Text(hex).font(.caption.monospaced()).foregroundStyle(.secondary)
+            Text(hex).font(.system(size: 18).monospaced()).foregroundStyle(.secondary)
             Spacer()
         }
     }
@@ -731,7 +737,7 @@ struct LayerInspector: View {
         }
         Text("Samples the most common opaque color in this layer. For a specific spot, "
              + "pick it with the Eyedropper tool first.")
-            .font(.caption)
+            .font(.system(size: 18))
             .foregroundStyle(.secondary)
     }
 
@@ -756,15 +762,15 @@ struct LayerInspector: View {
         )
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text("Tolerance").font(.subheadline).foregroundStyle(.secondary)
+                Text("Tolerance").font(.system(size: 18)).foregroundStyle(.secondary)
                 Spacer()
                 Text("\(Int(tol.wrappedValue))")
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    .font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
             }
             Slider(value: tol, in: 0...128)
             Text("How far from that color still counts as a match. Higher reaches more "
                  + "shades — and more of the subject.")
-                .font(.caption)
+                .font(.system(size: 18))
                 .foregroundStyle(.secondary)
         }
     }
@@ -778,15 +784,15 @@ struct LayerInspector: View {
         )
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text("Softness").font(.subheadline).foregroundStyle(.secondary)
+                Text("Softness").font(.system(size: 18)).foregroundStyle(.secondary)
                 Spacer()
                 Text("\(Int(soft.wrappedValue))")
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    .font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
             }
             Slider(value: soft, in: 0...128)
             Text("Shades just past the tolerance fade out instead of cutting off, with the "
                  + "key color taken out of them — so a glow on black stays a glow. 0 is a hard edge.")
-                .font(.caption)
+                .font(.system(size: 18))
                 .foregroundStyle(.secondary)
         }
     }
@@ -807,13 +813,13 @@ struct LayerInspector: View {
                 compass(i)
                 if pristine {
                     Text("This layer is empty, so the gradient DRAWS in these two colors.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.system(size: 18)).foregroundStyle(.secondary)
                     swatches(title: "From", selection: gradientBinding(i).startHex)
                     swatches(title: "To", selection: gradientBinding(i).endHex)
                     blendStops(i)
                 } else {
                     Text("This layer has artwork, so the gradient FADES it by position.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.system(size: 18)).foregroundStyle(.secondary)
                     opacityEnds(i)
                 }
             }
@@ -851,7 +857,7 @@ struct LayerInspector: View {
                                             [.w,  nil, .e],
                                             [.sw, .s, .se]]
         VStack(alignment: .leading, spacing: 6) {
-            Text("Direction").font(.subheadline).foregroundStyle(.secondary)
+            Text("Direction").font(.system(size: 18)).foregroundStyle(.secondary)
             VStack(spacing: 4) {
                 ForEach(0..<3, id: \.self) { r in
                     HStack(spacing: 4) {
@@ -861,8 +867,8 @@ struct LayerInspector: View {
                                     gradientBinding(i).wrappedValue.direction = dir
                                 } label: {
                                     Text(dir.label)
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .frame(width: 34, height: 26)
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .frame(width: 48, height: 34)
                                         .background(RoundedRectangle(cornerRadius: 5)
                                             .fill(dir == current
                                                   ? Color.accentColor.opacity(0.25)
@@ -872,7 +878,7 @@ struct LayerInspector: View {
                                 }
                                 .buttonStyle(.plain)
                             } else {
-                                Color.clear.frame(width: 34, height: 26)
+                                Color.clear.frame(width: 48, height: 34)
                             }
                         }
                     }
@@ -926,7 +932,7 @@ struct LayerInspector: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 Text(current.blurb)
-                    .font(.caption)
+                    .font(.system(size: 18))
                     .foregroundStyle(.secondary)
                 if current != .normal {
                     let strength = Binding<Double>(
@@ -937,7 +943,7 @@ struct LayerInspector: View {
                 }
                 Text("Blend needs something underneath to mix with — a layer on its own "
                      + "looks the same in every mode.")
-                    .font(.caption)
+                    .font(.system(size: 18))
                     .foregroundStyle(.tertiary)
             }
             .padding(.top, 4)

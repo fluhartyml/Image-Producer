@@ -644,7 +644,14 @@ struct ContentView: View {
         }
     }
 
+    /// The FILE's name first — a saved picture is called what Finder calls it. The internal
+    /// name stays "Untitled Image" on files made before naming existed, which is how Save to
+    /// Desktop wrote "Untitled Image.png" for "Image Producer Icon" (2026-10-04).
     private var exportFilename: String {
+        if let url = document.movedFileURL ?? fileURL {
+            let name = url.deletingPathExtension().lastPathComponent
+            if !name.isEmpty { return name }
+        }
         let base = document.name.trimmingCharacters(in: .whitespaces)
         return base.isEmpty ? "Untitled" : base
     }
@@ -753,6 +760,13 @@ struct ContentView: View {
         .onChange(of: activeTool) { _, newTool in
             if fitWidth && !newTool.fitWidthCompatible { fitWidth = false }
             // Leaving the Move tool commits whatever was being placed.
+            commitMoveSession()
+            beginMoveSessionIfNeeded()
+        }
+        // Move's Apply button: commit now, then open a fresh session on the same layer.
+        .onChange(of: document.moveApplyRequested) { _, now in
+            guard now else { return }
+            document.moveApplyRequested = false
             commitMoveSession()
             beginMoveSessionIfNeeded()
         }
@@ -1419,6 +1433,7 @@ struct CanvasInspector: View {
                     Button("360 — Epson photo inkjet")           { document.ppi = 360 }
                     Button("600 — Fine art / line art")          { document.ppi = 600 }
                 } label: { MenuInvite(title: "Common resolutions") }
+                .menuIndicator(.hidden)   // MenuInvite draws the one chevron; the Mac added a second
                 .fixedSize()
 
                 // Print size — derived readout (W × H) from pixels ÷ PPI.
@@ -1444,6 +1459,7 @@ struct CanvasInspector: View {
                         }
                     }
                 } label: { MenuInvite(title: "Canvas size presets") }
+                .menuIndicator(.hidden)   // MenuInvite draws the one chevron; the Mac added a second
                 .fixedSize()
 
                 if let aspectWarning {
@@ -2262,7 +2278,9 @@ struct ColorPaletteInspector: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 8).fill(fillColor)
+                // The SELECTED swatch, not the shared fill color — that one only updates on a
+                // tap, so the square showed white while the hex beside it read #000000.
+                RoundedRectangle(cornerRadius: 8).fill(Color(hex: document.palette[selected]) ?? .black)
                     .frame(width: 44, height: 44)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.4)))
                 VStack(alignment: .leading, spacing: 2) {
@@ -3240,7 +3258,7 @@ struct PenInspector: View {
             }
         } else {
             PanelPlaceholder(systemImage: "pencil.tip", title: "Pen (Pixels)",
-                             subtitle: "Select the Icon layer (a content layer) to draw")
+                             subtitle: "Select a layer to draw.")
         }
     }
 
@@ -4137,6 +4155,14 @@ struct MoveTransformInspector: View {
                     Slider(value: rotationSliderBinding(idx), in: -180...180)
                     RotationTicks()
                 }
+                // APPLY — his choice, 2026-10-04, over a "choose another tool" note: a clear
+                // way to finish. Choosing another tool still applies too.
+                Button {
+                    document.moveApplyRequested = true
+                } label: {
+                    Label("Apply", systemImage: "checkmark").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
                 HStack {
                     Button("Center") {
                         guard document.layers.indices.contains(idx) else { return }
