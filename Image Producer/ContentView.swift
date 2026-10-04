@@ -38,6 +38,8 @@ struct ContentView: View {
     /// hub's Project/File section. nil while the document is untitled / not yet saved.
     var fileURL: URL? = nil
     @State private var activeTool: Tool = .move
+    /// The New Image sheet (name + size), shown once when a new image is made.
+    @State private var showNewImageSheet = false
     /// The placement of every layer as last seen — what `followLinkedLayers` diffs against.
     @State private var linkBaseline: LinkSnapshot?
     @State private var activeLayerID: ImageLayer.ID?
@@ -364,8 +366,10 @@ struct ContentView: View {
                 activeTool = .canvas
                 ImageDocument.pendingNewProjectURL = nil
                 document.openedAsNew = false
+                showNewImageSheet = true
             }
         }
+        .sheet(isPresented: $showNewImageSheet) { NewImageSheet(document: document) }
         // ⚠️ ALL .primaryAction, AND THAT IS THE FIX, NOT A STYLE CHOICE.
         //
         // These were .secondaryAction and their .help() tooltips never appeared — only the
@@ -1487,7 +1491,9 @@ struct CanvasInspector: View {
             draftName = displayName
             // The pre-change state, so the first size change has an "Original" to go back to.
             document.captureHistoryBaselineIfNeeded()
+            applyPendingName()
         }
+        .onChange(of: document.pendingNewName) { applyPendingName() }
         .onChange(of: document.name) { draftName = displayName }
         .onChange(of: fileURL) { draftName = displayName; renameError = false }
         // CANVAS SIZE IS A HISTORY STEP — every path that changes it (Pixels fields,
@@ -1509,6 +1515,14 @@ struct CanvasInspector: View {
             Text(value).font(.system(size: 18)).foregroundStyle(.primary).textSelection(.enabled)
             Spacer(minLength: 0)
         }
+    }
+
+    /// Apply the name typed in the New Image sheet through the normal rename path.
+    private func applyPendingName() {
+        guard let n = document.pendingNewName else { return }
+        document.pendingNewName = nil
+        draftName = n
+        if fileURL == nil { commitName() } else { renameFile() }
     }
 
     private func commitName() {

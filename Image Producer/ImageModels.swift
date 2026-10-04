@@ -51,6 +51,9 @@ final class ImageDocument: ObservableObject {
     /// Mac uses never matched there (Michael, 2026-10-03: "it should open to the canvas
     /// tool inspector first"). Not saved; consumed once.
     var openedAsNew = false
+    /// The name typed in the New Image sheet, waiting for the Canvas tool to apply it
+    /// (it owns the rename-on-disk path). nil once applied.
+    @Published var pendingNewName: String?
 
     /// Where a NEW layer goes: directly above the selected one. Michael, 2026-10-03: "when
     /// i am on a selected layer and i choose a tool that makes a new layer like text, i want
