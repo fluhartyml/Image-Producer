@@ -113,13 +113,17 @@ enum LayerArtBounds {
         }
         guard maxX >= minX, maxY >= minY else { return nil }
 
-        // The context draws with a bottom-left origin, so flip Y back to the
-        // top-left space every caller here uses. +1 on the far edge because the
-        // box has to CONTAIN the last lit pixel, not stop at its near corner.
+        // ⛔ NO Y FLIP. The bitmap's memory runs TOP-DOWN — row 0 is the picture's top
+        // row — even though the context draws with a bottom-left origin. The old code
+        // flipped anyway, so art in a picture's top half was boxed in its bottom half:
+        // the Move outline and its drag area sat mirrored off the art (his lighthouse,
+        // 2026-10-04: "the ants are off like 50 percent"). Proven with a picture opaque
+        // only in its top-left quarter: rows 0…128 lit, reported 0.5…1.0 before.
+        // +1 on the far edge because the box has to CONTAIN the last lit pixel.
         let x0 = Double(minX) / Double(w)
         let x1 = Double(maxX + 1) / Double(w)
-        let y0 = 1 - Double(maxY + 1) / Double(h)
-        let y1 = 1 - Double(minY) / Double(h)
+        let y0 = Double(minY) / Double(h)
+        let y1 = Double(maxY + 1) / Double(h)
         return CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
     }
 }
