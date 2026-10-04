@@ -7068,6 +7068,18 @@ struct AutosaveModifier: ViewModifier {
                 Text("This document's history has reached an unsustainable level and may cause system degradation.")
             }
             .onReceive(document.objectWillChange) { _ in schedule() }
+            // A History commit saves NOW, not after the debounce (see `saveNowRequested`).
+            .onChange(of: document.saveNowRequested) { _, now in
+                guard now else { return }
+                document.saveNowRequested = false
+                debounce?.cancel()
+                if document.isViewingHistory {
+                    document.say("Not saved — still viewing an earlier step. Tap Keep this step to make it stick.",
+                                 kind: .warning)
+                } else {
+                    save()
+                }
+            }
             .onChange(of: scenePhase) { _, phase in
                 // Flush on background. The write is now ENQUEUED rather than completed
                 // inline — the serial queue picks it up immediately, and on macOS the

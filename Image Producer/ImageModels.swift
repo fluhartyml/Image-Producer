@@ -60,6 +60,10 @@ final class ImageDocument: ObservableObject {
     /// Set by a fluid canvas resize, which rewrites every layer's placement at once:
     /// tells the linked-layer follower to skip that one change. Not saved; consumed once.
     var skipLinkFollowOnce = false
+    /// A History commit (restore / delete / purge) asks for an IMMEDIATE save instead of
+    /// the 1.5 s debounce — his call, 2026-10-04: "immediately sounds good", after a
+    /// restore on the iPad never reached the file. Not saved; consumed at once.
+    @Published var saveNowRequested = false
     /// Nothing has happened to this document yet: no recorded edits and every layer blank.
     /// iPad/iPhone "New Image" writes the new file and then OPENS it from disk, so the
     /// in-memory `openedAsNew` flag never survives there — this is how the editor still
@@ -418,6 +422,7 @@ extension ImageDocument {
         restore(history.entries.last?.actions.last?.snapshot ?? history.baseline)
         historyCursor = .latest
         say("History — deleted that step and everything after it", kind: .info)
+        saveNowRequested = true
     }
 
     /// COMMIT, keeping the chosen step: restore the state THIS action produced and drop
@@ -444,6 +449,7 @@ extension ImageDocument {
         restore(entry.actions.last?.snapshot ?? history.baseline)
         historyCursor = .latest
         say("History — restored \(entry.title): \(entry.actions.last?.label ?? ""), later steps dropped", kind: .info)
+        saveNowRequested = true
     }
 
     /// Remove ONE step from the trail and nothing else. The canvas is not touched.
@@ -484,6 +490,7 @@ extension ImageDocument {
         }
         if case .baseline = historyCursor, history.entries.isEmpty { historyCursor = .latest }
         say("History — removed one step (canvas unchanged)", kind: .info)
+        saveNowRequested = true
     }
 
     /// COMMIT from the "Original" row: drop every recorded entry, back to the pre-edit state.
@@ -492,6 +499,7 @@ extension ImageDocument {
         restore(history.baseline)
         historyCursor = .latest
         say("History — back to Original, every step removed", kind: .info)
+        saveNowRequested = true
     }
 
     /// Purge History (the ONLY thing that clears the trail): keep the CURRENT image, drop the
@@ -502,6 +510,7 @@ extension ImageDocument {
         history.blobs = nil
         historyCursor = .latest
         say("History purged — the current image is kept, every step is gone", kind: .warning)
+        saveNowRequested = true
     }}
 
 // MARK: - Optimize History (lossless, 2026-09-16)
