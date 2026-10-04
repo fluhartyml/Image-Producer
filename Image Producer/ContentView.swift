@@ -1556,7 +1556,11 @@ struct CanvasInspector: View {
         guard !FileManager.default.fileExists(atPath: newURL.path) else { renameError = true; return }
 
         let coordinator = NSFileCoordinator()
-        var coordErr: NSError?
+        // ⛔ NEVER COORDINATE ON THE MAIN THREAD. On the iPad the open document is a file
+        // presenter that answers on the main thread; a coordinated move started there
+        // waits for it while it waits for us — the app froze with Create held down
+        // (2026-10-03). The work runs in the background; results come back to main.
+        let work = DispatchQueue.global(qos: .userInitiated)
         // ⚖️ DESTRUCTIVE ONCE, THEN NEVER AGAIN — his rule, 2026-09-06:
         //
         //   "i do want the first name change from that standard numbered file name to
@@ -1574,9 +1578,13 @@ struct CanvasInspector: View {
         // happened: if the file is still wearing its auto-generated name, the rename
         // MOVES. Once it is wearing a name he chose, every later rename COPIES and
         // leaves the previous one where it was.
-        let isStillAutoNamed = current.range(of: #"^ImageProducer\d{4}$"#,
+        // "Untitled" counts as auto-named too — it is what iPad/iPhone "New Image" makes,
+        // and renaming it from the New Image sheet must not leave an Untitled copy behind.
+        let isStillAutoNamed = current.range(of: #"^(ImageProducer\d{4}|Untitled( \d+)?)$"#,
                                              options: .regularExpression) != nil
         if isStillAutoNamed {
+          work.async {
+            var coordErr: NSError?
             coordinator.coordinate(writingItemAt: url, options: .forMoving,
                                    writingItemAt: newURL, options: .forReplacing, error: &coordErr) { src, dst in
                 do {
@@ -1599,15 +1607,20 @@ struct CanvasInspector: View {
                 }
             }
             if let coordErr {
-                renameError = true; draftName = displayName
-                document.say("Rename failed — \(coordErr.localizedDescription)", kind: .warning)
+                DispatchQueue.main.async {
+                    renameError = true; draftName = displayName
+                    document.say("Rename failed — \(coordErr.localizedDescription)", kind: .warning)
+                }
             }
+          }
             return
         }
 
         // ALREADY HIS NAME → copy, then follow the copy. The previous file stays exactly
         // where it was, untouched, which is the same shape as every other tool in this
         // app: the original is preserved and the work continues on the new thing.
+      work.async {
+        var coordErr: NSError?
         coordinator.coordinate(readingItemAt: url, options: [],
                                writingItemAt: newURL, options: .forReplacing, error: &coordErr) { src, dst in
             do {
@@ -1645,9 +1658,12 @@ struct CanvasInspector: View {
             }
         }
         if let coordErr {
-            renameError = true; draftName = displayName
-            document.say("Save As failed — \(coordErr.localizedDescription)", kind: .warning)
+            DispatchQueue.main.async {
+                renameError = true; draftName = displayName
+                document.say("Save As failed — \(coordErr.localizedDescription)", kind: .warning)
+            }
         }
+      }
     }
 
     /// The name to show: the FILE name when the project is saved (authoritative), else
