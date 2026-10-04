@@ -1289,27 +1289,40 @@ struct CanvasInspector: View {
     @State private var flattenLayerPDF = false
     @State private var layerMatte: Color = .white
     @State private var importingPDF = false
+    @State private var showNameInfo = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // --- Project name ---
             VStack(alignment: .leading, spacing: 6) {
                 // The LABEL is lighter than the NAME it labels (his rule, 2026-10-04).
-                Text("Project name").font(.system(size: 18, weight: .light)).foregroundStyle(.secondary)
+                // How the field works lives behind (i), not under it — his call, 2026-10-04:
+                // "renames the file on disk is cluttered and should be behind (i)".
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Project name").font(.system(size: 18, weight: .light)).foregroundStyle(.secondary)
+                    Button { showNameInfo.toggle() } label: { Image(systemName: "info.circle") }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .help("More about the project name")
+                        .popover(isPresented: $showNameInfo) {
+                            Text(fileURL == nil
+                                 ? "Working name for this untitled project."
+                                 : "Renames the file on disk. Press Return to apply.")
+                                .font(.system(size: 18))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(width: 300)
+                                .padding()
+                        }
+                }
                 if fileURL == nil {
                     // Untitled: editable working name (becomes the manifest name on first save).
                     TextField("Project name", text: $draftName)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18, weight: .semibold))
                         .onSubmit { commitName() }
-                    Text("Working name for this untitled project.")
-                        .font(.system(size: 18)).foregroundStyle(.primary)
                 } else {
                     // Saved: editing here renames the FILE on disk (one-stop — no trip to Finder).
                     TextField("Project name", text: $draftName)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18, weight: .semibold))
                         .onSubmit { renameFile() }
-                    Text("Renames the file on disk. Press Return to apply.")
-                        .font(.system(size: 18)).foregroundStyle(.primary)
                     if renameError {
                         Text("Couldn't rename — a file with that name may already exist.")
                             .font(.system(size: 18)).foregroundStyle(.red)
