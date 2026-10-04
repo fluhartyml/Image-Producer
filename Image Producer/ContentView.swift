@@ -5219,10 +5219,10 @@ struct CanvasView: View {
                 body
             }
             .opacity(layer.opacity)
-            .blendMode((layer.blend ?? .normal).swiftUI)
+            .layerBlend(layer)
         } else {
             body.opacity(layer.opacity)
-                .blendMode((layer.blend ?? .normal).swiftUI)
+                .layerBlend(layer)
         }
     }
 
@@ -6975,10 +6975,10 @@ struct ImageCompositeView: View {
                 body
             }
             .opacity(layer.opacity)
-            .blendMode((layer.blend ?? .normal).swiftUI)
+            .layerBlend(layer)
         } else {
             body.opacity(layer.opacity)
-                .blendMode((layer.blend ?? .normal).swiftUI)
+                .layerBlend(layer)
         }
     }
 

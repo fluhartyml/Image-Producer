@@ -251,6 +251,26 @@ struct LayerGradient: Codable, Equatable {
 
 // MARK: - Blend  (child 060)
 
+extension View {
+    /// Draws a layer with its Blend mode at its Strength. Full strength is the plain
+    /// mode. Below that the layer is drawn twice — normally at (1 − strength) and in the
+    /// mode at strength — so the mode eases back toward Normal. One helper, used by both
+    /// the canvas and the export compositor, so they can never disagree.
+    @ViewBuilder
+    func layerBlend(_ layer: ImageLayer) -> some View {
+        let mode = layer.blend ?? .normal
+        let s = min(max(layer.blendAmount, 0), 1)
+        if mode == .normal || s >= 1 {
+            self.blendMode(mode.swiftUI)
+        } else {
+            ZStack {
+                self.opacity(1 - s)
+                self.opacity(s).blendMode(mode.swiftUI)
+            }
+        }
+    }
+}
+
 /// BLEND — his name, 2026-09-06. The fourth child, and the only one on a different
 /// axis from the rest.
 ///
@@ -908,6 +928,13 @@ struct LayerInspector: View {
                 Text(current.blurb)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if current != .normal {
+                    let strength = Binding<Double>(
+                        get: { self.document.layers[i].blendAmount },
+                        set: { self.document.layers[i].blendStrength = $0 })
+                    labelledSlider("Strength", value: strength, range: 0...1,
+                                   readout: String(format: "%.0f%%", document.layers[i].blendAmount * 100))
+                }
                 Text("Blend needs something underneath to mix with — a layer on its own "
                      + "looks the same in every mode.")
                     .font(.caption)
@@ -958,6 +985,7 @@ struct LayerInspector: View {
         original.greenKey = nil
         original.gradient = nil
         original.blend = nil
+        original.blendStrength = nil
         original.isVisible = false
 
         // 016 — THE NAME LISTS WHAT ACTUALLY BAKED. Agreed 2026-09-06. It used to say

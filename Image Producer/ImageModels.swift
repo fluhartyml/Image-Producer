@@ -698,6 +698,10 @@ struct ImageLayer: Identifiable, Codable {
     /// How this layer's COLOR mixes with what is beneath — the one child on a
     /// different axis from the others. nil = Normal. See GlowTool.swift.
     var blend: LayerBlendMode?
+    /// How much of the Blend mode shows, 0…1 — his ask, 2026-10-04: "the blend should
+    /// have a slider". Optional so older files open unchanged; nil = full strength.
+    var blendStrength: Double?
+    var blendAmount: Double { blendStrength ?? 1 }
     var role: LayerRole
     /// Content elements on a CONTENT layer, composited bottom-to-top. Mixed types
     /// allowed (pixels + image + text + symbol on one layer). Empty = blank.
