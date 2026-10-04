@@ -1391,14 +1391,14 @@ struct CanvasInspector: View {
                         .onSubmit { if document.ppi < 1 { document.ppi = 1 } }
                     Text("PPI").font(.system(size: 18)).foregroundStyle(.secondary)
                 }
-                Menu("Common resolutions") {
+                Menu {
                     Button("72 — Screen / web")                  { document.ppi = 72 }
                     Button("150 — Draft print")                  { document.ppi = 150 }
                     Button("300 — Standard print / photo labs")  { document.ppi = 300 }
                     Button("360 — Epson photo inkjet")           { document.ppi = 360 }
                     Button("600 — Fine art / line art")          { document.ppi = 600 }
-                }
-                .font(.system(size: 18)).fixedSize()
+                } label: { MenuInvite(title: "Common resolutions") }
+                .fixedSize()
 
                 // Print size — derived readout (W × H) from pixels ÷ PPI.
                 attrRow("Print size", printSizeText)
@@ -1407,7 +1407,7 @@ struct CanvasInspector: View {
                 Toggle("Landscape", isOn: landscapeBinding).font(.system(size: 18)).fixedSize()
                 // The catalog, by job, in subsets (CanvasPresets.swift). Each item shows its
                 // numbers, shape and size rule on a second line.
-                Menu("Canvas size presets") {
+                Menu {
                     ForEach(CanvasPreset.catalog) { group in
                         Menu(group.title) {
                             ForEach(group.subsets) { subset in
@@ -1422,8 +1422,8 @@ struct CanvasInspector: View {
                             }
                         }
                     }
-                }
-                .font(.system(size: 18)).fixedSize()
+                } label: { MenuInvite(title: "Canvas size presets") }
+                .fixedSize()
 
                 if let aspectWarning {
                     Text(aspectWarning)
@@ -6579,6 +6579,19 @@ final class PixelPen: ObservableObject {
 /// THE (i) — the one way this app tucks an explanation away. His rule, 2026-10-03/04:
 /// text on screen is concise, and the detail lives behind (i). One control, so every
 /// (i) looks and behaves the same.
+/// A menu that LOOKS like there is more inside — heavier weight plus a chevron. His ask,
+/// 2026-10-04: "needs to be heavier and have a carrot or something to make the user
+/// curious to tap and find out more." Plain blue text read as a link, not a menu.
+struct MenuInvite: View {
+    let title: String
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title).font(.system(size: 18, weight: .semibold))
+            Image(systemName: "chevron.down").font(.system(size: 18, weight: .semibold))
+        }
+    }
+}
+
 struct InfoTip: View {
     let help: String
     let text: String
