@@ -369,11 +369,20 @@ struct ContentView: View {
                         // so it never fires mid-drag and never steals the tap from a control.
                         GeometryReader { pair in
                             let room = max(pair.size.width - 1, 0)   // less the 1pt divider
-                            let share: CGFloat = switch sidePanelFocus {
+                            let wanted: CGFloat = switch sidePanelFocus {
                                 case .inspector: 2.0 / 3.0
                                 case .layers:    1.0 / 3.0
                                 case nil:        0.5
                             }
+                            // FLOORS, so the narrow side stays readable. At a third, the
+                            // inspector ran out of room and its text spilled over the tool
+                            // icons (his screen, 2026-10-04). The split leans as far toward
+                            // 66/33 as the floors allow; a window too small for both floors
+                            // falls back to 50/50.
+                            let inspectorFloor: CGFloat = 280, layersFloor: CGFloat = 200
+                            let share: CGFloat = room >= inspectorFloor + layersFloor
+                                ? min(max(wanted, inspectorFloor / room), 1 - layersFloor / room)
+                                : 0.5
                             HStack(spacing: 0) {
                                 ToolInspector(document: document,
                                               camera: camera,
@@ -382,6 +391,7 @@ struct ContentView: View {
                                               fillColor: $fillColor,
                                               fileURL: fileURL)
                                     .frame(width: room * share)
+                                    .clipped()
                                     .simultaneousGesture(TapGesture().onEnded { focusSidePanel(.inspector) })
                                 Divider()
                                 // Right column: Layers with History "behind" it (spec: undo is the History
@@ -389,6 +399,7 @@ struct ContentView: View {
                                 // only LayerPanel, so History was unreachable on Mac — this restores it.
                                 LayersHistoryColumn(document: document, activeLayerID: $activeLayerID)
                                     .frame(width: room * (1 - share))
+                                    .clipped()
                                     .simultaneousGesture(TapGesture().onEnded { focusSidePanel(.layers) })
                             }
                         }
@@ -3467,6 +3478,23 @@ struct HistoryPanel: View {
         }
     }
 
+    /// Make the step being viewed the real state, through the same confirmation the
+    /// long-press "Restore from This Step" uses.
+    private func keepViewedStep() {
+        switch document.historyCursor {
+        case .latest:
+            return
+        case .baseline:
+            pending = .restoreOriginal(dropping: totalActions)
+        case .at(let e, let a):
+            guard document.history.entries.indices.contains(e),
+                  document.history.entries[e].actions.indices.contains(a) else { return }
+            pending = .restore(entry: e, action: a,
+                               dropping: actionsAfter(entry: e, action: a),
+                               label: document.history.entries[e].actions[a].label)
+        }
+    }
+
     /// Actions before entry `e` — the ordinal of that entry's first action.
     private func baseOrdinal(_ e: Int) -> Int {
         document.history.entries.prefix(e).reduce(0) { $0 + $1.actions.count }
@@ -3497,6 +3525,20 @@ struct HistoryPanel: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+
+            // KEEP THIS STEP — his ask, 2026-10-04, on the iPad: tapping only VIEWS a step,
+            // and the long-press that makes it stick was too hidden ("it doesnt seem to take
+            // hold"). Shown only while viewing. It still asks first: the newer steps go.
+            if document.isViewingHistory {
+                Button(action: keepViewedStep) {
+                    Label("Keep this step", systemImage: "checkmark.circle")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
 
             if document.history.entries.isEmpty && document.history.baseline == nil {
                 PanelPlaceholder(systemImage: "clock.arrow.circlepath",

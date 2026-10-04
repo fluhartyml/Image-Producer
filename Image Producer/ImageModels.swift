@@ -464,10 +464,25 @@ extension ImageDocument {
         guard history.entries.indices.contains(e),
               history.entries[e].actions.indices.contains(a) else { return }
         history.entries[e].actions.remove(at: a)
-        if history.entries[e].actions.isEmpty { history.entries.remove(at: e) }
-        if case .at(let ce, let ca) = historyCursor, ce == e, ca == a {
+        let entryGone = history.entries[e].actions.isEmpty
+        if entryGone { history.entries.remove(at: e) }
+        // KEEP THE CURSOR ON THE SAME STEP. Removing a row shifts every index after it, so a
+        // cursor left alone would point at a different step than the one on screen.
+        if case .at(let ce, let ca) = historyCursor {
+            if ce == e && ca == a                 { historyCursor = .latest }
+            else if ce == e && ca > a             { historyCursor = .at(entry: e, action: ca - 1) }
+            else if ce > e && entryGone           { historyCursor = .at(entry: ce - 1, action: ca) }
+        }
+        // VIEWING THE NEWEST STEP IS NOT VIEWING. His report, 2026-10-04: "the delete this
+        // history didnt delete the history number 3" — he deleted step 3 while viewing step
+        // 2, which left step 2 the newest but the cursor still "viewing", and autosave is
+        // off while viewing. The delete was never written, and the next reload brought step
+        // 3 back. Landing on the newest step now ends viewing, so the delete is saved.
+        if case .at(let ce, let ca) = historyCursor,
+           ce == history.entries.count - 1, ca == history.entries[ce].actions.count - 1 {
             historyCursor = .latest
         }
+        if case .baseline = historyCursor, history.entries.isEmpty { historyCursor = .latest }
         say("History — removed one step (canvas unchanged)", kind: .info)
     }
 
