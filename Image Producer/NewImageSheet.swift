@@ -17,7 +17,9 @@ import SwiftUI
 
 struct NewImageSheet: View {
     @ObservedObject var document: ImageDocument
-    @Environment(\.dismiss) private var dismiss
+    /// Closed by setting this, not by `dismiss` — on the iPad, Create did nothing
+    /// (Michael, 2026-10-03: "create buttons not wired").
+    @Binding var isPresented: Bool
     @State private var name = ""
     @State private var width = 1024
     @State private var height = 1024
@@ -58,7 +60,7 @@ struct NewImageSheet: View {
             }
 
             HStack {
-                Button("Cancel") { dismiss() }
+                Button("Cancel") { finish() }
                     .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Create") { create() }
@@ -78,6 +80,14 @@ struct NewImageSheet: View {
         document.canvasHeight = max(1, height)
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { document.pendingNewName = trimmed }
-        dismiss()
+        document.say("New image: \(trimmed.isEmpty ? "Untitled" : trimmed), \(document.canvasWidth) × \(document.canvasHeight)", kind: .edit)
+        finish()
+    }
+
+    /// Close, and remember this document was asked, so it is never asked twice.
+    private func finish() {
+        ImageDocument.askedForNewImage.insert(ObjectIdentifier(document))
+        document.newImageAsked = true
+        isPresented = false
     }
 }

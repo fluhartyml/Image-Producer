@@ -60,8 +60,12 @@ final class ImageDocument: ObservableObject {
     /// recognizes a brand-new image. (An untouched blank project reopened later also
     /// counts, and asking for its name and size then is harmless.)
     var isUntouchedBlank: Bool {
-        history.entries.isEmpty && layers.allSatisfy(\.isPristine)
+        !newImageAsked && history.entries.isEmpty && layers.allSatisfy(\.isPristine)
     }
+    /// The New Image sheet already ran for this document — never ask twice.
+    var newImageAsked = false
+    /// Same, across a reopen of the same document object this launch.
+    static var askedForNewImage: Set<ObjectIdentifier> = []
 
     /// Where a NEW layer goes: directly above the selected one. Michael, 2026-10-03: "when
     /// i am on a selected layer and i choose a tool that makes a new layer like text, i want

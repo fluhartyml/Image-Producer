@@ -367,12 +367,15 @@ struct ContentView: View {
                 activeTool = .canvas
                 ImageDocument.pendingNewProjectURL = nil
                 document.openedAsNew = false
-                showNewImageSheet = true
+                if !document.newImageAsked,
+                   !ImageDocument.askedForNewImage.contains(ObjectIdentifier(document)) {
+                    showNewImageSheet = true
+                }
             }
         }
         // Sized to its contents — the iPad's default sheet left most of it empty (his note).
         .sheet(isPresented: $showNewImageSheet) {
-            NewImageSheet(document: document).presentationSizing(.fitted)
+            NewImageSheet(document: document, isPresented: $showNewImageSheet).presentationSizing(.fitted)
         }
         // ⚠️ ALL .primaryAction, AND THAT IS THE FIX, NOT A STYLE CHOICE.
         //
