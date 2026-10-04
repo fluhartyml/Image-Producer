@@ -359,9 +359,11 @@ struct ContentView: View {
         // New projects are real files now, so match the just-created URL (by name) too.
         .onAppear {
             if fileURL == nil
+                || document.openedAsNew
                 || fileURL?.lastPathComponent == ImageDocument.pendingNewProjectURL?.lastPathComponent {
                 activeTool = .canvas
                 ImageDocument.pendingNewProjectURL = nil
+                document.openedAsNew = false
             }
         }
         // ⚠️ ALL .primaryAction, AND THAT IS THE FIX, NOT A STYLE CHOICE.

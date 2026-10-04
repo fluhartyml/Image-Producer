@@ -46,6 +46,11 @@ final class ImageDocument: ObservableObject {
     /// The canvas size as History last saw it — recorded or restored. The Canvas panel
     /// records a "Canvas Size" step only when the live size differs from this.
     var historyCanvasSize: CGSize?
+    /// Made from scratch this launch (not read from a file) — the editor opens it on the
+    /// Canvas tool. iPad/iPhone "New Image" names the file at once, so the URL check the
+    /// Mac uses never matched there (Michael, 2026-10-03: "it should open to the canvas
+    /// tool inspector first"). Not saved; consumed once.
+    var openedAsNew = false
 
     /// Where a NEW layer goes: directly above the selected one. Michael, 2026-10-03: "when
     /// i am on a selected layer and i choose a tool that makes a new layer like text, i want
@@ -221,13 +226,15 @@ final class ImageDocument: ObservableObject {
     /// floor's `isVisible` (the eyeball); there are no light/dark mode buttons. More
     /// layers can be added/deleted freely.
     static func newDefault() -> ImageDocument {
-        ImageDocument(layers: [
+        let doc = ImageDocument(layers: [
             ImageLayer(name: "Light",      role: .background(.light, fillHex: nil)),
             ImageLayer(name: "Dark",       role: .background(.dark,  fillHex: nil)),
             ImageLayer(name: "Background", role: .content),
             ImageLayer(name: "Midground",  role: .content),
             ImageLayer(name: "Foreground", role: .content),
         ])
+        doc.openedAsNew = true
+        return doc
     }
 }
 
