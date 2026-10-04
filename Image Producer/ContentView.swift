@@ -37,7 +37,8 @@ struct ContentView: View {
     /// The open document's file on disk (from the DocumentGroup) — shown in the Canvas
     /// hub's Project/File section. nil while the document is untitled / not yet saved.
     var fileURL: URL? = nil
-    @State private var activeTool: Tool = .move
+    /// Every file opens on Canvas — tool 1,1, the first in the palette (his rule, 2026-10-04).
+    @State private var activeTool: Tool = .canvas
     /// The New Image sheet (name + size), shown once when a new image is made.
     @State private var showNewImageSheet = false
     /// The placement of every layer as last seen — what `followLinkedLayers` diffs against.
@@ -356,8 +357,8 @@ struct ContentView: View {
                 }
             }
         }
-        // A NEW project lands on the Canvas hub so the user immediately sees where to name
-        // the project and set the canvas size; opened EXISTING files keep the Move tool.
+        // Every project opens on the Canvas hub (see `activeTool`). A NEW one also gets the
+        // New Image sheet, so the user names it and sets the canvas size up front.
         // New projects are real files now, so match the just-created URL (by name) too.
         .onAppear {
             if fileURL == nil
