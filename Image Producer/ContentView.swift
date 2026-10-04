@@ -1543,7 +1543,7 @@ struct CanvasInspector: View {
     /// (so autosave keeps writing to the right file).
     private func renameFile() {
         renameError = false
-        guard let url = fileURL else { return }
+        guard let url = document.movedFileURL ?? fileURL else { return }
         // Sanitize: a file name can't contain "/" or ":".
         let clean = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "/", with: "-")
@@ -1591,6 +1591,7 @@ struct CanvasInspector: View {
                     try FileManager.default.moveItem(at: src, to: dst)
                     coordinator.item(at: src, didMoveTo: dst)   // notify the open document to follow
                     DispatchQueue.main.async {
+                        document.movedFileURL = dst   // autosave follows the move (iPad)
                         // Only the destination: the auto-generated name is discarded on
                         // purpose, and a recents row pointing at a file that no longer
                         // exists is worse than no row. (list() drops dead entries too.)
@@ -1635,6 +1636,7 @@ struct CanvasInspector: View {
                 // turns this into Save As. Deliberate, not a misuse.
                 coordinator.item(at: src, didMoveTo: dst)
                 DispatchQueue.main.async {
+                    document.movedFileURL = dst   // autosave follows the copy (iPad)
                     // BOTH FILES GO INTO RECENTS — his call, 2026-09-06: "both should
                     // logically be in the list unless i reset the recents from the file
                     // menu." He is right, and the gap was mine: RecentProjects.note only
@@ -1669,7 +1671,7 @@ struct CanvasInspector: View {
     /// The name to show: the FILE name when the project is saved (authoritative), else
     /// the working/internal name. Fixes "shows Untitled when I opened erasertime.picprod."
     private var displayName: String {
-        if let url = fileURL { return url.deletingPathExtension().lastPathComponent }
+        if let url = document.movedFileURL ?? fileURL { return url.deletingPathExtension().lastPathComponent }
         return document.name
     }
 
@@ -6747,7 +6749,7 @@ struct AutosaveModifier: ViewModifier {
         guard !document.isViewingHistory else { return }
 
         let url: URL
-        if let fileURL {
+        if let fileURL = document.movedFileURL ?? fileURL {
             url = fileURL                                     // saved doc: write in place
         } else {
             // UNTITLED → auto-materialize a recovery copy so the canvas is never lost,

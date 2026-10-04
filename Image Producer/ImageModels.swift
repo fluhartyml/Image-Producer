@@ -64,6 +64,11 @@ final class ImageDocument: ObservableObject {
     }
     /// The New Image sheet already ran for this document — never ask twice.
     var newImageAsked = false
+    /// Where the file lives after Image Producer renamed it itself. On the iPad the window's
+    /// own URL is NOT updated after that move, so autosave kept writing to the old name and
+    /// re-created "Untitled" beside the renamed file (2026-10-03: "the file name didnt
+    /// save"). Autosave and the Project name field prefer this when set.
+    var movedFileURL: URL?
     /// Same, across a reopen of the same document object this launch.
     static var askedForNewImage: Set<ObjectIdentifier> = []
 
