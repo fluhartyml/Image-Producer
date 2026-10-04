@@ -735,10 +735,8 @@ struct LayerInspector: View {
             .controlSize(.small)
             Spacer()
         }
-        Text("Samples the most common opaque color in this layer. For a specific spot, "
+        InfoTip("More about this", "Samples the most common opaque color in this layer. For a specific spot, "
              + "pick it with the Eyedropper tool first.")
-            .font(.system(size: 18))
-            .foregroundStyle(.secondary)
     }
 
     /// Take the layer's dominant opaque color as the key. A whole-layer sample is the
@@ -768,10 +766,8 @@ struct LayerInspector: View {
                     .font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
             }
             Slider(value: tol, in: 0...128)
-            Text("How far from that color still counts as a match. Higher reaches more "
+            InfoTip("More about this", "How far from that color still counts as a match. Higher reaches more "
                  + "shades — and more of the subject.")
-                .font(.system(size: 18))
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -790,10 +786,8 @@ struct LayerInspector: View {
                     .font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
             }
             Slider(value: soft, in: 0...128)
-            Text("Shades just past the tolerance fade out instead of cutting off, with the "
+            InfoTip("More about this", "Shades just past the tolerance fade out instead of cutting off, with the "
                  + "key color taken out of them — so a glow on black stays a glow. 0 is a hard edge.")
-                .font(.system(size: 18))
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -941,10 +935,8 @@ struct LayerInspector: View {
                     labelledSlider("Strength", value: strength, range: 0...1,
                                    readout: String(format: "%.0f%%", document.layers[i].blendAmount * 100))
                 }
-                Text("Blend needs something underneath to mix with — a layer on its own "
+                InfoTip("More about this", "Blend needs something underneath to mix with — a layer on its own "
                      + "looks the same in every mode.")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.tertiary)
             }
             .padding(.top, 4)
         } label: {

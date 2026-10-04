@@ -448,15 +448,13 @@ struct CameraInspector: View {
                 Picker("Easing", selection: $camera.easing) {
                     ForEach(CameraEasing.allCases) { Text($0.title).tag($0) }
                 }
-                Text("Linear reads as mechanical — real motion starts slow and settles.")
-                    .font(.system(size: 14)).foregroundStyle(.secondary)
+                InfoTip("More about this", "Linear reads as mechanical — real motion starts slow and settles.")
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Path smoothing  \(Int(camera.smoothing * 100))%")
                         .font(.system(size: 15))
                     Slider(value: $camera.smoothing, in: 0...1)
                 }
-                Text("Pulls each shot toward its neighbors. Full smoothing flattens intentional motion too.")
-                    .font(.system(size: 14)).foregroundStyle(.secondary)
+                InfoTip("More about this", "Pulls each shot toward its neighbors. Full smoothing flattens intentional motion too.")
                 HStack {
                     Button("Generate") { generateCameraInBetweens(document, camera: camera) }
                         .disabled(shotCount < 2)

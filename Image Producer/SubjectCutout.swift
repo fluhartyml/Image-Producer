@@ -158,8 +158,7 @@ struct RemoveBackgroundInspector: View {
     var body: some View {
         if activeImage != nil {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Keeps the subject, clears everything behind it — so the layer underneath shows through.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                InfoTip("More about this", "Keeps the subject, clears everything behind it — so the layer underneath shows through.")
 
                 Button { scan() } label: {
                     Label(working ? "Finding the subject…" : "Remove Background",
@@ -173,8 +172,7 @@ struct RemoveBackgroundInspector: View {
                     Divider()
                     Text("Found \(n) separate subjects. Pick the ones to keep.")
                         .font(.system(size: 18))
-                    Text("A lighthouse standing on a cliff often comes back as one piece — the model sees them as a single connected object. Where it splits them, this is where you drop the half you don't want.")
-                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                    InfoTip("More about this", "A lighthouse standing on a cliff often comes back as one piece — the model sees them as a single connected object. Where it splits them, this is where you drop the half you don't want.")
 
                     ScrollView(.horizontal) {
                         HStack(spacing: 10) {
@@ -196,8 +194,7 @@ struct RemoveBackgroundInspector: View {
                     Text(problem).font(.system(size: 18)).foregroundStyle(.red)
                 }
 
-                Text("The cutout lands on a new layer above this one. The original is hidden, not replaced.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                InfoTip("More about this", "The cutout lands on a new layer above this one. The original is hidden, not replaced.")
                 Spacer()
             }
             .padding()
@@ -323,18 +320,15 @@ struct MagicLassoInspector: View {
     var body: some View {
         if hasImage {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Click a region on the canvas and it clears, so the layer below shows through. Hover first — the area that will go is highlighted in red.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                InfoTip("More about this", "Click a region on the canvas and it clears, so the layer below shows through. Hover first — the area that will go is highlighted in red.")
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Tolerance  \(Int(pen.lassoTolerance))").font(.system(size: 18))
                     Slider(value: $pen.lassoTolerance, in: 0...160, step: 1)
-                    Text("How different a pixel can be from the one you clicked and still go. Low stops at the faintest line. High walks through a soft sky or a gradient.")
-                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                    InfoTip("More about this", "How different a pixel can be from the one you clicked and still go. Low stops at the faintest line. High walks through a soft sky or a gradient.")
                 }
 
-                Text("Click as many times as you need — sky, then ocean, then the rock. They all go on one layer rather than stacking a new one each click, and History steps back through them one at a time.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                InfoTip("More about this", "Click as many times as you need — sky, then ocean, then the rock. They all go on one layer rather than stacking a new one each click, and History steps back through them one at a time.")
 
                 Text("Your original layer is kept and hidden, never overwritten.")
                     .font(.system(size: 18)).foregroundStyle(.secondary)

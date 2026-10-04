@@ -1185,9 +1185,7 @@ struct PaintBucketInspector: View {
             if activeHasImage {
                 Divider()
                 Text("Flood fill — pour color up to the lines").font(.system(size: 18)).bold()
-                Text("Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
+                InfoTip("More about this", "Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Tolerance  \(Int(pen.bucketTolerance))").font(.system(size: 18))
                     Slider(value: $pen.bucketTolerance, in: 0...160, step: 1)
@@ -2326,8 +2324,7 @@ struct ColorPaletteInspector: View {
             }
             .font(.system(size: 18)).buttonStyle(.bordered)
 
-            Text("Tap a swatch to make it the active color; edit it above. Add grows the box (8–24); the 8 base colors can't be removed. This palette is the only place colors are defined — every tool picks from it.")
-                .font(.system(size: 18)).foregroundStyle(.secondary)
+            InfoTip("More about this", "Tap a swatch to make it the active color; edit it above. Add grows the box (8–24); the 8 base colors can't be removed. This palette is the only place colors are defined — every tool picks from it.")
 
             Divider()
 
@@ -2738,9 +2735,7 @@ struct FontPickerInspector: View {
             }
             .buttonStyle(.borderedProminent)
             // Kept to one line at his word, 2026-10-03: "the blurb under new text layer is too long".
-            Text("Type, then press New Text Layer. Renaming the layer changes its text.")
-                .font(.system(size: 18)).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            InfoTip("More about this", "Type, then press New Text Layer. Renaming the layer changes its text.")
 
             HStack(spacing: 8) {
                 styleToggle("bold", "Bold", $bold)
@@ -2823,8 +2818,7 @@ struct FontPickerInspector: View {
 
             PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
 
-            Text("The text layer updates live, named after the text. Reposition with the Move tool; rename the layer (Layers panel) to edit it later.")
-                .font(.system(size: 18)).foregroundStyle(.secondary)
+            InfoTip("More about this", "The text layer updates live, named after the text. Reposition with the Move tool; rename the layer (Layers panel) to edit it later.")
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -3176,8 +3170,7 @@ struct PenInspector: View {
                     ColorPicker("Slot color", selection: slotColorBinding(slot.id), supportsOpacity: false)
                         .padding().frame(minWidth: 220)
                 }
-                Text("Tap to use · right-click (long-press) to change. Saved with the file; new docs inherit it.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                InfoTip("More about this", "Tap to use · right-click (long-press) to change. Saved with the file; new docs inherit it.")
 
                 VStack(spacing: 6) {
                     Button {
@@ -3198,8 +3191,7 @@ struct PenInspector: View {
                 }
                 .font(.system(size: 18))
                 .buttonStyle(.bordered)
-                Text("Save these colors as a reusable brand palette, or load one into this icon.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                InfoTip("More about this", "Save these colors as a reusable brand palette, or load one into this icon.")
                 if paletteLoadFailed {
                     Text("Couldn't read that palette file.").font(.system(size: 18)).foregroundStyle(.red)
                 }
@@ -3907,8 +3899,7 @@ struct MoveTransformInspector: View {
 
                 cropSizeControls
 
-                Text("Live preview is non-destructive (Export/Share trim to it). Apply Crop makes a new cropped layer and hides the original (kept).")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                InfoTip("More about this", "Live preview is non-destructive (Export/Share trim to it). Apply Crop makes a new cropped layer and hides the original (kept).")
             }
         }
         // ⚠️ ALSO ON APPEAR, NOT ONLY ON CHANGE. Every call to applyCrop() used to come
@@ -4098,8 +4089,7 @@ struct MoveTransformInspector: View {
                             Button("Fill") { applyFitFill(.fill, idx) }
                         }
                         .buttonStyle(.bordered)
-                        Text("Fit insets the object inside the canvas (letterbox if it isn't square). Fill covers the canvas and clips the overflow.")
-                            .font(.system(size: 18)).foregroundStyle(.secondary)
+                        InfoTip("More about this", "Fit insets the object inside the canvas (letterbox if it isn't square). Fill covers the canvas and clips the overflow.")
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
