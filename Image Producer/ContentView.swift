@@ -6475,7 +6475,10 @@ struct TextElementView: View {
 }
 
 struct ImageCompositeView: View {
-    let document: ImageDocument
+    /// OBSERVED, not a plain `let` — as a `let`, SwiftUI saw the same document reference
+    /// and skipped redrawing, so the floating preview kept a stale picture (on the iPad,
+    /// 2026-10-03, it stayed blank after a gradient was turned on).
+    @ObservedObject var document: ImageDocument
     let size: CGSize
     /// The Camera's transparent-stamp capture renders with this false. The Light/Dark
     /// layers are a preview control rather than artwork, so a capture should be able to
