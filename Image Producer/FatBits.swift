@@ -97,67 +97,31 @@ struct ProductionThumbnail: View {
 struct ZoomInspector: View {
     @ObservedObject var document: ImageDocument
 
-    /// Shipping sizes worth checking at a glance. NOT the resolution ladder —
-    /// R1's ladder (128/256/512/1024) is the ART-CELL grid density and lives in
-    /// the Pen inspector. These are display sizes, a different axis entirely.
-    private let checkSizes: [CGFloat] = [16, 32, 64]
-
-    /// ONE size, not a control. Michael, 2026-08-24: "i like the one size".
-    /// 128 is roughly a Dock icon. R2 asks for a thumbnail at true final size, and
-    /// a picker was me hedging on which "final" meant — his answer is that the
-    /// choice was not worth the control.
-    private let side: CGFloat = 128
-
     /// Shared with the canvas overlay — either surface can turn the PiP on or off.
     @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
+
+    // ⛔ "Rendered Icon Size" and "Small sizes" (16/32/64) are GONE — his call, 2026-10-04:
+    // "rendered icon size and small sizes are obsolete and left overs from icon producer,
+    // they may be removed for image producer." An app that makes posters and banners has
+    // no single "rendered icon" to judge. The floating preview stays.
+    // All text is 18 pt — his minimum (it had been caption-sized).
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
 
-            Toggle("Floating preview", isOn: $showProductionPiP)
-                .toggleStyle(.switch)
+            Toggle(isOn: $showProductionPiP) {
+                Text("Floating preview").font(.system(size: 18))
+            }
+            .toggleStyle(.switch)
             Text("Keeps the production preview on the canvas with ANY tool active — "
                  + "drag it to any corner.")
-                .font(.caption)
+                .font(.system(size: 18))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Divider()
-
-            // NOT "Actual Size" — Michael caught it, 2026-08-24: "the lable 'actual
-            // size' is incorrect because the canvas is a lot larger". He is right:
-            // ACTUAL SIZE means 1:1 with the DOCUMENT, and his canvas is 1024 while
-            // this is 128, so the label meant the opposite of what it showed.
-            // He then named it himself — "it should say rendered icon size" — which
-            // beats Claude's "Production Preview": it states WHAT IT IS rather than
-            // what it is for. His words, verbatim.
-            Text("Rendered Icon Size")
-                .font(.headline)
-
-            ProductionThumbnail(document: document, side: side)
-
-            Divider()
-
-            Text("Small sizes")
-                .font(.subheadline.weight(.semibold))
-            Text("How it lands where icons are smallest — 16 is a Finder list row.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            HStack(alignment: .bottom, spacing: 14) {
-                ForEach(checkSizes, id: \.self) { s in
-                    VStack(spacing: 4) {
-                        ProductionThumbnail(document: document, side: s)
-                        Text("\(Int(s))")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
             Text("The preview never follows the canvas zoom — that is the point. "
                  + "Work up close, judge at size.")
-                .font(.caption)
+                .font(.system(size: 18))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
