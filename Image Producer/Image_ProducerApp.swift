@@ -153,7 +153,10 @@ struct Image_ProducerApp: App {
                 // BUILD NUMBER IN THE TITLE BAR — his ask, 2026-10-03: "put the build number
                 // in the title bar", then on the iPad: "the main page should show the build
                 // number on the titlebar". Mac window subtitle; iPad/iPhone navigation subtitle.
-                .navigationSubtitle("Build \(appBuildNumber)")
+                // DEVELOPMENT BUILDS ONLY — his ruling, 2026-10-04: the number means nothing
+                // to a customer. Every build Xcode puts on his devices still shows it; the App
+                // Store build shows just the file name. About always has Version · Build.
+                .developmentBuildSubtitle()
         }
         // Turn off undo/redo. ImageDocument is a ReferenceFileDocument that never registers
         // undo actions — undo/redo belongs to the future linear History system, not the
@@ -318,6 +321,19 @@ struct Image_ProducerApp: App {
         }
         .defaultLaunchBehavior(.presented)
         .windowResizability(.contentSize)
+        #endif
+    }
+}
+
+
+extension View {
+    /// "Build N" in the title bar, in Debug builds only (what Xcode runs on his devices).
+    @ViewBuilder
+    func developmentBuildSubtitle() -> some View {
+        #if DEBUG
+        self.navigationSubtitle("Build \(appBuildNumber)")
+        #else
+        self
         #endif
     }
 }
