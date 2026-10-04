@@ -2369,6 +2369,11 @@ struct SymbolPickerInspector: View {
     @Binding var activeLayerID: ImageLayer.ID?
     @State private var search = ""
     @State private var tint: Color = .black
+    /// PICK, THEN ACT — his rule, 2026-10-04: "i dont want it to change the current glyph
+    /// till i press apply or create a new layer, it can preview / read only change till the
+    /// action button is pressed." Tapping a tile only sets this; the canvas is untouched
+    /// until Apply or Create New Layer.
+    @State private var picked: GlyphResult?
 
     /// One searchable Unicode character: the glyph plus its lowercased Unicode name.
     struct UnicodeGlyph: Identifiable, Hashable {
@@ -2435,8 +2440,8 @@ struct SymbolPickerInspector: View {
 
     /// Index of the layer to write into — the selected symbol layer, or a fresh one above
     /// the selection, named `name` and selected.
-    private func targetIndex(named name: String) -> Int {
-        if activeIsSymbolLayer, let i = activeIndex {
+    private func targetIndex(named name: String, newLayer: Bool) -> Int {
+        if !newLayer, activeIsSymbolLayer, let i = activeIndex {
             document.layers[i].name = name
             return i
         }
@@ -2505,11 +2510,39 @@ struct SymbolPickerInspector: View {
     var body: some View {
             VStack(alignment: .leading, spacing: 12) {
                 PaletteSwatchRow(document: document, color: $tint, label: "Color")
+
+                // THE PREVIEW + THE TWO ACTIONS. Read-only until a button is pressed.
+                if let picked {
+                    HStack(spacing: 12) {
+                        pickedPreview(picked)
+                            .frame(width: 88, height: 88)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.15)))
+                        Text(pickedTitle(picked))
+                            .font(.system(size: 18))
+                            .lineLimit(2)
+                            .minimumScaleFactor(10.0 / 18.0)
+                    }
+                    Button { act(on: picked, newLayer: true) } label: {
+                        Label("Create New Layer", systemImage: "plus.square.on.square")
+                            .font(.system(size: 18)).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button { act(on: picked, newLayer: false) } label: {
+                        Label("Apply to Selected Layer", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 18)).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!activeIsSymbolLayer)
+                } else {
+                    Text("Tap a glyph to preview it, then create a layer or apply it.")
+                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                }
+
                 TextField("Search SF & Unicode", text: $search)
                     .textFieldStyle(.roundedBorder)
                 if combinedResults.isEmpty {
                     Text("Can't find an SF or Unicode symbol matching “\(search.trimmingCharacters(in: .whitespaces))”.")
-                        .font(.system(size: 16)).foregroundStyle(.secondary).padding(.vertical, 8)
+                        .font(.system(size: 18)).foregroundStyle(.secondary).padding(.vertical, 8)
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 8) {
@@ -2530,29 +2563,62 @@ struct SymbolPickerInspector: View {
     @ViewBuilder private func resultTile(_ result: GlyphResult) -> some View {
         switch result {
         case .sf(let name):
-            Button { place(name) } label: {
+            Button { picked = result } label: {
                 Image(systemName: name)
                     .font(.system(size: 20))
                     .frame(width: 44, height: 44)
                     .background(RoundedRectangle(cornerRadius: 8)
-                        .fill(name == currentSymbol ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
+                        .fill(isHighlighted(result) ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
             }
             .buttonStyle(.plain).accessibilityLabel(name)
         case .unicode(let g):
-            Button { placeUnicode(g.char) } label: {
+            Button { picked = result } label: {
                 Text(g.char)
                     .font(.system(size: 22))
                     .frame(width: 44, height: 44)
                     .background(RoundedRectangle(cornerRadius: 8)
-                        .fill(g.char == currentText ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
+                        .fill(isHighlighted(result) ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
             }
             .buttonStyle(.plain).accessibilityLabel(g.name)
         }
     }
 
-    private func place(_ name: String) {
+    /// The picked tile wins the highlight; with nothing picked, the glyph already on the
+    /// selected layer is shown.
+    private func isHighlighted(_ r: GlyphResult) -> Bool {
+        if let picked { return picked == r }
+        switch r {
+        case .sf(let name):   return name == currentSymbol
+        case .unicode(let g): return g.char == currentText
+        }
+    }
+
+    @ViewBuilder private func pickedPreview(_ r: GlyphResult) -> some View {
+        switch r {
+        case .sf(let name):
+            Image(systemName: name).resizable().scaledToFit().padding(12).foregroundStyle(tint)
+        case .unicode(let g):
+            Text(g.char).font(.system(size: 52)).foregroundStyle(tint)
+        }
+    }
+
+    private func pickedTitle(_ r: GlyphResult) -> String {
+        switch r {
+        case .sf(let name):   return symbolLayerName(name)
+        case .unicode(let g): return g.name.capitalized
+        }
+    }
+
+    private func act(on r: GlyphResult, newLayer: Bool) {
+        switch r {
+        case .sf(let name):   place(name, newLayer: newLayer)
+        case .unicode(let g): placeUnicode(g.char, newLayer: newLayer)
+        }
+    }
+
+    private func place(_ name: String, newLayer: Bool) {
         document.captureHistoryBaselineIfNeeded()
-        let i = targetIndex(named: symbolLayerName(name))
+        let i = targetIndex(named: symbolLayerName(name), newLayer: newLayer)
         document.layers[i].setSymbol(name, tintHex: tint.hexString() ?? "#000000")
         document.recordHistory(toolID: Tool.symbol.rawValue, groupTitle: Tool.symbol.title,
                                actionLabel: "Place Symbol", layerID: document.layers[i].id)
@@ -2562,9 +2628,9 @@ struct SymbolPickerInspector: View {
     /// "Apple Symbols" (broad symbol coverage) and relies on Core Text glyph fallback for
     /// anything it lacks (e.g. emoji → Apple Color Emoji). Monochrome symbols take the
     /// chosen tint; color emoji keep their own colors.
-    private func placeUnicode(_ char: String) {
+    private func placeUnicode(_ char: String, newLayer: Bool) {
         document.captureHistoryBaselineIfNeeded()
-        let i = targetIndex(named: ImageLayer.nameForText(char))
+        let i = targetIndex(named: ImageLayer.nameForText(char), newLayer: newLayer)
         document.layers[i].setText(char, fontName: "Apple Symbols",
                                    tintHex: tint.hexString() ?? "#000000")
         document.recordHistory(toolID: Tool.symbol.rawValue, groupTitle: Tool.symbol.title,
