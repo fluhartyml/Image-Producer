@@ -239,6 +239,13 @@ struct LayerGradient: Codable, Equatable {
     /// Used when the layer HAS ARTWORK — the ramp drives opacity between these.
     var startOpacity = 1.0
     var endOpacity   = 0.0
+    /// PRISTINE only — where along the direction the blend starts and ends (0…1).
+    /// OPTIONAL so files saved before these existed still open: nil = 0 and 1, the full
+    /// corner-to-corner ramp. His ask, 2026-10-04: sliders on the two-color gradient too.
+    var startStop: Double? = nil
+    var endStop: Double? = nil
+    var blendStart: Double { startStop ?? 0 }
+    var blendEnd: Double { endStop ?? 1 }
 }
 
 
@@ -329,9 +336,13 @@ struct GradientVeil<Content: View>: View {
     var body: some View {
         let span = gradient.direction.span
         if isPristine {
-            LinearGradient(colors: [Color(hex: gradient.startHex) ?? .purple,
-                                    Color(hex: gradient.endHex) ?? .blue],
-                           startPoint: span.start, endPoint: span.end)
+            // Solid From color up to blendStart, the blend between, solid To color after
+            // blendEnd. The end is kept a hair past the start so the stops never cross.
+            LinearGradient(stops: [
+                .init(color: Color(hex: gradient.startHex) ?? .purple, location: gradient.blendStart),
+                .init(color: Color(hex: gradient.endHex) ?? .blue,
+                      location: max(gradient.blendEnd, gradient.blendStart + 0.001))
+            ], startPoint: span.start, endPoint: span.end)
         } else {
             content().mask(
                 LinearGradient(stops: [
@@ -768,18 +779,22 @@ struct LayerInspector: View {
         DisclosureGroup(isExpanded: $showGradient) {
             VStack(alignment: .leading, spacing: 12) {
                 Toggle("Gradient on this layer", isOn: gradientEnabled(i))
-                if document.layers[i].gradient?.isEnabled == true {
-                    compass(i)
-                    if pristine {
-                        Text("This layer is empty, so the gradient DRAWS in these two colors.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        swatches(title: "From", selection: gradientBinding(i).startHex)
-                        swatches(title: "To", selection: gradientBinding(i).endHex)
-                    } else {
-                        Text("This layer has artwork, so the gradient FADES it by position.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        opacityEnds(i)
-                    }
+                // EVERY CONTROL SHOWS UP FRONT — his ruling, 2026-10-04: "how do i know if
+                // gradients is the tool i actually wanted if i first have to commit to
+                // gradient and then go back to adjust the gradient?" Touching any control
+                // turns the gradient on as a preview (gradientBinding starts from an enabled
+                // LayerGradient); nothing is permanent until Apply.
+                compass(i)
+                if pristine {
+                    Text("This layer is empty, so the gradient DRAWS in these two colors.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    swatches(title: "From", selection: gradientBinding(i).startHex)
+                    swatches(title: "To", selection: gradientBinding(i).endHex)
+                    blendStops(i)
+                } else {
+                    Text("This layer has artwork, so the gradient FADES it by position.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    opacityEnds(i)
                 }
             }
             .padding(.top, 4)
@@ -844,6 +859,22 @@ struct LayerInspector: View {
                 }
             }
         }
+    }
+
+    /// Where the two-color blend starts and ends along the direction.
+    @ViewBuilder
+    private func blendStops(_ i: Int) -> some View {
+        let g = document.layers[i].gradient ?? LayerGradient()
+        let start = Binding<Double>(
+            get: { g.blendStart },
+            set: { v in gradientBinding(i).wrappedValue.startStop = min(v, g.blendEnd) })
+        let end = Binding<Double>(
+            get: { g.blendEnd },
+            set: { v in gradientBinding(i).wrappedValue.endStop = max(v, g.blendStart) })
+        labelledSlider("Blend starts", value: start, range: 0...1,
+                       readout: String(format: "%.0f%%", g.blendStart * 100))
+        labelledSlider("Blend ends", value: end, range: 0...1,
+                       readout: String(format: "%.0f%%", g.blendEnd * 100))
     }
 
     @ViewBuilder
