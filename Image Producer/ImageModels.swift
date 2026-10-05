@@ -1511,28 +1511,15 @@ extension ImageDocument {
             // survives. The URL is the hand-off: the reopen knows it was an import.
             //
             // THE PSD'S OWN NAME — his idea, 2026-10-05: "why doesnt it use the original psd
-            // file name just change the extention". LightHouseLockBox.psd → LightHouseLockBox,
-            // set on the configuration BEFORE the system's first save, so no rename is needed.
-            // (" 2", " 3"… if that name is taken — never over an existing project.)
-            var names: Set<String> = []
-            if let current = configuration.fileURL {
-                names.insert(current.lastPathComponent)
-                ipLog("import url \(current.path) exists=\(FileManager.default.fileExists(atPath: current.path))")
-                let dir = current.deletingLastPathComponent()
-                let base = source.deletingPathExtension().lastPathComponent
-                var candidate = dir.appendingPathComponent(base).appendingPathExtension(current.pathExtension)
-                var n = 2
-                while FileManager.default.fileExists(atPath: candidate.path) {
-                    candidate = dir.appendingPathComponent("\(base) \(n)").appendingPathExtension(current.pathExtension)
-                    n += 1
-                }
-                configuration.fileURL = candidate
-                names.insert(candidate.lastPathComponent)
-                ipLog("import url set to \(configuration.fileURL?.lastPathComponent ?? "nil")")
-            }
+            // file name just change the extention". It cannot be set here: this document
+            // lives in a temporary copy inside the app, and iPadOS ignored a new name set on it
+            // (build 276) — the real file is saved as "Untitled" afterwards. So the name rides
+            // the hand-off and the REOPEN renames the real file (below).
             // The reopen arrives with the URL seen from ANOTHER folder (build 275: a full-path
-            // match missed it and the New Image sheet came back), so match by name and time.
-            justImported = (names, Date())
+            // match missed it), so it is matched by file name and time.
+            var names: Set<String> = []
+            if let current = configuration.fileURL { names.insert(current.lastPathComponent) }
+            justImported = (names, source.deletingPathExtension().lastPathComponent, Date())
             ipLog("imported \(source.lastPathComponent): \(doc.layers.count) layers")
             return doc
         }
@@ -1555,14 +1542,25 @@ extension ImageDocument {
            pending.names.contains(name), Date().timeIntervalSince(pending.at) < 30 {
             justImported = nil
             doc.newImageAsked = true
-            ipLog("reopened import \(name) — no New Image sheet")
+            // The PSD's name, made unique in the folder the file really lives in.
+            if let url = configuration.fileURL {
+                let dir = url.deletingLastPathComponent()
+                var candidate = pending.sourceName
+                var n = 2
+                while FileManager.default.fileExists(atPath:
+                        dir.appendingPathComponent(candidate).appendingPathExtension(url.pathExtension).path) {
+                    candidate = "\(pending.sourceName) \(n)"; n += 1
+                }
+                doc.pendingNewName = candidate          // ContentView renames the file on open
+            }
+            ipLog("reopened import \(name) — no New Image sheet, rename to \(doc.pendingNewName ?? "nil")")
         }
         #endif
         return doc
     }
 
     /// Files New from Import wrote, waiting for the system to reopen them (see `make`).
-    @MainActor static var justImported: (names: Set<String>, at: Date)?
+    @MainActor static var justImported: (names: Set<String>, sourceName: String, at: Date)?
 }
 
 extension ImageDocument: Document {
