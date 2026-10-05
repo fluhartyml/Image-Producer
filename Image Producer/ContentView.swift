@@ -1736,6 +1736,15 @@ struct CanvasInspector: View {
                                              options: .regularExpression) != nil
 
         #if os(iOS)
+        // THE iOS 27 DOCUMENT SYSTEM (1.1): rename through the document's own configuration.
+        // The UIDocument title-bar rename below is IGNORED by it — on his iPad, build 273,
+        // "Test from import" timed out as "did not happen", and every new document stayed
+        // "Untitled" because the ImageProducerNNNN name goes through this same path.
+        if let config = document.configuration, config.fileURL != nil {
+            configurationRename(config, from: url, to: newURL, keepOriginal: !isStillAutoNamed,
+                                clean: clean, current: current)
+            return
+        }
         // ⛔ ON iPAD/iPHONE THE SYSTEM OWNS THE OPEN FILE. The DocumentGroup keeps a UIDocument
         // on it, and moving the file out from under that document does NOT move the
         // document: on leaving the editor it saved itself back under the OLD name, so
@@ -1878,6 +1887,46 @@ struct CanvasInspector: View {
     }
 
     #if os(iOS)
+    /// Rename (or, once it wears his name, Save As) under the iOS 27 document system: the
+    /// file is moved or copied with the configuration's OWN coordinator, then the
+    /// configuration is pointed at the new file so the system and autosave follow it.
+    /// Setting `fileURL` alone is not documented to move anything, so the move is ours.
+    private func configurationRename(_ config: URLDocumentConfiguration, from url: URL, to newURL: URL,
+                                     keepOriginal: Bool, clean: String, current: String) {
+        let coordinator = config.makeFileCoordinator()
+        // Never coordinate on the main thread (the 2026-10-03 freeze, above).
+        DispatchQueue.global(qos: .userInitiated).async {
+            var coordErr: NSError?
+            var failure: Error?
+            if keepOriginal {
+                coordinator.coordinate(readingItemAt: url, options: [],
+                                       writingItemAt: newURL, options: .forReplacing, error: &coordErr) { src, dst in
+                    do { try FileManager.default.copyItem(at: src, to: dst) } catch { failure = error }
+                }
+            } else {
+                coordinator.coordinate(writingItemAt: url, options: .forMoving,
+                                       writingItemAt: newURL, options: .forReplacing, error: &coordErr) { src, dst in
+                    do {
+                        try FileManager.default.moveItem(at: src, to: dst)
+                        coordinator.item(at: src, didMoveTo: dst)
+                    } catch { failure = error }
+                }
+            }
+            let error = failure ?? coordErr
+            DispatchQueue.main.async {
+                if let error {
+                    renameError = true; draftName = displayName
+                    document.say("Rename failed — \(error.localizedDescription)", kind: .warning)
+                    return
+                }
+                config.fileURL = newURL
+                document.movedFileURL = newURL          // autosave follows it
+                document.say(keepOriginal ? "Saved as \(clean) — \(current) kept" : "Renamed to \(clean)",
+                             kind: .info)
+            }
+        }
+    }
+
     /// The system's own UIDocument for `url` — the one the DocumentGroup opened — found by
     /// walking the window's view controllers to the UIDocumentViewController that holds it.
     /// Paths are compared after resolving symlinks (/var vs /private/var).
