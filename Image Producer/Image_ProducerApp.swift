@@ -266,10 +266,12 @@ struct Image_ProducerApp: App {
         // a prominent "New Image" button, and the recent-documents browser (free). New
         // docs are created as .imageProject (the first writable content type).
         #if !os(macOS)
-        // The version after the name — his idea, 2026-10-05: the system places the title at
-        // the buttons' leading edge, so "Image Producer" alone sat ~55 pt left of center; the
-        // version widens it to balance. Read from Xcode's Version setting, never hard-coded.
-        DocumentGroupLaunchScene("Image Producer \(appShortVersion)") {
+        // OUR OWN CENTERED TITLE — his call, 2026-10-05. The system draws its launch title
+        // from the buttons' LEADING edge, so "Image Producer" sat ~54 pt left of center and
+        // "Image Producer 1.1" still ~28 pt (measured on his iPad). The system title is now
+        // non-breaking spaces — invisible, but it still reserves the title's place in the
+        // layout — and the overlay below draws the real one, centered, at that height.
+        DocumentGroupLaunchScene(String(repeating: "\u{00A0}", count: launchTitle.count)) {
             // NUMBERED, LIKE THE MAC — his report, 2026-10-04: New Image made "Untitled" where
             // the Mac makes ImageProducer{number}. The system creates the new document from
             // the file returned here, under that file's name.
@@ -302,7 +304,7 @@ struct Image_ProducerApp: App {
                 startPoint: .top,
                 endPoint: .bottom
             )
-        } overlayAccessoryView: { _ in
+        } overlayAccessoryView: { geo in
             // Hero app icon above the wordmark — mirrors the Mac Welcome window, which
             // shows the app icon over the title. The 1024 icon art (LaunchHeroIcon,
             // light/dark) is clipped to the iOS app-icon superellipse so it reads as the
@@ -320,6 +322,19 @@ struct Image_ProducerApp: App {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 24)
+            }
+            .overlay {
+                // The name + version from Xcode, centered on the screen at the height the
+                // system reserved for its title. 73 pt bold matches the system title's
+                // measured 52 pt cap height.
+                Text(launchTitle)
+                    .font(.system(size: 73, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .padding(.horizontal, 24)
+                    .frame(width: geo.frame.width)
+                    .position(x: geo.frame.midX, y: geo.titleViewFrame.midY)
+                    .accessibilityAddTraits(.isHeader)
             }
         }
         #endif

@@ -7356,6 +7356,9 @@ var appShortVersion: String {
     Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
 }
 
+/// The iPad launch screen's title: the name and Xcode's version, e.g. "Image Producer 1.1".
+var launchTitle: String { "Image Producer \(appShortVersion)" }
+
 var appVersionLine: String {
     let info = Bundle.main.infoDictionary
     let short = info?["CFBundleShortVersionString"] as? String ?? "1.0"
