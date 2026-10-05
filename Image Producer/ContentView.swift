@@ -1705,7 +1705,11 @@ struct CanvasInspector: View {
         let newURL = url.deletingLastPathComponent()
             .appendingPathComponent(clean)
             .appendingPathExtension(url.pathExtension)
-        guard !FileManager.default.fileExists(atPath: newURL.path) else { renameError = true; return }
+        ipLog("rename \(url.lastPathComponent) → \(newURL.lastPathComponent) config=\(document.configuration?.fileURL?.lastPathComponent ?? "nil")")
+        guard !FileManager.default.fileExists(atPath: newURL.path) else {
+            ipLog("rename refused: \(newURL.lastPathComponent) already exists")
+            renameError = true; return
+        }
 
         let coordinator = NSFileCoordinator()
         // ⛔ NEVER COORDINATE ON THE MAIN THREAD. On the iPad the open document is a file
@@ -1913,6 +1917,7 @@ struct CanvasInspector: View {
                 }
             }
             let error = failure ?? coordErr
+            ipLog("configurationRename \(keepOriginal ? "copy" : "move") → \(newURL.lastPathComponent): \(error.map { "\($0)" } ?? "ok")")
             DispatchQueue.main.async {
                 if let error {
                     renameError = true; draftName = displayName
@@ -1921,6 +1926,7 @@ struct CanvasInspector: View {
                 }
                 config.fileURL = newURL
                 document.movedFileURL = newURL          // autosave follows it
+                ipLog("config.fileURL now \(config.fileURL?.lastPathComponent ?? "nil")")
                 document.say(keepOriginal ? "Saved as \(clean) — \(current) kept" : "Renamed to \(clean)",
                              kind: .info)
             }

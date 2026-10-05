@@ -1504,8 +1504,13 @@ extension ImageDocument {
                 throw CocoaError(.fileReadCorruptFile)
             }
             doc.newImageAsked = true                          // the file set the size
-            doc.pendingNewName = nextProjectName()
-            ipLog("imported \(source.lastPathComponent): \(doc.layers.count) layers, name \(doc.pendingNewName ?? "nil")")
+            // NO NAME, NO QUESTIONS — his rule, 2026-10-05: "if its not going to rename the
+            // import it shouldnt ask and leave it for the user to rename". The system saves
+            // this document and at once REOPENS the file as a fresh document (log, build 274:
+            // a second makeDocument with source nil, same URL), so nothing set on `doc` here
+            // survives. The URL is the hand-off: the reopen knows it was an import.
+            if let url = configuration.fileURL { justImported.insert(url.standardizedFileURL.path) }
+            ipLog("imported \(source.lastPathComponent): \(doc.layers.count) layers")
             return doc
         }
         let isNew = context.creationSource == .newImage || configuration.fileURL == nil
@@ -1520,8 +1525,19 @@ extension ImageDocument {
         }
         let doc = ImageDocument(layers: [])                   // filled by `apply` from the file
         doc.configuration = configuration
+        #if !os(macOS)
+        // The reopen of a file New from Import just wrote: open on the Canvas, no New Image sheet.
+        if let path = configuration.fileURL?.standardizedFileURL.path,
+           justImported.remove(path) != nil {
+            doc.newImageAsked = true
+            ipLog("reopened import \(configuration.fileURL?.lastPathComponent ?? "nil") — no New Image sheet")
+        }
+        #endif
         return doc
     }
+
+    /// Files New from Import wrote, waiting for the system to reopen them (see `make`).
+    @MainActor static var justImported: Set<String> = []
 }
 
 extension ImageDocument: Document {
