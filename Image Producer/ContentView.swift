@@ -1315,6 +1315,8 @@ struct CanvasInspector: View {
 
     @State private var draftName = ""
     @State private var renameError = false
+    /// Why the last rename failed, when known — shown instead of the generic line.
+    @State private var renameErrorText: String?
     /// Set when an aspect preset leaves the canvas below a target's stated minimum.
     @State private var aspectWarning: String?
     /// How the Pixels fields reshape the canvas. Set by the last preset applied, or by
@@ -1370,7 +1372,7 @@ struct CanvasInspector: View {
                         .textFieldStyle(.roundedBorder).font(.system(size: 18, weight: .semibold))
                         .onSubmit { renameFile() }
                     if renameError {
-                        Text("Couldn't rename — a file with that name may already exist.")
+                        Text(renameErrorText ?? "Couldn't rename — a file with that name may already exist.")
                             .font(.system(size: 18)).foregroundStyle(.red)
                     }
                 }
@@ -1650,7 +1652,7 @@ struct CanvasInspector: View {
         }
         .onChange(of: document.pendingNewName) { applyPendingName() }
         .onChange(of: document.name) { draftName = displayName }
-        .onChange(of: fileURL) { draftName = displayName; renameError = false; applyPendingName() }
+        .onChange(of: fileURL) { draftName = displayName; renameError = false; renameErrorText = nil; applyPendingName() }
         // CANVAS SIZE IS A HISTORY STEP — every path that changes it (Pixels fields,
         // Landscape, the three preset menus) lands here. Typing a number coalesces into one
         // step. A History restore sets the size it stored, which matches
@@ -1695,6 +1697,7 @@ struct CanvasInspector: View {
     /// (so autosave keeps writing to the right file).
     private func renameFile() {
         renameError = false
+        renameErrorText = nil
         guard let url = document.movedFileURL ?? fileURL else { return }
         // Sanitize: a file name can't contain "/" or ":".
         let clean = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1740,13 +1743,17 @@ struct CanvasInspector: View {
                                              options: .regularExpression) != nil
 
         #if os(iOS)
-        // THE iOS 27 DOCUMENT SYSTEM (1.1): rename through the document's own configuration.
-        // The UIDocument title-bar rename below is IGNORED by it — on his iPad, build 273,
-        // "Test from import" timed out as "did not happen", and every new document stayed
-        // "Untitled" because the ImageProducerNNNN name goes through this same path.
+        // THE iOS 27 DOCUMENT SYSTEM (1.1): the SYSTEM renames, not us.
+        // · Build 273: the UIDocument title-bar rename below is ignored by it ("did not happen").
+        // · Build 278: moving the file ourselves is refused — "you don't have permission to
+        //   access 'Desktop'" (Cocoa 513). The app may write the FILE, not change the FOLDER.
+        // Apple's title-bar rename works because iPadOS does it; the document browser's
+        // renameDocument(at:proposedName:) is that same system rename, offered to apps.
         if let config = document.configuration, config.fileURL != nil {
-            configurationRename(config, from: url, to: newURL, keepOriginal: !isStillAutoNamed,
-                                clean: clean, current: current)
+            Task { @MainActor in
+                await browserRename(config, from: url, to: clean, keepOriginal: !isStillAutoNamed,
+                                    current: current)
+            }
             return
         }
         // ⛔ ON iPAD/iPHONE THE SYSTEM OWNS THE OPEN FILE. The DocumentGroup keeps a UIDocument
@@ -1891,46 +1898,62 @@ struct CanvasInspector: View {
     }
 
     #if os(iOS)
-    /// Rename (or, once it wears his name, Save As) under the iOS 27 document system: the
-    /// file is moved or copied with the configuration's OWN coordinator, then the
-    /// configuration is pointed at the new file so the system and autosave follow it.
-    /// Setting `fileURL` alone is not documented to move anything, so the move is ours.
-    private func configurationRename(_ config: URLDocumentConfiguration, from url: URL, to newURL: URL,
-                                     keepOriginal: Bool, clean: String, current: String) {
-        let coordinator = config.makeFileCoordinator()
-        // Never coordinate on the main thread (the 2026-10-03 freeze, above).
-        DispatchQueue.global(qos: .userInitiated).async {
-            var coordErr: NSError?
-            var failure: Error?
-            if keepOriginal {
-                coordinator.coordinate(readingItemAt: url, options: [],
-                                       writingItemAt: newURL, options: .forReplacing, error: &coordErr) { src, dst in
-                    do { try FileManager.default.copyItem(at: src, to: dst) } catch { failure = error }
-                }
-            } else {
-                coordinator.coordinate(writingItemAt: url, options: .forMoving,
-                                       writingItemAt: newURL, options: .forReplacing, error: &coordErr) { src, dst in
-                    do {
-                        try FileManager.default.moveItem(at: src, to: dst)
-                        coordinator.item(at: src, didMoveTo: dst)
-                    } catch { failure = error }
-                }
-            }
-            let error = failure ?? coordErr
-            ipLog("configurationRename \(keepOriginal ? "copy" : "move") → \(newURL.lastPathComponent): \(error.map { "\($0)" } ?? "ok")")
-            DispatchQueue.main.async {
-                if let error {
-                    renameError = true; draftName = displayName
-                    document.say("Rename failed — \(error.localizedDescription)", kind: .warning)
-                    return
-                }
-                config.fileURL = newURL
-                document.movedFileURL = newURL          // autosave follows it
-                ipLog("config.fileURL now \(config.fileURL?.lastPathComponent ?? "nil")")
-                document.say(keepOriginal ? "Saved as \(clean) — \(current) kept" : "Renamed to \(clean)",
-                             kind: .info)
-            }
+    /// Rename (or, once it wears his name, Save As) through the SYSTEM's document browser —
+    /// the launch screen's own UIDocumentBrowserViewController — then point the document's
+    /// configuration at the final URL so the editor and autosave follow it.
+    /// Save As keeps his rule ("destructive the first time … after it is changed …
+    /// non destructive"): rename the open file, have the system copy it, then give the copy
+    /// the previous name back.
+    private func browserRename(_ config: URLDocumentConfiguration, from url: URL, to clean: String,
+                               keepOriginal: Bool, current: String) async {
+        func fail(_ why: String) {
+            ipLog("browserRename failed: \(why)")
+            renameError = true; draftName = displayName
+            renameErrorText = "Couldn't rename — \(why)"
+            document.say("Rename to \(clean) did not happen — \(why)", kind: .warning)
         }
+        guard let browser = Self.documentBrowser() else {
+            fail("the system's file browser was not found"); return
+        }
+        do {
+            let final = try await browser.renameDocument(at: url, proposedName: clean)
+            ipLog("browserRename \(url.lastPathComponent) → \(final.lastPathComponent)")
+            config.fileURL = final
+            document.movedFileURL = final               // autosave follows it
+            renameErrorText = nil
+            draftName = final.deletingPathExtension().lastPathComponent
+            guard keepOriginal else {
+                document.say("Renamed to \(draftName)", kind: .info)
+                return
+            }
+            // Keep the previous file: a system copy beside the renamed one, given the old name.
+            let copy: URL = try await withCheckedThrowingContinuation { cont in
+                browser.importDocument(at: final, nextToDocumentAt: final, mode: .copy) { copied, error in
+                    if let copied { cont.resume(returning: copied) }
+                    else { cont.resume(throwing: error ?? CocoaError(.fileWriteUnknown)) }
+                }
+            }
+            let kept = try await browser.renameDocument(at: copy, proposedName: current)
+            ipLog("browserRename kept \(kept.lastPathComponent)")
+            document.say("Saved as \(draftName) — \(kept.deletingPathExtension().lastPathComponent) kept", kind: .info)
+        } catch {
+            fail(error.localizedDescription)
+        }
+    }
+
+    /// The launch screen's document browser — the system's renamer — reached through the
+    /// UIDocumentViewController that holds the open document (iOS 18+ launch options).
+    static func documentBrowser() -> UIDocumentBrowserViewController? {
+        func search(_ vc: UIViewController?) -> UIDocumentBrowserViewController? {
+            guard let vc else { return nil }
+            if let dvc = vc as? UIDocumentViewController { return dvc.launchOptions.browserViewController }
+            for child in vc.children { if let hit = search(child) { return hit } }
+            return search(vc.presentedViewController)
+        }
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            for window in scene.windows { if let hit = search(window.rootViewController) { return hit } }
+        }
+        return nil
     }
 
     /// The system's own UIDocument for `url` — the one the DocumentGroup opened — found by
