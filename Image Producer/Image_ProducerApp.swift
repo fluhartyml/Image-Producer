@@ -287,13 +287,19 @@ struct Image_ProducerApp: App {
             // reads (PSD with its layers, PDF, pictures) seeds a NEW numbered project from a
             // copy of the file; the original is never written to.
             NewDocumentButton("New from Import…", contentType: .imageProject) {
+                // NEVER return nil here: nil tells the system "make a default document", which
+                // is how build 270 turned a tap into a blank Untitled. Cancel instead.
                 let types = await ImageDocument.newFromImportContentTypes
                 guard let source = await ImportPicker.pick(types: types),
-                      let numbered = ImageDocument.nextProjectURL() else { return nil }
+                      let numbered = ImageDocument.nextProjectURL() else { throw CancellationError() }
                 let template = FileManager.default.temporaryDirectory
                     .appendingPathComponent(numbered.lastPathComponent)
                 try? FileManager.default.removeItem(at: template)
-                return await ImageDocument.writeNewProject(at: template, from: source) ? template : nil
+                guard await ImageDocument.writeNewProject(at: template, from: source) else {
+                    print("IP-IMPORT: could not build a project from \(source.lastPathComponent)")
+                    throw CancellationError()
+                }
+                return template
             }
         } background: {
             // A CALMING PALE MINT in light mode — his call, 2026-10-05: "should be a calming

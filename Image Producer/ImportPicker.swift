@@ -21,17 +21,28 @@ enum ImportPicker {
     /// Present the Files picker for `types` and return a copy of the chosen file, or nil
     /// if the user cancels.
     static func pick(types: [UTType]) async -> URL? {
-        guard let top = topViewController() else { return nil }
+        // Diagnostics for build 271 — his tap on 270 went straight to a blank document.
+        // print() reaches `devicectl … --console`; remove once the cause is known.
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        print("IP-IMPORT: scenes=\(scenes.count) states=\(scenes.map { $0.activationState.rawValue }) windows=\(scenes.flatMap(\.windows).count)")
+        guard let top = topViewController() else {
+            print("IP-IMPORT: no view controller to present on")
+            return nil
+        }
+        print("IP-IMPORT: presenting on \(type(of: top)) inWindow=\(top.viewIfLoaded?.window != nil) beingDismissed=\(top.isBeingDismissed)")
         return await withCheckedContinuation { continuation in
             let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
             let delegate = Delegate { url in
+                print("IP-IMPORT: picker returned \(url?.lastPathComponent ?? "nil (cancelled)")")
                 current = nil
                 continuation.resume(returning: url)
             }
             current = delegate              // the picker holds its delegate weakly
             picker.delegate = delegate
             picker.allowsMultipleSelection = false
-            top.present(picker, animated: true)
+            top.present(picker, animated: true) {
+                print("IP-IMPORT: picker on screen=\(picker.viewIfLoaded?.window != nil)")
+            }
         }
     }
 
