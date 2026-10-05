@@ -277,6 +277,7 @@ struct Image_ProducerApp: App {
             // the Mac makes ImageProducer{number}. The system creates the new document from
             // the file returned here, under that file's name.
             NewDocumentButton("New Image", contentType: .imageProject) {
+                ipLog("New Image closure entered")
                 guard let numbered = ImageDocument.nextProjectURL() else { return nil }
                 let template = FileManager.default.temporaryDirectory
                     .appendingPathComponent(numbered.lastPathComponent)
@@ -289,6 +290,7 @@ struct Image_ProducerApp: App {
             NewDocumentButton("New from Import…", contentType: .imageProject) {
                 // NEVER return nil here: nil tells the system "make a default document", which
                 // is how build 270 turned a tap into a blank Untitled. Cancel instead.
+                ipLog("New from Import closure entered")
                 let types = await ImageDocument.newFromImportContentTypes
                 guard let source = await ImportPicker.pick(types: types),
                       let numbered = ImageDocument.nextProjectURL() else { throw CancellationError() }
@@ -296,7 +298,7 @@ struct Image_ProducerApp: App {
                     .appendingPathComponent(numbered.lastPathComponent)
                 try? FileManager.default.removeItem(at: template)
                 guard await ImageDocument.writeNewProject(at: template, from: source) else {
-                    print("IP-IMPORT: could not build a project from \(source.lastPathComponent)")
+                    ipLog("could not build a project from \(source.lastPathComponent)")
                     throw CancellationError()
                 }
                 return template

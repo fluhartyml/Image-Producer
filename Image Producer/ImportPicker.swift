@@ -16,6 +16,21 @@
 import UIKit
 import UniformTypeIdentifiers
 
+/// TEMPORARY diagnostics (builds 271–272): stdout never reached the Mac, so each line is
+/// appended to Library/ip-import.log in the app container, copied off with
+/// `devicectl device copy from`. Remove once the New from Import fault is understood.
+nonisolated func ipLog(_ line: String) {
+    guard let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first else { return }
+    let url = dir.appendingPathComponent("ip-import.log")
+    let stamp = ISO8601DateFormatter().string(from: Date())
+    let data = Data("\(stamp) \(line)\n".utf8)
+    if let h = try? FileHandle(forWritingTo: url) {
+        h.seekToEndOfFile(); h.write(data); try? h.close()
+    } else {
+        try? data.write(to: url)
+    }
+}
+
 @MainActor
 enum ImportPicker {
     /// Present the Files picker for `types` and return a copy of the chosen file, or nil
@@ -24,16 +39,16 @@ enum ImportPicker {
         // Diagnostics for build 271 — his tap on 270 went straight to a blank document.
         // print() reaches `devicectl … --console`; remove once the cause is known.
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        print("IP-IMPORT: scenes=\(scenes.count) states=\(scenes.map { $0.activationState.rawValue }) windows=\(scenes.flatMap(\.windows).count)")
+        ipLog(" scenes=\(scenes.count) states=\(scenes.map { $0.activationState.rawValue }) windows=\(scenes.flatMap(\.windows).count)")
         guard let top = topViewController() else {
-            print("IP-IMPORT: no view controller to present on")
+            ipLog(" no view controller to present on")
             return nil
         }
-        print("IP-IMPORT: presenting on \(type(of: top)) inWindow=\(top.viewIfLoaded?.window != nil) beingDismissed=\(top.isBeingDismissed)")
+        ipLog(" presenting on \(type(of: top)) inWindow=\(top.viewIfLoaded?.window != nil) beingDismissed=\(top.isBeingDismissed)")
         return await withCheckedContinuation { continuation in
             let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
             let delegate = Delegate { url in
-                print("IP-IMPORT: picker returned \(url?.lastPathComponent ?? "nil (cancelled)")")
+                ipLog(" picker returned \(url?.lastPathComponent ?? "nil (cancelled)")")
                 current = nil
                 continuation.resume(returning: url)
             }
@@ -41,7 +56,7 @@ enum ImportPicker {
             picker.delegate = delegate
             picker.allowsMultipleSelection = false
             top.present(picker, animated: true) {
-                print("IP-IMPORT: picker on screen=\(picker.viewIfLoaded?.window != nil)")
+                ipLog(" picker on screen=\(picker.viewIfLoaded?.window != nil)")
             }
         }
     }
