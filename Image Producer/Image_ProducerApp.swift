@@ -283,12 +283,6 @@ struct Image_ProducerApp: App {
                 try? FileManager.default.removeItem(at: template)
                 return await ImageDocument.writeNewProject(at: template) ? template : nil
             }
-            // FILLED IN THE APP'S PURPLE — his call, 2026-10-05. White capsules on the white
-            // launch screen were nearly invisible, so the eye measured the WORDS ("New Image"
-            // is shorter) and the centered title read as left of center. A solid fill shows
-            // the two buttons are the same width. (Light grey is his alternative.)
-            .buttonStyle(.borderedProminent)
-            .tint(.accentColor)
             // NEW FROM IMPORT — the Mac's ⇧⌘N, on the iPad. Every format Image Producer
             // reads (PSD with its layers, PDF, pictures) seeds a NEW numbered project from a
             // copy of the file; the original is never written to.
@@ -301,15 +295,20 @@ struct Image_ProducerApp: App {
                 try? FileManager.default.removeItem(at: template)
                 return await ImageDocument.writeNewProject(at: template, from: source) ? template : nil
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.accentColor)
         } background: {
-            // FOLLOWS LIGHT / DARK MODE — Michael, 2026-10-03, on his iPad in light mode:
-            // "the background is too dark and im in lightmode". It was a fixed navy, which
-            // also put the system's black title on near-black.
+            // A CALMING PALE MINT in light mode — his call, 2026-10-05: "should be a calming
+            // shade of minty green". White capsules on a white screen were nearly invisible,
+            // so the eye measured the WORDS ("New Image" is shorter) and the centered title
+            // read as left of center; on mint the two equal-width buttons show. (Tinting the
+            // buttons themselves does nothing — build 269: the launch scene draws its own.)
+            // Dark mode keeps the system dark, as before.
             LinearGradient(
-                colors: [Color(uiColor: .systemBackground),
-                         Color(uiColor: .secondarySystemBackground)],
+                colors: [Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+                            ? .systemBackground
+                            : UIColor(red: 0.925, green: 0.973, blue: 0.945, alpha: 1) }),
+                         Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+                            ? .secondarySystemBackground
+                            : UIColor(red: 0.875, green: 0.949, blue: 0.906, alpha: 1) })],
                 startPoint: .top,
                 endPoint: .bottom
             )
