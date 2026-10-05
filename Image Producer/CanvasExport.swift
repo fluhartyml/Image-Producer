@@ -456,6 +456,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     case bmp = "BMP"
     case pdfFlat = "PDF (flat)"
     case pdfLayers = "PDF (one page per layer)"
+    case psd = "PSD (Photoshop, layers kept)"
     case gifAnimated = "Animated GIF (one frame per layer)"
 
     var id: String { rawValue }
@@ -469,6 +470,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .gif, .gifAnimated:  return .gif
         case .bmp:  return .bmp
         case .pdfFlat, .pdfLayers: return .pdf
+        case .psd:  return .photoshopDocument
         }
     }
 
@@ -479,6 +481,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         switch self {
         case .pdfFlat:   return makeFlatPDF(document)
         case .pdfLayers: return makeLayerPDF(document, matte: matte)
+        case .psd:       return makeLayeredPSD(document)
         case .gifAnimated: return makeAnimatedGIF(document, fps: fps, loop: loop, cameraOnly: cameraOnly)
         default:
             guard let cg = renderCanvasImage(document) else { return nil }
@@ -487,10 +490,18 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     }
 }
 
+extension UTType {
+    /// Photoshop's document type. System-declared on the Mac; the extension fallback keeps
+    /// the iPad's file exporter writing ".psd" even if the system type is not present there.
+    static var photoshopDocument: UTType {
+        UTType("com.adobe.photoshop-image") ?? UTType(filenameExtension: "psd") ?? .data
+    }
+}
+
 /// A plain data file for SwiftUI's `.fileExporter` — any format the Export sheet writes.
 struct CanvasDataDocument: FileDocument {
     static var readableContentTypes: [UTType] {
-        [.png, .jpeg, .tiff, .gif, .bmp, .pdf, UTType("public.heic") ?? .png]
+        [.png, .jpeg, .tiff, .gif, .bmp, .pdf, UTType("public.heic") ?? .png, .photoshopDocument]
     }
     static var writableContentTypes: [UTType] { readableContentTypes }
     var data: Data
