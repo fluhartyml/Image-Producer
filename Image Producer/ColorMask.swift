@@ -377,7 +377,7 @@ struct EyedropperInspector: View {
 /// keeps interior matches by flooding only from the border. (Manual pixel-erase +
 /// Magic Select are later slices off the same core.)
 struct EraserInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
     @Binding var fillColor: Color
     /// Tolerance + contiguity live on the pen so the canvas can draw the live highlight.

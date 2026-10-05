@@ -128,6 +128,26 @@ final class ImageProducerAppDelegate: NSObject, NSApplicationDelegate {
 }
 #endif
 
+/// The editor for one open document: where it lives comes from the document system's
+/// configuration (Observable, so a rename is followed), editability from the environment.
+struct DocumentEditorRoot: View {
+    @Bindable var document: ImageDocument
+    @Environment(\.documentConfiguration) private var documentConfiguration
+
+    var body: some View {
+        let url = document.configuration?.fileURL
+        ContentView(document: document, fileURL: url)
+            // Self-driven autosave — the app has no UndoManager (undo/redo is the
+            // future History system's job), so SwiftUI's undo-based autosave never
+            // fires. This writes the package directly as edits settle.
+            .autosave(document: document, fileURL: url,
+                      isEditable: documentConfiguration?.isEditable ?? true)
+            // BUILD NUMBER IN THE TITLE BAR — development builds only (his rulings,
+            // 2026-10-03 / 10-04). The App Store build shows just the file name.
+            .developmentBuildSubtitle()
+    }
+}
+
 @main
 struct Image_ProducerApp: App {
 #if os(macOS)
@@ -142,21 +162,12 @@ struct Image_ProducerApp: App {
     var body: some Scene {
         // Document-based (roadmap 2.4.1): each icon is a saved package the user owns
         // in Files / iCloud Drive. New documents open with the default layer stack.
-        DocumentGroup(newDocument: { ImageDocument.newDefault() }) { configuration in
-            ContentView(document: configuration.document, fileURL: configuration.fileURL)
-                // Self-driven autosave — the app has no UndoManager (undo/redo is the
-                // future History system's job), so SwiftUI's undo-based autosave never
-                // fires. This writes the package directly as edits settle.
-                .autosave(document: configuration.document,
-                          fileURL: configuration.fileURL,
-                          isEditable: configuration.isEditable)
-                // BUILD NUMBER IN THE TITLE BAR — his ask, 2026-10-03: "put the build number
-                // in the title bar", then on the iPad: "the main page should show the build
-                // number on the titlebar". Mac window subtitle; iPad/iPhone navigation subtitle.
-                // DEVELOPMENT BUILDS ONLY — his ruling, 2026-10-04: the number means nothing
-                // to a customer. Every build Xcode puts on his devices still shows it; the App
-                // Store build shows just the file name. About always has Version · Build.
-                .developmentBuildSubtitle()
+        // The iOS/macOS 27 document system (1.1, 2026-10-05). `makeDocument` is told which
+        // launch button was tapped, and may wait while New from Import shows its picker.
+        DocumentGroup { document in
+            DocumentEditorRoot(document: document)
+        } makeDocument: { configuration, context in
+            try await ImageDocument.make(configuration: configuration, context: context)
         }
         // Turn off undo/redo. ImageDocument is a ReferenceFileDocument that never registers
         // undo actions — undo/redo belongs to the future linear History system, not the
@@ -276,33 +287,14 @@ struct Image_ProducerApp: App {
             // NUMBERED, LIKE THE MAC — his report, 2026-10-04: New Image made "Untitled" where
             // the Mac makes ImageProducer{number}. The system creates the new document from
             // the file returned here, under that file's name.
-            NewDocumentButton("New Image", contentType: .imageProject) {
-                ipLog("New Image closure entered")
-                guard let numbered = ImageDocument.nextProjectURL() else { return nil }
-                let template = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(numbered.lastPathComponent)
-                try? FileManager.default.removeItem(at: template)
-                return await ImageDocument.writeNewProject(at: template) ? template : nil
-            }
-            // NEW FROM IMPORT — the Mac's ⇧⌘N, on the iPad. Every format Image Producer
-            // reads (PSD with its layers, PDF, pictures) seeds a NEW numbered project from a
-            // copy of the file; the original is never written to.
-            NewDocumentButton("New from Import…", contentType: .imageProject) {
-                // NEVER return nil here: nil tells the system "make a default document", which
-                // is how build 270 turned a tap into a blank Untitled. Cancel instead.
-                ipLog("New from Import closure entered")
-                let types = await ImageDocument.newFromImportContentTypes
-                guard let source = await ImportPicker.pick(types: types),
-                      let numbered = ImageDocument.nextProjectURL() else { throw CancellationError() }
-                let template = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(numbered.lastPathComponent)
-                try? FileManager.default.removeItem(at: template)
-                guard await ImageDocument.writeNewProject(at: template, from: source) else {
-                    ipLog("could not build a project from \(source.lastPathComponent)")
-                    throw CancellationError()
-                }
-                return template
-            }
+            // Both buttons name the SOURCE; `ImageDocument.make` builds the document for it
+            // — numbered ImageProducerNNNN, never "Untitled" (his rule, 2026-10-05).
+            // (Builds 237–270 used `prepareDocumentURL`, which iPadOS 27 never called: every
+            // tap made a blank "Untitled". Logged on his iPad, build 272.)
+            NewDocumentButton("New Image", source: .newImage)
+            // NEW FROM IMPORT — the Mac's ⇧⌘N on the iPad. Every format Image Producer reads
+            // (PSD with its layers, PDF, pictures), from a COPY of the file.
+            NewDocumentButton("New from Import…", source: .importFile)
         } background: {
             // A CALMING PALE MINT in light mode — his call, 2026-10-05: "should be a calming
             // shade of minty green". White capsules on a white screen were nearly invisible,

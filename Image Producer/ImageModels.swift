@@ -22,6 +22,7 @@
 
 import SwiftUI
 import Combine
+import Observation
 import UniformTypeIdentifiers
 import CryptoKit
 
@@ -32,40 +33,78 @@ import CryptoKit
 /// Reordering a layer = reindexing this array; layers are never flattened until
 /// export.
 ///
-/// Reference type + `ObservableObject` because it is the app's `ReferenceFileDocument`
-/// (see the conformance below) — DocumentGroup owns it and saves it as a package.
-final class ImageDocument: ObservableObject {
-    @Published var name: String
+/// Reference type + `@Observable` because it is the app's `Document` (the iOS/macOS 27
+/// document system — see the conformance below). DocumentGroup owns it and saves it as a
+/// package. Was an `ObservableObject` / `ReferenceFileDocument` until 1.1 (2026-10-05),
+/// moved so the launch screen's New from Import can tell which button was tapped.
+@Observable
+final class ImageDocument {
+    /// The live document configuration from the iOS/macOS 27 document system — its
+    /// `fileURL` is where this document lives (Observable, so views follow a move).
+    @ObservationIgnored var configuration: URLDocumentConfiguration?
+    /// Hash of the manifest bytes this app last wrote itself. The document system re-reads
+    /// a file another writer changed — and our own autosave IS another writer to it — so a
+    /// re-read of exactly these bytes is our own save coming back and is ignored.
+    @ObservationIgnored var lastWrittenManifestHash: Int?
+
+    /// Read every property the old `ObservableObject` version published, so a single
+    /// `withObservationTracking` over this call fires on ANY of them — the exact set the
+    /// autosave used to hear through `objectWillChange`. Plain properties stay unobserved
+    /// (`@ObservationIgnored`), as they were never published before.
+    func observeSavedState() {
+        _ = name
+        _ = canvasWidth
+        _ = canvasHeight
+        _ = pendingNewName
+        _ = exportSheetRequested
+        _ = moveApplyRequested
+        _ = saveNowRequested
+        _ = layers
+        _ = palette
+        _ = history
+        _ = historyCursor
+        _ = cropMask
+        _ = maskRatio
+        _ = maskFreeCorners
+        _ = ppi
+        _ = bleedInches
+        _ = safeMarginInches
+        _ = cropMarks
+        _ = registrationMarks
+        _ = colorSpaceCMYK
+    }
+
+    var name: String
     /// Canvas pixel dimensions. Was a single square `canvasSize`; B2 makes it W×H so the
     /// canvas can take non-square print / photo / card shapes. Mutable — the Canvas tool
     /// resizes it (pixels = physical size × ppi). 1024×1024 is the default square master.
-    @Published var canvasWidth: Int
-    @Published var canvasHeight: Int
+    var canvasWidth: Int
+    var canvasHeight: Int
     /// Pixel size as a CGSize — the export / render reference.
     var canvasPixelSize: CGSize { CGSize(width: canvasWidth, height: canvasHeight) }
     /// The canvas size as History last saw it — recorded or restored. The Canvas panel
     /// records a "Canvas Size" step only when the live size differs from this.
-    var historyCanvasSize: CGSize?
+    @ObservationIgnored var historyCanvasSize: CGSize?
     /// Made from scratch this launch (not read from a file) — the editor opens it on the
     /// Canvas tool. iPad/iPhone "New Image" names the file at once, so the URL check the
     /// Mac uses never matched there (Michael, 2026-10-03: "it should open to the canvas
     /// tool inspector first"). Not saved; consumed once.
-    var openedAsNew = false
+    @ObservationIgnored var openedAsNew = false
     /// The name typed in the New Image sheet, waiting for the Canvas tool to apply it
     /// (it owns the rename-on-disk path). nil once applied.
-    @Published var pendingNewName: String?
+    var pendingNewName: String?
     /// The Canvas inspector's "Single image…" button asks the editor to open its Export
     /// sheet. Not saved; consumed at once.
-    @Published var exportSheetRequested = false
+    var exportSheetRequested = false
     /// Move / Transform's Apply button asks the editor to commit the placement. Not saved.
-    @Published var moveApplyRequested = false
+    var moveApplyRequested = false
     /// Set by a fluid canvas resize, which rewrites every layer's placement at once:
     /// tells the linked-layer follower to skip that one change. Not saved; consumed once.
-    var skipLinkFollowOnce = false
+    @ObservationIgnored var skipLinkFollowOnce = false
     /// A History commit (restore / delete / purge) asks for an IMMEDIATE save instead of
     /// the 1.5 s debounce — his call, 2026-10-04: "immediately sounds good", after a
     /// restore on the iPad never reached the file. Not saved; consumed at once.
-    @Published var saveNowRequested = false
+    var saveNowRequested = false
     /// Nothing has happened to this document yet: no recorded edits and every layer blank.
     /// iPad/iPhone "New Image" writes the new file and then OPENS it from disk, so the
     /// in-memory `openedAsNew` flag never survives there — this is how the editor still
@@ -75,12 +114,12 @@ final class ImageDocument: ObservableObject {
         !newImageAsked && history.entries.isEmpty && layers.allSatisfy(\.isPristine)
     }
     /// The New Image sheet already ran for this document — never ask twice.
-    var newImageAsked = false
+    @ObservationIgnored var newImageAsked = false
     /// Where the file lives after Image Producer renamed it itself. On the iPad the window's
     /// own URL is NOT updated after that move, so autosave kept writing to the old name and
     /// re-created "Untitled" beside the renamed file (2026-10-03: "the file name didnt
     /// save"). Autosave and the Project name field prefer this when set.
-    var movedFileURL: URL?
+    @ObservationIgnored var movedFileURL: URL?
     /// Same, across a reopen of the same document object this launch.
     static var askedForNewImage: Set<ObjectIdentifier> = []
 
@@ -96,14 +135,14 @@ final class ImageDocument: ObservableObject {
         return max(i + 1, afterFloors)
     }
     /// Bottom-to-top draw order.
-    @Published var layers: [ImageLayer]
+    var layers: [ImageLayer]
     /// The 8-slot brand palette (hex), saved WITH the document so it travels per-project.
-    @Published var palette: [String]
+    var palette: [String]
 
     /// Linear, tool-grouped edit history — the app's undo (a byproduct of stepping
     /// back through this list; there is NO ⌘Z / UndoManager). Saved in the package,
     /// persistent per-project. Empty until the recording hooks land (step 2).
-    @Published var history: ImageHistory = ImageHistory()
+    var history: ImageHistory = ImageHistory()
 
     /// THE STATUS LINE. Michael, 2026-09-06: *"maybe a status bar under the bottom
     /// that talks to the user for every tool being applied or every history being
@@ -155,7 +194,7 @@ final class ImageDocument: ObservableObject {
     /// always saves — a preview is transient, never persisted). The forward tail is only
     /// dropped when the user COMMITS by making a new edit from a past point. Transient
     /// (not saved); a reopened document always starts at `.latest`.
-    @Published var historyCursor: HistoryCursor = .latest
+    var historyCursor: HistoryCursor = .latest
 
     /// Optional crop/mask region marking the KEPT area. `nil` = no mask (full canvas).
     /// Non-destructive: stored here and applied at export/share; the source layers are
@@ -164,7 +203,7 @@ final class ImageDocument: ObservableObject {
     /// A four-cornered `CropMask` rather than a rectangle, because the Mask tool lets
     /// every corner move independently (⌘ drag) and lets the silhouette be a star, an
     /// oval or any Unicode glyph. See `MaskTool.swift` for the whole story.
-    @Published var cropMask: CropMask?
+    var cropMask: CropMask?
 
     /// The mask's bounding rectangle — the shape the crop had before the Mask tool, kept
     /// as a bridge so every existing caller (export trim, the Move tool's Crop section,
@@ -182,27 +221,27 @@ final class ImageDocument: ObservableObject {
     /// tool, not the picture. `maskRatio` nil means freeform (width and height
     /// independent); `maskFreeCorners` true means every corner moves on its own and the
     /// mask becomes a quadrilateral, which is what ⌘ does for the length of one drag.
-    @Published var maskRatio: CGFloat?
-    @Published var maskFreeCorners: Bool = false
+    var maskRatio: CGFloat?
+    var maskFreeCorners: Bool = false
 
     /// Output resolution in pixels-per-inch. Physical/print size = pixels ÷ ppi. Changing
     /// it is LOSSLESS — it reinterprets the SAME pixels at a new physical size; it never
     /// resamples. Saved with the document (absent in older files → defaults to 72).
-    @Published var ppi: Double
+    var ppi: Double
 
     // MARK: Print setup (Canvas hub section C) — feeds the Print PDF. All persisted.
     /// Bleed in inches — artwork extends this far past the trim so trimming leaves no white
     /// sliver. Print standard is 0.125 in (3 mm).
-    @Published var bleedInches: Double = 0.125
+    var bleedInches: Double = 0.125
     /// Safe-margin inset in inches — keep important content this far inside the trim.
-    @Published var safeMarginInches: Double = 0
+    var safeMarginInches: Double = 0
     /// Draw crop / trim marks at the trim corners in the Print PDF.
-    @Published var cropMarks: Bool = true
+    var cropMarks: Bool = true
     /// Draw registration marks (for aligning color plates) in the Print PDF.
-    @Published var registrationMarks: Bool = false
+    var registrationMarks: Bool = false
     /// Output color space for the Print PDF: false = RGB (default), true = CMYK. Switchable
     /// anytime — editing stays RGB on screen; CMYK is an export-time conversion.
-    @Published var colorSpaceCMYK: Bool = false
+    var colorSpaceCMYK: Bool = false
 
     /// Crayon-box defaults — used for a new doc, or one saved before palettes existed.
     static let defaultPalette = ["#000000", "#FFFFFF", "#FF3B30", "#FF9500",
@@ -1352,29 +1391,30 @@ struct ImageProjectManifest: Codable {
     var history: ImageHistory? = nil
 }
 
-extension ImageDocument: ReferenceFileDocument {
-    static var readableContentTypes: [UTType] { [.imageProject] }
-
-    /// Open a saved package: pull `manifest.json` out of the directory wrapper.
-    convenience init(configuration: ReadConfiguration) throws {
-        guard let data = configuration.file.fileWrappers?["manifest.json"]?.regularFileContents else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        let manifest = try JSONDecoder().decode(ImageProjectManifest.self, from: data)
-        let w = manifest.canvasWidth ?? manifest.canvasSize ?? 1024
-        let h = manifest.canvasHeight ?? manifest.canvasSize ?? 1024
-        self.init(name: manifest.name, canvasWidth: w, canvasHeight: h, layers: manifest.layers,
-                  palette: manifest.palette ?? ImageDocument.lastUsedPalette, cropRect: manifest.cropRect,
-                  ppi: manifest.ppi ?? 72, history: manifest.history ?? ImageHistory())
+extension ImageDocument {
+    /// Fill this document from a saved manifest — opening a package, or the document
+    /// system re-reading one that changed on disk. Was `init(configuration:)` when this was
+    /// a `ReferenceFileDocument`; the new system makes the document first and then applies
+    /// what it read, so it is a method now.
+    func load(_ manifest: ImageProjectManifest) {
+        name = manifest.name
+        canvasWidth = manifest.canvasWidth ?? manifest.canvasSize ?? 1024
+        canvasHeight = manifest.canvasHeight ?? manifest.canvasSize ?? 1024
+        layers = manifest.layers
+        palette = manifest.palette ?? ImageDocument.lastUsedPalette
         // A file written by the Mask tool carries the full four-corner mask; one written
-        // before it carries only a rectangle, which `init` has already turned into a mask.
-        if let saved = manifest.cropMask { cropMask = saved }
-        // Print-setup fields (section C) — apply saved values over the defaults.
-        if let v = manifest.bleedInches { bleedInches = v }
-        if let v = manifest.safeMarginInches { safeMarginInches = v }
-        if let v = manifest.cropMarks { cropMarks = v }
-        if let v = manifest.registrationMarks { registrationMarks = v }
-        if let v = manifest.colorSpaceCMYK { colorSpaceCMYK = v }
+        // before it carries only a rectangle.
+        cropMask = manifest.cropMask ?? manifest.cropRect.map { CropMask(rect: $0) }
+        ppi = manifest.ppi ?? 72
+        history = manifest.history ?? ImageHistory()
+        // Print-setup fields (section C) — saved values over the defaults.
+        bleedInches = manifest.bleedInches ?? 0.125
+        safeMarginInches = manifest.safeMarginInches ?? 0
+        cropMarks = manifest.cropMarks ?? true
+        registrationMarks = manifest.registrationMarks ?? false
+        colorSpaceCMYK = manifest.colorSpaceCMYK ?? false
+        // A document read from a file is not a brand-new one.
+        openedAsNew = false
     }
 
     /// One line of narration for the status bar under the canvas. Transient — it is
@@ -1396,8 +1436,8 @@ extension ImageDocument: ReferenceFileDocument {
         }
     }
 
-    /// Capture current state for writing (called off the main actor by SwiftUI).
-    func snapshot(contentType: UTType) throws -> ImageProjectManifest {
+    /// Capture current state for writing (on the main actor; the writer runs in the background).
+    func snapshotManifest() -> ImageProjectManifest {
         ImageProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
                             layers: layers, palette: palette, cropRect: cropRect,
                             cropMask: cropMask, ppi: ppi,
@@ -1406,26 +1446,126 @@ extension ImageDocument: ReferenceFileDocument {
                             colorSpaceCMYK: colorSpaceCMYK, history: history)
     }
 
-    /// Write the package: a directory wrapper holding `manifest.json`.
-    func fileWrapper(snapshot: ImageProjectManifest,
-                     configuration: WriteConfiguration) throws -> FileWrapper {
-        let data = try JSONEncoder().encode(snapshot)
-        // The save notification he asked for. Called off the main actor by SwiftUI —
-        // `say` hops back on its own.
+    /// The package around the manifest bytes: a directory holding `manifest.json`.
+    nonisolated static func packageWrapper(_ data: Data) -> FileWrapper {
+        let manifest = FileWrapper(regularFileWithContents: data)
+        manifest.preferredFilename = "manifest.json"
+        return FileWrapper(directoryWithFileWrappers: ["manifest.json": manifest])
+    }
+}
+
+/// What the reader hands back: the manifest plus a hash of its bytes, so `apply` can tell
+/// our own autosave coming back from a real outside change.
+struct ImageProjectRead: Sendable {
+    var manifest: ImageProjectManifest
+    var bytesHash: Int
+}
+
+// MARK: - The iOS/macOS 27 document system
+
+#if !os(macOS)
+extension DocumentCreationSource {
+    /// The launch screen's New Image button.
+    static let newImage = DocumentCreationSource(id: "newImage")
+    /// The launch screen's New from Import… button.
+    static let importFile = DocumentCreationSource(id: "importFile")
+}
+#endif
+
+extension ImageDocument {
+    /// The next lifetime name, ImageProducerNNNN — reserves the number.
+    nonisolated static func nextProjectName() -> String? {
+        nextProjectURL()?.deletingPathExtension().lastPathComponent
+    }
+
+    /// Build the document the system asked for: a NEW one (numbered, default layers), a
+    /// NEW one from an imported file (iPad New from Import — picker shown while the system
+    /// waits), or an empty shell for an existing file, which `apply` then fills.
+    static func make(configuration: URLDocumentConfiguration,
+                     context: DocumentCreationContext) async throws -> ImageDocument {
+        #if !os(macOS)
+        ipLog("makeDocument source=\(String(describing: context.creationSource)) fileURL=\(configuration.fileURL?.lastPathComponent ?? "nil")")
+        if context.creationSource == .importFile {
+            guard let source = await ImportPicker.pick(types: newFromImportContentTypes) else {
+                throw CancellationError()                     // cancelled: no document at all
+            }
+            let doc = ImageDocument(layers: [])
+            doc.configuration = configuration
+            let imported: Bool
+            if isPDF(source) {
+                imported = importPDFAsLayers(source, into: doc) > 0
+            } else if isPSD(source), importPSDAsLayers(source, into: doc) {
+                imported = true
+            } else {
+                imported = importImageAsLayer(source, into: doc)
+            }
+            guard imported else {
+                ipLog("import failed for \(source.lastPathComponent)")
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            doc.newImageAsked = true                          // the file set the size
+            doc.pendingNewName = nextProjectName()
+            ipLog("imported \(source.lastPathComponent): \(doc.layers.count) layers, name \(doc.pendingNewName ?? "nil")")
+            return doc
+        }
+        let isNew = context.creationSource == .newImage || configuration.fileURL == nil
+        #else
+        let isNew = configuration.fileURL == nil
+        #endif
+        if isNew {
+            let doc = newDefault()
+            doc.configuration = configuration
+            doc.pendingNewName = nextProjectName()            // ImageProducerNNNN, never Untitled
+            return doc
+        }
+        let doc = ImageDocument(layers: [])                   // filled by `apply` from the file
+        doc.configuration = configuration
+        return doc
+    }
+}
+
+extension ImageDocument: Document {
+    static var readableContentTypes: [UTType] { [.imageProject] }
+
+    nonisolated func reader(configuration: sending ReadConfiguration) -> sending FileWrapperDocumentReader<ImageProjectRead> {
+        FileWrapperDocumentReader(configuration) { wrapper in
+            guard let data = wrapper.fileWrappers?["manifest.json"]?.regularFileContents else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            let manifest = try JSONDecoder().decode(ImageProjectManifest.self, from: data)
+            return ImageProjectRead(manifest: manifest, bytesHash: data.hashValue)
+        }
+    }
+
+    func apply(snapshot: sending ImageProjectRead, previous: sending ImageProjectRead?) async throws {
+        // Our own autosave coming back as a "change on disk": already what we hold.
+        if let mine = lastWrittenManifestHash, mine == snapshot.bytesHash { return }
+        load(snapshot.manifest)
+    }
+
+    nonisolated func writer(configuration: sending WriteConfiguration) -> sending FileWrapperDocumentWriter<Data> {
+        FileWrapperDocumentWriter(configuration) { data, _ in
+            ImageDocument.packageWrapper(data)
+        }
+    }
+
+    /// ⌘S / Save As. Encoded here because it reads the model; the writer only sees bytes.
+    func snapshot(contentType: UTType) async throws -> sending Data {
+        let data = try JSONEncoder().encode(snapshotManifest())
+        lastWrittenManifestHash = data.hashValue
+        // The save notification he asked for.
         say("Saved — \(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file))",
             kind: .save)
         // ⌘S is "a conscious marker" — freeze exactly these bytes as Last Save.
         if let window = DocumentWindow.window(for: self) {
             if window.chamber.freezeLastSave(manifest: data) {
                 say("Froze this save — File ▸ Revert to Last Save returns here", kind: .save)
-                DispatchQueue.main.async { window.hasFrozenLastSave = true }
+                window.hasFrozenLastSave = true
             } else {
                 say("Could not freeze this save for Revert to Last Save", kind: .warning)
             }
         }
-        let manifest = FileWrapper(regularFileWithContents: data)
-        manifest.preferredFilename = "manifest.json"
-        return FileWrapper(directoryWithFileWrappers: ["manifest.json": manifest])
+        return data
     }
 }
 
@@ -1449,13 +1589,10 @@ extension ImageDocument {
     /// Named `encodedManifest`, not `encodedSnapshot`: History already owns that name for a
     /// different thing (it encodes only the layer stack). Two encoders, two jobs.
     func encodedManifest() throws -> Data {
-        let manifest = ImageProjectManifest(name: name, canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-                                           layers: layers, palette: palette, cropRect: cropRect,
-                                           cropMask: cropMask, ppi: ppi,
-                                           bleedInches: bleedInches, safeMarginInches: safeMarginInches,
-                                           cropMarks: cropMarks, registrationMarks: registrationMarks,
-                                           colorSpaceCMYK: colorSpaceCMYK, history: history)
-        return try JSONEncoder().encode(manifest)
+        let data = try JSONEncoder().encode(snapshotManifest())
+        // Remember what we wrote, so the document system re-reading it is recognized as us.
+        lastWrittenManifestHash = data.hashValue
+        return data
     }
 
     /// The package write itself. **BLOCKING — and deliberately `nonisolated` so it can

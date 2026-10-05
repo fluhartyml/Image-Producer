@@ -37,7 +37,7 @@ import ImagePlayground
 
 /// Tool #11's inspector — a prompt box + Make/Restyle buttons that seed Apple's sheet.
 struct ImagePlaygroundInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
 
     /// Cross-platform Apple-Intelligence capability check (no UIKit needed).

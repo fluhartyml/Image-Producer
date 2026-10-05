@@ -503,7 +503,7 @@ struct MaskBox: View {
 /// same ratio presets, the same "Apply" language — because it is the same idea grown up.
 /// The Move tool's Crop section is left in place and untouched; nothing was removed.
 struct MaskInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
 
     /// Ratio presets, in Photos' order. `nil` = freeform.
     private static let ratios: [(String, CGFloat?)] = [

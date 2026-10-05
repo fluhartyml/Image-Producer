@@ -33,7 +33,7 @@ import AppKit
 #endif
 
 struct ContentView: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     /// The open document's file on disk (from the DocumentGroup) — shown in the Canvas
     /// hub's Project/File section. nil while the document is untitled / not yet saved.
     var fileURL: URL? = nil
@@ -1040,7 +1040,7 @@ struct ToolRail: View {
 /// The active tool's inspector — Move's controls, or a placeholder for tools not
 /// built yet. Reused by BOTH the portrait swipe panel and the landscape column.
 struct ToolInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     @ObservedObject var camera: CameraState
     let activeTool: Tool
     /// A binding (not a value) so an inspector can select what it creates — Image import.
@@ -1141,7 +1141,7 @@ struct ToolInspector: View {
 /// canvas to fill it — the user makes their own Light and Dark backgrounds. The
 /// "Fill" button applies without a canvas tap (and works on Mac / for VoiceOver).
 struct PaintBucketInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
     @Binding var fillColor: Color
     /// Flood tolerance lives on the pen so the canvas can draw the live region preview.
@@ -1310,7 +1310,7 @@ struct CanvasPixelPreset: Identifiable {
 /// Project / File — rename, disk location, type, last saved, size, save state. Later
 /// slices add B Dimensions/Resolution, C Print setup, D Export (see DeveloperNotes).
 struct CanvasInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     var fileURL: URL?
 
     @State private var draftName = ""
@@ -1650,7 +1650,7 @@ struct CanvasInspector: View {
         }
         .onChange(of: document.pendingNewName) { applyPendingName() }
         .onChange(of: document.name) { draftName = displayName }
-        .onChange(of: fileURL) { draftName = displayName; renameError = false }
+        .onChange(of: fileURL) { draftName = displayName; renameError = false; applyPendingName() }
         // CANVAS SIZE IS A HISTORY STEP — every path that changes it (Pixels fields,
         // Landscape, the three preset menus) lands here. Typing a number coalesces into one
         // step. A History restore sets the size it stored, which matches
@@ -1675,9 +1675,13 @@ struct CanvasInspector: View {
     /// Apply the name typed in the New Image sheet through the normal rename path.
     private func applyPendingName() {
         guard let n = document.pendingNewName else { return }
-        document.pendingNewName = nil
         draftName = n
-        if fileURL == nil { commitName() } else { renameFile() }
+        // No file yet (a brand-new document the system has not written): take the name now
+        // and KEEP it pending, so the file is renamed the moment it exists — otherwise it
+        // stays "Untitled" on disk (his rule, 2026-10-05: a new document is ImageProducerNNNN).
+        if fileURL == nil { commitName(); return }
+        document.pendingNewName = nil
+        renameFile()
     }
 
     private func commitName() {
@@ -2213,7 +2217,7 @@ struct CanvasInspector: View {
 /// free color picking in the tools. Tap a swatch → `color` becomes that palette color.
 /// Custom colors are added in the Color Palette tool.
 struct PaletteSwatchRow: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     @Binding var color: Color
     var label = "Color (from palette)"
 
@@ -2245,7 +2249,7 @@ struct PaletteSwatchRow: View {
 /// → 24 max; the 8 base can't be removed). Save/Load reuses the .iconpalette brand file.
 struct ColorPaletteInspector: View {
     @EnvironmentObject var pen: PixelPen
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     @Binding var fillColor: Color
 
     @State private var savingPalette = false
@@ -2380,7 +2384,7 @@ struct ColorPaletteInspector: View {
 /// does not litter the stack.
 struct SymbolPickerInspector: View {
     @EnvironmentObject var pen: PixelPen
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     @Binding var activeLayerID: ImageLayer.ID?
     @State private var search = ""
     @State private var tint: Color = .black
@@ -2661,7 +2665,7 @@ struct SymbolPickerInspector: View {
 /// is stored but its rendering is a follow-up (no stock SwiftUI text-outline).
 struct FontPickerInspector: View {
     @EnvironmentObject var pen: PixelPen
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
 
     @State private var family: String = FontPickerInspector.families.first ?? "Helvetica"
@@ -2992,7 +2996,7 @@ struct FontPickerInspector: View {
 /// did. To New makes a layer above the selection named for the file — "i want a new layer
 /// with the image file name as the layer name."
 struct ImageImportInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     @Binding var activeLayerID: ImageLayer.ID?
     @State private var importing = false
     @State private var failed = false
@@ -3146,7 +3150,7 @@ struct PixelGrid: View {
 /// toggle, and brush size. Drawing happens on the canvas; this configures the pen.
 struct PenInspector: View {
     @EnvironmentObject var pen: PixelPen
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
 
     /// Resolution rungs for the graduated slider — 2 is the control.
@@ -3328,7 +3332,7 @@ enum BottomPanel: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     struct PanelView: View {
-        @ObservedObject var document: ImageDocument
+        @Bindable var document: ImageDocument
         @ObservedObject var camera: CameraState
         let activeTool: Tool
         // (PanelView is the bottom swipe panel; it observes the document too.)
@@ -3439,7 +3443,7 @@ struct PanelPlaceholder: View {
 /// so History (the app's undo) is reachable there — it "sits behind the layer list" per the
 /// spec. Portrait / iPhone reach the same two via the bottom swipe panel's picker instead.
 struct LayersHistoryColumn: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     @Binding var activeLayerID: ImageLayer.ID?
 
     private enum Tab: String, CaseIterable, Identifiable {
@@ -3473,7 +3477,7 @@ struct LayersHistoryColumn: View {
 /// point — everything after it is dropped. The "Original" row returns to the pre-edit state.
 /// Purge History (behind the ⋯ menu, confirmed) clears the trail but keeps the current image.
 struct HistoryPanel: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     @Binding var activeLayerID: ImageLayer.ID?
     /// iPhone (no pills) shows a "History" header so the swiped-to page is labeled.
     var showsHeader: Bool = false
@@ -3872,7 +3876,7 @@ private struct HistoryEntryRow: View {
 /// Tool #1's inspector: a document-level CROP section (aspect + size, non-destructive,
 /// shrink-only — v1) plus scale / rotation / center / reset on the ACTIVE layer.
 struct MoveTransformInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
 
     @State private var cropAspect: CropAspect = .original
@@ -4769,7 +4773,7 @@ struct CanvasView: View {
             }
     }
 
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     /// Lightbox + playback preview state. Window-owned, not document-owned.
     @ObservedObject var camera: CameraState
     @Binding var activeLayerID: ImageLayer.ID?
@@ -5383,7 +5387,7 @@ struct CanvasView: View {
 /// to the start, so a tap doesn't jump the layer — only a real drag moves it
 /// (Michael 2026-06-11: "it moves when touched").
 struct TransformBox: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let index: Int
     let size: CGSize
     @State private var startCenter: CGPoint?
@@ -5618,7 +5622,7 @@ struct Checkerboard: View {
 /// rename is via the row's context menu. `showsHeader` is false inside the
 /// portrait swipe panel (the segmented control already labels it "Layers").
 struct LayerPanel: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     var showsHeader: Bool = true
     @Binding var activeLayerID: ImageLayer.ID?
     @State private var renamingID: ImageLayer.ID?
@@ -6800,7 +6804,7 @@ struct InfoTip: View {
 }
 
 struct ExportSheet: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     /// Runs the icon-set export (it brings up its own folder panel and reports the result).
     var onIconSet: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
@@ -6993,7 +6997,7 @@ struct ImageCompositeView: View {
     /// OBSERVED, not a plain `let` — as a `let`, SwiftUI saw the same document reference
     /// and skipped redrawing, so the floating preview kept a stale picture (on the iPad,
     /// 2026-10-03, it stayed blank after a gradient was turned on).
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let size: CGSize
     /// The Camera's transparent-stamp capture renders with this false. The Light/Dark
     /// layers are a preview control rather than artwork, so a capture should be able to
@@ -7193,7 +7197,7 @@ struct ActivityView: UIViewControllerRepresentable {
 /// UndoManager (undo/redo belongs to the future History system, and we don't want them to
 /// compete), so without this the document is never marked dirty and edits are lost on close.
 struct AutosaveModifier: ViewModifier {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let fileURL: URL?
     let isEditable: Bool
     @Environment(\.scenePhase) private var scenePhase
@@ -7218,7 +7222,10 @@ struct AutosaveModifier: ViewModifier {
             } message: {
                 Text("This document's history has reached an unsustainable level and may cause system degradation.")
             }
-            .onReceive(document.objectWillChange) { _ in schedule() }
+            // ANY change to what the old ObservableObject published → the debounced save.
+            // (Was `.onReceive(document.objectWillChange)`; the 27 document system is
+            // Observation-based, so the same set is watched with observation tracking.)
+            .task(id: ObjectIdentifier(document)) { await watchForChanges() }
             // A History commit saves NOW, not after the debounce (see `saveNowRequested`).
             .onChange(of: document.saveNowRequested) { _, now in
                 guard now else { return }
@@ -7246,6 +7253,17 @@ struct AutosaveModifier: ViewModifier {
                     document.say("Named and saved — removed the untitled recovery copy", kind: .info)
                 }
             }
+    }
+
+    /// Wait for the next change to any saved property, schedule the save, and repeat.
+    private func watchForChanges() async {
+        while !Task.isCancelled {
+            await withCheckedContinuation { (resume: CheckedContinuation<Void, Never>) in
+                withObservationTracking { document.observeSavedState() } onChange: { resume.resume() }
+            }
+            if Task.isCancelled { return }
+            schedule()
+        }
     }
 
     /// Coalesce a burst of edits into a single write 1.5s after the last change.

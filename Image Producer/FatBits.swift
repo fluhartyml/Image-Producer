@@ -51,7 +51,7 @@ import SwiftUI
 /// R2. Interpolation is off: smoothing an icon preview would show the user
 /// something the Finder never will.
 struct ProductionThumbnail: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
 
     /// The SHORT edge in points — fixed. Not a zoom factor — a real size.
     var side: CGFloat = 128
@@ -95,7 +95,7 @@ struct ProductionThumbnail: View {
 /// Finder list row. They are a row of previews, not a mode — nothing here
 /// changes what the canvas is doing.
 struct ZoomInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
 
     /// Shared with the canvas overlay — either surface can turn the PiP on or off.
     @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
@@ -168,7 +168,7 @@ enum PiPCorner: Int, CaseIterable {
 }
 
 struct ProductionPiP: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
 
     /// The canvas display rect's size — corners are the CANVAS's, not the window's.
     let bounds: CGSize

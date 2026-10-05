@@ -16,7 +16,7 @@
 import SwiftUI
 
 struct NewImageSheet: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     /// Closed by setting this, not by `dismiss` — on the iPad, Create did nothing
     /// (Michael, 2026-10-03: "create buttons not wired").
     @Binding var isPresented: Bool
@@ -38,7 +38,7 @@ struct NewImageSheet: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Name").font(.system(size: 18)).foregroundStyle(.secondary)
-                TextField("Untitled", text: $name)
+                TextField(document.pendingNewName ?? document.name, text: $name)
                     .textFieldStyle(.roundedBorder).font(.system(size: 18))
             }
 
@@ -80,7 +80,7 @@ struct NewImageSheet: View {
         document.canvasHeight = max(1, height)
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { document.pendingNewName = trimmed }
-        document.say("New image: \(trimmed.isEmpty ? "Untitled" : trimmed), \(document.canvasWidth) × \(document.canvasHeight)", kind: .edit)
+        document.say("New image: \(trimmed.isEmpty ? (document.pendingNewName ?? document.name) : trimmed), \(document.canvasWidth) × \(document.canvasHeight)", kind: .edit)
         finish()
     }
 

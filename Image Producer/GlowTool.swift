@@ -399,7 +399,7 @@ struct GradientVeil<Content: View>: View {
 /// Guideline 2.1 rejects visible "coming soon" controls). It joins the list the day
 /// it works.
 struct LayerInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     var activeLayerID: ImageLayer.ID?
 
     /// Which layer is being dressed: ALWAYS the one selected in the Layers list. There

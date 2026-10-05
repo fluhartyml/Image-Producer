@@ -134,7 +134,7 @@ import SwiftUI
 /// Non-destructive, exactly like the Magic Eraser: the cutout arrives on a NEW layer above and
 /// the original is hidden, never overwritten.
 struct RemoveBackgroundInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
 
     @State private var instanceCount: Int?
@@ -301,7 +301,7 @@ struct RemoveBackgroundInspector: View {
 ///   • **Magic Lasso** matches a REGION you point at — the surgical one, for the piece the
 ///     other two leave behind (the cliff under a lifted lighthouse, one cloud, one shadow).
 struct MagicLassoInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
     @EnvironmentObject var pen: PixelPen   // same idiom as the other inspectors
 

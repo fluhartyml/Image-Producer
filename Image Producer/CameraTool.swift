@@ -298,7 +298,7 @@ func generateCameraInBetweens(_ document: ImageDocument, camera: CameraState) {
 // MARK: - Inspector
 
 struct CameraInspector: View {
-    @ObservedObject var document: ImageDocument
+    @Bindable var document: ImageDocument
     /// Deliberately NOT on the document — see `CameraState`. Living there made Animation
     /// mode un-tick itself every time the autosave fired.
     @ObservedObject var camera: CameraState
