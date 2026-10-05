@@ -268,11 +268,11 @@ struct Image_ProducerApp: App {
         #if !os(macOS)
         // CENTERED WITH LEADING SPACES — his fallback, 2026-10-05: "add spaces before image
         // if needed". The system draws the launch title from the buttons' LEADING edge, so
-        // "Image Producer 1.1" measured ~28 pt left of center on his iPad. Two thin spaces
-        // (~0.2 em each at the title's ~73 pt) move it right by about that much. (Build 266
+        // "Image Producer 1.1" measured ~28 pt left of center on his iPad. Each thin space
+        // measured ~7 pt of shift on his iPad (two left it ~14 pt left), so four. (Build 266
         // drew our own title in the overlay at titleViewFrame — it landed on the button row,
         // off the right edge: the proxy's frames are not in the overlay's coordinates.)
-        DocumentGroupLaunchScene("\u{2009}\u{2009}" + launchTitle) {
+        DocumentGroupLaunchScene(String(repeating: "\u{2009}", count: 4) + launchTitle) {
             // NUMBERED, LIKE THE MAC — his report, 2026-10-04: New Image made "Untitled" where
             // the Mac makes ImageProducer{number}. The system creates the new document from
             // the file returned here, under that file's name.
