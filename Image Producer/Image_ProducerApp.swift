@@ -266,7 +266,10 @@ struct Image_ProducerApp: App {
         // a prominent "New Image" button, and the recent-documents browser (free). New
         // docs are created as .imageProject (the first writable content type).
         #if !os(macOS)
-        DocumentGroupLaunchScene("Image Producer") {
+        // The version after the name — his idea, 2026-10-05: the system places the title at
+        // the buttons' leading edge, so "Image Producer" alone sat ~55 pt left of center; the
+        // version widens it to balance. Read from Xcode's Version setting, never hard-coded.
+        DocumentGroupLaunchScene("Image Producer \(appShortVersion)") {
             // NUMBERED, LIKE THE MAC — his report, 2026-10-04: New Image made "Untitled" where
             // the Mac makes ImageProducer{number}. The system creates the new document from
             // the file returned here, under that file's name.

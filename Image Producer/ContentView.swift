@@ -7350,6 +7350,12 @@ extension View {
 /// MARKETING_VERSION / CURRENT_PROJECT_VERSION without manual edits. Shared by
 /// the About sheet, the macOS Welcome window, and the iOS launch scene so the
 /// version reads identically on every platform.
+/// The marketing version alone ("1.1") — Xcode's Version setting, read from the bundle so
+/// it is always the version being built, never a number typed into the code.
+var appShortVersion: String {
+    Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+}
+
 var appVersionLine: String {
     let info = Bundle.main.infoDictionary
     let short = info?["CFBundleShortVersionString"] as? String ?? "1.0"
