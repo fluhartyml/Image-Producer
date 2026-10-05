@@ -1509,7 +1509,30 @@ extension ImageDocument {
             // this document and at once REOPENS the file as a fresh document (log, build 274:
             // a second makeDocument with source nil, same URL), so nothing set on `doc` here
             // survives. The URL is the hand-off: the reopen knows it was an import.
-            if let url = configuration.fileURL { justImported.insert(url.standardizedFileURL.path) }
+            //
+            // THE PSD'S OWN NAME — his idea, 2026-10-05: "why doesnt it use the original psd
+            // file name just change the extention". LightHouseLockBox.psd → LightHouseLockBox,
+            // set on the configuration BEFORE the system's first save, so no rename is needed.
+            // (" 2", " 3"… if that name is taken — never over an existing project.)
+            var names: Set<String> = []
+            if let current = configuration.fileURL {
+                names.insert(current.lastPathComponent)
+                ipLog("import url \(current.path) exists=\(FileManager.default.fileExists(atPath: current.path))")
+                let dir = current.deletingLastPathComponent()
+                let base = source.deletingPathExtension().lastPathComponent
+                var candidate = dir.appendingPathComponent(base).appendingPathExtension(current.pathExtension)
+                var n = 2
+                while FileManager.default.fileExists(atPath: candidate.path) {
+                    candidate = dir.appendingPathComponent("\(base) \(n)").appendingPathExtension(current.pathExtension)
+                    n += 1
+                }
+                configuration.fileURL = candidate
+                names.insert(candidate.lastPathComponent)
+                ipLog("import url set to \(configuration.fileURL?.lastPathComponent ?? "nil")")
+            }
+            // The reopen arrives with the URL seen from ANOTHER folder (build 275: a full-path
+            // match missed it and the New Image sheet came back), so match by name and time.
+            justImported = (names, Date())
             ipLog("imported \(source.lastPathComponent): \(doc.layers.count) layers")
             return doc
         }
@@ -1527,17 +1550,19 @@ extension ImageDocument {
         doc.configuration = configuration
         #if !os(macOS)
         // The reopen of a file New from Import just wrote: open on the Canvas, no New Image sheet.
-        if let path = configuration.fileURL?.standardizedFileURL.path,
-           justImported.remove(path) != nil {
+        ipLog("reopen \(configuration.fileURL?.path ?? "nil")")
+        if let pending = justImported, let name = configuration.fileURL?.lastPathComponent,
+           pending.names.contains(name), Date().timeIntervalSince(pending.at) < 30 {
+            justImported = nil
             doc.newImageAsked = true
-            ipLog("reopened import \(configuration.fileURL?.lastPathComponent ?? "nil") — no New Image sheet")
+            ipLog("reopened import \(name) — no New Image sheet")
         }
         #endif
         return doc
     }
 
     /// Files New from Import wrote, waiting for the system to reopen them (see `make`).
-    @MainActor static var justImported: Set<String> = []
+    @MainActor static var justImported: (names: Set<String>, at: Date)?
 }
 
 extension ImageDocument: Document {
