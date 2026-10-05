@@ -3031,7 +3031,7 @@ struct ImageImportInspector: View {
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                         .help("More about importing")
                         .popover(isPresented: $showInfo) {
-                            Text("Selected Layer replaces that layer's picture. New Layer goes above the selected one. Opens PNG, JPEG, HEIC, TIFF, GIF and BMP, plus PSD on Mac (flattened). Use Move to size and place it.")
+                            Text("Selected Layer replaces that layer's picture. New Layer goes above the selected one. Opens PNG, JPEG, HEIC, TIFF, GIF, BMP and Photoshop PSD. A PSD to a New Layer keeps all its layers; to the Selected Layer it comes in flattened. Use Move to size and place it.")
                                 .font(.system(size: 18))
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(width: 300)
@@ -3055,8 +3055,42 @@ struct ImageImportInspector: View {
     private func load(_ url: URL) {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        guard let raw = try? Data(contentsOf: url),
-              let png = pngData(fromImageData: raw) else {
+        guard let raw = try? Data(contentsOf: url) else {
+            failed = true
+            document.say("Image not imported — \(url.lastPathComponent) could not be read", kind: .warning)
+            return
+        }
+        // Photoshop: to a New Layer, every layer comes in; to the Selected Layer, flattened.
+        if PSDReader.isPSD(raw), let psd = try? PSDReader.read(raw) {
+            if toNewLayer {
+                var layers = psd.imageLayers(canvas: document.canvasPixelSize)
+                if layers.isEmpty, let png = psd.flattenedPNG() {
+                    var layer = ImageLayer(name: url.deletingPathExtension().lastPathComponent, role: .content)
+                    layer.setImage(png)
+                    layer.nameLinkedToText = false
+                    layers = [layer]
+                }
+                guard !layers.isEmpty else { failed = true; return }
+                document.captureHistoryBaselineIfNeeded()
+                let at = document.newLayerIndex(above: activeLayerID)
+                document.layers.insert(contentsOf: layers, at: at)   // bottom to top, as in Photoshop
+                activeLayerID = layers.last!.id
+                document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
+                                       actionLabel: "Import \(url.deletingPathExtension().lastPathComponent) (\(layers.count) layer\(layers.count == 1 ? "" : "s"))",
+                                       layerID: layers.last!.id)
+                if let note = psd.importNote { document.say("Photoshop file imported — \(note)", kind: .info) }
+                return
+            }
+            if let png = psd.flattenedPNG() {
+                guard let i = activeIndex, activeIsContent else { failed = true; return }
+                document.captureHistoryBaselineIfNeeded()
+                document.layers[i].setImage(png)
+                document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
+                                       actionLabel: "Import Image", layerID: document.layers[i].id)
+                return
+            }
+        }
+        guard let png = pngData(fromImageData: raw) else {
             failed = true
             document.say("Image not imported — \(url.lastPathComponent) could not be read", kind: .warning)
             return
@@ -7096,13 +7130,16 @@ func pngData(fromImageData data: Data) -> Data? {
 }
 
 /// Every image UTType the RUNNING platform can actually decode (queried from ImageIO), so
-/// the import picker only ever offers formats we can truly open. On macOS this includes
-/// PSD (imported flattened) and BMP; the list auto-narrows on iOS where the system decoder
-/// is smaller (e.g. PSD isn't offered there). Falls back to the abstract image type.
+/// the import picker only ever offers formats we can truly open, plus Photoshop PSD, which
+/// our own PSDReader opens with its layers on every platform. Falls back to the abstract
+/// image type.
 var importableImageTypes: [UTType] {
     let ids = (CGImageSourceCopyTypeIdentifiers() as? [String]) ?? []
-    let types = ids.compactMap { UTType($0) }
-    return types.isEmpty ? [.image] : types
+    var types = ids.compactMap { UTType($0) }
+    if types.isEmpty { types = [.image] }
+    // Photoshop is read by our own PSDReader, so it is offered everywhere — the iPad too.
+    if !types.contains(where: { $0.conforms(to: .photoshopDocument) }) { types.append(.photoshopDocument) }
+    return types
 }
 
 /// Cross-platform image type + a SwiftUI Image bridge, for rendering imported PNGs.

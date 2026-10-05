@@ -1611,8 +1611,27 @@ extension ImageDocument {
     /// are accepted. (Two paths disagreeing about the same rule is a bug shape we have
     /// already paid for once.)
     @MainActor static func writeNewProject(at url: URL, from sourceURL: URL) -> Bool {
-        isPDF(sourceURL) ? writeNewProjectFromPDF(at: url, pdf: sourceURL)
-                         : writeNewProjectFromImage(at: url, image: sourceURL)
+        if isPDF(sourceURL) { return writeNewProjectFromPDF(at: url, pdf: sourceURL) }
+        // A Photoshop file opens WITH its layers; if it can't be read that way, the
+        // flattened image path below is the fallback (the Mac can still flatten one).
+        if isPSD(sourceURL), writeNewProjectFromPSD(at: url, psd: sourceURL) { return true }
+        return writeNewProjectFromImage(at: url, image: sourceURL)
+    }
+
+    /// New-document seed from a Photoshop file — its size is the canvas, its layers the
+    /// stack. Same contract as the PDF and image seeds: nothing invented.
+    @MainActor static func writeNewProjectFromPSD(at url: URL, psd psdURL: URL) -> Bool {
+        let doc = ImageDocument(layers: [])
+        let scoped = psdURL.startAccessingSecurityScopedResource()
+        let added = importPSDAsLayers(psdURL, into: doc)
+        if scoped { psdURL.stopAccessingSecurityScopedResource() }
+        guard added else { return false }
+        doc.name = url.deletingPathExtension().lastPathComponent
+        do {
+            try doc.writePackage(to: url)
+            pendingNewProjectURL = url      // so the editor opens it on the Canvas hub
+            return true
+        } catch { return false }
     }
 
     /// Type check by CONTENT first, extension only as the fallback — a PDF named `.png`
