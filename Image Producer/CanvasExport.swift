@@ -456,7 +456,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     case bmp = "BMP"
     case pdfFlat = "PDF (flat)"
     case pdfLayers = "PDF (one page per layer)"
-    case psd = "PSD (Photoshop, layers kept)"
+    case psd = "PSD (layers)"
     case gifAnimated = "Animated GIF (one frame per layer)"
 
     var id: String { rawValue }

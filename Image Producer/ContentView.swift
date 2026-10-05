@@ -6819,6 +6819,8 @@ struct ExportSheet: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+                .font(.system(size: 18))
+                .fixedSize()            // one line — a long format name must never wrap
                 Spacer()
             }
             if format == .gifAnimated {
@@ -6870,10 +6872,13 @@ struct ExportSheet: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
             }
+            .font(.system(size: 18))
         }
         .padding(20)
         #if os(iOS)
-        // iPad: size the sheet to its content so it doesn't float in an empty box.
+        // iPad: a real width (fitted alone made it a tiny generic box, 2026-10-05 — "TOO
+        // small"), height still sized to the content so it doesn't float in an empty box.
+        .frame(width: 520)
         .presentationSizing(.fitted)
         .presentationDragIndicator(.visible)
         #else
