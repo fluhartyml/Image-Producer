@@ -1515,11 +1515,9 @@ extension ImageDocument {
             // lives in a temporary copy inside the app, and iPadOS ignored a new name set on it
             // (build 276) — the real file is saved as "Untitled" afterwards. So the name rides
             // the hand-off and the REOPEN renames the real file (below).
-            // The reopen arrives with the URL seen from ANOTHER folder (build 275: a full-path
-            // match missed it), so it is matched by file name and time.
-            var names: Set<String> = []
-            if let current = configuration.fileURL { names.insert(current.lastPathComponent) }
-            justImported = (names, source.deletingPathExtension().lastPathComponent, Date())
+            // The reopen is matched by TIME ONLY: its folder differs (build 275) and so can its
+            // name — with an "Untitled" already there it came back "Untitled 2" (build 277).
+            justImported = (source.deletingPathExtension().lastPathComponent, Date())
             ipLog("imported \(source.lastPathComponent): \(doc.layers.count) layers")
             return doc
         }
@@ -1539,7 +1537,7 @@ extension ImageDocument {
         // The reopen of a file New from Import just wrote: open on the Canvas, no New Image sheet.
         ipLog("reopen \(configuration.fileURL?.path ?? "nil")")
         if let pending = justImported, let name = configuration.fileURL?.lastPathComponent,
-           pending.names.contains(name), Date().timeIntervalSince(pending.at) < 30 {
+           Date().timeIntervalSince(pending.at) < 30 {
             justImported = nil
             doc.newImageAsked = true
             // The PSD's name, made unique in the folder the file really lives in.
@@ -1560,7 +1558,7 @@ extension ImageDocument {
     }
 
     /// Files New from Import wrote, waiting for the system to reopen them (see `make`).
-    @MainActor static var justImported: (names: Set<String>, sourceName: String, at: Date)?
+    @MainActor static var justImported: (sourceName: String, at: Date)?
 }
 
 extension ImageDocument: Document {
