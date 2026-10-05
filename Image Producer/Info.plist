@@ -2,70 +2,27 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleDisplayName</key>
-	<string>Image Producer</string>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	<key>UTExportedTypeDeclarations</key>
-	<array>
-		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>com.nightgard.Image-Producer.project</string>
-			<key>UTTypeDescription</key>
-			<string>Image Producer Project</string>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>com.apple.package</string>
-			</array>
-			<key>UTTypeTagSpecification</key>
-			<dict>
-				<key>public.filename-extension</key>
-				<array>
-					<string>imgprd</string>
-					<string>picprod</string>
-					<string>iconproj</string>
-				</array>
-			</dict>
-		</dict>
-		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>com.nightgard.Image-Producer.palette</string>
-			<key>UTTypeDescription</key>
-			<string>Image Producer Palette</string>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>public.json</string>
-			</array>
-			<key>UTTypeTagSpecification</key>
-			<dict>
-				<key>public.filename-extension</key>
-				<array>
-					<string>iconpalette</string>
-				</array>
-			</dict>
-		</dict>
-	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>Image Producer Project</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>com.nightgard.Image-Producer.project</string>
-			</array>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.nightgard.Image-Producer.project</string>
+			</array>
 		</dict>
-		<!-- Images. Rank is Alternate, NOT Owner: Image Producer offers itself in
-		     Open With and accepts a drag onto its icon, but does not take the system
-		     default for every PNG on the Mac away from Preview. Opening one seeds a
-		     NEW project from the picture; the original file is never modified. -->
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>Image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>public.png</string>
@@ -77,23 +34,60 @@
 				<string>com.microsoft.bmp</string>
 				<string>public.webp</string>
 			</array>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>LSHandlerRank</key>
-			<string>Alternate</string>
 		</dict>
 	</array>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.com.nightgard.image-producer</key>
 		<dict>
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>
-			<key>NSUbiquitousContainerSupportedFolderLevels</key>
-			<string>Any</string>
 			<key>NSUbiquitousContainerName</key>
 			<string>Image Producer</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
 		</dict>
 	</dict>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Image Producer Project</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.nightgard.Image-Producer.project</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>imgprd</string>
+					<string>picprod</string>
+					<string>iconproj</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Image Producer Palette</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.nightgard.Image-Producer.palette</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>iconpalette</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>
