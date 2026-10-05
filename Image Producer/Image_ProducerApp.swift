@@ -283,6 +283,12 @@ struct Image_ProducerApp: App {
                 try? FileManager.default.removeItem(at: template)
                 return await ImageDocument.writeNewProject(at: template) ? template : nil
             }
+            // FILLED IN THE APP'S PURPLE — his call, 2026-10-05. White capsules on the white
+            // launch screen were nearly invisible, so the eye measured the WORDS ("New Image"
+            // is shorter) and the centered title read as left of center. A solid fill shows
+            // the two buttons are the same width. (Light grey is his alternative.)
+            .buttonStyle(.borderedProminent)
+            .tint(.accentColor)
             // NEW FROM IMPORT — the Mac's ⇧⌘N, on the iPad. Every format Image Producer
             // reads (PSD with its layers, PDF, pictures) seeds a NEW numbered project from a
             // copy of the file; the original is never written to.
@@ -295,6 +301,8 @@ struct Image_ProducerApp: App {
                 try? FileManager.default.removeItem(at: template)
                 return await ImageDocument.writeNewProject(at: template, from: source) ? template : nil
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.accentColor)
         } background: {
             // FOLLOWS LIGHT / DARK MODE — Michael, 2026-10-03, on his iPad in light mode:
             // "the background is too dark and im in lightmode". It was a fixed navy, which
