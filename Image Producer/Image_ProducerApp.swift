@@ -277,6 +277,18 @@ struct Image_ProducerApp: App {
                 try? FileManager.default.removeItem(at: template)
                 return await ImageDocument.writeNewProject(at: template) ? template : nil
             }
+            // NEW FROM IMPORT — the Mac's ⇧⌘N, on the iPad. Every format Image Producer
+            // reads (PSD with its layers, PDF, pictures) seeds a NEW numbered project from a
+            // copy of the file; the original is never written to.
+            NewDocumentButton("New from Import…", contentType: .imageProject) {
+                let types = await ImageDocument.newFromImportContentTypes
+                guard let source = await ImportPicker.pick(types: types),
+                      let numbered = ImageDocument.nextProjectURL() else { return nil }
+                let template = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(numbered.lastPathComponent)
+                try? FileManager.default.removeItem(at: template)
+                return await ImageDocument.writeNewProject(at: template, from: source) ? template : nil
+            }
         } background: {
             // FOLLOWS LIGHT / DARK MODE — Michael, 2026-10-03, on his iPad in light mode:
             // "the background is too dark and im in lightmode". It was a fixed navy, which
