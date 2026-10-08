@@ -148,6 +148,33 @@ struct DocumentEditorRoot: View {
     }
 }
 
+#if !os(macOS)
+/// The launch screen's hero icon + version line.
+/// ON A NARROW SCREEN (iPhone, the folded iPhone Duo) the system puts the title much higher,
+/// so the iPad's 96-pt icon at 44 pt down sat ON the title and hid "Prod". Narrow gets a
+/// 64-pt icon tucked under the status bar instead. The iPad (regular width) is unchanged.
+private struct LaunchHeroOverlay: View {
+    @Environment(\.horizontalSizeClass) private var widthClass
+
+    var body: some View {
+        let narrow = widthClass == .compact
+        VStack {
+            Image("LaunchHeroIcon")
+                .resizable()
+                .frame(width: narrow ? 64 : 96, height: narrow ? 64 : 96)
+                .clipShape(RoundedRectangle(cornerRadius: narrow ? 15 : 22, style: .continuous))
+                .shadow(radius: 8, y: 3)
+                .padding(.top, narrow ? 4 : 44)
+            Spacer()
+            Text(appVersionLine)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 24)
+        }
+    }
+}
+#endif
+
 @main
 struct Image_ProducerApp: App {
 #if os(macOS)
@@ -318,19 +345,7 @@ struct Image_ProducerApp: App {
             // light/dark) is clipped to the iOS app-icon superellipse so it reads as the
             // home-screen icon. The version line stays pinned at the bottom — the
             // conventional spot for a build stamp on a launch screen.
-            VStack {
-                Image("LaunchHeroIcon")
-                    .resizable()
-                    .frame(width: 96, height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .shadow(radius: 8, y: 3)
-                    .padding(.top, 44)
-                Spacer()
-                Text(appVersionLine)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 24)
-            }
+            LaunchHeroOverlay()
         }
         #endif
 
