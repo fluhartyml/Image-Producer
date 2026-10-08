@@ -268,6 +268,18 @@ struct ContentView: View {
     /// Portrait stacks it; landscape puts the canvas on the left, tools+panel on the right.
     @ViewBuilder
     private func phoneLayout(geo: GeometryProxy) -> some View {
+        phoneLayoutBody(geo: geo)
+            // THE TOOL INSPECTOR WAS HIDDEN ON THE PHONE — his catch, 2026-10-08: "i dont see
+            // a tool inspector". The panel opened on Layers (page 2), and with no pills on the
+            // phone only the page dots hinted that Tool was a swipe away. On the phone it now
+            // opens on Tool, and picking a tool brings Tool back (pick a tool → tune it).
+            // iPad keeps its pills and its Layers default.
+            .onAppear { bottomPanel = .tool }
+            .onChange(of: activeTool) { bottomPanel = .tool }
+    }
+
+    @ViewBuilder
+    private func phoneLayoutBody(geo: GeometryProxy) -> some View {
         if geo.size.height > geo.size.width {
             VStack(spacing: 0) {
                 // Canvas ~42% (was half): the inspector was starved for height. No
