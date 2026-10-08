@@ -276,6 +276,10 @@ struct ContentView: View {
             // iPad keeps its pills and its Layers default.
             .onAppear { bottomPanel = .tool }
             .onChange(of: activeTool) { bottomPanel = .tool }
+            // LIGHTER AND PLAIN ON THE PHONE — his words, 2026-10-08: "they need to be lighter
+            // and plane with minimal flourishes". Size stays 18 pt (his rule); the WEIGHT drops
+            // to light and bold headers flatten with it. iPhone only.
+            .fontWeight(.light)
     }
 
     @ViewBuilder
@@ -323,6 +327,7 @@ struct ContentView: View {
             // purpose: focus mode, phone, portrait and wide all get the same bar in
             // the same place, so it is never the thing that moved.
             StatusBar(window: window)
+                .fontWeight(isPhone ? .light : nil)   // no bold on the phone (his, 2026-10-08)
         }
         // LINKED LAYERS follow each other — one rule for every control that places a
         // layer. See LayerLink.swift.

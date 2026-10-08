@@ -12,10 +12,10 @@
 //  the user's original file is never opened for writing — the same promise the Mac makes.
 //
 
-#if !os(macOS) && canImport(UIKit)
-import UIKit
-import UniformTypeIdentifiers
+import Foundation
 
+/// Outside the iOS-only block since 2026-10-08: ContentView's rename calls it on the Mac too,
+/// and inside the block the Mac build failed ("cannot find 'ipLog'").
 /// TEMPORARY diagnostics (builds 271–272): stdout never reached the Mac, so each line is
 /// appended to Library/ip-import.log in the app container, copied off with
 /// `devicectl device copy from`. Remove once the New from Import fault is understood.
@@ -30,6 +30,10 @@ nonisolated func ipLog(_ line: String) {
         try? data.write(to: url)
     }
 }
+
+#if !os(macOS) && canImport(UIKit)
+import UIKit
+import UniformTypeIdentifiers
 
 @MainActor
 enum ImportPicker {
