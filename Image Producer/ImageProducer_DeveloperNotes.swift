@@ -32,6 +32,52 @@
 //    Image Playground tool, effects, print/canvas-size, the registration gate.
 //
 //  ----------------------------------------------------------------------------
+//  DECIDED 2026-10-08 — iPHONE PORTRAIT: ONE RAIL DOWN THE RIGHT EDGE (Michael)
+//  ----------------------------------------------------------------------------
+//  For the iPhone Duo's folded screen. Agreed against this sketch — his words:
+//  "yes your image is exactly it!"
+//
+//    ┌──────────────────┬──┐
+//    │                  │ <│  title rail: close,
+//    │      CANVAS      │ ⇪│  name (reads bottom
+//    │   (full width)   │ …│  to top), export, •••
+//    │                  │  │
+//    ├──────────────────┼──┤
+//    │                  │ ▣│  tool rail:
+//    │  TOOL INSPECTOR  │ ✥│  tools stacked
+//    │  (left-to-right) │ ⬚│  top to bottom
+//    │                  │ 💧│
+//    └──────────────────┴──┘
+//
+//  • The title bar leaves the top: its items go down the right edge beside the canvas,
+//    in the place the zoom cluster (expand / fit / + 100% −) holds today.
+//  • The tool strip leaves its row: the tools stack down the same right edge, starting
+//    at the top of the tool inspector.
+//  • Inspector, layers and all reading text stay left-to-right.
+//  • The "Autosaved — size" status line is removed on the phone ("eating valuable
+//    realestate"). The zoom cluster also takes too much room (his, same evening).
+//  • His framing: portrait and landscape are JUXTAPOSED — the same streamlined idea
+//    turned 90°, to optimize screen use.
+//
+//  LANDSCAPE (agreed same evening, "yes"):
+//    ┌──┬────────────┬──────────────┬──┐
+//    │ <│            │ ▣ ✥ ⬚ 💧 ⋀ ◆ │ ⇪│
+//    │ P│   CANVAS   ├──────────────┤ ⇧│
+//    │ h│            │     TOOL     │ ⓘ│
+//    │ o│            │   INSPECTOR  │  │
+//    └──┴────────────┴──────────────┴──┘
+//  • The TITLE BAR IS SPLIT IN HALF — his words: "put the first half on the left side and
+//    the remaining half export share and (i) on the right most side". Close + name down
+//    the far left (name reads bottom to top); export · share · info down the far right.
+//  • The tool row STAYS HORIZONTAL across the top of the inspector, as it is today.
+//  • Applies to the expanded (focus) canvas too — its side margins hold the two halves.
+//  • ZOOM CLUSTER STAYS ON THE CANVAS — his ruling, reversing the earlier note: "the arrow
+//    in at 45 degrees arrows pointing out horizontally and the + 100% - can stay because
+//    they earn their space".
+//  • THE THUMBNAIL STAYS — his ruling: "but the thumbnail earns its position here too".
+//  NOT YET BUILT.
+//
+//  ----------------------------------------------------------------------------
 //  VERIFIED APPLE FACTS (sourced from Apple Developer docs, 2026-06-10)
 //  ----------------------------------------------------------------------------
 //  Framework is `ImagePlayground` — there is NO "ImagePlaygroundKit"; you just

@@ -749,6 +749,19 @@ struct ContentView: View {
                     .scaleEffect(canvasZoom)
                     .offset(canvasPan)
                     .gesture(pinchZoom)
+                    #if os(iOS)
+                    // TWO-FINGER PAN, ANY TOOL — his catch, 2026-10-08: "i can zoom but i cant
+                    // pan up or down". Pan lived only in the Zoom tool's gestures, so with any
+                    // other tool a zoomed canvas could not be moved. Two fingers navigate
+                    // (Procreate's rule, already in the notes); one finger stays the tool's.
+                    .gesture(TwoFingerPan(
+                        onChange: { t in
+                            guard canvasZoom > 1 else { return }   // nothing to pan at fit size
+                            canvasPan = CGSize(width: panAtDragStart.width + t.width,
+                                               height: panAtDragStart.height + t.height)
+                        },
+                        onEnd: { panAtDragStart = canvasPan }))
+                    #endif
                     .gesture(activeTool == .zoom ? zoomToolGestures : nil)
             }
         }
@@ -6513,6 +6526,41 @@ struct ZoomableCanvas<Content: View>: View {
 }
 
 #if os(iOS)
+/// Two-finger drag that reports its translation. A UIKit recognizer because SwiftUI's
+/// DragGesture cannot require two touches. Recognizes alongside the pinch, so pan and
+/// zoom happen in the same gesture, as in every drawing app.
+struct TwoFingerPan: UIGestureRecognizerRepresentable {
+    var onChange: (CGSize) -> Void
+    var onEnd: () -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.minimumNumberOfTouches = 2
+        pan.maximumNumberOfTouches = 2
+        pan.delegate = context.coordinator
+        return pan
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        switch recognizer.state {
+        case .changed:
+            let t = recognizer.translation(in: recognizer.view)
+            onChange(CGSize(width: t.x, height: t.y))
+        case .ended, .cancelled, .failed:
+            onEnd()
+        default:
+            break
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizer(_ g: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+    }
+}
+
 struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     @ViewBuilder var content: Content
 
