@@ -268,58 +268,24 @@ struct ContentView: View {
     /// Portrait stacks it; landscape puts the canvas on the left, tools+panel on the right.
     @ViewBuilder
     private func phoneLayout(geo: GeometryProxy) -> some View {
-        phoneLayoutBody(geo: geo)
-            // THE TOOL INSPECTOR WAS HIDDEN ON THE PHONE — his catch, 2026-10-08: "i dont see
-            // a tool inspector". The panel opened on Layers (page 2), and with no pills on the
-            // phone only the page dots hinted that Tool was a swipe away. On the phone it now
-            // opens on Tool, and picking a tool brings Tool back (pick a tool → tune it).
-            // iPad keeps its pills and its Layers default.
-            .onAppear { bottomPanel = .tool }
-            .onChange(of: activeTool) { bottomPanel = .tool }
-            // LIGHTER AND PLAIN ON THE PHONE — his words, 2026-10-08: "they need to be lighter
-            // and plane with minimal flourishes". Size stays 18 pt (his rule); the WEIGHT drops
-            // to light and bold headers flatten with it. iPhone only.
-            .fontWeight(.light)
-    }
-
-    // THE iPHONE LAYOUT — agreed with Michael 2026-10-08 against two sketches (see the
-    // DeveloperNotes, "iPHONE PORTRAIT: ONE RAIL DOWN THE RIGHT EDGE" and LANDSCAPE).
-    // No title bar and no status line on the phone; their contents live in side rails.
-    //   PORTRAIT:  [ canvas / inspector ] [ rail: title items over the canvas, tools below ]
-    //   LANDSCAPE: [ title ] [ canvas ] [ tool row / inspector ] [ export · share · info ]
-    private let phoneRailWidth: CGFloat = 52
-
-    @ViewBuilder
-    private func phoneLayoutBody(geo: GeometryProxy) -> some View {
         if geo.size.height > geo.size.width {
-            let canvasHeight = geo.size.height * 0.42
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    canvasArea
-                        .frame(height: canvasHeight)
-                    Divider()
-                    BottomPanel.PanelView(document: document, camera: camera, activeTool: activeTool,
-                                          activeLayerID: $activeLayerID, selection: $bottomPanel,
-                                          fillColor: $fillColor, fileURL: fileURL, compact: true)
-                        .frame(maxHeight: .infinity)
-                }
+            VStack(spacing: 0) {
+                // Canvas ~42% (was half): the inspector was starved for height. No
+                // ActiveToolLabel here — the tool strip highlights the active tool and
+                // the inspector names it, so a third label was redundant. Panel is
+                // `compact` (no pills, swipe + dots) and takes the freed room.
+                canvasArea
+                    .frame(height: geo.size.height * 0.42)
                 Divider()
-                VStack(spacing: 0) {
-                    phoneTitleRail(withActions: true)
-                        .frame(height: canvasHeight)
-                    Divider()
-                    ToolRail(activeTool: $activeTool,
-                             onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } },
-                             columns: 1)
-                        .frame(maxHeight: .infinity)
-                }
-                .frame(width: phoneRailWidth)
+                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, lines: 1)
+                Divider()
+                BottomPanel.PanelView(document: document, camera: camera, activeTool: activeTool,
+                                      activeLayerID: $activeLayerID, selection: $bottomPanel,
+                                      fillColor: $fillColor, fileURL: fileURL, compact: true)
+                    .frame(maxHeight: .infinity)
             }
         } else {
             HStack(spacing: 0) {
-                phoneTitleRail(withActions: false)
-                    .frame(width: phoneRailWidth)
-                Divider()
                 canvasArea
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Divider()
@@ -332,111 +298,20 @@ struct ContentView: View {
                                           fillColor: $fillColor, fileURL: fileURL, compact: true)
                 }
                 .frame(width: 300)
-                Divider()
-                phoneActionRail
-                    .frame(width: phoneRailWidth)
             }
         }
-    }
-
-    /// The expanded canvas on the phone keeps its rails — the canvas's side margins hold
-    /// them (his ruling: the split title bar applies to the expanded canvas too).
-    @ViewBuilder
-    private func phoneFocusedLayout(geo: GeometryProxy) -> some View {
-        if geo.size.height > geo.size.width {
-            HStack(spacing: 0) {
-                canvasArea
-                Divider()
-                phoneTitleRail(withActions: true).frame(width: phoneRailWidth)
-            }
-        } else {
-            HStack(spacing: 0) {
-                phoneTitleRail(withActions: false).frame(width: phoneRailWidth)
-                Divider()
-                canvasArea
-                Divider()
-                phoneActionRail.frame(width: phoneRailWidth)
-            }
-        }
-    }
-
-    #if os(iOS)
-    @Environment(\.dismiss) private var closeDocument
-    #endif
-
-    /// Close, then the file name and build reading bottom to top. The build lives here on
-    /// the phone — his rule, 2026-10-08: "the build number needs to be on the main screen and
-    /// not hidden behind (i)". In portrait the rail also carries export · share · info.
-    private func phoneTitleRail(withActions: Bool) -> some View {
-        VStack(spacing: 6) {
-            #if os(iOS)
-            Button { closeDocument() } label: {
-                Image(systemName: "chevron.left").frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("Close")
-            #endif
-            UpwardText {
-                Text("\(phoneDocumentName)  ·  \(appBuildNumber)")
-                    .font(.system(size: 18))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            .frame(maxHeight: .infinity)
-            if withActions { phoneActionButtons }
-        }
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var phoneActionRail: some View {
-        VStack(spacing: 6) { phoneActionButtons }
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    /// The title bar's right half: export · share · info — the same three actions.
-    @ViewBuilder
-    private var phoneActionButtons: some View {
-        Button { showExportSheet = true } label: {
-            Image(systemName: "arrow.up.doc").frame(width: 44, height: 44)
-        }
-        .accessibilityLabel("Export")
-        ShareLink(item: shareItem, preview: SharePreview(exportFilename)) {
-            Image(systemName: "square.and.arrow.up").frame(width: 44, height: 44)
-        }
-        .accessibilityLabel("Share")
-        Button { showAbout = true } label: {
-            Image(systemName: "info.circle").frame(width: 44, height: 44)
-        }
-        .accessibilityLabel("About Image Producer")
-    }
-
-    private var phoneDocumentName: String {
-        fileURL?.deletingPathExtension().lastPathComponent ?? "Untitled"
     }
 
     var body: some View {
         VStack(spacing: 0) {
             editorBody
                 .overlay { CopiedPopup(trigger: camera.copiedFlash) }
-            // THE STATUS LINE — not on the phone (his, 2026-10-08: "eating valuable realestate";
-            // the build number moved to the title rail). Everywhere else, unchanged:
-            if !isPhone {
             Divider()
             // THE STATUS LINE — his ask, 2026-09-06. Outside every layout branch on
             // purpose: focus mode, phone, portrait and wide all get the same bar in
             // the same place, so it is never the thing that moved.
             StatusBar(window: window)
-            }
         }
-        #if os(iOS)
-        // No title bar on the phone — its halves live in the side rails.
-        .toolbar(isPhone ? .hidden : .automatic, for: .navigationBar)
-        // An open document frees the phone to rotate; closing it returns the launch
-        // screen to portrait (see PhoneOrientation, Image_ProducerApp.swift).
-        .onAppear { PhoneOrientation.openDocuments += 1 }
-        .onDisappear { PhoneOrientation.openDocuments = max(0, PhoneOrientation.openDocuments - 1) }
-        #endif
         // LINKED LAYERS follow each other — one rule for every control that places a
         // layer. See LayerLink.swift.
         .onChange(of: LinkSnapshot(document), initial: true) {
@@ -450,9 +325,7 @@ struct ContentView: View {
 
     private var editorBody: some View {
         GeometryReader { geo in
-            if canvasFocused && isPhone {
-                phoneFocusedLayout(geo: geo)
-            } else if canvasFocused {
+            if canvasFocused {
                 // Full-screen focus: canvas only, tools/panel hidden. The on-canvas
                 // control cluster carries the toggle back out + the zoom buttons.
                 canvasArea
@@ -517,14 +390,9 @@ struct ContentView: View {
                             // 66/33 as the floors allow; a window too small for both floors
                             // falls back to 50/50.
                             let inspectorFloor: CGFloat = 280, layersFloor: CGFloat = 200
-                            // TOO NARROW FOR BOTH FLOORS (the open iPhone Duo, ~450 pt, 2026-10-08):
-                            // the old 50/50 fallback gave the inspector ~225 pt, its rows overflowed,
-                            // and centered content lost its LEFT edge ("roject name" — his screen).
-                            // Now the inspector keeps its floor and Layers takes the rest; layer
-                            // names already shrink to fit (his Oct 4 exception).
                             let share: CGFloat = room >= inspectorFloor + layersFloor
                                 ? min(max(wanted, inspectorFloor / room), 1 - layersFloor / room)
-                                : (room > 0 ? min(inspectorFloor / room, 0.7) : 0.5)
+                                : 0.5
                             HStack(spacing: 0) {
                                 ToolInspector(document: document,
                                               camera: camera,
@@ -532,9 +400,7 @@ struct ContentView: View {
                                               activeLayerID: $activeLayerID,
                                               fillColor: $fillColor,
                                               fileURL: fileURL)
-                                    // Anchored LEADING: if it ever overflows, it clips on the right,
-                                    // never the left where the labels start.
-                                    .frame(width: room * share, alignment: .leading)
+                                    .frame(width: room * share)
                                     .clipped()
                                     .simultaneousGesture(TapGesture().onEnded { focusSidePanel(.inspector) })
                                 Divider()
@@ -865,26 +731,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .scaleEffect(canvasZoom)
                     .offset(canvasPan)
-                    #if os(iOS)
-                    // TWO-FINGER PAN, ANY TOOL — his catch, 2026-10-08: "i can zoom but i cant
-                    // pan up or down". Pan lived only in the Zoom tool's gestures, so with any
-                    // other tool a zoomed canvas could not be moved. Two fingers navigate
-                    // (Procreate's rule, already in the notes); one finger stays the tool's.
-                    // ORDER: two .gesture modifiers on one view compete exclusively, so the pinch
-                    // is attached as .simultaneousGesture (a UIKit-backed gesture cannot be).
-                    // His 18:58 "cant pan" was on build 282, which had no two-finger pan at all;
-                    // 283 (pan as a second .gesture) was never run on a device.
-                    .gesture(TwoFingerPan(
-                        onChange: { t in
-                            guard canvasZoom > 1 else { return }   // nothing to pan at fit size
-                            canvasPan = CGSize(width: panAtDragStart.width + t.width,
-                                               height: panAtDragStart.height + t.height)
-                        },
-                        onEnd: { panAtDragStart = canvasPan }))
-                    .simultaneousGesture(pinchZoom)
-                    #else
                     .gesture(pinchZoom)
-                    #endif
                     .gesture(activeTool == .zoom ? zoomToolGestures : nil)
             }
         }
@@ -1147,12 +994,10 @@ struct ToolRail: View {
     /// Double-tap on a tool's own button. Zoom uses it to toggle all-the-way-out and
     /// back — Michael 2026-08-24. Optional so callers that do not care can omit it.
     var onDoubleTap: ((Tool) -> Void)? = nil
-    /// Columns of tools: 2 by default; the iPhone's portrait rail is 1 (2026-10-08).
-    var columns: Int = 2
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(44), spacing: 4), count: columns), spacing: 4) {
+            LazyVGrid(columns: [GridItem(.fixed(44), spacing: 4), GridItem(.fixed(44), spacing: 4)], spacing: 4) {
                 ForEach(Tool.shipping) { tool in
                     Button { activeTool = tool } label: {
                         ToolGlyph(tool: tool)
@@ -6651,41 +6496,6 @@ struct ZoomableCanvas<Content: View>: View {
 }
 
 #if os(iOS)
-/// Two-finger drag that reports its translation. A UIKit recognizer because SwiftUI's
-/// DragGesture cannot require two touches. Recognizes alongside the pinch, so pan and
-/// zoom happen in the same gesture, as in every drawing app.
-struct TwoFingerPan: UIGestureRecognizerRepresentable {
-    var onChange: (CGSize) -> Void
-    var onEnd: () -> Void
-
-    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
-
-    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
-        let pan = UIPanGestureRecognizer()
-        pan.minimumNumberOfTouches = 2
-        pan.maximumNumberOfTouches = 2
-        pan.delegate = context.coordinator
-        return pan
-    }
-
-    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
-        switch recognizer.state {
-        case .changed:
-            let t = recognizer.translation(in: recognizer.view)
-            onChange(CGSize(width: t.x, height: t.y))
-        case .ended, .cancelled, .failed:
-            onEnd()
-        default:
-            break
-        }
-    }
-
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        func gestureRecognizer(_ g: UIGestureRecognizer,
-                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
-    }
-}
-
 struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     @ViewBuilder var content: Content
 
@@ -7643,23 +7453,7 @@ var appShortVersion: String {
 }
 
 /// The iPad launch screen's title: the name and Xcode's version, e.g. "Image Producer 1.1".
-/// ON THE iPHONE IT CARRIES THE BUILD — his rule, 2026-10-08: "the build number needs to be on
-/// the main screen and not hidden behind (i)". The launch screen's bottom version line sits
-/// behind the Recents panel on a phone, so the build goes in the title: "Image Producer 1.1 (284)".
-var launchTitle: String {
-    // DEVELOPMENT BUILDS SHOW IT ON EVERY DEVICE — his ask, 2026-10-08: "since were in
-    // development mode can the build show every wherer?"
-    #if DEBUG
-    return "Image Producer \(appShortVersion) (\(appBuildNumber))"
-    #else
-    #if os(iOS)
-    if UIDevice.current.userInterfaceIdiom == .phone {
-        return "Image Producer \(appShortVersion) (\(appBuildNumber))"
-    }
-    #endif
-    return "Image Producer \(appShortVersion)"
-    #endif
-}
+var launchTitle: String { "Image Producer \(appShortVersion)" }
 
 var appVersionLine: String {
     let info = Bundle.main.infoDictionary
@@ -7858,29 +7652,5 @@ struct StatusBar: View {
         case .edit:    .accentColor
         case nil:      .secondary
         }
-    }
-}
-
-/// Text that reads BOTTOM TO TOP, for the iPhone's title rail (his, 2026-10-08: "the title
-/// bar should be from bottom to top"). A rotation alone keeps the text's horizontal size in
-/// layout and spills out of a 52-pt rail; this swaps width and height so the rail sizes to
-/// it, and proposes the rail's height as the line length so a long name truncates.
-struct UpwardText<Content: View>: View {
-    @ViewBuilder var content: Content
-    var body: some View {
-        UpwardLayout { content.rotationEffect(.degrees(-90)) }
-    }
-}
-
-private struct UpwardLayout: Layout {
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard let v = subviews.first else { return .zero }
-        let s = v.sizeThatFits(ProposedViewSize(width: proposal.height, height: nil))
-        return CGSize(width: s.height, height: s.width)
-    }
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        guard let v = subviews.first else { return }
-        let s = v.sizeThatFits(ProposedViewSize(width: bounds.height, height: nil))
-        v.place(at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center, proposal: ProposedViewSize(s))
     }
 }

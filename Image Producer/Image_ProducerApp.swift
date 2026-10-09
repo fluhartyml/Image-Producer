@@ -148,89 +148,10 @@ struct DocumentEditorRoot: View {
     }
 }
 
-#if !os(macOS)
-/// The launch screen's hero icon + version line.
-/// ON A NARROW SCREEN (iPhone, the folded iPhone Duo) the system puts the title much higher,
-/// so the iPad's 96-pt icon at 44 pt down sat ON the title and hid "Prod". Narrow gets a
-/// 64-pt icon tucked under the status bar instead. The iPad (regular width) is unchanged.
-private struct LaunchHeroOverlay: View {
-    let proxy: DocumentLaunchGeometryProxy
-    @Environment(\.horizontalSizeClass) private var widthClass
-
-    /// THE iPHONE DUO, OPEN AND SIDEWAYS — his catch, 2026-10-08 on the Duo simulator: "the
-    /// hero is off to the right". There the system puts the title in a LEFT panel and the file
-    /// list on the right, but this overlay spans the whole screen, so a centered icon landed
-    /// on the panels' dividing edge and the version line was cut off. The proxy's frames are
-    /// not in this overlay's coordinates (build 266), but the DIFFERENCE between the title's
-    /// center and the frame's center is, so the hero follows the title by that much. Only when
-    /// it is large — phone portrait and the iPad (title ~centered) stay exactly as they were.
-    private var titleShift: CGFloat {
-        let d = proxy.titleViewFrame.midX - proxy.frame.midX
-        // +42: the visible title and buttons sit ~42 pt right of the title FRAME's center
-        // (measured on the Duo, open + sideways, build 290 — the icon read left of them).
-        return abs(d) > 40 ? d + 42 : 0
-    }
-
-    var body: some View {
-        let narrow = widthClass == .compact
-        VStack {
-            Image("LaunchHeroIcon")
-                .resizable()
-                .frame(width: narrow ? 64 : 96, height: narrow ? 64 : 96)
-                .clipShape(RoundedRectangle(cornerRadius: narrow ? 15 : 22, style: .continuous))
-                .shadow(radius: 8, y: 3)
-                .padding(.top, narrow ? 4 : 44)
-            Spacer()
-            Text(appVersionLine)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 24)
-        }
-        .offset(x: titleShift)
-    }
-}
-#endif
-
-#if os(iOS)
-/// THE iPHONE LAUNCH SCREEN STAYS PORTRAIT — his call, 2026-10-08, as a trial: "lock the
-/// launch screen to portrait lets see and if its okay we stay if not we just go back".
-/// In landscape Apple's launch screen gives the whole phone to the file browser and hides
-/// the hero icon and buttons, and iOS offers no way to rearrange it (openDocument is
-/// Mac-only, so a launch screen of our own cannot open documents). So: no document open
-/// on a phone → portrait only. An open document rotates freely. iPad is untouched.
-/// TO GO BACK: delete this class and the adaptor line in Image_ProducerApp, and the
-/// PhoneOrientation calls in ContentView.
-final class ImageProducerPhoneDelegate: NSObject, UIApplicationDelegate {
-    func application(_ application: UIApplication,
-                     supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        guard UIDevice.current.userInterfaceIdiom == .phone else { return .all }
-        return PhoneOrientation.openDocuments > 0 ? .allButUpsideDown : .portrait
-    }
-}
-
-@MainActor
-enum PhoneOrientation {
-    /// Editors on screen right now. The launch screen is showing when this is 0.
-    static var openDocuments = 0 { didSet { refresh() } }
-
-    private static func refresh() {
-        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
-        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
-            scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
-            if openDocuments == 0 {
-                scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
-            }
-        }
-    }
-}
-#endif
-
 @main
 struct Image_ProducerApp: App {
 #if os(macOS)
     @NSApplicationDelegateAdaptor(ImageProducerAppDelegate.self) private var appDelegate
-#elseif os(iOS)
-    @UIApplicationDelegateAdaptor(ImageProducerPhoneDelegate.self) private var phoneDelegate
 #endif
 
     init() {
@@ -391,13 +312,25 @@ struct Image_ProducerApp: App {
                 startPoint: .top,
                 endPoint: .bottom
             )
-        } overlayAccessoryView: { proxy in
+        } overlayAccessoryView: { _ in
             // Hero app icon above the wordmark — mirrors the Mac Welcome window, which
             // shows the app icon over the title. The 1024 icon art (LaunchHeroIcon,
             // light/dark) is clipped to the iOS app-icon superellipse so it reads as the
             // home-screen icon. The version line stays pinned at the bottom — the
             // conventional spot for a build stamp on a launch screen.
-            LaunchHeroOverlay(proxy: proxy)
+            VStack {
+                Image("LaunchHeroIcon")
+                    .resizable()
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .shadow(radius: 8, y: 3)
+                    .padding(.top, 44)
+                Spacer()
+                Text(appVersionLine)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 24)
+            }
         }
         #endif
 
