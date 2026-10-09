@@ -154,7 +154,20 @@ struct DocumentEditorRoot: View {
 /// so the iPad's 96-pt icon at 44 pt down sat ON the title and hid "Prod". Narrow gets a
 /// 64-pt icon tucked under the status bar instead. The iPad (regular width) is unchanged.
 private struct LaunchHeroOverlay: View {
+    let proxy: DocumentLaunchGeometryProxy
     @Environment(\.horizontalSizeClass) private var widthClass
+
+    /// THE iPHONE DUO, OPEN AND SIDEWAYS — his catch, 2026-10-08 on the Duo simulator: "the
+    /// hero is off to the right". There the system puts the title in a LEFT panel and the file
+    /// list on the right, but this overlay spans the whole screen, so a centered icon landed
+    /// on the panels' dividing edge and the version line was cut off. The proxy's frames are
+    /// not in this overlay's coordinates (build 266), but the DIFFERENCE between the title's
+    /// center and the frame's center is, so the hero follows the title by that much. Only when
+    /// it is large — phone portrait and the iPad (title ~centered) stay exactly as they were.
+    private var titleShift: CGFloat {
+        let d = proxy.titleViewFrame.midX - proxy.frame.midX
+        return abs(d) > 40 ? d : 0
+    }
 
     var body: some View {
         let narrow = widthClass == .compact
@@ -171,6 +184,7 @@ private struct LaunchHeroOverlay: View {
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 24)
         }
+        .offset(x: titleShift)
     }
 }
 #endif
@@ -375,13 +389,13 @@ struct Image_ProducerApp: App {
                 startPoint: .top,
                 endPoint: .bottom
             )
-        } overlayAccessoryView: { _ in
+        } overlayAccessoryView: { proxy in
             // Hero app icon above the wordmark — mirrors the Mac Welcome window, which
             // shows the app icon over the title. The 1024 icon art (LaunchHeroIcon,
             // light/dark) is clipped to the iOS app-icon superellipse so it reads as the
             // home-screen icon. The version line stays pinned at the bottom — the
             // conventional spot for a build stamp on a launch screen.
-            LaunchHeroOverlay()
+            LaunchHeroOverlay(proxy: proxy)
         }
         #endif
 
