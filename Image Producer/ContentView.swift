@@ -748,12 +748,15 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .scaleEffect(canvasZoom)
                     .offset(canvasPan)
-                    .gesture(pinchZoom)
                     #if os(iOS)
                     // TWO-FINGER PAN, ANY TOOL — his catch, 2026-10-08: "i can zoom but i cant
                     // pan up or down". Pan lived only in the Zoom tool's gestures, so with any
                     // other tool a zoomed canvas could not be moved. Two fingers navigate
                     // (Procreate's rule, already in the notes); one finger stays the tool's.
+                    // ORDER: two .gesture modifiers on one view compete exclusively, so the pinch
+                    // is attached as .simultaneousGesture (a UIKit-backed gesture cannot be).
+                    // His 18:58 "cant pan" was on build 282, which had no two-finger pan at all;
+                    // 283 (pan as a second .gesture) was never run on a device.
                     .gesture(TwoFingerPan(
                         onChange: { t in
                             guard canvasZoom > 1 else { return }   // nothing to pan at fit size
@@ -761,6 +764,9 @@ struct ContentView: View {
                                                height: panAtDragStart.height + t.height)
                         },
                         onEnd: { panAtDragStart = canvasPan }))
+                    .simultaneousGesture(pinchZoom)
+                    #else
+                    .gesture(pinchZoom)
                     #endif
                     .gesture(activeTool == .zoom ? zoomToolGestures : nil)
             }
