@@ -390,9 +390,14 @@ struct ContentView: View {
                             // 66/33 as the floors allow; a window too small for both floors
                             // falls back to 50/50.
                             let inspectorFloor: CGFloat = 280, layersFloor: CGFloat = 200
+                            // TOO NARROW FOR BOTH FLOORS (the open iPhone Duo, ~450 pt): the touch
+                            // still decides — his ruling, 2026-10-08: "tapping the inspector should
+                            // expand the tool inspector decreasing the layer|history". It used to
+                            // freeze at 50/50 here, so the Canvas inspector clipped and a tap did
+                            // nothing ("roject name", "esolution" on his screen).
                             let share: CGFloat = room >= inspectorFloor + layersFloor
                                 ? min(max(wanted, inspectorFloor / room), 1 - layersFloor / room)
-                                : 0.5
+                                : wanted
                             HStack(spacing: 0) {
                                 ToolInspector(document: document,
                                               camera: camera,
@@ -400,7 +405,9 @@ struct ContentView: View {
                                               activeLayerID: $activeLayerID,
                                               fillColor: $fillColor,
                                               fileURL: fileURL)
-                                    .frame(width: room * share)
+                                    // Anchored LEADING: anything too wide clips on the right, never
+                                    // the left where the labels start.
+                                    .frame(width: room * share, alignment: .leading)
                                     .clipped()
                                     .simultaneousGesture(TapGesture().onEnded { focusSidePanel(.inspector) })
                                 Divider()
@@ -408,7 +415,7 @@ struct ContentView: View {
                                 // panel sitting behind the layer list). The wide/Mac layout used to hardcode
                                 // only LayerPanel, so History was unreachable on Mac — this restores it.
                                 LayersHistoryColumn(document: document, activeLayerID: $activeLayerID)
-                                    .frame(width: room * (1 - share))
+                                    .frame(width: room * (1 - share), alignment: .leading)
                                     .clipped()
                                     .simultaneousGesture(TapGesture().onEnded { focusSidePanel(.layers) })
                             }
