@@ -7636,12 +7636,18 @@ var appShortVersion: String {
 /// the main screen and not hidden behind (i)". The launch screen's bottom version line sits
 /// behind the Recents panel on a phone, so the build goes in the title: "Image Producer 1.1 (284)".
 var launchTitle: String {
+    // DEVELOPMENT BUILDS SHOW IT ON EVERY DEVICE — his ask, 2026-10-08: "since were in
+    // development mode can the build show every wherer?"
+    #if DEBUG
+    return "Image Producer \(appShortVersion) (\(appBuildNumber))"
+    #else
     #if os(iOS)
     if UIDevice.current.userInterfaceIdiom == .phone {
         return "Image Producer \(appShortVersion) (\(appBuildNumber))"
     }
     #endif
     return "Image Producer \(appShortVersion)"
+    #endif
 }
 
 var appVersionLine: String {
