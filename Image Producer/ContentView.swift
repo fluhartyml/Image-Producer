@@ -7524,7 +7524,17 @@ var appShortVersion: String {
 }
 
 /// The iPad launch screen's title: the name and Xcode's version, e.g. "Image Producer 1.1".
-var launchTitle: String { "Image Producer \(appShortVersion)" }
+/// ON THE iPHONE IT CARRIES THE BUILD — his rule, 2026-10-08: "the build number needs to be on
+/// the main screen and not hidden behind (i)". The launch screen's bottom version line sits
+/// behind the Recents panel on a phone, so the build goes in the title: "Image Producer 1.1 (284)".
+var launchTitle: String {
+    #if os(iOS)
+    if UIDevice.current.userInterfaceIdiom == .phone {
+        return "Image Producer \(appShortVersion) (\(appBuildNumber))"
+    }
+    #endif
+    return "Image Producer \(appShortVersion)"
+}
 
 var appVersionLine: String {
     let info = Bundle.main.infoDictionary
