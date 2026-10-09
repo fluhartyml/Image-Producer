@@ -517,9 +517,14 @@ struct ContentView: View {
                             // 66/33 as the floors allow; a window too small for both floors
                             // falls back to 50/50.
                             let inspectorFloor: CGFloat = 280, layersFloor: CGFloat = 200
+                            // TOO NARROW FOR BOTH FLOORS (the open iPhone Duo, ~450 pt, 2026-10-08):
+                            // the old 50/50 fallback gave the inspector ~225 pt, its rows overflowed,
+                            // and centered content lost its LEFT edge ("roject name" — his screen).
+                            // Now the inspector keeps its floor and Layers takes the rest; layer
+                            // names already shrink to fit (his Oct 4 exception).
                             let share: CGFloat = room >= inspectorFloor + layersFloor
                                 ? min(max(wanted, inspectorFloor / room), 1 - layersFloor / room)
-                                : 0.5
+                                : (room > 0 ? min(inspectorFloor / room, 0.7) : 0.5)
                             HStack(spacing: 0) {
                                 ToolInspector(document: document,
                                               camera: camera,
@@ -527,7 +532,9 @@ struct ContentView: View {
                                               activeLayerID: $activeLayerID,
                                               fillColor: $fillColor,
                                               fileURL: fileURL)
-                                    .frame(width: room * share)
+                                    // Anchored LEADING: if it ever overflows, it clips on the right,
+                                    // never the left where the labels start.
+                                    .frame(width: room * share, alignment: .leading)
                                     .clipped()
                                     .simultaneousGesture(TapGesture().onEnded { focusSidePanel(.inspector) })
                                 Divider()
