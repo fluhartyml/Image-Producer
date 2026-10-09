@@ -175,10 +175,46 @@ private struct LaunchHeroOverlay: View {
 }
 #endif
 
+#if os(iOS)
+/// THE iPHONE LAUNCH SCREEN STAYS PORTRAIT — his call, 2026-10-08, as a trial: "lock the
+/// launch screen to portrait lets see and if its okay we stay if not we just go back".
+/// In landscape Apple's launch screen gives the whole phone to the file browser and hides
+/// the hero icon and buttons, and iOS offers no way to rearrange it (openDocument is
+/// Mac-only, so a launch screen of our own cannot open documents). So: no document open
+/// on a phone → portrait only. An open document rotates freely. iPad is untouched.
+/// TO GO BACK: delete this class and the adaptor line in Image_ProducerApp, and the
+/// PhoneOrientation calls in ContentView.
+final class ImageProducerPhoneDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return .all }
+        return PhoneOrientation.openDocuments > 0 ? .allButUpsideDown : .portrait
+    }
+}
+
+@MainActor
+enum PhoneOrientation {
+    /// Editors on screen right now. The launch screen is showing when this is 0.
+    static var openDocuments = 0 { didSet { refresh() } }
+
+    private static func refresh() {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            if openDocuments == 0 {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+            }
+        }
+    }
+}
+#endif
+
 @main
 struct Image_ProducerApp: App {
 #if os(macOS)
     @NSApplicationDelegateAdaptor(ImageProducerAppDelegate.self) private var appDelegate
+#elseif os(iOS)
+    @UIApplicationDelegateAdaptor(ImageProducerPhoneDelegate.self) private var phoneDelegate
 #endif
 
     init() {

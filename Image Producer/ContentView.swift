@@ -432,6 +432,10 @@ struct ContentView: View {
         #if os(iOS)
         // No title bar on the phone — its halves live in the side rails.
         .toolbar(isPhone ? .hidden : .automatic, for: .navigationBar)
+        // An open document frees the phone to rotate; closing it returns the launch
+        // screen to portrait (see PhoneOrientation, Image_ProducerApp.swift).
+        .onAppear { PhoneOrientation.openDocuments += 1 }
+        .onDisappear { PhoneOrientation.openDocuments = max(0, PhoneOrientation.openDocuments - 1) }
         #endif
         // LINKED LAYERS follow each other — one rule for every control that places a
         // layer. See LayerLink.swift.
