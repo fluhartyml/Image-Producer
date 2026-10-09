@@ -23,6 +23,12 @@ struct NewImageSheet: View {
     @State private var name = ""
     @State private var width = 1024
     @State private var height = 1024
+    /// THE iPHONE — his verdict, 2026-10-08: "it looks like shit for creating a new document".
+    /// The 420-pt minimum width ran past a 390-pt phone (the form lost its left margin) and the
+    /// sheet filled the screen with the form floating in the middle. On a compact width: no
+    /// minimum, a sheet exactly as tall as the form, and no bold (his phone rule, same night).
+    @Environment(\.horizontalSizeClass) private var widthClass
+    @State private var formHeight: CGFloat = 340
 
     /// A few common starting sizes. Every other preset is in the Canvas tool.
     private let sizes: [(label: String, w: Int, h: Int)] = [
@@ -71,7 +77,11 @@ struct NewImageSheet: View {
             .font(.system(size: 18))
         }
         .padding(24)
-        .frame(minWidth: 420)
+        .frame(minWidth: widthClass == .compact ? nil : 420)
+        .fixedSize(horizontal: false, vertical: true)
+        .fontWeight(widthClass == .compact ? .light : nil)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
+        .presentationDetents(widthClass == .compact ? [.height(formHeight)] : [.large])
         .onAppear { width = document.canvasWidth; height = document.canvasHeight }
     }
 
