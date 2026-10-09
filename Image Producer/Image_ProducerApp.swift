@@ -166,7 +166,9 @@ private struct LaunchHeroOverlay: View {
     /// it is large — phone portrait and the iPad (title ~centered) stay exactly as they were.
     private var titleShift: CGFloat {
         let d = proxy.titleViewFrame.midX - proxy.frame.midX
-        return abs(d) > 40 ? d : 0
+        // +42: the visible title and buttons sit ~42 pt right of the title FRAME's center
+        // (measured on the Duo, open + sideways, build 290 — the icon read left of them).
+        return abs(d) > 40 ? d + 42 : 0
     }
 
     var body: some View {
