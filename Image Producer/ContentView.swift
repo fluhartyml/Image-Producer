@@ -2502,7 +2502,7 @@ struct SymbolPickerInspector: View {
 
     /// A curated starter set of long-standing SF Symbols (safe across OS versions).
     static let symbols: [String] = [
-        "star.fill", "heart.fill", "bolt.fill", "flame.fill", "leaf.fill", "drop.fill",
+        "app.fill", "star.fill", "heart.fill", "bolt.fill", "flame.fill", "leaf.fill", "drop.fill",
         "moon.fill", "sun.max.fill", "cloud.fill", "sparkles", "wand.and.stars", "crown.fill",
         "camera.fill", "photo.fill", "video.fill", "music.note", "mic.fill", "headphones",
         "paintbrush.fill", "pencil", "hammer.fill", "wrench.and.screwdriver.fill", "lightbulb.fill", "key.fill",
