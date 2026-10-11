@@ -1464,10 +1464,19 @@ extension ImageDocument {
     }
 }
 
-/// What the reader hands back: the manifest plus a hash of its bytes, so `apply` can tell
-/// our own autosave coming back from a real outside change.
-struct ImageProjectRead: Sendable {
-    var manifest: ImageProjectManifest
+/// What the reader hands back: the manifest's RAW BYTES plus their hash, so `apply` can
+/// tell our own autosave coming back from a real outside change.
+///
+/// ⛔ RAW BYTES, NOT A DECODED MANIFEST — and `nonisolated` — on purpose. 2026-10-11, the
+/// beachball on New Image (builds 304 and 306): the reader decoded `ImageProjectManifest`,
+/// whose Codable conformance is MAIN-ACTOR-isolated in this target (default isolation =
+/// MainActor; the compiler warned: "main actor-isolated conformance … cannot be used in
+/// @concurrent context"). When the document system re-reads the file during a revert it
+/// holds the MAIN THREAD waiting for the reader (`URLPlatformDocument.read` →
+/// `semaphore_wait_trap`), so a reader that needs the main actor can never finish. The
+/// reader now only fetches bytes; decoding happens in `apply`, which runs on the main actor.
+nonisolated struct ImageProjectRead: Sendable {
+    var data: Data
     var bytesHash: Int
 }
 
@@ -1576,18 +1585,18 @@ extension ImageDocument: Document {
 
     nonisolated func reader(configuration: sending ReadConfiguration) -> sending FileWrapperDocumentReader<ImageProjectRead> {
         FileWrapperDocumentReader(configuration) { wrapper in
+            // Bytes only — no main-actor work here (see ImageProjectRead).
             guard let data = wrapper.fileWrappers?["manifest.json"]?.regularFileContents else {
                 throw CocoaError(.fileReadCorruptFile)
             }
-            let manifest = try JSONDecoder().decode(ImageProjectManifest.self, from: data)
-            return ImageProjectRead(manifest: manifest, bytesHash: data.hashValue)
+            return ImageProjectRead(data: data, bytesHash: data.hashValue)
         }
     }
 
     func apply(snapshot: sending ImageProjectRead, previous: sending ImageProjectRead?) async throws {
         // Our own autosave coming back as a "change on disk": already what we hold.
         if let mine = lastWrittenManifestHash, mine == snapshot.bytesHash { return }
-        load(snapshot.manifest)
+        load(try JSONDecoder().decode(ImageProjectManifest.self, from: snapshot.data))
     }
 
     nonisolated func writer(configuration: sending WriteConfiguration) -> sending FileWrapperDocumentWriter<Data> {
