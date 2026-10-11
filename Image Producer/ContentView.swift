@@ -2791,6 +2791,23 @@ struct FontPickerInspector: View {
         text.bold(bold).italic(italic).underline(underline)
     }
 
+    /// The font Return will pick: the arrow-key highlight when it is still in the list,
+    /// otherwise the best match for what was typed.
+    private func suggestion(in shown: [FontFamilyInfo]) -> String? {
+        if let t = jumpTarget, shown.contains(where: { $0.name == t }) { return t }
+        return findText.isEmpty ? nil : shown.first?.name
+    }
+
+    /// ↑ / ↓ step the highlight through the visible list and keep it in view.
+    private func moveSuggestion(_ step: Int, in shown: [FontFamilyInfo], _ proxy: ScrollViewProxy) {
+        guard !shown.isEmpty else { return }
+        let current = suggestion(in: shown).flatMap { s in shown.firstIndex { $0.name == s } }
+            ?? shown.firstIndex { $0.name == family }
+        let next = current.map { min(max($0 + step, 0), shown.count - 1) } ?? 0
+        jumpTarget = shown[next].name
+        withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(shown[next].name) }
+    }
+
     /// Choose a font from the list (click, Return on the jump target, or Return in Find).
     private func pick(_ name: String) {
         family = name
@@ -2922,13 +2939,50 @@ struct FontPickerInspector: View {
             Text("Font").font(.system(size: 18)).foregroundStyle(.secondary)
             // FIND FONT — his ask, 2026-10-11: "press f and it jumps to fonts beginning with
             // f … typed fut it would get closer without having to scroll".
+            // AUTOCOMPLETE — his ask, 2026-10-11: "as they type the rest of the font name is
+            // filled in … like googles search term predictive text … if it gets the right
+            // font you just press enter or use your arrow keys to find the right one then
+            // press enter". The highlighted suggestion is `jumpTarget`, shared with
+            // type-to-jump, so the list below always shows which font Return will pick.
+            let shown = catalog.matching(findText)
+            ScrollViewReader { proxy in
+            VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Find font", text: $findText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 18))
-                    .autocorrectionDisabled()
-                    .onSubmit { if let first = catalog.matching(findText).first { pick(first.name) } }
+                ZStack(alignment: .leading) {
+                    // Gray completion behind the typed letters: the rest of the suggested
+                    // name when it BEGINS with what was typed ("fut" + "ura").
+                    if let s = suggestion(in: shown), !findText.isEmpty,
+                       s.range(of: findText, options: [.caseInsensitive, .anchored]) != nil {
+                        (Text(findText).foregroundStyle(.clear)
+                         + Text(String(s.dropFirst(findText.count))).foregroundStyle(.secondary))
+                            .font(.system(size: 18))
+                            .lineLimit(1)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                    // Placeholder wording is his, 2026-10-11: "type fontname. . ." in light gray.
+                    TextField("Find font", text: $findText,
+                              prompt: Text("Type font name…").foregroundStyle(.secondary))
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 18))
+                        .autocorrectionDisabled()
+                        .onSubmit { if let s = suggestion(in: shown) { pick(s); findText = "" } }
+                        .onKeyPress(.downArrow) { moveSuggestion(+1, in: shown, proxy); return .handled }
+                        .onKeyPress(.upArrow) { moveSuggestion(-1, in: shown, proxy); return .handled }
+                        .onKeyPress(.tab) {
+                            // Tab accepts the suggestion into the box, Google style.
+                            guard let s = suggestion(in: shown), s != findText else { return .ignored }
+                            findText = s
+                            return .handled
+                        }
+                }
+                // A match in the MIDDLE of a name ("nerd" → "3270 Nerd Font") cannot be
+                // completed in place, so the whole suggested name shows beside the field.
+                if let s = suggestion(in: shown), !findText.isEmpty,
+                   s.range(of: findText, options: [.caseInsensitive, .anchored]) == nil {
+                    Text("→ \(s)").font(.system(size: 18)).foregroundStyle(.secondary).lineLimit(1)
+                }
                 if !findText.isEmpty {
                     Button { findText = "" } label: { Image(systemName: "xmark.circle.fill") }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
@@ -2937,9 +2991,13 @@ struct FontPickerInspector: View {
             }
             .padding(.horizontal, 8).padding(.vertical, 5)
             .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.12)))
+            .onChange(of: findText) {
+                // Each new letter re-suggests the BEST match (the top of the list).
+                jumpTarget = findText.isEmpty ? nil : catalog.matching(findText).first?.name
+                // Cleared (or picked with Return): back to the full list, at the chosen font.
+                proxy.scrollTo(jumpTarget ?? family, anchor: jumpTarget == nil ? .center : .top)
+            }
 
-            let shown = catalog.matching(findText)
-            ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(shown) { info in
@@ -2963,6 +3021,8 @@ struct FontPickerInspector: View {
                     if press.key == .return, let target = jumpTarget {
                         pick(target); return .handled
                     }
+                    if press.key == .downArrow { moveSuggestion(+1, in: shown, proxy); return .handled }
+                    if press.key == .upArrow { moveSuggestion(-1, in: shown, proxy); return .handled }
                     guard let ch = press.characters.first, ch.isLetter || ch.isNumber || ch == " " else {
                         return .ignored
                     }
@@ -2979,6 +3039,7 @@ struct FontPickerInspector: View {
                     return .handled
                 }
                 .onAppear { proxy.scrollTo(family, anchor: .center) }
+            }
             }
 
             // Glyph browser (a real FontBook for the chosen font) — tapping a glyph APPENDS
