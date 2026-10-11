@@ -23,6 +23,10 @@ struct NewImageSheet: View {
     @State private var name = ""
     @State private var width = 1024
     @State private var height = 1024
+    /// Decided ONCE, when the sheet appears. Read live, a rename underneath the open sheet
+    /// added the Name field after the sheet had sized itself — title and buttons clipped
+    /// (his screen, 2026-10-11: "the popup is crammed together").
+    @State private var isAutoNamed = true
 
     /// A few common starting sizes. Every other preset is in the Canvas tool.
     private let sizes: [(label: String, w: Int, h: Int)] = [
@@ -86,12 +90,16 @@ struct NewImageSheet: View {
         }
         .padding(24)
         .frame(minWidth: 420)
-        .onAppear { width = document.canvasWidth; height = document.canvasHeight }
+        .fixedSize(horizontal: false, vertical: true)
+        .onAppear {
+            width = document.canvasWidth; height = document.canvasHeight
+            isAutoNamed = fileIsAutoNamed
+        }
     }
 
     /// True when the name is still the automatic one (or unknown) — the only case the
     /// sheet asks for a name.
-    private var isAutoNamed: Bool {
+    private var fileIsAutoNamed: Bool {
         guard let stem = fileName else { return true }
         return stem.range(of: #"^ImageProducer\d{4}$"#, options: .regularExpression) != nil
     }

@@ -1542,22 +1542,15 @@ extension ImageDocument {
         }
         let isNew = context.creationSource == .newImage || configuration.fileURL == nil
         #else
-        let isNew = configuration.fileURL == nil
+        // ⛔ NOT `configuration.fileURL == nil`. Traced 2026-10-11 (build 311): when the Mac
+        // OPENS an existing file, SwiftUI makes the document from inside
+        // `URLPlatformDocument.read` BEFORE the configuration has its file URL — source nil,
+        // fileURL nil. Testing the URL called every open "new": a fresh ImageProducerNNNN
+        // name, the New Image sheet, and the opened file copied to that name (his "3D text
+        // test" came up as ImageProducer0037). A real new document says so in its source.
+        let isNew = context.creationSource != nil
         #endif
         if isNew {
-            // DIAGNOSTIC (2026-10-11): who asks for a brand-new document? At launch the Mac
-            // build opened a blank ImageProducerNNNN instead of the Welcome window, and
-            // nothing in the app's own code calls for one. Appends the call stack to
-            // <container>/tmp/new-document-trace.txt. Remove once the cause is known.
-            let trace = "\(Date()) source=\(String(describing: context.creationSource))\n"
-                + Thread.callStackSymbols.prefix(40).joined(separator: "\n") + "\n\n"
-            let traceURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("new-document-trace.txt")
-            if let h = try? FileHandle(forWritingTo: traceURL) {
-                h.seekToEndOfFile(); h.write(Data(trace.utf8)); try? h.close()
-            } else {
-                try? Data(trace.utf8).write(to: traceURL)
-            }
             let doc = newDefault()
             doc.configuration = configuration
             doc.pendingNewName = nextProjectName()            // ImageProducerNNNN, never Untitled
