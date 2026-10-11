@@ -742,6 +742,24 @@ struct ContentView: View {
                     .gesture(activeTool == .zoom ? zoomToolGestures : nil)
             }
         }
+        // ZOOM: RIGHT-CLICK → FIT SCREEN. From the PhotoCraft test video (2026-10-11): the
+        // reviewer right-clicks with the magnifier and picks Fit Screen every time he uses
+        // Photoshop, and PhotoCraft had no such menu. Zoom tool only, so it never covers the
+        // Pen's right-click erase. On iPad the same menu opens with a long press.
+        .contextMenu {
+            if activeTool == .zoom {
+                Button { applyZoom(minZoom) } label: { Label("Fit Screen", systemImage: "arrow.down.right.and.arrow.up.left") }
+                Button { fitWidth = true } label: { Label("Fit Width", systemImage: "arrow.left.and.right") }
+                Divider()
+                Button { applyZoom(canvasZoom * doubleClickZoomFactor) } label: { Label("Zoom In", systemImage: "plus.magnifyingglass") }
+                    .disabled(canvasZoom >= maxZoom)
+                Button { applyZoom(canvasZoom / doubleClickZoomFactor) } label: { Label("Zoom Out", systemImage: "minus.magnifyingglass") }
+                    .disabled(canvasZoom <= minZoom)
+                if canvasZoom == minZoom, zoomBeforeToggle != nil {
+                    Button { toggleZoomAllTheWayOut() } label: { Label("Back to Previous Zoom", systemImage: "arrow.uturn.backward") }
+                }
+            }
+        }
         .padding()
         .background(Color(white: 0.5).opacity(0.12))
         .clipped()                                   // zoomed canvas stays inside its area
@@ -891,8 +909,8 @@ struct ContentView: View {
                 Text("\(Int(canvasZoom * 100))%")
                     .font(.system(size: 11, weight: .semibold).monospacedDigit())
             }
-            .help("Reset zoom to 100%")
-            .accessibilityLabel("Reset zoom to 100 percent")
+            .help("Fit Screen — the whole canvas in view (100%)")
+            .accessibilityLabel("Fit screen")
             Button { setZoom(canvasZoom - zoomStep) } label: { Image(systemName: "minus") }
                 .help("Zoom out")
                 .accessibilityLabel("Zoom out")
