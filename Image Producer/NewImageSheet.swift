@@ -38,7 +38,11 @@ struct NewImageSheet: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Name").font(.system(size: 18)).foregroundStyle(.secondary)
-                TextField(document.pendingNewName ?? document.name, text: $name)
+                // The suggestion is the FILE's real name. Found 2026-10-11: a blank project he had
+                // named "Font test", reopened, offered "Untitled" — the name stored inside the file
+                // never followed the rename on disk. His words: "it wants to rename to 'untitled'
+                // instead of … 'Font test'". Empty field + Create keeps this name.
+                TextField(document.pendingNewName ?? fileName ?? document.name, text: $name)
                     .textFieldStyle(.roundedBorder).font(.system(size: 18))
             }
 
@@ -75,12 +79,20 @@ struct NewImageSheet: View {
         .onAppear { width = document.canvasWidth; height = document.canvasHeight }
     }
 
+    /// The project file's name on disk, without its extension — what the Canvas tool's
+    /// Project name field shows.
+    private var fileName: String? {
+        let url = document.movedFileURL ?? document.configuration?.fileURL
+        let stem = url?.deletingPathExtension().lastPathComponent ?? ""
+        return stem.isEmpty ? nil : stem
+    }
+
     private func create() {
         document.canvasWidth = max(1, width)
         document.canvasHeight = max(1, height)
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { document.pendingNewName = trimmed }
-        document.say("New image: \(trimmed.isEmpty ? (document.pendingNewName ?? document.name) : trimmed), \(document.canvasWidth) × \(document.canvasHeight)", kind: .edit)
+        document.say("New image: \(trimmed.isEmpty ? (document.pendingNewName ?? fileName ?? document.name) : trimmed), \(document.canvasWidth) × \(document.canvasHeight)", kind: .edit)
         finish()
     }
 
