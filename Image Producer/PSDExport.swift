@@ -18,9 +18,15 @@
 //    • Light and Dark go in as ordinary layers with their own visibility.
 //    • The flattened composite, which is what Preview, Quick Look and Finder show.
 //
+//    • IMAGE PRODUCER'S OWN PROJECT, hidden in a private image resource (PSDProjectBlock,
+//      below) — his ask, 2026-10-11: "i want to work within a psd file the whole time".
+//      Photoshop skips resources it does not know, so it still sees ordinary pixel layers;
+//      Image Producer reopens the file with every layer fully editable (live text, 3D,
+//      glow, shadow…). Edit history is left out — it can be hundreds of MB.
+//
 //  ⚠️ Honest limits:
-//    • Text, symbols, glow and gradients arrive as PIXELS — Photoshop's live text and layer
-//      styles are not written. Same trade-off as the layer PDF.
+//    • In PHOTOSHOP, text, symbols, glow and gradients are PIXELS — Photoshop's live text and
+//      layer styles are not written. Same trade-off as the layer PDF.
 //    • Blend STRENGTH has no Photoshop equivalent. A blend at 50% or more is written as that
 //      mode; under 50% as Normal.
 //    • Photoshop's PSD limit is 30,000 px on a side; larger canvases return nil (PSB would
@@ -29,6 +35,7 @@
 
 import SwiftUI
 import CoreGraphics
+import CryptoKit
 
 // MARK: - Rendering the document into PSD layers
 
@@ -55,7 +62,11 @@ import CoreGraphics
                                       isHidden: !layer.isVisible,
                                       blendKey: psdBlendKey(layer)))
     }
-    return PSDWriter.data(width: w, height: h, layers: layers, composite: composite)
+    // The project rides along for Image Producer; history stays out (size).
+    var manifest = document.snapshotManifest()
+    manifest.history = nil
+    let project = try? JSONEncoder().encode(manifest)
+    return PSDWriter.data(width: w, height: h, layers: layers, composite: composite, project: project)
 }
 
 /// Photoshop's four-letter blend key for the layer's blend mode.
@@ -112,7 +123,8 @@ enum PSDWriter {
     }
 
     /// The finished file. `composite` is the flattened image (straight RGBA).
-    static func data(width w: Int, height h: Int, layers: [Layer], composite: [UInt8]) -> Data? {
+    static func data(width w: Int, height h: Int, layers: [Layer], composite: [UInt8],
+                     project: Data? = nil) -> Data? {
         let count = w * h * 4
         guard w > 0, h > 0, w <= maxSide, h <= maxSide, composite.count == count,
               layers.allSatisfy({ $0.rgba.count == count }), layers.count <= Int(Int16.max)
@@ -128,9 +140,11 @@ enum PSDWriter {
         out.append(u32: UInt32(w))
         out.append(u16: 8)                       // bits per channel
         out.append(u16: 3)                       // color mode: RGB
-        // Color mode data, image resources: none
+        // Color mode data: none. Image resources: Image Producer's project, if given —
+        // written AFTER the rest, because its fingerprint covers everything below it.
         out.append(u32: 0)
-        out.append(u32: 0)
+        let head = out
+        out = Data()
 
         // Layer and mask information
         var info = Data()
@@ -195,7 +209,16 @@ enum PSDWriter {
         }
         out.append(counts)
         out.append(rows)
-        return out
+
+        var file = head
+        if let project, let block = PSDProjectBlock.resource(project: project, fingerprinting: out) {
+            file.append(u32: UInt32(block.count))
+            file.append(block)
+        } else {
+            file.append(u32: 0)
+        }
+        file.append(out)
+        return file
     }
 
     /// One layer channel as PSD stores it: a byte count per row, then the packed rows.
@@ -276,4 +299,81 @@ private extension Data {
         append(contentsOf: [UInt8(v >> 24), UInt8((v >> 16) & 0xFF), UInt8((v >> 8) & 0xFF), UInt8(v & 0xFF)])
     }
     mutating func append(i32 v: Int32) { append(u32: UInt32(bitPattern: v)) }
+}
+
+// MARK: - Image Producer's project inside the PSD
+
+/// The private image resource that carries Image Producer's own project in a PSD.
+///
+/// Layout (one standard Photoshop image-resource block):
+///   "8BIM" · id `resourceID` · empty Pascal name · length · payload (padded to even)
+///   payload = `magic` · SHA-256 of every byte AFTER the image resources · zlib(manifest JSON)
+///
+/// ⚠️ THE FINGERPRINT IS THE SAFETY. Photoshop may keep a resource it does not know when it
+/// re-saves a file it has edited. Without the check, Image Producer would reopen its own
+/// stale copy and silently throw away the Photoshop edits. With it, any change to the
+/// layers or the picture — even an unchanged re-save that re-encodes them — means the
+/// copy is ignored and Photoshop's pixels are what open. It can lose editability; it can
+/// never lose work.
+enum PSDProjectBlock {
+    /// In the 4000–4999 range Adobe's spec reserves for plug-in resources. The magic
+    /// below, not the number, is what identifies ours.
+    static let resourceID: UInt16 = 4410
+    static let magic = Data("IMGPRD-PSD-PROJECT-1".utf8)
+
+    static func resource(project: Data, fingerprinting tail: Data) -> Data? {
+        guard let packed = try? (project as NSData).compressed(using: .zlib) as Data else { return nil }
+        var payload = magic
+        payload.append(Data(SHA256.hash(data: tail)))
+        payload.append(packed)
+        var block = Data()
+        block.append(ascii: "8BIM")
+        block.append(u16: resourceID)
+        block.append(contentsOf: [0, 0])                 // empty Pascal name, padded to even
+        block.append(u32: UInt32(payload.count))
+        block.append(payload)
+        if payload.count % 2 == 1 { block.append(UInt8(0)) }
+        return block
+    }
+
+    enum Found {
+        /// The project JSON, and the file has not changed since Image Producer wrote it.
+        case current(Data)
+        /// Ours, but the layers or picture changed since (edited elsewhere).
+        case stale
+    }
+
+    /// Look through a PSD's image-resources section for our block.
+    static func find(resources: ArraySlice<UInt8>, tail: ArraySlice<UInt8>) -> Found? {
+        var p = resources.startIndex
+        let end = resources.endIndex
+        func u16(_ i: Int) -> Int { Int(resources[i]) << 8 | Int(resources[i + 1]) }
+        func u32(_ i: Int) -> Int { u16(i) << 16 | u16(i + 2) }
+        while p + 12 <= end {
+            guard resources[p..<p + 4].elementsEqual("8BIM".utf8) else { return nil }
+            let id = u16(p + 4)
+            var q = p + 6
+            let nameLength = Int(resources[q])
+            q += 1 + nameLength
+            if (1 + nameLength) % 2 == 1 { q += 1 }      // Pascal name padded to even
+            guard q + 4 <= end else { return nil }
+            let size = u32(q)
+            q += 4
+            guard size >= 0, q + size <= end else { return nil }
+            if id == Int(resourceID) {
+                let payload = Data(resources[q..<q + size])
+                let hashEnd = magic.count + 32
+                if payload.count > hashEnd, payload.prefix(magic.count) == magic {
+                    let stored = payload.subdata(in: magic.count..<hashEnd)
+                    guard stored == Data(SHA256.hash(data: Data(tail))) else { return .stale }
+                    let packed = payload.subdata(in: hashEnd..<payload.count)
+                    guard let json = try? (packed as NSData).decompressed(using: .zlib) as Data
+                    else { return .stale }
+                    return .current(json)
+                }
+            }
+            p = q + size + (size % 2)
+        }
+        return nil
+    }
 }

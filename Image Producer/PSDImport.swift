@@ -52,6 +52,8 @@ enum PSDReader {
         var composite: [UInt8]?
         var skippedAdjustments = 0
         var blendsShownAsNormal = 0
+        /// Image Producer's own project, if this file was written by it (PSDExport.swift).
+        var imageProducerProject: PSDProjectBlock.Found?
     }
 
     enum Failure: Error { case notPSD, unsupported(String), damaged }
@@ -75,9 +77,13 @@ enum PSDReader {
         let header = Header(width: w, height: h, depth: depth, mode: mode)
 
         try c.skip(Int(try c.u32()))            // color mode data
-        try c.skip(Int(try c.u32()))            // image resources
+        let resourceLength = Int(try c.u32())   // image resources
+        let resources = try c.bytes(resourceLength)
 
         var doc = Document(width: w, height: h, layers: [])
+        // Everything after the resources is what our fingerprint covers.
+        doc.imageProducerProject = PSDProjectBlock.find(resources: resources,
+                                                        tail: c.b[c.p..<c.b.count])
         var mergedHasAlpha = false
         let sectionLength = Int(try c.u32())
         let sectionEnd = c.p + sectionLength
@@ -559,6 +565,18 @@ extension PSDReader.Document {
 @MainActor func importPSDAsLayers(_ url: URL, into document: ImageDocument) -> Bool {
     guard let raw = try? Data(contentsOf: url), PSDReader.isPSD(raw),
           let psd = try? PSDReader.read(raw) else { return false }
+    // Written by Image Producer and unchanged since: reopen the real project, every layer
+    // editable — his "work within a psd file the whole time".
+    if case .current(let json) = psd.imageProducerProject,
+       let manifest = try? JSONDecoder().decode(ImageProjectManifest.self, from: json),
+       manifest.canvasWidth == psd.width, manifest.canvasHeight == psd.height,
+       !manifest.layers.isEmpty {
+        let wasNew = document.openedAsNew
+        document.load(manifest)
+        document.openedAsNew = wasNew
+        document.say("Photoshop file opened with all of its Image Producer layers editable", kind: .info)
+        return true
+    }
     document.canvasWidth = psd.width
     document.canvasHeight = psd.height
     var layers = psd.imageLayers(canvas: document.canvasPixelSize)
@@ -573,7 +591,10 @@ extension PSDReader.Document {
     document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
                            actionLabel: "Open Photoshop file (\(layers.count) layer\(layers.count == 1 ? "" : "s"))",
                            layerID: layers.last!.id)
-    if let note = psd.importNote { document.say("Photoshop file opened — \(note)", kind: .info) }
+    if case .stale = psd.imageProducerProject {
+        document.say("Photoshop file was changed outside Image Producer — opened as its Photoshop layers",
+                     kind: .info)
+    } else if let note = psd.importNote { document.say("Photoshop file opened — \(note)", kind: .info) }
     return true
 }
 
