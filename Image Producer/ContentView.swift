@@ -2175,7 +2175,7 @@ struct CanvasInspector: View {
         // would contradict the whole point of this preset — that it keeps the resolution
         // he chose. So the shape changes and the shortfall is reported.
         if p.minLongEdge > 0 && long < p.minLongEdge {
-            aspectWarning = "Canvas is \(document.canvasWidth) × \(document.canvasHeight). "
+            aspectWarning = "Canvas is W \(document.canvasWidth) × H \(document.canvasHeight). "
                           + "That is below the \(p.minLongEdge)px minimum long edge for this target — "
                           + "the shape is right, the resolution is too low. Raise Pixels, then re-apply."
         } else {
@@ -4513,7 +4513,7 @@ struct MoveTransformInspector: View {
         let size = document.layers[idx].transform.contentSize
         let w = Int((size.width  * ref).rounded())
         let h = Int((size.height * ref).rounded())
-        return w == h ? "\(w) px" : "\(w) × \(h) px"
+        return w == h ? "\(w) px" : "W \(w) × H \(h) px"
     }
 
     /// Nudge the layer's SIZE by whole pixels.

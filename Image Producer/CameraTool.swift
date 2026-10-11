@@ -108,7 +108,7 @@ func captureCameraFrame(_ document: ImageDocument, camera: CameraState,
     // a paste anywhere matches the new layer.
     let copied = copyCapturedPNGToClipboard(png)
 
-    var bits = ["Frame \(index)", "\(w)×\(h)"]
+    var bits = ["Frame \(index)", "W \(w) × H \(h)"]
     if !s.includeBackground { bits.append("transparent") }
     if s.scale != 1 { bits.append("\(Int(s.scale))×") }
     if s.trimToArt { bits.append("trimmed") }

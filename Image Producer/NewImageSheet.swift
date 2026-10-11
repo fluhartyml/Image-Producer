@@ -117,7 +117,7 @@ struct NewImageSheet: View {
         document.canvasHeight = max(1, height)
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { document.pendingNewName = trimmed }
-        document.say("New image: \(trimmed.isEmpty ? (document.pendingNewName ?? fileName ?? document.name) : trimmed), \(document.canvasWidth) × \(document.canvasHeight)", kind: .edit)
+        document.say("New image: \(trimmed.isEmpty ? (document.pendingNewName ?? fileName ?? document.name) : trimmed), W \(document.canvasWidth) × H \(document.canvasHeight)", kind: .edit)
         finish()
     }
 
