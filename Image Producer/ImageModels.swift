@@ -1817,10 +1817,11 @@ extension ImageDocument {
     /// old LaunchServices collision stays resolved). Every existing project on disk keeps
     /// opening exactly as before. Only the extension given to NEW documents changed.
     ///
-    /// 2026-10-11: NEW documents are `.prd` — his call, three letters like a DOS extension
-    /// ("extentions are usually three letters from DOS"). Checked: nothing on his Mac claims
-    /// `.prd`. `.imgprd`, `.picprod` and `.iconproj` stay declared, so every file still opens.
-    static let projectExtension = "prd"
+    /// ⛔ `.prd` WAS TRIED AND REVERTED, 2026-10-11 (builds 325–328). Every OLDER copy of the
+    /// app still registered on a Mac (the App Store build, earlier builds) declares this type
+    /// WITHOUT `.prd`, and LaunchServices goes by them — so a `.prd` file was "a folder" and
+    /// would not open. His ruling: "if it aint broke dont fix it revert to imgprd".
+    static let projectExtension = "imgprd"
 
     /// Where new projects are written immediately so a canvas is never an unnamed
     /// "Untitled": the app's iCloud Documents folder (syncs across devices, shows in
