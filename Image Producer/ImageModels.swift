@@ -1816,7 +1816,11 @@ extension ImageDocument {
     /// the app owns outright (no longer shared with the retired "Icon Producer" app, so the
     /// old LaunchServices collision stays resolved). Every existing project on disk keeps
     /// opening exactly as before. Only the extension given to NEW documents changed.
-    static let projectExtension = "imgprd"
+    ///
+    /// 2026-10-11: NEW documents are `.prd` — his call, three letters like a DOS extension
+    /// ("extentions are usually three letters from DOS"). Checked: nothing on his Mac claims
+    /// `.prd`. `.imgprd`, `.picprod` and `.iconproj` stay declared, so every file still opens.
+    static let projectExtension = "prd"
 
     /// Where new projects are written immediately so a canvas is never an unnamed
     /// "Untitled": the app's iCloud Documents folder (syncs across devices, shows in
