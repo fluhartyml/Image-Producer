@@ -541,7 +541,9 @@ struct WelcomeView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(recents.prefix(6), id: \.self) { url in
                             let staged = stagedURL == url
-                            Label(url.deletingPathExtension().lastPathComponent, systemImage: "doc")
+                            // Full file name, extension and all — his word, 2026-10-11, so a
+                            // project and its .psd twin can be told apart.
+                            Label(url.lastPathComponent, systemImage: "doc")
                                 .font(.system(size: 18))
                                 .foregroundStyle(staged ? Color.white : Color.accentColor)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
