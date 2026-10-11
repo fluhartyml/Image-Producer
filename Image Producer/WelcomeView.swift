@@ -183,24 +183,65 @@ struct WelcomeView: View {
         return String(n.prefix(200))
     }
 
-    /// `asPSD`: the New .psd button — the file is a .psd from the very start (his ask,
-    /// 2026-10-11). New Image is the Image Producer project, as always.
-    private func createNew(asPSD: Bool = false) {
+    /// OPEN .psd — his design, 2026-10-11: "if it cant find photoshop.psd then it opens a
+    /// new file named photoshop.psd". The typed name is looked up as <name>.psd in the
+    /// Image Producer folder: there → it opens; not there → a new one is made and opened.
+    /// "Open", not "New": opening a .psd is the plain, legal description (his word).
+    /// Empty name: a file picker for any .psd.
+    private func openPSD() {
+        let typed = cleanedName
+        if typed.isEmpty {
+            let panel = NSOpenPanel()
+            panel.allowedContentTypes = [.photoshopDocument]
+            panel.allowsMultipleSelection = false
+            panel.prompt = "Open"
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            Task { await open(url) }
+            return
+        }
+        Task {
+            let found = await Task.detached { ImageDocument.namedProjectURL(typed, ext: "psd") }.value
+            guard let url = found else {
+                openError = "Could not find the Image Producer folder."
+                return
+            }
+            if !FileManager.default.fileExists(atPath: url.path) {
+                guard ImageDocument.writeNewPSD(at: url) else {
+                    openError = "Could not create \(url.lastPathComponent)."
+                    return
+                }
+            }
+            await open(url)
+        }
+    }
+
+    /// Open a file and close Welcome — or stay and say why it would not open.
+    private func open(_ url: URL) async {
+        RecentProjects.note(url)
+        do {
+            try await openDocument(at: url)
+            dismissWindow(id: "welcome")
+        } catch {
+            openError = "“\(url.lastPathComponent)” would not open: \(error.localizedDescription) (\(String(describing: error)))"
+        }
+    }
+
+    /// New Image: always a new Image Producer project.
+    private func createNew() {
         let typed = cleanedName
         Task {
             // Resolve the new file's URL OFF the main thread (the iCloud lookup can
             // block). Create + open on the main actor. ALWAYS end with a visible
             // window: if open fails, log why and fall back to an untitled doc — so we
             // can never land in "welcome gone, no document window, app still running."
-            let url = await Task.detached { () -> URL? in
-                let base = typed.isEmpty ? ImageDocument.nextProjectURL() : ImageDocument.namedProjectURL(typed)
-                return asPSD ? base?.deletingPathExtension().appendingPathExtension("psd") : base
+            let url = await Task.detached {
+                typed.isEmpty ? ImageDocument.nextProjectURL() : ImageDocument.namedProjectURL(typed)
             }.value
             if let url, !typed.isEmpty, FileManager.default.fileExists(atPath: url.path) {
                 nameTaken = url                       // he decides; nothing is created
                 return
             }
-            guard let url, asPSD ? ImageDocument.writeNewPSD(at: url) : ImageDocument.writeNewProject(at: url) else {
+            guard let url, ImageDocument.writeNewProject(at: url) else {
                 openError = "Could not create the project file."
                 return
             }
@@ -271,12 +312,11 @@ struct WelcomeView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                // The one extra choice, as its own button — his word, 2026-10-11: a
-                // two-way "Image Producer | .psd" picker was redundant with New Image.
+                // OPEN .psd — his word, 2026-10-11: "not new psd 'open .psd'".
                 Button {
-                    createNew(asPSD: true)
+                    openPSD()
                 } label: {
-                    Label("New .psd", systemImage: "plus")
+                    Label("Open .psd", systemImage: "doc")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
