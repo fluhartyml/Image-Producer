@@ -170,9 +170,6 @@ struct WelcomeView: View {
     /// 2026-10-11 a failed open quietly made a blank ImageProducerNNNN instead, which hid
     /// the failure and looked like the app ignoring the name he typed.
     @State private var openError: String?
-    /// Image Producer project, or Photoshop PSD — his ask, 2026-10-11, so a PSD can be
-    /// the file from the very start.
-    @State private var newAsPSD = false
 
     private func refreshRecents() {
         recents = RecentProjects.list()
@@ -186,14 +183,15 @@ struct WelcomeView: View {
         return String(n.prefix(200))
     }
 
-    private func createNew() {
+    /// `asPSD`: the New .psd button — the file is a .psd from the very start (his ask,
+    /// 2026-10-11). New Image is the Image Producer project, as always.
+    private func createNew(asPSD: Bool = false) {
         let typed = cleanedName
         Task {
             // Resolve the new file's URL OFF the main thread (the iCloud lookup can
             // block). Create + open on the main actor. ALWAYS end with a visible
             // window: if open fails, log why and fall back to an untitled doc — so we
             // can never land in "welcome gone, no document window, app still running."
-            let asPSD = newAsPSD
             let url = await Task.detached { () -> URL? in
                 let base = typed.isEmpty ? ImageDocument.nextProjectURL() : ImageDocument.namedProjectURL(typed)
                 return asPSD ? base?.deletingPathExtension().appendingPathExtension("psd") : base
@@ -249,14 +247,6 @@ struct WelcomeView: View {
                     .font(.system(size: 18))
                     .onSubmit { createNew() }
                     .onChange(of: newName) { nameTaken = nil; openError = nil }
-                Picker("Format", selection: $newAsPSD) {
-                    Text("Image Producer").tag(false)
-                    Text(".psd").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .font(.system(size: 18))
-                .onChange(of: newAsPSD) { nameTaken = nil; openError = nil }
                 if let taken = nameTaken {
                     HStack {
                         Text("“\(taken.deletingPathExtension().lastPathComponent)” already exists.")
@@ -273,14 +263,25 @@ struct WelcomeView: View {
                 }
             }
 
-            Button {
-                createNew()
-            } label: {
-                Label("New Image", systemImage: "plus")
-                    .frame(maxWidth: .infinity)
+            HStack(spacing: 10) {
+                Button {
+                    createNew()
+                } label: {
+                    Label("New Image", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                // The one extra choice, as its own button — his word, 2026-10-11: a
+                // two-way "Image Producer | .psd" picker was redundant with New Image.
+                Button {
+                    createNew(asPSD: true)
+                } label: {
+                    Label("New .psd", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
             }
             .controlSize(.large)
-            .buttonStyle(.borderedProminent)
 
             if let openError {
                 Text(openError)
