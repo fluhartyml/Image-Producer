@@ -117,11 +117,20 @@ struct ExportCommands: Commands {
     @FocusedValue(\.saveAsAction) private var saveAsAction
 
     var body: some Commands {
-        CommandGroup(after: .saveItem) {
-            // Always visible — no Option key to discover it (his "unintuitive").
+        // THE SAVE GROUP, PLAIN — his word, 2026-10-11: "save as better be just save as and
+        // not require all those key combos". macOS's own group put ⇧⌘S on Duplicate and hid
+        // Save As behind the Option key. Replaced with: Save ⌘S, Save As… ⇧⌘S (name +
+        // format), Rename…, Move To…. Duplicate is gone — Save As covers it.
+        CommandGroup(replacing: .saveItem) {
+            Button("Save") { NSApp.sendAction(#selector(NSDocument.save(_:)), to: nil, from: nil) }
+                .keyboardShortcut("s", modifiers: .command)
             Button("Save As…") { saveAsAction?() }
-                .keyboardShortcut("s", modifiers: [.command, .option, .shift])
+                .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled(saveAsAction == nil)
+            Button("Rename…") { NSApp.sendAction(#selector(NSDocument.rename(_:)), to: nil, from: nil) }
+            Button("Move To…") { NSApp.sendAction(#selector(NSDocument.move(_:)), to: nil, from: nil) }
+        }
+        CommandGroup(after: .saveItem) {
             Button("Export…") { exportAction?() }
                 .keyboardShortcut("e", modifiers: .command)
                 .disabled(exportAction == nil)
