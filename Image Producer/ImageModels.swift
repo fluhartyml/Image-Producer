@@ -46,6 +46,11 @@ final class ImageDocument {
     /// a file another writer changed — and our own autosave IS another writer to it — so a
     /// re-read of exactly these bytes is our own save coming back and is ignored.
     @ObservationIgnored var lastWrittenManifestHash: Int?
+    /// This document is a PSD that Image Producer did NOT write (Photoshop, a download…).
+    /// Autosave leaves it alone, and the first ⌘S keeps the original beside it — writing
+    /// over it would turn what Image Producer cannot keep (adjustment layers, groups,
+    /// Photoshop's live text) into pixels, silently. Commandment VI: never lose his work.
+    @ObservationIgnored var psdFromElsewhere = false
 
     /// Read every property the old `ObservableObject` version published, so a single
     /// `withObservationTracking` over this call fires on ANY of them — the exact set the
@@ -1478,6 +1483,11 @@ extension ImageDocument {
 nonisolated struct ImageProjectRead: Sendable {
     var data: Data
     var bytesHash: Int
+
+    /// True when these bytes are a Photoshop PSD — the PSD IS the document (his "work within
+    /// a psd file the whole time", 2026-10-11). `apply` turns it into a project, on the
+    /// main actor, through `projectFromPSD` (PSDImport.swift).
+    var isPSD: Bool { data.prefix(4) == Data("8BPS".utf8) }
 }
 
 // MARK: - The iOS/macOS 27 document system
@@ -1587,11 +1597,20 @@ extension ImageDocument {
 }
 
 extension ImageDocument: Document {
-    static var readableContentTypes: [UTType] { [.imageProject] }
+    /// The project package, and Photoshop PSD as a document in its own right — opened,
+    /// edited and saved in place. Writable types default to these.
+    static var readableContentTypes: [UTType] { [.imageProject, .photoshopDocument] }
 
     nonisolated func reader(configuration: sending ReadConfiguration) -> sending FileWrapperDocumentReader<ImageProjectRead> {
         FileWrapperDocumentReader(configuration) { wrapper in
             // Bytes only — no main-actor work here (see ImageProjectRead).
+            // A PSD is one plain file starting with Photoshop's signature.
+            if wrapper.isRegularFile {
+                guard let data = wrapper.regularFileContents, data.prefix(4) == Data("8BPS".utf8) else {
+                    throw CocoaError(.fileReadCorruptFile)
+                }
+                return ImageProjectRead(data: data, bytesHash: data.hashValue)
+            }
             guard let data = wrapper.fileWrappers?["manifest.json"]?.regularFileContents else {
                 throw CocoaError(.fileReadCorruptFile)
             }
@@ -1602,17 +1621,65 @@ extension ImageDocument: Document {
     func apply(snapshot: sending ImageProjectRead, previous: sending ImageProjectRead?) async throws {
         // Our own autosave coming back as a "change on disk": already what we hold.
         if let mine = lastWrittenManifestHash, mine == snapshot.bytesHash { return }
+        if snapshot.isPSD {
+            let name = configuration?.fileURL?.deletingPathExtension().lastPathComponent ?? self.name
+            guard let project = projectFromPSD(snapshot.data, name: name) else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            load(project.manifest)
+            psdFromElsewhere = !project.isOwnProject
+            if project.isOwnProject {
+                say("Photoshop file — every Image Producer layer editable", kind: .info)
+            } else if let note = project.note {
+                say("Photoshop file opened — \(note)", kind: .info)
+            }
+            return
+        }
         load(try JSONDecoder().decode(ImageProjectManifest.self, from: snapshot.data))
     }
 
     nonisolated func writer(configuration: sending WriteConfiguration) -> sending FileWrapperDocumentWriter<Data> {
         FileWrapperDocumentWriter(configuration) { data, _ in
-            ImageDocument.packageWrapper(data)
+            // `snapshot` decided the format: PSD bytes are one plain file, anything else
+            // is the project manifest inside its package.
+            data.prefix(4) == Data("8BPS".utf8) ? FileWrapper(regularFileWithContents: data)
+                                                : ImageDocument.packageWrapper(data)
         }
     }
 
     /// ⌘S / Save As. Encoded here because it reads the model; the writer only sees bytes.
     func snapshot(contentType: UTType) async throws -> sending Data {
+        // A PSD document saves as a PSD, with the project — history included — inside it.
+        if contentType.conforms(to: .photoshopDocument) {
+            // First save over a PSD from elsewhere: keep the original beside it, once.
+            if psdFromElsewhere, let url = configuration?.fileURL {
+                let keep = url.deletingLastPathComponent()
+                    .appendingPathComponent("\(url.deletingPathExtension().lastPathComponent) (original)")
+                    .appendingPathExtension(url.pathExtension)
+                if !FileManager.default.fileExists(atPath: keep.path) {
+                    do { try FileManager.default.copyItem(at: url, to: keep) }
+                    catch {
+                        say("Could not keep the original Photoshop file — not saved", kind: .warning)
+                        throw error
+                    }
+                    say("Kept the original as \(keep.lastPathComponent)", kind: .info)
+                }
+                psdFromElsewhere = false
+            }
+            guard let psd = makeLayeredPSD(self, includeHistory: true) else {
+                say("Could not write this as a Photoshop file — nothing saved", kind: .warning)
+                throw CocoaError(.fileWriteUnknown)
+            }
+            lastWrittenManifestHash = psd.hashValue
+            say("Saved as Photoshop — \(ByteCountFormatter.string(fromByteCount: Int64(psd.count), countStyle: .file))",
+                kind: .save)
+            // Revert to Last Save keeps working: it freezes the project, not the PSD.
+            if let window = DocumentWindow.window(for: self),
+               let manifest = try? JSONEncoder().encode(snapshotManifest()) {
+                window.hasFrozenLastSave = window.chamber.freezeLastSave(manifest: manifest)
+            }
+            return psd
+        }
         let data = try JSONEncoder().encode(snapshotManifest())
         lastWrittenManifestHash = data.hashValue
         // The save notification he asked for.
@@ -1682,9 +1749,15 @@ extension ImageDocument {
     /// own coordinator tells the system the change is the document's, so nothing reverts.
     nonisolated static func writeEncodedPackage(_ data: Data, to url: URL,
                                                 coordinator: NSFileCoordinator? = nil) throws {
-        let mf = FileWrapper(regularFileWithContents: data)
-        mf.preferredFilename = "manifest.json"
-        let dir = FileWrapper(directoryWithFileWrappers: ["manifest.json": mf])
+        // PSD bytes are ONE plain file; a manifest goes inside the project package.
+        let dir: FileWrapper
+        if data.prefix(4) == Data("8BPS".utf8) {
+            dir = FileWrapper(regularFileWithContents: data)
+        } else {
+            let mf = FileWrapper(regularFileWithContents: data)
+            mf.preferredFilename = "manifest.json"
+            dir = FileWrapper(directoryWithFileWrappers: ["manifest.json": mf])
+        }
 
         var coordError: NSError?
         var writeError: Error?

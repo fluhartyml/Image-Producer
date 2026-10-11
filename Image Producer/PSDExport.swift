@@ -40,7 +40,9 @@ import CryptoKit
 // MARK: - Rendering the document into PSD layers
 
 /// The whole project as a layered Photoshop file, or nil if it can't be written.
-@MainActor func makeLayeredPSD(_ document: ImageDocument) -> Data? {
+/// `includeHistory`: true when the PSD IS the document (Save / autosave), so the edit
+/// history survives like it does in a project; false for an Export meant to be shared.
+@MainActor func makeLayeredPSD(_ document: ImageDocument, includeHistory: Bool = false) -> Data? {
     let w = Int(document.canvasPixelSize.width)
     let h = Int(document.canvasPixelSize.height)
     guard w > 0, h > 0, w <= PSDWriter.maxSide, h <= PSDWriter.maxSide,
@@ -64,7 +66,7 @@ import CryptoKit
     }
     // The project rides along for Image Producer; history stays out (size).
     var manifest = document.snapshotManifest()
-    manifest.history = nil
+    if !includeHistory { manifest.history = nil }
     let project = try? JSONEncoder().encode(manifest)
     return PSDWriter.data(width: w, height: h, layers: layers, composite: composite, project: project)
 }
@@ -339,8 +341,9 @@ enum PSDProjectBlock {
     enum Found {
         /// The project JSON, and the file has not changed since Image Producer wrote it.
         case current(Data)
-        /// Ours, but the layers or picture changed since (edited elsewhere).
-        case stale
+        /// Ours, but the layers or picture changed since (edited elsewhere). Carries the old
+        /// project JSON when it can still be unpacked, so live text can be offered back.
+        case stale(Data?)
     }
 
     /// Look through a PSD's image-resources section for our block.
@@ -365,10 +368,9 @@ enum PSDProjectBlock {
                 let hashEnd = magic.count + 32
                 if payload.count > hashEnd, payload.prefix(magic.count) == magic {
                     let stored = payload.subdata(in: magic.count..<hashEnd)
-                    guard stored == Data(SHA256.hash(data: Data(tail))) else { return .stale }
                     let packed = payload.subdata(in: hashEnd..<payload.count)
-                    guard let json = try? (packed as NSData).decompressed(using: .zlib) as Data
-                    else { return .stale }
+                    let json = try? (packed as NSData).decompressed(using: .zlib) as Data
+                    guard stored == Data(SHA256.hash(data: Data(tail))), let json else { return .stale(json) }
                     return .current(json)
                 }
             }

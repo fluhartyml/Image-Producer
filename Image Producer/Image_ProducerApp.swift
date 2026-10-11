@@ -134,7 +134,9 @@ final class ImageProducerAppDelegate: NSObject, NSApplicationDelegate {
             // Our own project package: hand straight to the document controller, unchanged.
             let isProject = (try? source.resourceValues(forKeys: [.contentTypeKey]))?
                 .contentType?.conforms(to: .imageProject) ?? false
-            if isProject {
+            // A Photoshop file opens IN PLACE as its own document (saved back as a PSD) —
+            // his "work within a psd file the whole time", 2026-10-11.
+            if isProject || ImageDocument.isPSD(source) {
                 NSDocumentController.shared.openDocument(withContentsOf: source, display: true) { doc, _, err in
                     if doc == nil {
                         NSLog("ImageProducer open: failed for %@ — %@",

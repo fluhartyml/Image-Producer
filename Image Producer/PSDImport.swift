@@ -559,42 +559,108 @@ extension PSDReader.Document {
     }
 }
 
+/// A PSD turned into an Image Producer project — the one loader for Open, New from a PSD
+/// and Revert, so they can never disagree.
+///   • Written by Image Producer and UNCHANGED since: its own project, every layer editable.
+///   • Otherwise: Photoshop's layers as pictures — and if Image Producer's copy is still in
+///     the file but STALE (edited in Photoshop), the layers that were live text or symbols
+///     come back too, HIDDEN, named "… (Image Producer copy)". His ask, 2026-10-11: "if
+///     photoshop saved the 3d text flat … can image producer so preserved 3d text in a
+///     hidden/restored layer?" Photoshop's version is what shows; nothing editable is lost.
+struct PSDProject {
+    var manifest: ImageProjectManifest
+    /// True when the file's own Image Producer project was used as-is.
+    var isOwnProject: Bool
+    /// How many live layers came back hidden from a stale copy.
+    var restoredHidden: Int
+    var note: String?
+}
+
+@MainActor func projectFromPSD(_ data: Data, name: String) -> PSDProject? {
+    guard PSDReader.isPSD(data), let psd = try? PSDReader.read(data) else { return nil }
+    let decoder = JSONDecoder()
+    func fits(_ m: ImageProjectManifest) -> Bool {
+        m.canvasWidth == psd.width && m.canvasHeight == psd.height && !m.layers.isEmpty
+    }
+    var staleCopy: ImageProjectManifest?
+    switch psd.imageProducerProject {
+    case .current(let json)?:
+        if var m = try? decoder.decode(ImageProjectManifest.self, from: json), fits(m) {
+            m.name = name
+            return PSDProject(manifest: m, isOwnProject: true, restoredHidden: 0, note: nil)
+        }
+    case .stale(let json)?:
+        staleCopy = json.flatMap { try? decoder.decode(ImageProjectManifest.self, from: $0) }
+            .flatMap { fits($0) ? $0 : nil }
+    case nil:
+        break
+    }
+
+    let canvas = CGSize(width: psd.width, height: psd.height)
+    var layers = psd.imageLayers(canvas: canvas)
+    if layers.isEmpty {                                    // a flat PSD: one picture
+        guard let png = psd.flattenedPNG() else { return nil }
+        var layer = ImageLayer(name: name, role: .content)
+        layer.setImage(png)
+        layers = [layer]
+    }
+    var restored = 0
+    for var old in staleCopy?.layers ?? [] where old.isLiveEditable {
+        old.id = UUID()
+        old.isVisible = false
+        old.name += " (Image Producer copy)"
+        layers.append(old)
+        restored += 1
+    }
+    var parts: [String] = []
+    if psd.imageProducerProject != nil {
+        parts.append("changed outside Image Producer, so Photoshop's layers opened")
+    }
+    if restored > 0 {
+        parts.append("\(restored) editable text layer\(restored == 1 ? "" : "s") restored, hidden")
+    }
+    if let note = psd.importNote { parts.append(note) }
+    let manifest = ImageProjectManifest(name: name, canvasWidth: psd.width, canvasHeight: psd.height,
+                                        layers: layers, palette: staleCopy?.palette)
+    return PSDProject(manifest: manifest, isOwnProject: false, restoredHidden: restored,
+                      note: parts.isEmpty ? nil : parts.joined(separator: " · "))
+}
+
+extension ImageLayer {
+    /// Holds something Photoshop can only keep as pixels: live text (2D or 3D) or a symbol.
+    var isLiveEditable: Bool {
+        elements.contains { el in
+            switch el.content {
+            case .text, .symbol: return true
+            case .image, .pixels: return false
+            }
+        }
+    }
+}
+
 /// Seed a NEW document from a PSD: its size becomes the canvas and its layers the stack —
 /// the PSD is the template, nothing else is invented. False if the file can't be read
 /// with layers (the caller then falls back to the flattened image path).
 @MainActor func importPSDAsLayers(_ url: URL, into document: ImageDocument) -> Bool {
-    guard let raw = try? Data(contentsOf: url), PSDReader.isPSD(raw),
-          let psd = try? PSDReader.read(raw) else { return false }
-    // Written by Image Producer and unchanged since: reopen the real project, every layer
-    // editable — his "work within a psd file the whole time".
-    if case .current(let json) = psd.imageProducerProject,
-       let manifest = try? JSONDecoder().decode(ImageProjectManifest.self, from: json),
-       manifest.canvasWidth == psd.width, manifest.canvasHeight == psd.height,
-       !manifest.layers.isEmpty {
+    guard let raw = try? Data(contentsOf: url),
+          let project = projectFromPSD(raw, name: url.deletingPathExtension().lastPathComponent)
+    else { return false }
+    if project.isOwnProject {
         let wasNew = document.openedAsNew
-        document.load(manifest)
+        document.load(project.manifest)
         document.openedAsNew = wasNew
         document.say("Photoshop file opened with all of its Image Producer layers editable", kind: .info)
         return true
     }
-    document.canvasWidth = psd.width
-    document.canvasHeight = psd.height
-    var layers = psd.imageLayers(canvas: document.canvasPixelSize)
-    if layers.isEmpty {                                    // a flat PSD: one picture
-        guard let png = psd.flattenedPNG() else { return false }
-        var layer = ImageLayer(name: url.deletingPathExtension().lastPathComponent, role: .content)
-        layer.setImage(png)
-        layers = [layer]
-    }
+    let layers = project.manifest.layers
+    document.canvasWidth = project.manifest.canvasWidth ?? document.canvasWidth
+    document.canvasHeight = project.manifest.canvasHeight ?? document.canvasHeight
     document.captureHistoryBaselineIfNeeded()
     document.layers.append(contentsOf: layers)
     document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
                            actionLabel: "Open Photoshop file (\(layers.count) layer\(layers.count == 1 ? "" : "s"))",
                            layerID: layers.last!.id)
-    if case .stale = psd.imageProducerProject {
-        document.say("Photoshop file was changed outside Image Producer — opened as its Photoshop layers",
-                     kind: .info)
-    } else if let note = psd.importNote { document.say("Photoshop file opened — \(note)", kind: .info) }
+    if let note = project.note { document.say("Photoshop file opened — \(note)", kind: .info) }
     return true
 }
 

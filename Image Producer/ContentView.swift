@@ -7633,9 +7633,27 @@ struct AutosaveModifier: ViewModifier {
             url = r
         }
 
-        guard let data = try? document.encodedManifest() else {
-            document.say("Autosave could not encode the document — nothing written", kind: .warning)
-            return
+        // A PSD document autosaves AS A PSD (project + history inside it) — his "work within
+        // a psd file the whole time", 2026-10-11. Everything else is the project package.
+        let data: Data
+        if ImageDocument.isPSD(url) {
+            guard !document.psdFromElsewhere else {
+                document.say("Photoshop file from another app — not autosaved. ⌘S saves it and keeps the original.",
+                             kind: .info)
+                return
+            }
+            guard let psd = makeLayeredPSD(document, includeHistory: true) else {
+                document.say("Autosave could not write the Photoshop file — nothing written", kind: .warning)
+                return
+            }
+            document.lastWrittenManifestHash = psd.hashValue
+            data = psd
+        } else {
+            guard let manifest = try? document.encodedManifest() else {
+                document.say("Autosave could not encode the document — nothing written", kind: .warning)
+                return
+            }
+            data = manifest
         }
         let size = ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
         let doc = document

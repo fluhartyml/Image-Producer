@@ -91,6 +91,17 @@ nonisolated final class Cryochamber: @unchecked Sendable {
     }
 
     /// The frozen manifest, decoded. `nil` if the point was never taken or cannot be read.
+    /// The frozen point's bytes when it is a Photoshop PSD (Open, for a PSD document, freezes
+    /// the .psd file itself — one plain file, not a package). nil for a project package.
+    func frozenPSD(_ point: Point) -> Data? {
+        guard has(point) else { return nil }
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url(point).path, isDirectory: &isDir), !isDir.boolValue,
+              let data = try? Data(contentsOf: url(point)), data.prefix(4) == Data("8BPS".utf8)
+        else { return nil }
+        return data
+    }
+
     func thaw(_ point: Point) throws -> ImageProjectManifest? {
         guard has(point) else { return nil }
         let data = try Data(contentsOf: url(point).appendingPathComponent("manifest.json"))
@@ -125,8 +136,12 @@ extension ImageDocument {
     func revert(to point: Cryochamber.Point, from chamber: Cryochamber) -> Bool {
         let manifest: ImageProjectManifest
         do {
-            guard let m = try chamber.thaw(point) else { return false }
-            manifest = m
+            if let psd = chamber.frozenPSD(point), let project = projectFromPSD(psd, name: name) {
+                manifest = project.manifest                 // a PSD document's frozen Open
+            } else {
+                guard let m = try chamber.thaw(point) else { return false }
+                manifest = m
+            }
         } catch {
             say("Could not read the frozen copy — nothing was changed", kind: .warning)
             return false
