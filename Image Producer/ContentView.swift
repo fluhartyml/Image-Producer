@@ -429,9 +429,18 @@ struct ContentView: View {
         // New Image sheet, so the user names it and sets the canvas size up front.
         // New projects are real files now, so match the just-created URL (by name) too.
         .onAppear {
+            // A blank file only counts as NEW while it still carries an app-made name
+            // (ImageProducerNNNN / Untitled). Found 2026-10-11 on his Mac: a blank project he
+            // had already named "Font test", reopened, threw the New Image sheet at him again —
+            // the "already asked" mark is not saved in the file, so blank + reopened looked
+            // brand new. His call: "if you can make it so it doesnt pop up in the first place
+            // it would be better." A name he chose is proof the sheet already ran.
+            let stem = fileURL?.deletingPathExtension().lastPathComponent ?? ""
+            let fileIsAppNamed = stem.range(of: #"^(ImageProducer\d{4}|Untitled( \d+)?)$"#,
+                                            options: .regularExpression) != nil
             if fileURL == nil
                 || document.openedAsNew
-                || document.isUntouchedBlank
+                || (document.isUntouchedBlank && fileIsAppNamed)
                 || fileURL?.lastPathComponent == ImageDocument.pendingNewProjectURL?.lastPathComponent {
                 activeTool = .canvas
                 ImageDocument.pendingNewProjectURL = nil
