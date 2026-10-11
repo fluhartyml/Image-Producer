@@ -170,6 +170,12 @@ struct WelcomeView: View {
     /// 2026-10-11 a failed open quietly made a blank ImageProducerNNNN instead, which hid
     /// the failure and looked like the app ignoring the name he typed.
     @State private var openError: String?
+    /// THE NAME BOX IS A STAGING AREA — his design, 2026-10-11: "you tap a recent name and
+    /// its text automatically populates the name optional text box then you tap new image
+    /// open psd open or new from import". One click on a Recent STAGES it (no more opening
+    /// by accident); the buttons act on what is staged. Double-click still opens at once.
+    /// Cleared the moment the name is edited to something else.
+    @State private var stagedURL: URL?
 
     private func refreshRecents() {
         recents = RecentProjects.list()
@@ -189,6 +195,7 @@ struct WelcomeView: View {
     /// "Open", not "New": opening a .psd is the plain, legal description (his word).
     /// Empty name: a file picker for any .psd.
     private func openPSD() {
+        if let staged = stagedURL, ImageDocument.isPSD(staged) { Task { await openRecent(staged) }; return }
         let typed = cleanedName
         if typed.isEmpty {
             let panel = NSOpenPanel()
@@ -215,6 +222,52 @@ struct WelcomeView: View {
         }
     }
 
+    /// Copy `source` into the Image Producer folder as "<name> N" (the first free number
+    /// from 2) and open the copy. The Image Producer folder, not the source's own folder:
+    /// a Recent can live anywhere, and the sandbox only lets the app write its own folder.
+    private func newFromCopy(of source: URL) async {
+        let folder = await Task.detached { ImageDocument.projectsDirectory() }.value
+        guard let dir = folder else {
+            openError = "Could not find the Image Producer folder."
+            return
+        }
+        let stem = source.deletingPathExtension().lastPathComponent
+        let ext = source.pathExtension
+        var n = 2
+        var copy = dir.appendingPathComponent("\(stem) \(n)").appendingPathExtension(ext)
+        while FileManager.default.fileExists(atPath: copy.path) {
+            n += 1
+            copy = dir.appendingPathComponent("\(stem) \(n)").appendingPathExtension(ext)
+        }
+        var failure: String?
+        await RecentProjects.withAccess(source) {
+            do { try FileManager.default.copyItem(at: source, to: copy) }
+            catch { failure = error.localizedDescription }
+        }
+        if let failure {
+            openError = "Could not copy “\(stem)”: \(failure)"
+            return
+        }
+        stagedURL = nil
+        await open(copy)
+    }
+
+    /// Open a Recent: sandboxed, so the grant is held while the document opens. A failed
+    /// open stays here and says why — never a blank new document in its place.
+    private func openRecent(_ url: URL) async {
+        var failure: String?
+        await RecentProjects.withAccess(url) {
+            RecentProjects.note(url)
+            do { try await openDocument(at: url) }
+            catch { failure = "\(error.localizedDescription) (\(String(describing: error)))" }
+        }
+        if let failure {
+            openError = "“\(url.deletingPathExtension().lastPathComponent)” would not open: \(failure)"
+        } else {
+            dismissWindow(id: "welcome")
+        }
+    }
+
     /// Open a file and close Welcome — or stay and say why it would not open.
     private func open(_ url: URL) async {
         RecentProjects.note(url)
@@ -237,8 +290,13 @@ struct WelcomeView: View {
             let url = await Task.detached {
                 typed.isEmpty ? ImageDocument.nextProjectURL() : ImageDocument.namedProjectURL(typed)
             }.value
-            if let url, !typed.isEmpty, FileManager.default.fileExists(atPath: url.path) {
-                nameTaken = url                       // he decides; nothing is created
+            // NAME ALREADY USED (or a Recent staged): New Image makes a COPY of that file
+            // with the next number after the name, and opens the copy — his rule,
+            // 2026-10-11: "if the user tapped new image it acts like new from copy and
+            // appends a number after the name". The original is never touched.
+            let existing = stagedURL ?? url.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
+            if let source = existing, !typed.isEmpty {
+                await newFromCopy(of: source)
                 return
             }
             guard let url, ImageDocument.writeNewProject(at: url) else {
@@ -287,7 +345,11 @@ struct WelcomeView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 18))
                     .onSubmit { createNew() }
-                    .onChange(of: newName) { nameTaken = nil; openError = nil }
+                    .onChange(of: newName) {
+                        nameTaken = nil; openError = nil
+                        if let staged = stagedURL,
+                           staged.deletingPathExtension().lastPathComponent != newName { stagedURL = nil }
+                    }
                 if let taken = nameTaken {
                     HStack {
                         Text("“\(taken.deletingPathExtension().lastPathComponent)” already exists.")
@@ -345,6 +407,14 @@ struct WelcomeView: View {
             // time someone opened one, edited, and saved, they would expect their PNG to
             // have changed. It has not.
             Button {
+                // Staged: open that exact file. A typed name that is a project in the
+                // Image Producer folder opens too. Otherwise, the file picker.
+                if let staged = stagedURL { Task { await openRecent(staged) }; return }
+                let typed = cleanedName
+                if !typed.isEmpty, let url = ImageDocument.namedProjectURL(typed),
+                   FileManager.default.fileExists(atPath: url.path) {
+                    Task { await open(url) }; return
+                }
                 let panel = NSOpenPanel()
                 panel.allowedContentTypes = [.imageProject]
                 panel.allowsMultipleSelection = false
@@ -387,8 +457,16 @@ struct WelcomeView: View {
                 panel.prompt = "Import"
                 panel.message = "Choose an image or PDF to open as a new document."
                 guard panel.runModal() == .OK, let pdfURL = panel.url else { return }
+                let typed = cleanedName
                 Task {
-                    let url = await Task.detached { ImageDocument.nextProjectURL() }.value
+                    // The name box names the new project; a name in use is never overwritten.
+                    let url = await Task.detached {
+                        typed.isEmpty ? ImageDocument.nextProjectURL() : ImageDocument.namedProjectURL(typed)
+                    }.value
+                    if let url, !typed.isEmpty, FileManager.default.fileExists(atPath: url.path) {
+                        nameTaken = url
+                        return
+                    }
                     var opened = false
                     if let url, ImageDocument.writeNewProject(at: url, from: pdfURL) {
                         RecentProjects.note(url)
@@ -435,29 +513,23 @@ struct WelcomeView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(recents.prefix(6), id: \.self) { url in
-                            Button {
-                                Task {
-                                    // Sandboxed: the grant only exists inside this scope,
-                                    // so the document has to be opened while it is held.
-                                    var failure: String?
-                                    await RecentProjects.withAccess(url) {
-                                        RecentProjects.note(url)
-                                        do { try await openDocument(at: url) }
-                                        catch { failure = "\(error.localizedDescription) (\(String(describing: error)))" }
-                                    }
-                                    // A failed open stays here and says why — never a blank
-                                    // new document in its place.
-                                    if let failure {
-                                        openError = "“\(url.deletingPathExtension().lastPathComponent)” would not open: \(failure)"
-                                    } else {
-                                        dismissWindow(id: "welcome")
-                                    }
+                            let staged = stagedURL == url
+                            Label(url.deletingPathExtension().lastPathComponent, systemImage: "doc")
+                                .font(.system(size: 18))
+                                .foregroundStyle(staged ? Color.white : Color.accentColor)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 5)
+                                    .fill(staged ? Color.accentColor : Color.clear))
+                                .contentShape(Rectangle())
+                                // Double-click opens; a single click stages (count 2 first,
+                                // so a double-click is not also read as two stagings).
+                                .onTapGesture(count: 2) { Task { await openRecent(url) } }
+                                .onTapGesture {
+                                    stagedURL = url
+                                    newName = url.deletingPathExtension().lastPathComponent
+                                    nameTaken = nil; openError = nil
                                 }
-                            } label: {
-                                Label(url.deletingPathExtension().lastPathComponent,
-                                      systemImage: "doc")
-                            }
-                            .buttonStyle(.link)
                         }
                     }
                     .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
