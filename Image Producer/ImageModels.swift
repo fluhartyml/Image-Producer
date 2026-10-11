@@ -1656,14 +1656,24 @@ extension ImageDocument {
     /// Evidence, not theory: `~/Desktop/bugs/2026-08-21-image-producer-autosave-hang-sample.txt`
     /// — 1704 of 1704 samples parked in `AutosaveModifier.save()` →
     /// `writePackage(to:)` → `_blockOnAccessClaim:` → `semaphore_wait_trap`.
-    nonisolated static func writeEncodedPackage(_ data: Data, to url: URL) throws {
+    ///
+    /// `coordinator`: the DOCUMENT'S OWN coordinator (`URLDocumentConfiguration
+    /// .makeFileCoordinator()`), when writing the open document's file. 2026-10-11, build
+    /// 304: a plain `NSFileCoordinator()` made the write look like ANOTHER app's, so the
+    /// document system reverted the window from disk — and that revert waits on the main
+    /// actor while holding the main thread: a permanent beachball on the New Image sheet
+    /// (sample: `relinquishPresentedItemToWriter` → `_revertToVersion` →
+    /// `URLPlatformDocument.read` → `semaphore_wait_trap`). Writing through the document's
+    /// own coordinator tells the system the change is the document's, so nothing reverts.
+    nonisolated static func writeEncodedPackage(_ data: Data, to url: URL,
+                                                coordinator: NSFileCoordinator? = nil) throws {
         let mf = FileWrapper(regularFileWithContents: data)
         mf.preferredFilename = "manifest.json"
         let dir = FileWrapper(directoryWithFileWrappers: ["manifest.json": mf])
 
         var coordError: NSError?
         var writeError: Error?
-        NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing,
+        (coordinator ?? NSFileCoordinator()).coordinate(writingItemAt: url, options: .forReplacing,
                                        error: &coordError) { coordURL in
             do { try dir.write(to: coordURL, options: .atomic, originalContentsURL: nil) }
             catch { writeError = error }
@@ -1684,10 +1694,15 @@ enum PackageWriter {
         DispatchQueue(label: "com.nightgard.Image-Producer.package-write", qos: .utility)
 
     /// Hand off an already-encoded snapshot. Returns immediately; the caller is never blocked.
-    nonisolated static func enqueue(_ data: Data, to url: URL,
+    nonisolated static func enqueue(_ data: Data, to url: URL, coordinator: NSFileCoordinator? = nil,
                                      completion: (@Sendable (Error?) -> Void)? = nil) {
+        // Handed over once and used only on this queue.
+        nonisolated(unsafe) let coordinator = coordinator
         queue.async {
-            do { try ImageDocument.writeEncodedPackage(data, to: url); completion?(nil) }
+            do {
+                try ImageDocument.writeEncodedPackage(data, to: url, coordinator: coordinator)
+                completion?(nil)
+            }
             catch { completion?(error) }
         }
     }

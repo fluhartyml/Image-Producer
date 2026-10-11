@@ -7637,11 +7637,26 @@ struct AutosaveModifier: ViewModifier {
         let size = ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
         let doc = document
         document.say("Autosaving — \(size)…", kind: .save)
-        PackageWriter.enqueue(data, to: url) { error in
+        // The open document's own file: write through ITS coordinator, so the system
+        // knows the change is the document's and does not revert the window from disk
+        // (the build-304 beachball — see `writeEncodedPackage`). Then record the file's
+        // new date, so a later ⌘S does not see "changed by another application".
+        let config = document.configuration
+        let own = config?.fileURL.map { $0.standardizedFileURL == url.standardizedFileURL } ?? false
+        let coordinator = own ? config?.makeFileCoordinator() : nil
+        PackageWriter.enqueue(data, to: url, coordinator: coordinator) { error in
             if let error {
                 doc.say("Autosave FAILED — \(error.localizedDescription)", kind: .warning)
             } else {
                 doc.say("Autosaved — \(size)", kind: .save)
+                guard own else { return }
+                let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate
+                Task { @MainActor in
+                    if let date, doc.configuration?.fileURL?.standardizedFileURL == url.standardizedFileURL {
+                        doc.configuration?.lastContentModificationDate = date
+                    }
+                }
             }
         }
 
