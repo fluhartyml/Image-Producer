@@ -450,6 +450,16 @@ struct WelcomeView: View {
             // Takes an IMAGE as readily as a PDF — the panel used to be locked to PDF, which
             // made an ordinary PNG unopenable even though the layer importer reads one fine.
             Button {
+                // STAGED (or a name already in use): no picker — a copy with the next
+                // number, exactly like New Image. His word, 2026-10-11: "new from import
+                // would act the same as open as a copy with a number appended because
+                // theres no file navigation just a list of recents".
+                let typed = cleanedName
+                if let staged = stagedURL { Task { await newFromCopy(of: staged) }; return }
+                if !typed.isEmpty, let url = ImageDocument.namedProjectURL(typed),
+                   FileManager.default.fileExists(atPath: url.path) {
+                    Task { await newFromCopy(of: url) }; return
+                }
                 let panel = NSOpenPanel()
                 panel.allowedContentTypes = ImageDocument.newFromImportContentTypes
                 panel.allowsMultipleSelection = false
@@ -457,7 +467,6 @@ struct WelcomeView: View {
                 panel.prompt = "Import"
                 panel.message = "Choose an image or PDF to open as a new document."
                 guard panel.runModal() == .OK, let pdfURL = panel.url else { return }
-                let typed = cleanedName
                 Task {
                     // The name box names the new project; a name in use is never overwritten.
                     let url = await Task.detached {
