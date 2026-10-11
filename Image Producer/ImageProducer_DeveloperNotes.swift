@@ -1700,3 +1700,34 @@
 //
 //  Attribution: Core Text is Apple's platform API — no credit line needed.
 //
+//
+// MARK: - 🧊 3D TEXT — extruded, animated (2026-10-11)
+//
+//  His words, 2026-10-11: "can we turn a font into a 3D object that can be
+//  animated?" · "like if it says new can you make it spin or wiggle back and
+//  forth?" — then "yes add the 3d text to the developer notes".
+//  ⬜ NOTES ONLY — nothing below is coded. No SceneKit/RealityKit in the app yet.
+//
+//  1. 3D TEXT LAYER — any installed font, extruded into a solid: depth, bevel
+//     (chamfer) on the edges, color or material, a light. Live text stays text
+//     (his "no rasterization please unless specifically asked to").
+//
+//  2. TWO MOTIONS to start, both looping on their own:
+//       • SPIN   — all the way around the vertical axis.
+//       • WIGGLE — rocks back and forth, like a sign on a hinge.
+//     Settings: speed, and how far the wiggle swings (degrees).
+//
+//  3. PLAYS LIVE on the canvas; EXPORTS as a short animation.
+//
+//  WHAT IS ALREADY HERE TO BUILD ON (read in code 2026-10-11):
+//   • Letter outlines from Core Text — MaskTool.swift ~L272
+//     (CTFontCreatePathForGlyph). The same path can feed an extrusion.
+//   • The Camera tool records frames (CameraTool.swift, CameraFrame in
+//     ImageModels.swift) — a spin/wiggle could render its frames into it.
+//
+//  APPLE FRAMEWORKS TO WEIGH (look up current OS 27 APIs before choosing —
+//  not checked yet): SceneKit's SCNText / SCNShape (extrude a path, chamfer)
+//  vs RealityKit's mesh generation. Pick the one supported on Mac AND iPad.
+//
+//  Attribution: Apple frameworks only — no credit line needed.
+//
