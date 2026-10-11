@@ -455,6 +455,18 @@ struct ContentView: View {
         .sheet(isPresented: $showNewImageSheet) {
             NewImageSheet(document: document, isPresented: $showNewImageSheet).presentationSizing(.fitted)
         }
+        // ADJUST — Levels / Gaussian Blur / Liquify, each its own window (2026-10-11). Opened by
+        // the Adjust tool's buttons or the Mac's Image / Filter menus, for the active layer.
+        .sheet(item: Binding(get: { document.adjustmentRequested },
+                             set: { document.adjustmentRequested = $0 })) { a in
+            AdjustmentSheetHost(document: document, adjustment: a, activeLayerID: activeLayerID) {
+                document.adjustmentRequested = nil
+            }
+            #if os(iOS)
+            .presentationDetents([.large])
+            #endif
+        }
+        .focusedSceneValue(\.adjustmentAction, { document.adjustmentRequested = $0 })
         // ⚠️ ALL .primaryAction, AND THAT IS THE FIX, NOT A STYLE CHOICE.
         //
         // These were .secondaryAction and their .help() tooltips never appeared — only the
@@ -1147,6 +1159,8 @@ struct ToolInspector: View {
             RemoveBackgroundInspector(document: document, activeLayerID: activeLayerID)
         case .magicLasso:
             MagicLassoInspector(document: document, activeLayerID: activeLayerID)
+        case .adjust:
+            AdjustInspector(document: document, activeLayerID: activeLayerID)
         case .eyedropper:
             EyedropperInspector(fillColor: $fillColor)
         case .eraser:
@@ -4835,8 +4849,8 @@ private struct ToolPointer: ViewModifier {
         // click, so a camera cursor would promise a click the tool does not take.
         // Glow joins them for the same reason: it is chosen and tuned entirely in the
         // inspector, so a special cursor over the canvas would promise a click it does
-        // not take.
-        case .imagePlayground, .canvas, .colorPalette, .image, .cutout, .camera, .layer:
+        // not take. Adjust too: its work happens in its own windows, not on the canvas.
+        case .imagePlayground, .canvas, .colorPalette, .image, .cutout, .camera, .layer, .adjust:
             nil
         }
     }

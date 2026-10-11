@@ -31,7 +31,7 @@ import ImageIO
 // MARK: - Pixel buffer helpers
 
 /// RGBA8 bytes (sRGB, premultiplied-last) for a CGImage, plus its dimensions.
-func rgbaBytes(from cg: CGImage) -> (bytes: [UInt8], w: Int, h: Int)? {
+nonisolated func rgbaBytes(from cg: CGImage) -> (bytes: [UInt8], w: Int, h: Int)? {
     let w = cg.width, h = cg.height
     guard w > 0, h > 0 else { return nil }
     let cs = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -46,7 +46,7 @@ func rgbaBytes(from cg: CGImage) -> (bytes: [UInt8], w: Int, h: Int)? {
 }
 
 /// Build a CGImage back from RGBA8 bytes.
-func cgImage(fromRGBA bytes: [UInt8], w: Int, h: Int) -> CGImage? {
+nonisolated func cgImage(fromRGBA bytes: [UInt8], w: Int, h: Int) -> CGImage? {
     guard bytes.count == w * h * 4 else { return nil }
     var mutable = bytes
     let cs = CGColorSpace(name: CGColorSpace.sRGB)!

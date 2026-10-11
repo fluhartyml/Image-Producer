@@ -96,6 +96,9 @@ final class ImageDocument {
     /// The Canvas inspector's "Single image…" button asks the editor to open its Export
     /// sheet. Not saved; consumed at once.
     var exportSheetRequested = false
+    /// The Adjust tool or the Image / Filter menu asks the editor to open Levels, Gaussian
+    /// Blur or Liquify for the active layer. Not saved; consumed at once.
+    var adjustmentRequested: Adjustment?
     /// Move / Transform's Apply button asks the editor to commit the placement. Not saved.
     var moveApplyRequested = false
     /// Set by a fluid canvas resize, which rewrites every layer's placement at once:

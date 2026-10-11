@@ -27,6 +27,40 @@ extension FocusedValues {
     }
 }
 
+/// Opens Levels / Gaussian Blur / Liquify on the focused document's active layer.
+struct AdjustmentActionKey: FocusedValueKey { typealias Value = (Adjustment) -> Void }
+
+extension FocusedValues {
+    var adjustmentAction: ((Adjustment) -> Void)? {
+        get { self[AdjustmentActionKey.self] }
+        set { self[AdjustmentActionKey.self] = newValue }
+    }
+}
+
+/// Image ▸ Adjustments ▸ Levels… (⌘L) and Filter ▸ Gaussian Blur… / Liquify… (⇧⌘X) —
+/// Photoshop's places and shortcuts, which is where a Photoshop user's hands already go
+/// (the PhotoCraft test video, 2026-10-11: Ctrl+L is the first thing he presses).
+struct AdjustmentCommands: Commands {
+    @FocusedValue(\.adjustmentAction) private var adjust
+
+    var body: some Commands {
+        CommandMenu("Image") {
+            Menu("Adjustments") {
+                Button("Levels…") { adjust?(.levels) }
+                    .keyboardShortcut("l", modifiers: .command)
+                    .disabled(adjust == nil)
+            }
+        }
+        CommandMenu("Filter") {
+            Button("Gaussian Blur…") { adjust?(.gaussianBlur) }
+                .disabled(adjust == nil)
+            Button("Liquify…") { adjust?(.liquify) }
+                .keyboardShortcut("x", modifiers: [.command, .shift])
+                .disabled(adjust == nil)
+        }
+    }
+}
+
 struct RevertToOpenActionKey: FocusedValueKey { typealias Value = () -> Void }
 struct RevertToLastSaveActionKey: FocusedValueKey { typealias Value = () -> Void }
 struct OptimizeHistoryActionKey: FocusedValueKey { typealias Value = () -> Void }
@@ -191,6 +225,8 @@ struct Image_ProducerApp: App {
             // document's history. The History tab/page already exists as a placeholder
             // (ContentView.historyPage); only the engine is missing ("no engine yet").
             CommandGroup(replacing: .undoRedo) { }
+
+            AdjustmentCommands()
 
             #if os(macOS)
             // File > Export… (⌘E) — placed after Save, but distinct from it: Save

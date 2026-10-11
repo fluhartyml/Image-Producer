@@ -36,6 +36,7 @@ enum Tool: String, CaseIterable, Identifiable {
                        // Translucent, Glow (Neon/Plasma), and Gradient when it lands.
     case cutout        // Remove Background — Vision subject lift, keeps the subject, drops the scene
     case magicLasso    // Magic Lasso — click a region, it selects the matching area and clears it
+    case adjust        // Levels / Gaussian Blur / Liquify — each in its own window (2026-10-11)
     case zoom          // navigation only (not history)
     case camera        // Capture: stamps the visible canvas onto a new topmost layer
 
@@ -71,6 +72,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .layer:      "Layer…"
         case .cutout:     "Remove Background"
         case .magicLasso: "Magic Lasso"
+        case .adjust:     "Adjust"
         case .zoom:       "Zoom"
         case .camera:     "Camera"
         }
@@ -96,6 +98,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .layer:      "square.3.layers.3d.middle.filled"
         case .cutout:     "person.and.background.dotted"
         case .magicLasso: "lasso.badge.sparkles"
+        case .adjust:     "slider.horizontal.3"
         case .zoom:       "magnifyingglass"
         case .camera:     "camera"
         }
