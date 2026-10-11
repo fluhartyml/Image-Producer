@@ -26,10 +26,10 @@ struct NewImageSheet: View {
 
     /// A few common starting sizes. Every other preset is in the Canvas tool.
     private let sizes: [(label: String, w: Int, h: Int)] = [
-        ("Square — 1024 × 1024", 1024, 1024),
-        ("Web banner — 1500 × 500", 1500, 500),
-        ("HD video — 1920 × 1080", 1920, 1080),
-        ("Portrait post — 1080 × 1350", 1080, 1350),
+        ("Square — W 1024 × H 1024", 1024, 1024),
+        ("Web banner — W 1500 × H 500", 1500, 500),
+        ("HD video — W 1920 × H 1080", 1920, 1080),
+        ("Portrait post — W 1080 × H 1350", 1080, 1350),
     ]
 
     var body: some View {
