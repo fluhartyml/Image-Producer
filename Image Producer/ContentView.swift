@@ -1440,10 +1440,13 @@ struct CanvasInspector: View {
                 // art scales-to-fit the new shape, letterboxed on the background.
                 HStack(spacing: 6) {
                     Text("Pixels").font(.system(size: 18)).frame(width: 92, alignment: .leading)
+                    // W and H labels — his ask, 2026-10-11 ("H and W are not shown").
+                    Text("W").font(.system(size: 18)).foregroundStyle(.secondary).help("Width")
                     TextField("W", value: widthBinding, format: .number)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
                         .disabled(sizeRule == .fluidHeight)
                     Text("×").font(.system(size: 18))
+                    Text("H").font(.system(size: 18)).foregroundStyle(.secondary).help("Height")
                     TextField("H", value: heightBinding, format: .number)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
                         .disabled(sizeRule == .fluidWidth)
@@ -2072,10 +2075,10 @@ struct CanvasInspector: View {
 
     /// Derived print size readout (W × H) in the chosen unit, from pixels ÷ PPI.
     private var printSizeText: String {
-        if unit == .px { return "\(document.canvasWidth) × \(document.canvasHeight) px" }
+        if unit == .px { return "W \(document.canvasWidth) × H \(document.canvasHeight) px" }
         let w = unit.fromInches(Double(document.canvasWidth) / max(1, document.ppi))
         let h = unit.fromInches(Double(document.canvasHeight) / max(1, document.ppi))
-        return String(format: "%.2f × %.2f %@", w, h, unit.label)
+        return String(format: "W %.2f × H %.2f %@", w, h, unit.label)
     }
 
     /// Apply a catalog preset, then adopt its size rule for later Pixels edits.

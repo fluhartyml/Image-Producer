@@ -70,8 +70,8 @@ struct CanvasPreset: Identifiable {
     /// The numbers, for the second line of the menu item.
     var detail: String {
         switch size {
-        case .inches(let w, let h): "\(Self.num(w)) × \(Self.num(h)) in"
-        case .pixels(let w, let h): "\(w) × \(h) px"
+        case .inches(let w, let h): "W \(Self.num(w)) × H \(Self.num(h)) in"
+        case .pixels(let w, let h): "W \(w) × H \(h) px"
         case .ratio(let w, let h, let min): min > 0 ? "\(w):\(h), at least \(min) px long" : "\(w):\(h)"
         }
     }
