@@ -166,6 +166,10 @@ struct WelcomeView: View {
     /// Set when the typed name is already a project. Never suffixed into "Name 2" (Skills
     /// Lab: compare on collision, never suffix) — he decides: open it, or type another.
     @State private var nameTaken: URL?
+    /// Why the last open failed, shown in this window. ⛔ No silent fallback: until
+    /// 2026-10-11 a failed open quietly made a blank ImageProducerNNNN instead, which hid
+    /// the failure and looked like the app ignoring the name he typed.
+    @State private var openError: String?
 
     private func refreshRecents() {
         recents = RecentProjects.list()
@@ -193,22 +197,20 @@ struct WelcomeView: View {
                 nameTaken = url                       // he decides; nothing is created
                 return
             }
-            var opened = false
-            if let url, ImageDocument.writeNewProject(at: url) {
-                // Register in the recent-documents list (SwiftUI's openDocument
-                // doesn't always record it), then open.
-                RecentProjects.note(url)
-                do { try await openDocument(at: url); opened = true }
-                catch {
-                    NSLog("ImageProducer New: openDocument failed for %@ — %@",
-                          url.path, String(describing: error))
-                }
-            } else {
-                NSLog("ImageProducer New: could not create project file (url=%@)",
-                      String(describing: url))
+            guard let url, ImageDocument.writeNewProject(at: url) else {
+                openError = "Could not create the project file."
+                return
             }
-            if !opened { newDocument(contentType: .imageProject) }
-            dismissWindow(id: "welcome")
+            // Register in the recent-documents list (SwiftUI's openDocument
+            // doesn't always record it), then open.
+            RecentProjects.note(url)
+            do {
+                try await openDocument(at: url)
+                dismissWindow(id: "welcome")
+            } catch {
+                // The file exists; say why it would not open and stay here.
+                openError = "“\(url.deletingPathExtension().lastPathComponent)” was created but would not open: \(error.localizedDescription) (\(String(describing: error)))"
+            }
         }
     }
 
@@ -241,7 +243,7 @@ struct WelcomeView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 18))
                     .onSubmit { createNew() }
-                    .onChange(of: newName) { nameTaken = nil }
+                    .onChange(of: newName) { nameTaken = nil; openError = nil }
                 if let taken = nameTaken {
                     HStack {
                         Text("“\(taken.deletingPathExtension().lastPathComponent)” already exists.")
@@ -266,6 +268,14 @@ struct WelcomeView: View {
             }
             .controlSize(.large)
             .buttonStyle(.borderedProminent)
+
+            if let openError {
+                Text(openError)
+                    .font(.system(size: 18))
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             // OPEN — Michael spotted the gap, 2026-09-06: "i just noticed a missng
             // element… what about an open?"
@@ -375,11 +385,19 @@ struct WelcomeView: View {
                                 Task {
                                     // Sandboxed: the grant only exists inside this scope,
                                     // so the document has to be opened while it is held.
+                                    var failure: String?
                                     await RecentProjects.withAccess(url) {
                                         RecentProjects.note(url)
-                                        try? await openDocument(at: url)
+                                        do { try await openDocument(at: url) }
+                                        catch { failure = "\(error.localizedDescription) (\(String(describing: error)))" }
                                     }
-                                    dismissWindow(id: "welcome")
+                                    // A failed open stays here and says why — never a blank
+                                    // new document in its place.
+                                    if let failure {
+                                        openError = "“\(url.deletingPathExtension().lastPathComponent)” would not open: \(failure)"
+                                    } else {
+                                        dismissWindow(id: "welcome")
+                                    }
                                 }
                             } label: {
                                 Label(url.deletingPathExtension().lastPathComponent,

@@ -36,6 +36,10 @@ struct NewImageSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("New Image").font(.system(size: 24, weight: .semibold))
 
+            // A file he already named (Welcome's name field) is not asked again — only an
+            // automatic ImageProducerNNNN name is. His word, 2026-10-11: the second ask was
+            // "being a hover mom".
+            if isAutoNamed {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Name").font(.system(size: 18)).foregroundStyle(.secondary)
                 // The suggestion is the FILE's real name. Found 2026-10-11: a blank project he had
@@ -45,13 +49,19 @@ struct NewImageSheet: View {
                 TextField(document.pendingNewName ?? fileName ?? document.name, text: $name)
                     .textFieldStyle(.roundedBorder).font(.system(size: 18))
             }
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Size in pixels").font(.system(size: 18)).foregroundStyle(.secondary)
                 HStack(spacing: 6) {
+                    // W and H labels — his ask, 2026-10-11, so width and height can't be confused.
+                    Text("W").font(.system(size: 18)).foregroundStyle(.secondary)
+                        .help("Width")
                     TextField("W", value: $width, format: .number)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 90)
                     Text("×").font(.system(size: 18))
+                    Text("H").font(.system(size: 18)).foregroundStyle(.secondary)
+                        .help("Height")
                     TextField("H", value: $height, format: .number)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 90)
                     Menu("Sizes") {
@@ -77,6 +87,13 @@ struct NewImageSheet: View {
         .padding(24)
         .frame(minWidth: 420)
         .onAppear { width = document.canvasWidth; height = document.canvasHeight }
+    }
+
+    /// True when the name is still the automatic one (or unknown) — the only case the
+    /// sheet asks for a name.
+    private var isAutoNamed: Bool {
+        guard let stem = fileName else { return true }
+        return stem.range(of: #"^ImageProducer\d{4}$"#, options: .regularExpression) != nil
     }
 
     /// The project file's name on disk, without its extension — what the Canvas tool's
