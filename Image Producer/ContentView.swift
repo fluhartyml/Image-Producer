@@ -3321,7 +3321,7 @@ struct ImageImportInspector: View {
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                         .help("More about importing")
                         .popover(isPresented: $showInfo) {
-                            Text("Selected Layer replaces that layer's picture. New Layer goes above the selected one. Opens PNG, JPEG, HEIC, TIFF, GIF, BMP and Photoshop PSD. A PSD to a New Layer keeps all its layers; to the Selected Layer it comes in flattened. Use Move to size and place it.")
+                            Text("Selected Layer replaces that layer's picture. New Layer goes above the selected one. Opens PNG, JPEG, HEIC, TIFF, GIF, BMP and .psd. A PSD to a New Layer keeps all its layers; to the Selected Layer it comes in flattened. Use Move to size and place it.")
                                 .font(.system(size: 18))
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(width: 300)
@@ -3368,7 +3368,7 @@ struct ImageImportInspector: View {
                 document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
                                        actionLabel: "Import \(url.deletingPathExtension().lastPathComponent) (\(layers.count) layer\(layers.count == 1 ? "" : "s"))",
                                        layerID: layers.last!.id)
-                if let note = psd.importNote { document.say("Photoshop file imported — \(note)", kind: .info) }
+                if let note = psd.importNote { document.say(".psd file imported — \(note)", kind: .info) }
                 return
             }
             if let png = psd.flattenedPNG() {
@@ -7639,12 +7639,12 @@ struct AutosaveModifier: ViewModifier {
         let data: Data
         if ImageDocument.isPSD(url) {
             guard !document.psdFromElsewhere else {
-                document.say("Photoshop file from another app — not autosaved. ⌘S saves it and keeps the original.",
+                document.say(".psd file from another app — not autosaved. ⌘S saves it and keeps the original.",
                              kind: .info)
                 return
             }
             guard let psd = makeLayeredPSD(document, includeHistory: true) else {
-                document.say("Autosave could not write the Photoshop file — nothing written", kind: .warning)
+                document.say("Autosave could not write the .psd file — nothing written", kind: .warning)
                 return
             }
             document.lastWrittenManifestHash = psd.hashValue
@@ -7963,7 +7963,7 @@ struct StatusBar: View {
     init(panel: NSSavePanel, startWithPSD: Bool) {
         self.panel = panel
         super.init()
-        popup.addItems(withTitles: ["Image Producer Project", "Photoshop (PSD)"])
+        popup.addItems(withTitles: ["Image Producer Project", ".psd"])
         popup.selectItem(at: startWithPSD ? 1 : 0)
         popup.target = self
         popup.action = #selector(changed)
@@ -8010,7 +8010,7 @@ extension ContentView {
         let data: Data
         if picker.isPSD {
             guard let psd = makeLayeredPSD(document, includeHistory: true) else {
-                document.say("Save As failed — could not make the Photoshop file", kind: .warning); return
+                document.say("Save As failed — could not make the .psd file", kind: .warning); return
             }
             data = psd
         } else {

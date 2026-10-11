@@ -251,7 +251,7 @@ struct WelcomeView: View {
                     .onChange(of: newName) { nameTaken = nil; openError = nil }
                 Picker("Format", selection: $newAsPSD) {
                     Text("Image Producer").tag(false)
-                    Text("Photoshop").tag(true)
+                    Text(".psd").tag(true)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()

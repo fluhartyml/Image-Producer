@@ -491,7 +491,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     case bmp = "BMP"
     case pdfFlat = "PDF (flat)"
     case pdfLayers = "PDF (one page per layer)"
-    case psd = "Photoshop PSD (layers preserved)"
+    case psd = ".psd (layers preserved)"
     case gifAnimated = "Animated GIF (one frame per layer)"
     case gif3DText = "Animated GIF (3D text loop)"
 

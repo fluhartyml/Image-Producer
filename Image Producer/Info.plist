@@ -37,7 +37,7 @@
 		</dict>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Photoshop Image</string>
+			<string>PSD Image</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>

@@ -1629,9 +1629,9 @@ extension ImageDocument: Document {
             load(project.manifest)
             psdFromElsewhere = !project.isOwnProject
             if project.isOwnProject {
-                say("Photoshop file — every Image Producer layer editable", kind: .info)
+                say(".psd file — every Image Producer layer editable", kind: .info)
             } else if let note = project.note {
-                say("Photoshop file opened — \(note)", kind: .info)
+                say(".psd file opened — \(note)", kind: .info)
             }
             return
         }
@@ -1659,7 +1659,7 @@ extension ImageDocument: Document {
                 if !FileManager.default.fileExists(atPath: keep.path) {
                     do { try FileManager.default.copyItem(at: url, to: keep) }
                     catch {
-                        say("Could not keep the original Photoshop file — not saved", kind: .warning)
+                        say("Could not keep the original .psd file — not saved", kind: .warning)
                         throw error
                     }
                     say("Kept the original as \(keep.lastPathComponent)", kind: .info)
@@ -1667,11 +1667,11 @@ extension ImageDocument: Document {
                 psdFromElsewhere = false
             }
             guard let psd = makeLayeredPSD(self, includeHistory: true) else {
-                say("Could not write this as a Photoshop file — nothing saved", kind: .warning)
+                say("Could not write this as a .psd file — nothing saved", kind: .warning)
                 throw CocoaError(.fileWriteUnknown)
             }
             lastWrittenManifestHash = psd.hashValue
-            say("Saved as Photoshop — \(ByteCountFormatter.string(fromByteCount: Int64(psd.count), countStyle: .file))",
+            say("Saved as .psd — \(ByteCountFormatter.string(fromByteCount: Int64(psd.count), countStyle: .file))",
                 kind: .save)
             // Revert to Last Save keeps working: it freezes the project, not the PSD.
             if let window = DocumentWindow.window(for: self),

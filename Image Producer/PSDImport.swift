@@ -614,7 +614,7 @@ struct PSDProject {
     }
     var parts: [String] = []
     if psd.imageProducerProject != nil {
-        parts.append("changed outside Image Producer, so Photoshop's layers opened")
+        parts.append("changed outside Image Producer, so the .psd's own layers opened")
     }
     if restored > 0 {
         parts.append("\(restored) editable text layer\(restored == 1 ? "" : "s") restored, hidden")
@@ -649,7 +649,7 @@ extension ImageLayer {
         let wasNew = document.openedAsNew
         document.load(project.manifest)
         document.openedAsNew = wasNew
-        document.say("Photoshop file opened with all of its Image Producer layers editable", kind: .info)
+        document.say(".psd file opened with all of its Image Producer layers editable", kind: .info)
         return true
     }
     let layers = project.manifest.layers
@@ -658,9 +658,9 @@ extension ImageLayer {
     document.captureHistoryBaselineIfNeeded()
     document.layers.append(contentsOf: layers)
     document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
-                           actionLabel: "Open Photoshop file (\(layers.count) layer\(layers.count == 1 ? "" : "s"))",
+                           actionLabel: "Open .psd file (\(layers.count) layer\(layers.count == 1 ? "" : "s"))",
                            layerID: layers.last!.id)
-    if let note = project.note { document.say("Photoshop file opened — \(note)", kind: .info) }
+    if let note = project.note { document.say(".psd file opened — \(note)", kind: .info) }
     return true
 }
 
