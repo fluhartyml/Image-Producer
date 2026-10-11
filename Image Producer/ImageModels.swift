@@ -1861,8 +1861,22 @@ extension ImageDocument {
 
     /// `<projects>/<name>.imgprd` for a name typed in the Welcome window. Does NOT check
     /// whether it exists — the caller does, and asks rather than suffixing.
-    nonisolated static func namedProjectURL(_ name: String) -> URL? {
-        projectsDirectory()?.appendingPathComponent(name).appendingPathExtension(projectExtension)
+    nonisolated static func namedProjectURL(_ name: String, ext: String = projectExtension) -> URL? {
+        projectsDirectory()?.appendingPathComponent(name).appendingPathExtension(ext)
+    }
+
+    /// A brand-new default image written as a PHOTOSHOP file — the Welcome window's
+    /// Photoshop format (his ask, 2026-10-11). Image Producer's own PSD: it reopens with
+    /// every layer editable and autosaves in place.
+    @MainActor static func writeNewPSD(at url: URL) -> Bool {
+        let doc = newDefault()
+        doc.name = url.deletingPathExtension().lastPathComponent
+        guard let data = makeLayeredPSD(doc, includeHistory: true) else { return false }
+        do {
+            try data.write(to: url, options: .atomic)
+            pendingNewProjectURL = url
+            return true
+        } catch { return false }
     }
 
     /// Write a brand-new default project to `url` (which the caller resolved OFF the main

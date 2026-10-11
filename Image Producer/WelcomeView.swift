@@ -170,6 +170,9 @@ struct WelcomeView: View {
     /// 2026-10-11 a failed open quietly made a blank ImageProducerNNNN instead, which hid
     /// the failure and looked like the app ignoring the name he typed.
     @State private var openError: String?
+    /// Image Producer project, or Photoshop PSD — his ask, 2026-10-11, so a PSD can be
+    /// the file from the very start.
+    @State private var newAsPSD = false
 
     private func refreshRecents() {
         recents = RecentProjects.list()
@@ -190,14 +193,16 @@ struct WelcomeView: View {
             // block). Create + open on the main actor. ALWAYS end with a visible
             // window: if open fails, log why and fall back to an untitled doc — so we
             // can never land in "welcome gone, no document window, app still running."
-            let url = await Task.detached {
-                typed.isEmpty ? ImageDocument.nextProjectURL() : ImageDocument.namedProjectURL(typed)
+            let asPSD = newAsPSD
+            let url = await Task.detached { () -> URL? in
+                let base = typed.isEmpty ? ImageDocument.nextProjectURL() : ImageDocument.namedProjectURL(typed)
+                return asPSD ? base?.deletingPathExtension().appendingPathExtension("psd") : base
             }.value
             if let url, !typed.isEmpty, FileManager.default.fileExists(atPath: url.path) {
                 nameTaken = url                       // he decides; nothing is created
                 return
             }
-            guard let url, ImageDocument.writeNewProject(at: url) else {
+            guard let url, asPSD ? ImageDocument.writeNewPSD(at: url) : ImageDocument.writeNewProject(at: url) else {
                 openError = "Could not create the project file."
                 return
             }
@@ -244,6 +249,14 @@ struct WelcomeView: View {
                     .font(.system(size: 18))
                     .onSubmit { createNew() }
                     .onChange(of: newName) { nameTaken = nil; openError = nil }
+                Picker("Format", selection: $newAsPSD) {
+                    Text("Image Producer").tag(false)
+                    Text("Photoshop").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .font(.system(size: 18))
+                .onChange(of: newAsPSD) { nameTaken = nil; openError = nil }
                 if let taken = nameTaken {
                     HStack {
                         Text("“\(taken.deletingPathExtension().lastPathComponent)” already exists.")

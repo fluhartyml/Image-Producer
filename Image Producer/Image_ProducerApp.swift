@@ -20,10 +20,20 @@ struct ExportActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
 
+/// File > Save As… for the focused document — his ask, 2026-10-11: a plain Save As that
+/// asks for a name AND a format (Image Producer project or Photoshop PSD).
+struct SaveAsActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
 extension FocusedValues {
     var exportAction: (() -> Void)? {
         get { self[ExportActionKey.self] }
         set { self[ExportActionKey.self] = newValue }
+    }
+    var saveAsAction: (() -> Void)? {
+        get { self[SaveAsActionKey.self] }
+        set { self[SaveAsActionKey.self] = newValue }
     }
 }
 
@@ -104,9 +114,14 @@ struct CryochamberCommands: Commands {
 /// Adds File > Export… (⌘E) driving the focused document's Export flow.
 struct ExportCommands: Commands {
     @FocusedValue(\.exportAction) private var exportAction
+    @FocusedValue(\.saveAsAction) private var saveAsAction
 
     var body: some Commands {
         CommandGroup(after: .saveItem) {
+            // Always visible — no Option key to discover it (his "unintuitive").
+            Button("Save As…") { saveAsAction?() }
+                .keyboardShortcut("s", modifiers: [.command, .option, .shift])
+                .disabled(saveAsAction == nil)
             Button("Export…") { exportAction?() }
                 .keyboardShortcut("e", modifiers: .command)
                 .disabled(exportAction == nil)

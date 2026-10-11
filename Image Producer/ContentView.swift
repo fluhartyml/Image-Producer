@@ -569,6 +569,7 @@ struct ContentView: View {
         // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
         // targeting the focused document.
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
+        .focusedSceneValue(\.saveAsAction, { saveAsWithFormat() })
         // The Canvas inspector's "Single image…" button asks for the same sheet.
         .onChange(of: document.exportSheetRequested) {
             if document.exportSheetRequested { document.exportSheetRequested = false; showExportSheet = true }
@@ -7951,3 +7952,93 @@ struct StatusBar: View {
         }
     }
 }
+
+#if os(macOS)
+// MARK: - File ▸ Save As… with a format
+
+/// The save panel's Format menu: keeps the panel's extension in step with the choice.
+@MainActor final class SaveAsFormatPicker: NSObject {
+    let panel: NSSavePanel
+    let popup = NSPopUpButton()
+    init(panel: NSSavePanel, startWithPSD: Bool) {
+        self.panel = panel
+        super.init()
+        popup.addItems(withTitles: ["Image Producer Project", "Photoshop (PSD)"])
+        popup.selectItem(at: startWithPSD ? 1 : 0)
+        popup.target = self
+        popup.action = #selector(changed)
+        changed()
+    }
+    var isPSD: Bool { popup.indexOfSelectedItem == 1 }
+    @objc func changed() {
+        panel.allowedContentTypes = [isPSD ? .photoshopDocument : .imageProject]
+    }
+    /// "Format:  [menu]", for the panel's accessory area.
+    var accessory: NSView {
+        let label = NSTextField(labelWithString: "Format:")
+        label.font = .systemFont(ofSize: 18)
+        popup.font = .systemFont(ofSize: 18)
+        let row = NSStackView(views: [label, popup])
+        row.edgeInsets = NSEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+        return row
+    }
+}
+
+extension ContentView {
+    /// Save As — his ask, 2026-10-11: name AND format in one place. Writes the document to
+    /// the chosen file in the chosen format, opens that file, and closes this window on
+    /// the old one (already autosaved), so the window carries on in the new file.
+    func saveAsWithFormat() {
+        let oldURL = document.movedFileURL ?? fileURL
+        let panel = NSSavePanel()
+        panel.title = "Save As"
+        panel.prompt = "Save"
+        panel.nameFieldStringValue = oldURL?.deletingPathExtension().lastPathComponent ?? document.name
+        panel.directoryURL = oldURL?.deletingLastPathComponent() ?? ImageDocument.projectsDirectory()
+        let picker = SaveAsFormatPicker(panel: panel, startWithPSD: oldURL.map(ImageDocument.isPSD) ?? false)
+        panel.accessoryView = picker.accessory
+        guard panel.runModal() == .OK, let chosen = panel.url else { return }
+        let url = chosen.deletingPathExtension()
+            .appendingPathExtension(picker.isPSD ? "psd" : ImageDocument.projectExtension)
+        // The open file itself: autosave already keeps it current, and an outside write to
+        // the open document is exactly what froze the app (see `writeEncodedPackage`).
+        if let oldURL, oldURL.standardizedFileURL == url.standardizedFileURL {
+            document.say("That is this file — it is already saved there", kind: .info)
+            return
+        }
+
+        let data: Data
+        if picker.isPSD {
+            guard let psd = makeLayeredPSD(document, includeHistory: true) else {
+                document.say("Save As failed — could not make the Photoshop file", kind: .warning); return
+            }
+            data = psd
+        } else {
+            guard let manifest = try? document.encodedManifest() else {
+                document.say("Save As failed — could not encode the project", kind: .warning); return
+            }
+            data = manifest
+        }
+        let doc = document
+        PackageWriter.enqueue(data, to: url) { error in
+            Task { @MainActor in
+                if let error {
+                    doc.say("Save As failed — \(error.localizedDescription)", kind: .warning); return
+                }
+                RecentProjects.note(url)
+                NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { opened, _, err in
+                    guard opened != nil else {
+                        doc.say("Saved \(url.lastPathComponent), but it would not open — \(err?.localizedDescription ?? "unknown")",
+                                kind: .warning)
+                        return
+                    }
+                    // The new file is open in its own window; retire the old one.
+                    if let oldURL, oldURL.standardizedFileURL != url.standardizedFileURL {
+                        NSDocumentController.shared.document(for: oldURL)?.close()
+                    }
+                }
+            }
+        }
+    }
+}
+#endif
