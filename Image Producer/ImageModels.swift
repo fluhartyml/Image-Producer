@@ -1771,6 +1771,12 @@ extension ImageDocument {
         return candidate
     }
 
+    /// `<projects>/<name>.imgprd` for a name typed in the Welcome window. Does NOT check
+    /// whether it exists — the caller does, and asks rather than suffixing.
+    nonisolated static func namedProjectURL(_ name: String) -> URL? {
+        projectsDirectory()?.appendingPathComponent(name).appendingPathExtension(projectExtension)
+    }
+
     /// Write a brand-new default project to `url` (which the caller resolved OFF the main
     /// thread via `nextProjectURL` — the slow iCloud-container lookup lives there). This
     /// stays on the main actor because ImageDocument is main-actor-isolated; the write is a

@@ -159,8 +159,57 @@ struct WelcomeView: View {
     /// projects appear without the view needing to be rebuilt.
     @State private var recents: [URL] = []
 
+    /// NAME BEFORE NEW — his ask, 2026-10-11: "can the user type the proposed new file name
+    /// in the welcome sheet before clicking on create new file?" Empty = the usual
+    /// ImageProducerNNNN.
+    @State private var newName = ""
+    /// Set when the typed name is already a project. Never suffixed into "Name 2" (Skills
+    /// Lab: compare on collision, never suffix) — he decides: open it, or type another.
+    @State private var nameTaken: URL?
+
     private func refreshRecents() {
         recents = RecentProjects.list()
+    }
+
+    /// The typed name, made safe as a file name: trimmed, no path separators.
+    private var cleanedName: String {
+        var n = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        n = n.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+        while n.hasPrefix(".") { n.removeFirst() }
+        return String(n.prefix(200))
+    }
+
+    private func createNew() {
+        let typed = cleanedName
+        Task {
+            // Resolve the new file's URL OFF the main thread (the iCloud lookup can
+            // block). Create + open on the main actor. ALWAYS end with a visible
+            // window: if open fails, log why and fall back to an untitled doc — so we
+            // can never land in "welcome gone, no document window, app still running."
+            let url = await Task.detached {
+                typed.isEmpty ? ImageDocument.nextProjectURL() : ImageDocument.namedProjectURL(typed)
+            }.value
+            if let url, !typed.isEmpty, FileManager.default.fileExists(atPath: url.path) {
+                nameTaken = url                       // he decides; nothing is created
+                return
+            }
+            var opened = false
+            if let url, ImageDocument.writeNewProject(at: url) {
+                // Register in the recent-documents list (SwiftUI's openDocument
+                // doesn't always record it), then open.
+                RecentProjects.note(url)
+                do { try await openDocument(at: url); opened = true }
+                catch {
+                    NSLog("ImageProducer New: openDocument failed for %@ — %@",
+                          url.path, String(describing: error))
+                }
+            } else {
+                NSLog("ImageProducer New: could not create project file (url=%@)",
+                      String(describing: url))
+            }
+            if !opened { newDocument(contentType: .imageProject) }
+            dismissWindow(id: "welcome")
+        }
     }
 
     var body: some View {
@@ -187,30 +236,30 @@ struct WelcomeView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            Button {
-                Task {
-                    // Resolve the new file's URL OFF the main thread (the iCloud lookup can
-                    // block). Create + open on the main actor. ALWAYS end with a visible
-                    // window: if open fails, log why and fall back to an untitled doc — so we
-                    // can never land in "welcome gone, no document window, app still running."
-                    let url = await Task.detached { ImageDocument.nextProjectURL() }.value
-                    var opened = false
-                    if let url, ImageDocument.writeNewProject(at: url) {
-                        // Register in the recent-documents list (SwiftUI's openDocument
-                        // doesn't always record it), then open.
-                        RecentProjects.note(url)
-                        do { try await openDocument(at: url); opened = true }
-                        catch {
-                            NSLog("ImageProducer New: openDocument failed for %@ — %@",
-                                  url.path, String(describing: error))
+            VStack(alignment: .leading, spacing: 6) {
+                TextField("Name (optional)", text: $newName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 18))
+                    .onSubmit { createNew() }
+                    .onChange(of: newName) { nameTaken = nil }
+                if let taken = nameTaken {
+                    HStack {
+                        Text("“\(taken.deletingPathExtension().lastPathComponent)” already exists.")
+                            .font(.system(size: 18)).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Open It") {
+                            Task {
+                                RecentProjects.note(taken)
+                                if (try? await openDocument(at: taken)) != nil { dismissWindow(id: "welcome") }
+                            }
                         }
-                    } else {
-                        NSLog("ImageProducer New: could not create project file (url=%@)",
-                              String(describing: url))
+                        .font(.system(size: 18))
                     }
-                    if !opened { newDocument(contentType: .imageProject) }
-                    dismissWindow(id: "welcome")
                 }
+            }
+
+            Button {
+                createNew()
             } label: {
                 Label("New Image", systemImage: "plus")
                     .frame(maxWidth: .infinity)
