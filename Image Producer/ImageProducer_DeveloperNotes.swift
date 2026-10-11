@@ -1594,3 +1594,109 @@
 //     hold real PNGs beside manifest.json. Base64 costs ~33% on top of the image
 //     and forces the whole file through a JSON parser on every open and write.
 //
+//
+// MARK: - 🎬 FROM THE PHOTOCRAFT VIDEOS — five tools to add (2026-10-11)
+//
+//  His ask, 2026-10-11: "yes add them all to the developer notes and anything we
+//  use attribute it acordingly." ⬜ NOTES ONLY — nothing below is coded.
+//
+//  SOURCES (inspiration only — no code taken from any of them):
+//   • Video: "Someone Just Recreated Adobe With AI… FOR FREE!" — Jeff Fagan.
+//     Commentary on the legal angle; ~15 s of app footage.
+//   • Video: "This Free Photoshop Clone Shouldn't Exist - Let's TEST It" — Kirk,
+//     "Tech it before you wreck it." PhotoCraft 0.5.0 vs Photoshop, five tests.
+//     Both files on his "mint houz 1 TB" drive.
+//   • ArtCraft / PhotoCraft — getartcraft.com/apps · github.com/storytold/artcraft.
+//     Native Rust, early alpha. Dual-licensed MIT + Apache-2.0 (checked on GitHub
+//     2026-10-11). Both are compatible with our GPL v3.
+//
+//  ⭐ WHAT IMAGE PRODUCER HAS NONE OF TODAY (grepped 2026-10-11): Levels, Curves,
+//     Histogram, Gaussian Blur, Liquify. Text ALREADY beats PhotoCraft here: ours
+//     lists every installed font, and Kirk's Futura did not appear in PhotoCraft.
+//
+//  1. LEVELS (⌘L) — input/output black, mid, white sliders + a live histogram.
+//     Include the two things Kirk found missing in PhotoCraft:
+//       • EYEDROPPERS (black / gray / white point picked from the canvas).
+//       • ⌥ CLIPPING PREVIEW — hold Option on a slider to see what clips to
+//         pure black / white.
+//     Engine: Core Image (CIAreaHistogram for the graph; tone math via
+//     CIColorPolynomial / CIToneCurve or a small CIColorKernel).
+//
+//  2. GAUSSIAN BLUR — applied to the active layer, or only inside the current
+//     mask/selection when one exists (his test: blur on a lasso selection).
+//     Radius in pixels. Engine: CIGaussianBlur (clamp edges, crop back).
+//
+//  3. LIQUIFY — brush-based PUCKER and BLOAT, with brush size + density.
+//     The tool Kirk was most impressed by in PhotoCraft. Engine: a displacement
+//     mesh accumulated per stroke (CIDisplacementDistortion), with
+//     CIPinchDistortion / CIBumpDistortion as the single-dab reference.
+//
+//  4. DROP SHADOW as a LAYER EFFECT — color, opacity, distance, size, and an
+//     ANGLE DIAL (PhotoCraft made him type the angle in degrees). Lives in the
+//     Layer… tool beside Glow (GlowTool.swift already has shadow/blur plumbing).
+//
+//  5. ZOOM: RIGHT-CLICK → FIT SCREEN — the context-menu habit PhotoCraft lacks.
+//     Keep a Fit Screen button too.
+//
+//  ⛔ ATTRIBUTION RULE FOR THIS WORK — his, 2026-10-11, plus our standing
+//     feedback_every_app_credits_others_code_and_disclaims_ownership:
+//   • APPLE FRAMEWORKS (Core Image / Core Graphics) need no credit line; they
+//     are the platform.
+//   • IF ANY ARTCRAFT CODE OR A CLOSELY PORTED ALGORITHM IS USED: add to the About
+//     sheet's "Acknowledgments" (ContentView.swift ~L7520):
+//         "Portions adapted from ArtCraft (github.com/storytold/artcraft),
+//          used under the MIT and Apache 2.0 licenses."
+//     and keep ArtCraft's copyright notice + NOTICE file text in the repo
+//     (Apache-2.0 §4 requires the NOTICE to travel with derived work). Mark the
+//     ported function in a comment naming the ArtCraft source file.
+//   • IDEAS FROM THE VIDEOS ARE NOT CODE: the sources list above is their credit.
+//   • Do NOT copy PhotoCraft's or Adobe's names, icons or screen layouts — the
+//     trade-dress risk Jeff Fagan's video raises.
+//
+//
+// MARK: - 🔤 FONT LIST — find, jump, preview (2026-10-11)
+//
+//  His words, 2026-10-11: "how can the user press f and it jumps to fonts
+//  begimming with f and what if they typed fut it would get closer without having
+//  to scroll throufg all of the fonts?" — then "yes add them to the developer
+//  notes" · "can the font name be written in the font type of the name listed, as
+//  a preview of each font? glyph fonts like wingdimgs would need something
+//  different". ⬜ NOTES ONLY — nothing below is coded.
+//
+//  TODAY (read in code 2026-10-11): FontPickerInspector, ContentView.swift ~L2872.
+//  A plain ScrollView of 203 Buttons, 150 pt tall. Typing does nothing; the user
+//  scrolls. Each name is ALREADY drawn in its own font (.font(.custom(fam, …))),
+//  which is why Wingdings' name renders as symbols.
+//  The family list comes from CTFontManagerCopyAvailableFontFamilyNames() — on
+//  this MacBook it returns 203 families incl. Futura, Impact, Helvetica,
+//  Wingdings (run standalone 2026-10-11; NOT yet seen in the app's own list).
+//
+//  1. FIND FONT FIELD above the list — typing "f" narrows to fonts beginning with
+//     F, "fut" narrows to Futura. Clearing it restores the full list.
+//
+//  2. TYPE-TO-JUMP when the list has focus — keystrokes scroll to the first match
+//     without hiding the rest (Finder-column behavior).
+//
+//  3. ⛔ 18 PT MINIMUM: the names are drawn at 16 pt today — below his rule.
+//     Raise to 18 pt (feedback_18pt_minimum_font).
+//
+//  4. PREVIEW RULE — name drawn in its own font ONLY when that shows a preview.
+//     Measured on this MacBook, 2026-10-11: 54 of 203 families need different
+//     handling, in two groups:
+//       • SYMBOL fonts — CTFontGetSymbolicTraits class == classSymbolic:
+//         Wingdings, Wingdings 2, Wingdings 3, Webdings, Zapf Dingbats, Symbol,
+//         Bodoni Ornaments, Apple Braille, Apple Color Emoji.
+//       • NO LATIN LETTERS — CTFontCopyCharacterSet lacks a–z (Arabic, Hebrew,
+//         Devanagari, … plus Symbols Nerd Font, which is not flagged symbolic).
+//     ⭐ Bodoni Ornaments HAS Latin letters but they are ornaments — so the test
+//        must be BOTH: preview-in-own-font  ⇔  hasLatin && !symbolic.
+//     For the others: name in the SYSTEM font (readable, 18 pt) + a short sample
+//     of the font's own characters beside it — first few glyphs for symbol
+//     fonts; a few native-script letters for the script fonts.
+//
+//  5. FONT LIST IS READ ONCE AT LAUNCH (static let). A font installed while the
+//     app is open appears only after relaunch. Consider re-reading on
+//     kCTFontManagerRegisteredFontsChangedNotification.
+//
+//  Attribution: Core Text is Apple's platform API — no credit line needed.
+//

@@ -2753,7 +2753,7 @@ struct FontPickerInspector: View {
     @Bindable var document: ImageDocument
     let activeLayerID: ImageLayer.ID?
 
-    @State private var family: String = FontPickerInspector.families.first ?? "Helvetica"
+    @State private var family: String = FontCatalog.shared.families.first?.name ?? "Helvetica"
     @State private var tint: Color = .black
     @State private var bold = false
     @State private var italic = false
@@ -2774,12 +2774,63 @@ struct FontPickerInspector: View {
     /// Center of the line just finished with Enter, so the next line spawns offset below it.
     @State private var lastLineCenter: CGPoint?
 
-    /// Installed font family names (Core Text — cross-platform), sorted.
-    static let families: [String] =
-        ((CTFontManagerCopyAvailableFontFamilyNames() as? [String]) ?? []).sorted()
+    /// Installed font families — re-read when fonts are installed (see FontCatalog.swift).
+    private var catalog: FontCatalog { FontCatalog.shared }
+    /// Find Font field. "f" narrows to F…, "fut" to Futura. Empty = every family.
+    @State private var findText = ""
+    /// Type-to-jump, Finder-column style: letters typed into the focused list build up a
+    /// prefix (reset after a pause), and the list scrolls to and outlines the first match.
+    /// It does NOT choose the font — Return or a click does — so typing "fut" never
+    /// restyles the text layer being edited three times on the way.
+    @State private var jumpBuffer = ""
+    @State private var lastJumpKey = Date.distantPast
+    @State private var jumpTarget: String?
+    @FocusState private var fontListFocused: Bool
 
     private func styled(_ text: Text) -> Text {
         text.bold(bold).italic(italic).underline(underline)
+    }
+
+    /// Choose a font from the list (click, Return on the jump target, or Return in Find).
+    private func pick(_ name: String) {
+        family = name
+        jumpTarget = nil
+        recomputeGlyphs()
+    }
+
+    /// One row of the Font list, 18 pt (his minimum). A font whose name can preview itself
+    /// is drawn in that font. A symbol font (Wingdings) or one without a–z (Arabic, Hebrew)
+    /// would turn its own name into symbols or fallback letters, so its name is drawn
+    /// plainly and a few of ITS characters sit beside it as the preview.
+    @ViewBuilder
+    private func fontRow(_ info: FontFamilyInfo) -> some View {
+        Button { pick(info.name) } label: {
+            HStack(spacing: 10) {
+                if info.previewsItself {
+                    styled(Text(info.name).font(.custom(info.name, size: 18)))
+                        .lineLimit(1)
+                } else {
+                    Text(info.name).font(.system(size: 18)).lineLimit(1)
+                    if !info.sample.isEmpty {
+                        Text(info.sample).font(.custom(info.name, size: 18))
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4).padding(.horizontal, 6)
+            .background(RoundedRectangle(cornerRadius: 6)
+                .fill(info.name == family ? Color.accentColor.opacity(0.2) : Color.clear))
+            .overlay(RoundedRectangle(cornerRadius: 6)
+                .stroke(info.name == jumpTarget ? Color.accentColor : Color.clear, lineWidth: 2))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .id(info.name)
+        .accessibilityLabel(info.name)
     }
 
     /// User-edit binding: typing in the field updates the live text layer. (Programmatic
@@ -2869,22 +2920,66 @@ struct FontPickerInspector: View {
             }
 
             Text("Font").font(.system(size: 18)).foregroundStyle(.secondary)
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(Self.families, id: \.self) { fam in
-                        Button { family = fam; recomputeGlyphs() } label: {
-                            styled(Text(fam).font(.custom(fam, size: 16)))
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 4).padding(.horizontal, 6)
-                                .background(RoundedRectangle(cornerRadius: 6)
-                                    .fill(fam == family ? Color.accentColor.opacity(0.2) : Color.clear))
-                        }
-                        .buttonStyle(.plain)
-                    }
+            // FIND FONT — his ask, 2026-10-11: "press f and it jumps to fonts beginning with
+            // f … typed fut it would get closer without having to scroll".
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Find font", text: $findText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 18))
+                    .autocorrectionDisabled()
+                    .onSubmit { if let first = catalog.matching(findText).first { pick(first.name) } }
+                if !findText.isEmpty {
+                    Button { findText = "" } label: { Image(systemName: "xmark.circle.fill") }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .help("Show every font")
                 }
             }
-            .frame(maxHeight: 150)
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.12)))
+
+            let shown = catalog.matching(findText)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(shown) { info in
+                            fontRow(info)
+                        }
+                        if shown.isEmpty {
+                            Text("No font matches “\(findText)”")
+                                .font(.system(size: 18)).foregroundStyle(.secondary)
+                                .padding(6)
+                        }
+                    }
+                }
+                .frame(maxHeight: 220)
+                // TYPE-TO-JUMP: click the list, then type.
+                .focusable()
+                .focused($fontListFocused)
+                .focusEffectDisabled()
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .stroke(fontListFocused ? Color.accentColor.opacity(0.6) : Color.clear, lineWidth: 2))
+                .onKeyPress(phases: .down) { press in
+                    if press.key == .return, let target = jumpTarget {
+                        pick(target); return .handled
+                    }
+                    guard let ch = press.characters.first, ch.isLetter || ch.isNumber || ch == " " else {
+                        return .ignored
+                    }
+                    let now = Date()
+                    if now.timeIntervalSince(lastJumpKey) > 1.0 { jumpBuffer = "" }
+                    lastJumpKey = now
+                    jumpBuffer.append(ch)
+                    if let hit = shown.first(where: {
+                        $0.name.range(of: jumpBuffer, options: [.caseInsensitive, .anchored]) != nil
+                    })?.name {
+                        jumpTarget = hit
+                        withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(hit, anchor: .top) }
+                    }
+                    return .handled
+                }
+                .onAppear { proxy.scrollTo(family, anchor: .center) }
+            }
 
             // Glyph browser (a real FontBook for the chosen font) — tapping a glyph APPENDS
             // it to the text, building a string from the keyboard AND the font's repertoire.
@@ -2972,16 +3067,10 @@ struct FontPickerInspector: View {
     }
 
     /// The chosen family's supported characters (its repertoire), bounded for speed.
+    /// Scans the Private Use Area too — Wingdings and Webdings keep every glyph there, so
+    /// the old ordinary-Unicode scan showed them as empty (found 2026-10-11).
     private func recomputeGlyphs() {
-        let font = CTFontCreateWithName(family as CFString, 24, nil)
-        let set = CTFontCopyCharacterSet(font) as CharacterSet
-        var out: [String] = []
-        for value in 0x21...0x33FF {
-            guard let scalar = Unicode.Scalar(value), set.contains(scalar) else { continue }
-            out.append(String(scalar))
-            if out.count >= 1000 { break }
-        }
-        glyphs = out
+        glyphs = FontCatalog.repertoire(of: family)
     }
 
     /// Create the live text layer on the first character, then keep it + its NAME in sync
