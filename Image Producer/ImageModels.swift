@@ -1865,6 +1865,20 @@ extension ImageDocument {
         projectsDirectory()?.appendingPathComponent(name).appendingPathExtension(ext)
     }
 
+    /// An EXISTING project written out as a .psd with all of its content — Open .psd on a
+    /// project (his word, 2026-10-11: "its opening a file that was already there but now
+    /// in psd format"). Not marked new, so no size question. The project is untouched.
+    @MainActor static func writePSD(fromProject project: URL, to url: URL) -> Bool {
+        guard let data = try? Data(contentsOf: project.appendingPathComponent("manifest.json")),
+              let manifest = try? JSONDecoder().decode(ImageProjectManifest.self, from: data)
+        else { return false }
+        let doc = ImageDocument(layers: [])
+        doc.load(manifest)
+        doc.name = url.deletingPathExtension().lastPathComponent
+        guard let psd = makeLayeredPSD(doc, includeHistory: true) else { return false }
+        do { try psd.write(to: url, options: .atomic); return true } catch { return false }
+    }
+
     /// A brand-new default image written as a PHOTOSHOP file — the Welcome window's
     /// Photoshop format (his ask, 2026-10-11). Image Producer's own PSD: it reopens with
     /// every layer editable and autosaves in place.

@@ -207,15 +207,33 @@ struct WelcomeView: View {
             return
         }
         Task {
-            let found = await Task.detached { ImageDocument.namedProjectURL(typed, ext: "psd") }.value
-            guard let url = found else {
+            let found = await Task.detached { () -> (psd: URL?, project: URL?) in
+                (ImageDocument.namedProjectURL(typed, ext: "psd"), ImageDocument.namedProjectURL(typed))
+            }.value
+            guard let url = found.psd else {
                 openError = "Could not find the Image Producer folder."
                 return
             }
             if !FileManager.default.fileExists(atPath: url.path) {
-                guard ImageDocument.writeNewPSD(at: url) else {
-                    openError = "Could not create \(url.lastPathComponent)."
-                    return
+                // An existing project by this name (staged, or found) comes in AS a .psd —
+                // its own content, no size question. Only a name with no file at all makes
+                // a blank new one.
+                let fm = FileManager.default
+                let project = stagedURL ?? found.project.flatMap { fm.fileExists(atPath: $0.path) ? $0 : nil }
+                if let project {
+                    var ok = false
+                    await RecentProjects.withAccess(project) {
+                        ok = ImageDocument.writePSD(fromProject: project, to: url)
+                    }
+                    guard ok else {
+                        openError = "Could not make \(url.lastPathComponent) from “\(project.deletingPathExtension().lastPathComponent)”."
+                        return
+                    }
+                } else {
+                    guard ImageDocument.writeNewPSD(at: url) else {
+                        openError = "Could not create \(url.lastPathComponent)."
+                        return
+                    }
                 }
             }
             await open(url)
