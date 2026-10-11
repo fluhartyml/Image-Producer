@@ -1545,6 +1545,19 @@ extension ImageDocument {
         let isNew = configuration.fileURL == nil
         #endif
         if isNew {
+            // DIAGNOSTIC (2026-10-11): who asks for a brand-new document? At launch the Mac
+            // build opened a blank ImageProducerNNNN instead of the Welcome window, and
+            // nothing in the app's own code calls for one. Appends the call stack to
+            // <container>/tmp/new-document-trace.txt. Remove once the cause is known.
+            let trace = "\(Date()) source=\(String(describing: context.creationSource))\n"
+                + Thread.callStackSymbols.prefix(40).joined(separator: "\n") + "\n\n"
+            let traceURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("new-document-trace.txt")
+            if let h = try? FileHandle(forWritingTo: traceURL) {
+                h.seekToEndOfFile(); h.write(Data(trace.utf8)); try? h.close()
+            } else {
+                try? Data(trace.utf8).write(to: traceURL)
+            }
             let doc = newDefault()
             doc.configuration = configuration
             doc.pendingNewName = nextProjectName()            // ImageProducerNNNN, never Untitled
