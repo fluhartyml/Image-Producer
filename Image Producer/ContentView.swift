@@ -7643,7 +7643,22 @@ struct AutosaveModifier: ViewModifier {
         // new date, so a later ⌘S does not see "changed by another application".
         let config = document.configuration
         let own = config?.fileURL.map { $0.standardizedFileURL == url.standardizedFileURL } ?? false
+        #if os(macOS)
+        // ⛔ The write must name THE OPEN NSDocument as its file presenter. Without that, the
+        // system tells the document "another writer changed your file" and the document
+        // reverts from disk — and SwiftUI's revert holds the main thread waiting on work that
+        // needs the main thread: a permanent beachball, every time, right after "Autosaved"
+        // (2026-10-11, builds 304/306/307/308; `makeFileCoordinator()` did NOT prevent it).
+        // A coordinator created WITH the document as presenter is never reported back to
+        // that same presenter — documented NSFileCoordinator behavior.
+        let presenter = own ? NSDocumentController.shared.document(for: url) : nil
+        let coordinator: NSFileCoordinator? = presenter.map { NSFileCoordinator(filePresenter: $0) }
+            ?? (own ? config?.makeFileCoordinator() : nil)
+        NSLog("ImageProducer autosave: own=%@ presenter=%@ url=%@", own ? "yes" : "no",
+              presenter == nil ? "NONE" : "found", url.lastPathComponent)
+        #else
         let coordinator = own ? config?.makeFileCoordinator() : nil
+        #endif
         PackageWriter.enqueue(data, to: url, coordinator: coordinator) { error in
             if let error {
                 doc.say("Autosave FAILED — \(error.localizedDescription)", kind: .warning)
@@ -7655,6 +7670,10 @@ struct AutosaveModifier: ViewModifier {
                 Task { @MainActor in
                     if let date, doc.configuration?.fileURL?.standardizedFileURL == url.standardizedFileURL {
                         doc.configuration?.lastContentModificationDate = date
+                        #if os(macOS)
+                        // So the document's next ⌘S does not see "changed by another app".
+                        NSDocumentController.shared.document(for: url)?.fileModificationDate = date
+                        #endif
                     }
                 }
             }
