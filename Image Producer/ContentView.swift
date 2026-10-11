@@ -1439,19 +1439,22 @@ struct CanvasInspector: View {
 
                 // Pixels — editable W × H. This is the explicit pixel-count change; existing
                 // art scales-to-fit the new shape, letterboxed on the background.
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Text("Pixels").font(.system(size: 18)).frame(width: 92, alignment: .leading)
-                    // W and H labels — his ask, 2026-10-11 ("H and W are not shown").
+                    // W and H labels — his ask, 2026-10-11 ("H and W are not shown"). The
+                    // trailing "px" went to make room (his screen: the row clipped W, H and
+                    // px); the px/in/mm/pt switch right below already names the unit.
                     Text("W").font(.system(size: 18)).foregroundStyle(.secondary).help("Width")
+                        .fixedSize()
                     TextField("W", value: widthBinding, format: .number)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
                         .disabled(sizeRule == .fluidHeight)
-                    Text("×").font(.system(size: 18))
+                    Text("×").font(.system(size: 18)).fixedSize()
                     Text("H").font(.system(size: 18)).foregroundStyle(.secondary).help("Height")
+                        .fixedSize()
                     TextField("H", value: heightBinding, format: .number)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
                         .disabled(sizeRule == .fluidWidth)
-                    Text("px").font(.system(size: 18)).foregroundStyle(.secondary)
                 }
 
                 HStack(spacing: 8) {

@@ -250,7 +250,8 @@ struct WelcomeView: View {
             return
         }
         let stem = source.deletingPathExtension().lastPathComponent
-        let ext = source.pathExtension
+        // A copy is a NEW project, so it takes the current extension (.prd); a .psd stays .psd.
+        let ext = ImageDocument.isPSD(source) ? source.pathExtension : ImageDocument.projectExtension
         var n = 2
         var copy = dir.appendingPathComponent("\(stem) \(n)").appendingPathExtension(ext)
         while FileManager.default.fileExists(atPath: copy.path) {
