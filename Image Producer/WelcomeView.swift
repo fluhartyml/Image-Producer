@@ -240,9 +240,13 @@ struct WelcomeView: View {
         }
     }
 
-    /// Copy `source` into the Image Producer folder as "<name> N" (the first free number
-    /// from 2) and open the copy. The Image Producer folder, not the source's own folder:
-    /// a Recent can live anywhere, and the sandbox only lets the app write its own folder.
+    /// New Image / New from Import on a file that already exists: a NEW PROJECT made from
+    /// it, named "<name> N" (first free number from 2), in the Image Producer folder, then
+    /// opened. ALWAYS a project (.prd) — a staged .psd is brought in as a project too (his
+    /// screen, 2026-10-11: he pressed New Image on the .psd and got another .psd). Only
+    /// Open .psd stays in .psd. The source is never touched. The Image Producer folder,
+    /// not the source's own: a Recent can live anywhere and the sandbox only lets the app
+    /// write its own folder.
     private func newFromCopy(of source: URL) async {
         let folder = await Task.detached { ImageDocument.projectsDirectory() }.value
         guard let dir = folder else {
@@ -250,8 +254,7 @@ struct WelcomeView: View {
             return
         }
         let stem = source.deletingPathExtension().lastPathComponent
-        // A copy is a NEW project, so it takes the current extension (.prd); a .psd stays .psd.
-        let ext = ImageDocument.isPSD(source) ? source.pathExtension : ImageDocument.projectExtension
+        let ext = ImageDocument.projectExtension
         var n = 2
         var copy = dir.appendingPathComponent("\(stem) \(n)").appendingPathExtension(ext)
         while FileManager.default.fileExists(atPath: copy.path) {
@@ -260,11 +263,21 @@ struct WelcomeView: View {
         }
         var failure: String?
         await RecentProjects.withAccess(source) {
-            do { try FileManager.default.copyItem(at: source, to: copy) }
-            catch { failure = error.localizedDescription }
+            if ImageDocument.isPSD(source) {
+                // The .psd's content, as a project.
+                guard let data = try? Data(contentsOf: source),
+                      let project = projectFromPSD(data, name: copy.deletingPathExtension().lastPathComponent)
+                else { failure = "it could not be read"; return }
+                let doc = ImageDocument(layers: [])
+                doc.load(project.manifest)
+                do { try doc.writePackage(to: copy) } catch { failure = error.localizedDescription }
+            } else {
+                do { try FileManager.default.copyItem(at: source, to: copy) }
+                catch { failure = error.localizedDescription }
+            }
         }
         if let failure {
-            openError = "Could not copy “\(stem)”: \(failure)"
+            openError = "Could not make a new project from “\(source.lastPathComponent)”: \(failure)"
             return
         }
         stagedURL = nil
