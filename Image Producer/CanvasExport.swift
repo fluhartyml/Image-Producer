@@ -42,10 +42,12 @@ extension Color {
 
 /// Render the document's visible layers to a CGImage at canvasPixelSize × `scale`.
 @MainActor func renderCanvasImage(_ document: ImageDocument, scale: CGFloat = 1,
-                                  includeBackgrounds: Bool = true) -> CGImage? {
+                                  includeBackgrounds: Bool = true,
+                                  text3DTime: Double? = nil) -> CGImage? {
     let renderer = ImageRenderer(content: ImageCompositeView(document: document,
                                                             size: document.canvasPixelSize,
-                                                            includeBackgrounds: includeBackgrounds))
+                                                            includeBackgrounds: includeBackgrounds)
+                                    .environment(\.text3DTime, text3DTime))
     renderer.scale = scale
     return renderer.cgImage
 }
@@ -444,6 +446,39 @@ func encodedImageData(_ cg: CGImage, as type: UTType) -> Data? {
     return out as Data
 }
 
+/// The 3D text layers that move (spin or wiggle), visible ones only.
+@MainActor func movingText3D(_ document: ImageDocument) -> [Text3D] {
+    document.layers.filter(\.isVisible).compactMap { $0.textContent?.threeD }
+        .filter { $0.isEnabled && $0.motion != .still }
+}
+
+/// ONE FULL LOOP OF THE 3D TEXT as an animated GIF — the whole picture, every frame,
+/// with every moving 3D text at the same moment of its loop. Length = the longest
+/// cycle among them, so the slowest one completes and the GIF loops seamlessly for it.
+/// His ask, 2026-10-11: 3D text that spins or wiggles, exported as a short animation.
+@MainActor func makeText3DLoopGIF(_ document: ImageDocument, fps: Double, loop: Bool) -> Data? {
+    let cycles = movingText3D(document).map { max(0.2, $0.secondsPerCycle) }
+    guard let length = cycles.max() else { return nil }
+    let rate = max(1, fps)
+    let count = max(2, Int((length * rate).rounded()))
+    let out = NSMutableData()
+    guard let dest = CGImageDestinationCreateWithData(out, UTType.gif.identifier as CFString,
+                                                      count, nil) else { return nil }
+    if loop {
+        let file = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
+        CGImageDestinationSetProperties(dest, file as CFDictionary)
+    }
+    let delay = length / Double(count)
+    let props = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: delay,
+                                                 kCGImagePropertyGIFUnclampedDelayTime: delay]]
+    for k in 0..<count {
+        guard let cg = renderCanvasImage(document, text3DTime: Double(k) * delay) else { return nil }
+        CGImageDestinationAddImage(dest, cg, props as CFDictionary)
+    }
+    guard CGImageDestinationFinalize(dest) else { return nil }
+    return out as Data
+}
+
 /// Formats the unified Export sheet (⌘E) offers — the project rendered out to a file.
 /// No legacy multi-size app-icon PNG set (deprecated: modern Xcode takes a single 1024
 /// PNG or an Icon Composer .icon, both covered by "PNG" / the layer PDF here).
@@ -458,6 +493,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     case pdfLayers = "PDF (one page per layer)"
     case psd = "Photoshop PSD (layers preserved)"
     case gifAnimated = "Animated GIF (one frame per layer)"
+    case gif3DText = "Animated GIF (3D text loop)"
 
     var id: String { rawValue }
 
@@ -467,7 +503,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .jpeg: return .jpeg
         case .tiff: return .tiff
         case .heic: return UTType("public.heic") ?? .png
-        case .gif, .gifAnimated:  return .gif
+        case .gif, .gifAnimated, .gif3DText:  return .gif
         case .bmp:  return .bmp
         case .pdfFlat, .pdfLayers: return .pdf
         case .psd:  return .photoshopDocument
@@ -483,6 +519,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .pdfLayers: return makeLayerPDF(document, matte: matte)
         case .psd:       return makeLayeredPSD(document)
         case .gifAnimated: return makeAnimatedGIF(document, fps: fps, loop: loop, cameraOnly: cameraOnly)
+        case .gif3DText: return makeText3DLoopGIF(document, fps: fps, loop: loop)
         default:
             guard let cg = renderCanvasImage(document) else { return nil }
             return encodedImageData(cg, as: utType)

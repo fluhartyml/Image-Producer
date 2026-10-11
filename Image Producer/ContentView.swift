@@ -2977,6 +2977,12 @@ struct FontPickerInspector: View {
                 }
             }
 
+            // 3D — his ask, 2026-10-11: "can we turn a font into a 3D object that can be
+            // animated?" (Text3D.swift)
+            if let id = currentTextLayerID {
+                Text3DSection(document: document, layerID: id)
+            }
+
             Text("Font").font(.system(size: 18)).foregroundStyle(.secondary)
             // FIND FONT — his ask, 2026-10-11: "press f and it jumps to fonts beginning with
             // f … typed fut it would get closer without having to scroll".
@@ -7163,6 +7169,21 @@ struct ExportSheet: View {
                 }
                 Toggle("Loop", isOn: $gifLoop).font(.system(size: 18))
             }
+            if format == .gif3DText {
+                // 3D TEXT LOOP (Text3D.swift): one full turn or swing, whole picture.
+                let moving = movingText3D(document)
+                Text(moving.isEmpty
+                     ? "No moving 3D text. In the Text tool, turn on 3D letters and choose Spin or Wiggle."
+                     : "One full turn or swing of the 3D text, the whole picture in every frame.")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(Int(gifFPS)) frames a second").font(.system(size: 18))
+                    Slider(value: $gifFPS, in: 1...24, step: 1)
+                }
+                Toggle("Loop", isOn: $gifLoop).font(.system(size: 18))
+            }
             if format == .pdfLayers {
                 Toggle("Flatten transparency onto a matte", isOn: $flattenMatte)
                 if flattenMatte {
@@ -7230,6 +7251,14 @@ struct TextElementView: View {
 
     var body: some View {
         let ref = min(size.width, size.height)
+        if let s = text.threeD, s.isEnabled {
+            // 3D LETTERS (Text3D.swift) fill the same box the flat letters would.
+            Text3DElementView(text: text, style: s,
+                              box: CGSize(width: t.contentSize.width * ref,
+                                          height: t.contentSize.height * ref))
+                .rotationEffect(.degrees(t.rotationDegrees))
+                .position(x: t.center.x * size.width, y: t.center.y * size.height)
+        } else {
         ZStack {
             if text.outline, text.outlineWidth > 0 {
                 let c = Color(hex: text.outlineColorHex) ?? .black
@@ -7242,6 +7271,7 @@ struct TextElementView: View {
         }
         .rotationEffect(.degrees(t.rotationDegrees))
         .position(x: t.center.x * size.width, y: t.center.y * size.height)
+        }
     }
 
     private func glyphs(_ color: Color, _ ref: CGFloat) -> some View {

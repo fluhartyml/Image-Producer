@@ -1106,6 +1106,9 @@ struct TextContent: Codable {
     /// Stroke width in CANVAS PIXELS — the unit he asked about ("per pixel or my point?").
     var outlineWidth: Double = 2
     var outlineColorHex = "#000000"
+    /// 3D LETTERS — extruded, posed or animated (Text3D.swift). nil = flat text.
+    /// His ask, 2026-10-11: "like if it says new can you make it spin or wiggle".
+    var threeD: Text3D?
 }
 
 extension TextContent {
@@ -1123,6 +1126,7 @@ extension TextContent {
         outline = try c.decodeIfPresent(Bool.self, forKey: .outline) ?? false
         outlineWidth = try c.decodeIfPresent(Double.self, forKey: .outlineWidth) ?? 2
         outlineColorHex = try c.decodeIfPresent(String.self, forKey: .outlineColorHex) ?? "#000000"
+        threeD = try c.decodeIfPresent(Text3D.self, forKey: .threeD)
     }
 }
 

@@ -1706,7 +1706,12 @@
 //  His words, 2026-10-11: "can we turn a font into a 3D object that can be
 //  animated?" · "like if it says new can you make it spin or wiggle back and
 //  forth?" — then "yes add the 3d text to the developer notes".
-//  ⬜ NOTES ONLY — nothing below is coded. No SceneKit/RealityKit in the app yet.
+//  ✅ CODED 2026-10-11 (Text3D.swift) — "yes code the 3d text". A setting on the
+//  text element (TextContent.threeD), Text tool → "3D letters": Still / Spin /
+//  Wiggle, speed, swing, turn, tilt, depth, bevel, side color. SceneKit SCNText +
+//  SCNRenderer offscreen (not deprecated in the OS 27 SDKs), drawn through
+//  TextElementView so canvas, exports and Camera all match. Export → "Animated GIF
+//  (3D text loop)" = one full cycle. Standalone render checked; NOT yet run in-app.
 //
 //  1. 3D TEXT LAYER — any installed font, extruded into a solid: depth, bevel
 //     (chamfer) on the edges, color or material, a light. Live text stays text
