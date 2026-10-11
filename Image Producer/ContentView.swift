@@ -5543,9 +5543,16 @@ struct CanvasView: View {
     private func glowingContent(_ layer: ImageLayer, size: CGSize) -> some View {
         // Same order as the export compositor — gradient, then glow, then opacity.
         let body = gradientedContent(layer, size: size)
-        if let glow = layer.glow, glow.isEnabled {
+        let shadow = layer.shadow.flatMap { $0.isEnabled ? $0 : nil }
+        if layer.glow?.isEnabled == true || shadow != nil {
+            // Shadow lowest, then the glow, then the art — the same stack as the export.
             ZStack {
-                GlowHalo(glow: glow, reference: min(size.width, size.height)) { body }
+                if let shadow {
+                    DropShadowCast(shadow: shadow, reference: min(size.width, size.height)) { body }
+                }
+                if let glow = layer.glow, glow.isEnabled {
+                    GlowHalo(glow: glow, reference: min(size.width, size.height)) { body }
+                }
                 body
             }
             .opacity(layer.opacity)
@@ -7304,9 +7311,16 @@ struct ImageCompositeView: View {
         // that result, THEN uniform opacity multiplies the whole thing. So a faded layer
         // glows faded, which is what you would expect from looking at it.
         let body = gradiented(layer)
-        if let glow = layer.glow, glow.isEnabled {
+        let shadow = layer.shadow.flatMap { $0.isEnabled ? $0 : nil }
+        if layer.glow?.isEnabled == true || shadow != nil {
+            // Drop shadow under the glow under the art (DropShadow.swift).
             ZStack {
-                GlowHalo(glow: glow, reference: min(size.width, size.height)) { body }
+                if let shadow {
+                    DropShadowCast(shadow: shadow, reference: min(size.width, size.height)) { body }
+                }
+                if let glow = layer.glow, glow.isEnabled {
+                    GlowHalo(glow: glow, reference: min(size.width, size.height)) { body }
+                }
                 body
             }
             .opacity(layer.opacity)

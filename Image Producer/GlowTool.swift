@@ -408,6 +408,7 @@ struct LayerInspector: View {
     /// choose is what also changes the picker" → "yes remove the picker".
     @State private var showTranslucent = false
     @State private var showGlow = false
+    @State private var showShadow = false
     @State private var showGreenKey = false
     @State private var showGradient = false
     @State private var showBlend = false
@@ -439,6 +440,7 @@ struct LayerInspector: View {
                         Divider()
                         translucentReveal(i)
                         glowReveal(i)
+                        shadowReveal(i)
                         greenKeyReveal(i)
                         gradientReveal(i)
                         blendReveal(i)
@@ -478,6 +480,7 @@ struct LayerInspector: View {
         guard let i = targetIndex, document.layers.indices.contains(i) else { return false }
         let layer = document.layers[i]
         return (layer.glow?.isEnabled ?? false)
+            || (layer.shadow?.isEnabled ?? false)
             || layer.opacity < 1.0
             || (layer.greenKey?.isEnabled ?? false)
             || (layer.gradient?.isEnabled ?? false)
@@ -655,6 +658,60 @@ struct LayerInspector: View {
         }
     }
 
+
+    // MARK: Child — Drop Shadow
+
+    /// DROP SHADOW — from the PhotoCraft test video (2026-10-11), with the angle DIAL
+    /// PhotoCraft lacked. See DropShadow.swift.
+    @ViewBuilder
+    private func shadowReveal(_ i: Int) -> some View {
+        DisclosureGroup(isExpanded: $showShadow) {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("Shadow this layer", isOn: shadowEnabled(i))
+                if document.layers[i].shadow?.isEnabled == true {
+                    let sh = document.layers[i].shadow ?? LayerShadow()
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Light angle — the shadow falls away from the dot")
+                            .font(.system(size: 18)).foregroundStyle(.secondary)
+                        AngleDial(degrees: shadowBinding(i).angleDegrees)
+                    }
+                    labelledSlider("Distance", value: shadowBinding(i).distanceFraction,
+                                   range: 0...0.15, readout: String(format: "%.1f%%", sh.distanceFraction * 100))
+                    labelledSlider("Size (softness)", value: shadowBinding(i).sizeFraction,
+                                   range: 0...0.10, readout: String(format: "%.1f%%", sh.sizeFraction * 100))
+                    labelledSlider("Opacity", value: shadowBinding(i).opacity,
+                                   range: 0...1, readout: String(format: "%.0f%%", sh.opacity * 100))
+                    HStack {
+                        Text("Color").font(.system(size: 18)).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Black") { shadowBinding(i).wrappedValue.colorHex = "#000000" }
+                            .buttonStyle(.bordered).controlSize(.small)
+                    }
+                    swatches(title: "", selection: shadowBinding(i).colorHex)
+                }
+            }
+            .padding(.top, 4)
+        } label: {
+            let sh = document.layers[i].shadow
+            revealLabel("Drop Shadow", expanded: $showShadow,
+                        on: sh?.isEnabled ?? false,
+                        detail: (sh?.isEnabled ?? false) ? "\(Int(sh?.angleDegrees ?? 120))°" : nil)
+        }
+    }
+
+    private func shadowBinding(_ i: Int) -> Binding<LayerShadow> {
+        Binding(get: { self.document.layers[i].shadow ?? LayerShadow() },
+                set: { self.document.layers[i].shadow = $0 })
+    }
+
+    private func shadowEnabled(_ i: Int) -> Binding<Bool> {
+        Binding(get: { self.document.layers[i].shadow?.isEnabled ?? false },
+                set: { on in
+                    var sh = self.document.layers[i].shadow ?? LayerShadow()
+                    sh.isEnabled = on
+                    self.document.layers[i].shadow = on ? sh : nil
+                })
+    }
 
     // MARK: Child — Green Key
 
@@ -979,6 +1036,7 @@ struct LayerInspector: View {
         var original = source
         original.id = UUID()
         original.glow = nil
+        original.shadow = nil
         original.opacity = 1.0
         original.greenKey = nil
         original.gradient = nil
@@ -995,6 +1053,7 @@ struct LayerInspector: View {
         // follows, and the reason the existing suffix is stripped first.
         var applied: [String] = []
         if source.glow?.isEnabled == true { applied.append("Glow") }
+        if source.shadow?.isEnabled == true { applied.append("Drop Shadow") }
         if source.opacity < 1.0 { applied.append("Translucent") }
         if source.greenKey?.isEnabled == true { applied.append("Green Key") }
         if source.gradient?.isEnabled == true { applied.append("Gradient") }
@@ -1004,7 +1063,7 @@ struct LayerInspector: View {
         // Strip EVERY effect label, not just Glow/Translucent — "(Green Key)" used to
         // survive the strip, so keying twice gave "Background (Green Key) (Green Key)".
         var base = source.name
-        let effect = "Glow|Translucent|Green Key|Gradient|Applied|Multiply|Screen|Overlay"
+        let effect = "Glow|Drop Shadow|Translucent|Green Key|Gradient|Applied|Multiply|Screen|Overlay"
         while let r = base.range(of: #" \((?:\#(effect))(?: \+ (?:\#(effect)))*(?: \d+)?\)$"#,
                                  options: .regularExpression) {
             base.removeSubrange(r)
@@ -1020,6 +1079,7 @@ struct LayerInspector: View {
         document.layers[i].setImage(png)
         document.layers[i].transform = document.coveringTransform(forPNG: png)
         document.layers[i].glow = nil          // pixels now, not a live effect
+        document.layers[i].shadow = nil        // baked in
         document.layers[i].opacity = 1.0       // baked in
         document.layers[i].greenKey = nil      // baked in
         document.layers[i].gradient = nil      // baked in

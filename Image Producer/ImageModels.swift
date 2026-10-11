@@ -733,6 +733,9 @@ struct ImageLayer: Identifiable, Codable {
     /// optional for the same reason `cameraFrame` is — documents written before the
     /// Glow tool shipped still decode. See GlowTool.swift.
     var glow: LayerGlow?
+    /// Drop shadow drawn UNDER this layer's artwork (and under its glow). nil = none;
+    /// optional so older documents decode. See DropShadow.swift.
+    var shadow: LayerShadow?
     /// GLOBAL color key — every pixel matching this color goes clear, holes and all.
     /// nil = no key. Optional for the same reason as `glow`. See GlowTool.swift.
     var greenKey: LayerGreenKey?
