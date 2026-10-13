@@ -1446,13 +1446,13 @@ struct CanvasInspector: View {
                     // px); the px/in/mm/pt switch right below already names the unit.
                     Text("W").font(.system(size: 18)).foregroundStyle(.secondary).help("Width")
                         .fixedSize()
-                    TextField("W", value: widthBinding, format: .number)
+                    CommitIntField(placeholder: "W", value: widthBinding)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
                         .disabled(sizeRule == .fluidHeight)
                     Text("×").font(.system(size: 18)).fixedSize()
                     Text("H").font(.system(size: 18)).foregroundStyle(.secondary).help("Height")
                         .fixedSize()
-                    TextField("H", value: heightBinding, format: .number)
+                    CommitIntField(placeholder: "H", value: heightBinding)
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
                         .disabled(sizeRule == .fluidWidth)
                 }
@@ -6765,6 +6765,38 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
 #endif
 
 // MARK: - Helpers
+
+/// A whole-number box that changes its value only on Return or on leaving the box —
+/// never per keystroke.
+///
+/// ⛔ HIS BUG, 2026-10-13, in the App Store build: *"its not letting my type in my custom
+/// dimentions it keeps stealing the keyboard"*. The canvas W/H boxes were bound straight to
+/// the canvas, so typing "1920" applied "1" first — a 1-pixel-wide canvas — and the autosave
+/// that followed reloaded the document and pushed him out of the box before he could type
+/// the rest. A size is one decision, not four: this holds what he types until he is done.
+struct CommitIntField: View {
+    let placeholder: String
+    @Binding var value: Int
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField(placeholder, text: $draft)
+            .focused($focused)
+            .onSubmit(commit)
+            .onChange(of: focused) { _, now in if !now { commit() } }
+            .onAppear { draft = value.formatted() }
+            .onChange(of: value) { _, v in if !focused { draft = v.formatted() } }
+    }
+
+    /// Apply what was typed (digits only, so "1,920" reads as 1920); anything that is not a
+    /// number just puts the current value back.
+    private func commit() {
+        if let n = Int(draft.filter(\.isNumber)), n != value { value = n }
+        draft = value.formatted()
+    }
+}
+
 
 extension Color {
     /// "#RRGGBB" (or "RRGGBB") -> Color. Returns nil on a malformed string.

@@ -220,20 +220,15 @@ enum IconSetExport {
     // different thing entirely: a WIDE icon built from at least two LAYERS (the TV shifts
     // them apart when the icon is focused), plus Top Shelf banners.
     //
-    // The layers fall straight out of the document: the BACK is the floor, stretched to the
-    // wide shape (it is a solid fill, so stretching loses nothing); the FRONT is every other
-    // visible layer, floors hidden, transparent, centred. Together they are exactly the
-    // square icon on its own floor, widened. Top Shelf is the two flattened.
+    // Each image is RENDERED on a copy of the canvas reshaped to that size (`widened`) — the
+    // canvas is adjusted, never stretched. The BACK layer is the floor; the FRONT is every
+    // other visible layer, on transparency; Top Shelf is the whole picture.
     //
     // Light AND dark, his words: "it does light and dark automatically". actool accepts
     // dark renditions in every tvOS well and stores them (checked the compiled Assets.car);
     // whether the TV swaps them with its own Dark setting is for the TV to show.
 
     static let tvFolderName = "App Icon & Top Shelf Image.brandassets"
-
-    /// The art is rendered once at the tallest height any TV image needs (Top Shelf @2x)
-    /// and drawn down from there.
-    static let tvArtPx = 1440
 
     private enum TVPart { case back, front, flat }
 
@@ -276,12 +271,9 @@ enum IconSetExport {
         var files: [String: Data] = [:]
         for appearance in [IconAppearance.light, .dark] {
             let lit = render(appearance, of: document)
-            guard let floor = floorColor(of: lit),
-                  let artPNG = ContentView.renderIconPNG(document: hidingFloors(lit), px: tvArtPx),
-                  let source = CGImageSourceCreateWithData(artPNG as CFData, nil),
-                  let art = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return [:] }
             for image in tvImages {
-                guard let png = compose(image, floor: floor, art: art) else { return [:] }
+                let stage = widened(lit, width: image.width, height: image.height)
+                guard let png = renderTV(stage, image) else { return [:] }
                 files["\(image.folder)/\(fileName(image, appearance))"] = png
             }
         }
@@ -289,24 +281,44 @@ enum IconSetExport {
         return files
     }
 
-    /// The colour of the one floor `render` left lit (it always fills a clear or missing one).
-    private static func floorColor(of document: ImageDocument) -> CGColor? {
-        for layer in document.layers where layer.isVisible {
-            if case .background(_, let hex?) = layer.role, let rgb = RGB(hex: hex) {
-                return CGColor(srgbRed: rgb.r, green: rgb.g, blue: rgb.b, alpha: 1)
+    /// A DETACHED copy whose CANVAS is reshaped to `width`×`height` — his rule, 2026-10-13:
+    /// "as long as it adjusts the canvas and doesnt stretch the canvas". The canvas grows
+    /// sideways; nothing on it changes shape:
+    ///   • floors and gradients simply cover the wider canvas;
+    ///   • images, symbols and text are already sized from the SHORTER edge and placed by
+    ///     a normalized centre, so they keep their size — only the centre is re-mapped, so
+    ///     everything sits exactly where it sat on the original canvas, now in the middle;
+    ///   • PIXEL painting is the one thing the compositor stretches to the full canvas, so
+    ///     here it becomes an ordinary picture at the original canvas's shape, on a layer
+    ///     of its own just under the one it came from (same opacity, blend and effects).
+    static func widened(_ document: ImageDocument, width: Int, height: Int) -> ImageDocument {
+        let oldAspect = Double(document.canvasWidth) / Double(max(1, document.canvasHeight))
+        let newAspect = Double(width) / Double(max(1, height))
+        let remap = { (x: CGFloat) in 0.5 + (x - 0.5) * CGFloat(oldAspect / newAspect) }
+        func isPixels(_ e: LayerElement) -> Bool { if case .pixels = e.content { true } else { false } }
+        var layers: [ImageLayer] = []
+        for var layer in document.layers {
+            guard case .content = layer.role else { layers.append(layer); continue }
+            let paint = layer.elements.filter(isPixels)
+            if !paint.isEmpty {
+                var painted = layer
+                painted.id = UUID()
+                painted.elements = paint.compactMap {
+                    guard case .pixels(let px) = $0.content else { return nil }
+                    return LayerElement(content: .image(ImageContent(pngData: px.pngData)))
+                }
+                painted.transform = LayerTransform()
+                painted.transform.scale = max(oldAspect, 1)   // fills the old canvas's height
+                painted.transform.center.x = remap(0.5)
+                layers.append(painted)
+                layer.elements.removeAll(where: isPixels)
+                if layer.elements.isEmpty { continue }
             }
-        }
-        return nil
-    }
-
-    /// The same detached copy with its floors hidden — the art alone, on transparency.
-    private static func hidingFloors(_ document: ImageDocument) -> ImageDocument {
-        var layers = document.layers
-        for i in layers.indices {
-            if case .background = layers[i].role { layers[i].isVisible = false }
+            layer.transform.center.x = remap(layer.transform.center.x)
+            layers.append(layer)
         }
         return ImageDocument(name: document.name,
-                             canvasWidth: document.canvasWidth,
+                             canvasWidth: Int((Double(document.canvasHeight) * newAspect).rounded()),
                              canvasHeight: document.canvasHeight,
                              layers: layers,
                              palette: document.palette,
@@ -314,28 +326,24 @@ enum IconSetExport {
                              ppi: document.ppi)
     }
 
-    /// Draw one TV image: the floor across the whole width, the square art centred at full
-    /// height. Only the FRONT layer keeps an alpha channel — it is the one that must be
-    /// see-through; the back and Top Shelf are flattened like the iOS icon.
-    private static func compose(_ image: TVImage, floor: CGColor, art: CGImage) -> Data? {
-        let w = image.width, h = image.height
-        let alpha = image.part == .front ? CGImageAlphaInfo.premultipliedLast : .noneSkipLast
-        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                  bitmapInfo: alpha.rawValue) else { return nil }
-        ctx.interpolationQuality = .high
-        if image.part != .front {
-            ctx.setFillColor(floor)
-            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+    /// Render one TV image from a widened copy. BACK = the floor alone; FRONT = everything
+    /// but the floor, on transparency (the one that keeps an alpha channel — the TV needs
+    /// to see through it); Top Shelf = the whole picture, flattened like the iOS icon.
+    private static func renderTV(_ document: ImageDocument, _ image: TVImage) -> Data? {
+        var stage = document
+        if image.part == .back {
+            var layers = document.layers
+            for i in layers.indices where layers[i].backgroundRole == nil { layers[i].isVisible = false }
+            stage = ImageDocument(name: document.name, canvasWidth: document.canvasWidth,
+                                  canvasHeight: document.canvasHeight, layers: layers,
+                                  palette: document.palette, cropRect: nil, ppi: document.ppi)
         }
-        if image.part != .back {
-            ctx.draw(art, in: CGRect(x: CGFloat(w - h) / 2, y: 0, width: CGFloat(h), height: CGFloat(h)))
-        }
-        guard let cg = ctx.makeImage() else { return nil }
-        let out = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(out, "public.png" as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(dest, cg, nil)
-        return CGImageDestinationFinalize(dest) ? out as Data : nil
+        let renderer = ImageRenderer(content: ImageCompositeView(
+            document: stage, size: CGSize(width: image.width, height: image.height),
+            includeBackgrounds: image.part != .front))
+        renderer.scale = 1
+        guard let cg = renderer.cgImage, let png = pngData(from: cg) else { return nil }
+        return image.part == .front ? png : stripAlpha(png)
     }
 
     /// Every Contents.json in the brand assets, laid out the way Xcode's own tvOS template does.
