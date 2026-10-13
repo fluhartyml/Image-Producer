@@ -211,6 +211,172 @@ enum IconSetExport {
                                             options: [.prettyPrinted, .sortedKeys])) ?? Data()
     }
 
+    // MARK: - Apple TV
+    //
+    // HIS ASK, 2026-10-13: "you need to update apple tv into the icon export". Found the same
+    // afternoon when the Mediaworks tvOS archive failed validation — "Missing Info.plist Key …
+    // CFBundleIcons.CFBundlePrimaryIcon" and "TVTopShelfImage.TVTopShelfPrimaryImageWide" —
+    // because AppIcon.appiconset only ever carried iPhone and Mac art. Apple TV wants a
+    // different thing entirely: a WIDE icon built from at least two LAYERS (the TV shifts
+    // them apart when the icon is focused), plus Top Shelf banners.
+    //
+    // The layers fall straight out of the document: the BACK is the floor, stretched to the
+    // wide shape (it is a solid fill, so stretching loses nothing); the FRONT is every other
+    // visible layer, floors hidden, transparent, centred. Together they are exactly the
+    // square icon on its own floor, widened. Top Shelf is the two flattened.
+    //
+    // Light AND dark, his words: "it does light and dark automatically". actool accepts
+    // dark renditions in every tvOS well and stores them (checked the compiled Assets.car);
+    // whether the TV swaps them with its own Dark setting is for the TV to show.
+
+    static let tvFolderName = "App Icon & Top Shelf Image.brandassets"
+
+    /// The art is rendered once at the tallest height any TV image needs (Top Shelf @2x)
+    /// and drawn down from there.
+    static let tvArtPx = 1440
+
+    private enum TVPart { case back, front, flat }
+
+    /// One PNG in the brand assets: where it goes, its pixel size, and which part it shows.
+    private struct TVImage {
+        let folder: String, stem: String, width: Int, height: Int, scale: Int, part: TVPart
+    }
+
+    private static let iconStack = "App Icon.imagestack"
+    private static let storeStack = "App Icon - App Store.imagestack"
+    private static let topShelf = "Top Shelf Image.imageset"
+    private static let topShelfWide = "Top Shelf Image Wide.imageset"
+
+    private static let tvImages: [TVImage] = {
+        var list: [TVImage] = []
+        for (stack, sizes) in [(iconStack, [(400, 240, 1), (800, 480, 2)]), (storeStack, [(1280, 768, 1)])] {
+            for (w, h, s) in sizes {
+                list.append(TVImage(folder: "\(stack)/Back.imagestacklayer/Content.imageset", stem: "back",
+                                    width: w, height: h, scale: s, part: .back))
+                list.append(TVImage(folder: "\(stack)/Front.imagestacklayer/Content.imageset", stem: "front",
+                                    width: w, height: h, scale: s, part: .front))
+            }
+        }
+        for (set, w, h) in [(topShelf, 1920, 720), (topShelfWide, 2320, 720)] {
+            for s in [1, 2] {
+                list.append(TVImage(folder: set, stem: "topshelf", width: w * s, height: h * s, scale: s, part: .flat))
+            }
+        }
+        return list
+    }()
+
+    private static func fileName(_ image: TVImage, _ appearance: IconAppearance) -> String {
+        image.stem + (image.scale == 2 ? "@2x" : "") + (appearance == .dark ? "-dark" : "") + ".png"
+    }
+
+    /// The Apple TV brand assets, light and dark — PNGs plus every Contents.json, keyed by
+    /// path inside the `.brandassets` folder. All or nothing: a set that names a dark file
+    /// it does not contain would fail in Xcode.
+    static func buildTV(from document: ImageDocument) -> [String: Data] {
+        var files: [String: Data] = [:]
+        for appearance in [IconAppearance.light, .dark] {
+            let lit = render(appearance, of: document)
+            guard let floor = floorColor(of: lit),
+                  let artPNG = ContentView.renderIconPNG(document: hidingFloors(lit), px: tvArtPx),
+                  let source = CGImageSourceCreateWithData(artPNG as CFData, nil),
+                  let art = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return [:] }
+            for image in tvImages {
+                guard let png = compose(image, floor: floor, art: art) else { return [:] }
+                files["\(image.folder)/\(fileName(image, appearance))"] = png
+            }
+        }
+        files.merge(tvContents()) { $1 }
+        return files
+    }
+
+    /// The colour of the one floor `render` left lit (it always fills a clear or missing one).
+    private static func floorColor(of document: ImageDocument) -> CGColor? {
+        for layer in document.layers where layer.isVisible {
+            if case .background(_, let hex?) = layer.role, let rgb = RGB(hex: hex) {
+                return CGColor(srgbRed: rgb.r, green: rgb.g, blue: rgb.b, alpha: 1)
+            }
+        }
+        return nil
+    }
+
+    /// The same detached copy with its floors hidden — the art alone, on transparency.
+    private static func hidingFloors(_ document: ImageDocument) -> ImageDocument {
+        var layers = document.layers
+        for i in layers.indices {
+            if case .background = layers[i].role { layers[i].isVisible = false }
+        }
+        return ImageDocument(name: document.name,
+                             canvasWidth: document.canvasWidth,
+                             canvasHeight: document.canvasHeight,
+                             layers: layers,
+                             palette: document.palette,
+                             cropRect: nil,
+                             ppi: document.ppi)
+    }
+
+    /// Draw one TV image: the floor across the whole width, the square art centred at full
+    /// height. Only the FRONT layer keeps an alpha channel — it is the one that must be
+    /// see-through; the back and Top Shelf are flattened like the iOS icon.
+    private static func compose(_ image: TVImage, floor: CGColor, art: CGImage) -> Data? {
+        let w = image.width, h = image.height
+        let alpha = image.part == .front ? CGImageAlphaInfo.premultipliedLast : .noneSkipLast
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: alpha.rawValue) else { return nil }
+        ctx.interpolationQuality = .high
+        if image.part != .front {
+            ctx.setFillColor(floor)
+            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        }
+        if image.part != .back {
+            ctx.draw(art, in: CGRect(x: CGFloat(w - h) / 2, y: 0, width: CGFloat(h), height: CGFloat(h)))
+        }
+        guard let cg = ctx.makeImage() else { return nil }
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out, "public.png" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, cg, nil)
+        return CGImageDestinationFinalize(dest) ? out as Data : nil
+    }
+
+    /// Every Contents.json in the brand assets, laid out the way Xcode's own tvOS template does.
+    private static func tvContents() -> [String: Data] {
+        let info: [String: Any] = ["author": "xcode", "version": 1]
+        func json(_ root: [String: Any]) -> Data {
+            (try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        }
+        var files: [String: Data] = [:]
+        files["Contents.json"] = json(["assets": [
+            ["filename": storeStack, "idiom": "tv", "role": "primary-app-icon", "size": "1280x768"],
+            ["filename": iconStack, "idiom": "tv", "role": "primary-app-icon", "size": "400x240"],
+            ["filename": topShelfWide, "idiom": "tv", "role": "top-shelf-image-wide", "size": "2320x720"],
+            ["filename": topShelf, "idiom": "tv", "role": "top-shelf-image", "size": "1920x720"],
+        ], "info": info])
+        for stack in [iconStack, storeStack] {
+            files["\(stack)/Contents.json"] = json(["layers": [["filename": "Front.imagestacklayer"],
+                                                              ["filename": "Back.imagestacklayer"]],
+                                                   "info": info])
+            for layer in ["Front", "Back"] {
+                files["\(stack)/\(layer).imagestacklayer/Contents.json"] = json(["info": info])
+            }
+        }
+        // One imageset Contents.json per folder, listing each scale in light then dark.
+        for folder in Set(tvImages.map(\.folder)) {
+            var images: [[String: Any]] = []
+            for image in tvImages where image.folder == folder {
+                for appearance in [IconAppearance.light, .dark] {
+                    var entry: [String: Any] = ["filename": fileName(image, appearance),
+                                                "idiom": "tv", "scale": "\(image.scale)x"]
+                    if appearance == .dark {
+                        entry["appearances"] = [["appearance": "luminosity", "value": "dark"]]
+                    }
+                    images.append(entry)
+                }
+            }
+            files["\(folder)/Contents.json"] = json(["images": images, "info": info])
+        }
+        return files
+    }
+
     // MARK: - Writing
 
     /// Write the set into `directory` as `AppIcon.appiconset` — inside a folder named for
@@ -222,18 +388,23 @@ enum IconSetExport {
     /// used to land as a bare `AppIcon.appiconset`, so two projects exported to the same
     /// place replaced each other and nothing said whose icon it was. The inner name stays
     /// `AppIcon.appiconset` because that is what Xcode's asset catalog expects.
+    ///
+    /// `setName` is the set's own folder — `AppIcon.appiconset`, or the Apple TV
+    /// `.brandassets`, whose file names carry subfolders ("App Icon.imagestack/…").
     static func write(_ files: [String: Data], into directory: URL,
-                      projectName: String? = nil) throws -> URL {
+                      projectName: String? = nil, setName: String = folderName) throws -> URL {
         var parent = directory
         if let folder = projectName.map(safeFolderName), !folder.isEmpty {
             parent = directory.appendingPathComponent(folder, isDirectory: true)
         }
-        let set = parent.appendingPathComponent(folderName, isDirectory: true)
+        let set = parent.appendingPathComponent(setName, isDirectory: true)
         let fm = FileManager.default
         if fm.fileExists(atPath: set.path) { try fm.removeItem(at: set) }
         try fm.createDirectory(at: set, withIntermediateDirectories: true)
         for (name, data) in files {
-            try data.write(to: set.appendingPathComponent(name), options: .atomic)
+            let url = set.appendingPathComponent(name)
+            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
         }
         return set
     }
@@ -254,11 +425,22 @@ enum IconSetExport {
             let dir = try chooseDirectory()
             guard let dir else { return "" }               // user cancelled
             let set = try write(files, into: dir, projectName: projectName)
+            let tvFiles = buildTV(from: document)
+            if !tvFiles.isEmpty {
+                _ = try write(tvFiles, into: dir, projectName: projectName, setName: tvFolderName)
+            }
+            let tvLine = tvFiles.isEmpty
+                ? "The Apple TV set could not be rendered, so only the iPhone/Mac set was written."
+                : "Beside it, \(tvFolderName) — the Apple TV icon (front and back layers) and Top Shelf "
+                  + "images, light and dark. In the app's build settings, set the tvOS App Icon to "
+                  + "\"App Icon & Top Shelf Image\"."
             return """
                 Wrote \(lightFile) and \(darkFile) to \(set.path).
 
                 The tinted well is declared but left empty — iOS derives it from the \
                 light icon.
+
+                \(tvLine)
 
                 Drag \(folderName) into Assets.xcassets.
                 """
