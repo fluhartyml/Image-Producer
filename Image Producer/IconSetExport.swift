@@ -176,10 +176,15 @@ enum IconSetExport {
     /// inside a layer app.
     static func build(from document: ImageDocument) -> [String: Data] {
         var files: [String: Data] = [:]
-        if let d = ContentView.renderIconPNG(document: render(.light, of: document), px: px) {
+        // ⭐ THE EXPORT OVERRIDES THE CANVAS SHAPE — his, 2026-10-13: "the export should
+        // overide those dimentions dont you think?" An app icon is square whatever the canvas
+        // is. Rendering a wide canvas straight into a square squeezed it (his 1920×720 export
+        // came out with the folder oversized), so the copy is reshaped to square first, the
+        // same way the Apple TV images are widened — trimmed at the sides, never squeezed.
+        if let d = ContentView.renderIconPNG(document: widened(render(.light, of: document), width: px, height: px), px: px) {
             files[lightFile] = stripAlpha(d)
         }
-        if let d = ContentView.renderIconPNG(document: render(.dark, of: document), px: px) {
+        if let d = ContentView.renderIconPNG(document: widened(render(.dark, of: document), width: px, height: px), px: px) {
             files[darkFile] = stripAlpha(d)
         }
         guard !files.isEmpty else { return [:] }
@@ -281,7 +286,8 @@ enum IconSetExport {
         return files
     }
 
-    /// A DETACHED copy whose CANVAS is reshaped to `width`×`height` — his rule, 2026-10-13:
+    /// A DETACHED copy whose CANVAS is reshaped to `width`×`height` (wider for Apple TV, square
+    /// for the iPhone/Mac icon whatever shape he left the canvas) — his rule, 2026-10-13:
     /// "as long as it adjusts the canvas and doesnt stretch the canvas". The canvas grows
     /// sideways; nothing on it changes shape:
     ///   • floors and gradients simply cover the wider canvas;
