@@ -4912,6 +4912,38 @@ private struct ToolPointer: ViewModifier {
         return Image(nsImage: out)
     }
 
+    /// The Zoom pointer: a black magnifier inside a white outline, a little larger than
+    /// the plain symbol. Michael, 2026-10-19: "pointer dissapears when im trying to zoom
+    /// in" — a flat black glass vanished into a dark picture, the same failure the drop
+    /// had. Same answer as the drop: two tones, so one always contrasts.
+    ///
+    /// The outline is the glyph STAMPED in a ring of offsets, not the glyph scaled up as
+    /// the drop does it. A magnifier is a ring: scaling it up only outlines the OUTSIDE,
+    /// leaving the inner edge of the lens black on a dark picture.
+    static func zoomPointer() -> Image {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
+        guard let glyph = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)?
+                .withSymbolConfiguration(cfg) else {
+            return Image(systemName: "magnifyingglass")
+        }
+
+        let inset: CGFloat = 2.5                    // outline thickness
+        let size = NSSize(width: glyph.size.width + inset * 2,
+                          height: glyph.size.height + inset * 2)
+        let halo = tinted(glyph, .white)
+        let out = NSImage(size: size)
+        out.lockFocus()
+        for step in 0..<16 {
+            let a = CGFloat(step) * .pi / 8
+            halo.draw(in: NSRect(x: inset + cos(a) * inset, y: inset + sin(a) * inset,
+                                 width: glyph.size.width, height: glyph.size.height))
+        }
+        tinted(glyph, .black).draw(in: NSRect(x: inset, y: inset,
+                                              width: glyph.size.width, height: glyph.size.height))
+        out.unlockFocus()
+        return Image(nsImage: out)
+    }
+
     /// Recolor a template symbol without losing its alpha shape.
     private static func tinted(_ image: NSImage, _ color: NSColor) -> NSImage {
         let out = NSImage(size: image.size)
@@ -4943,7 +4975,7 @@ private struct ToolPointer: ViewModifier {
         // The mask is dragged by its corners and its middle, so the pointer is the frame
         // itself, centered — same reasoning as Move.
         case .mask:       .image(Image(systemName: "square.dashed"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
-        case .zoom:       .image(Image(systemName: "magnifyingglass"), hotSpot: UnitPoint(x: 0.45, y: 0.45))
+        case .zoom:       .image(zoomPointer(),                    hotSpot: UnitPoint(x: 0.45, y: 0.45))
         case .symbol:     .image(Image(systemName: "star"),        hotSpot: UnitPoint(x: 0.5, y: 0.5))
 
         // ARROW, deliberately. Michael listed these as exceptions: they are driven from
