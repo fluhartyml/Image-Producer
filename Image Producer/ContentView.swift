@@ -117,6 +117,35 @@ struct ContentView: View {
     /// that fits its area has nowhere to go, so this resets whenever zoom returns to 1.
     @State private var canvasPan: CGSize = .zero
     @State private var panAtDragStart: CGSize = .zero
+    /// The canvas view's own frame (its layout size, before zoom), measured — the PiP
+    /// navigator maps its clicks with the same numbers the canvas draws with.
+    @State private var canvasFrame: CGSize = .zero
+
+    /// The on-screen canvas at 1× inside `canvasFrame` (CanvasView's own fit rule).
+    private var canvasDisplaySize: CGSize {
+        CanvasView.fittedDisplay(canvasWidth: document.canvasWidth,
+                                 canvasHeight: document.canvasHeight, in: canvasFrame)
+    }
+
+    /// The part of the canvas in view, in 0…1 canvas units — the box drawn on the PiP.
+    /// nil when there is nothing to navigate (1×, or Fit Width's own scroll view).
+    private var pipViewport: CGRect? {
+        let d = canvasDisplaySize, z = canvasZoom
+        guard !fitWidth, z > 1, d.width > 0, d.height > 0 else { return nil }
+        let w = canvasFrame.width / (d.width * z), h = canvasFrame.height / (d.height * z)
+        let cx = 0.5 - canvasPan.width / (d.width * z), cy = 0.5 - canvasPan.height / (d.height * z)
+        return CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h)
+    }
+
+    /// PiP NAVIGATION — Michael, 2026-10-19: "the PiP the pointer when clicked centers to
+    /// that exact point and click drag pans". `p` is a point on the canvas in 0…1; the
+    /// canvas is scaled about its centre then offset, so centring `p` is this offset.
+    private func centerCanvas(onNormalized p: CGPoint) {
+        let d = canvasDisplaySize, z = canvasZoom
+        guard !fitWidth, z > 1 else { return }
+        canvasPan = CGSize(width: -(p.x - 0.5) * d.width * z, height: -(p.y - 0.5) * d.height * z)
+        panAtDragStart = canvasPan                  // the Zoom tool's drag carries on from here
+    }
 
     /// What one double-click is worth. Michael, 2026-08-24: "you double click the canvas
     /// to zoom in +1.5x per double click".
@@ -758,6 +787,11 @@ struct ContentView: View {
                            activeTool: activeTool,
                            fillColor: $fillColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(GeometryReader { g in
+                        Color.clear
+                            .onAppear { canvasFrame = g.size }
+                            .onChange(of: g.size) { _, s in canvasFrame = s }
+                    })
                     .scaleEffect(canvasZoom)
                     .offset(canvasPan)
                     .gesture(pinchZoom)
@@ -798,7 +832,11 @@ struct ContentView: View {
         // corners of the canvas area rather than to the artwork.
         .overlay {
             if showProductionPiP {
-                GeometryReader { g in ProductionPiP(document: document, bounds: g.size) }
+                GeometryReader { g in
+                    ProductionPiP(document: document, bounds: g.size,
+                                  viewport: pipViewport,
+                                  onNavigate: { centerCanvas(onNormalized: $0) })
+                }
             }
         }
         .overlay(alignment: .bottomTrailing) { canvasControls }
@@ -903,7 +941,10 @@ struct ContentView: View {
     /// Always reachable — including in focus mode, which is the only way back out.
     private var canvasControls: some View {
         VStack(spacing: 6) {
-            Button { canvasFocused.toggle() } label: {
+            // EVERY CONTROL HERE PUTS YOU IN THE ZOOM TOOL. Michael, 2026-10-19: using the
+            // full-screen arrows, Fit Width or + / − "you should be automatically put in
+            // the zoom tool" — its inspector shows, and its drag pans the zoomed canvas.
+            Button { canvasFocused.toggle(); activeTool = .zoom } label: {
                 Image(systemName: canvasFocused
                       ? "arrow.down.right.and.arrow.up.left"
                       : "arrow.up.left.and.arrow.down.right")
@@ -915,7 +956,7 @@ struct ContentView: View {
 
             // Fit Width: fill the area width + scroll vertically, within the resizable
             // window (NOT full-screen). Sticky toggle; tinted when on.
-            Button { fitWidth.toggle() } label: { Image(systemName: "arrow.left.and.right") }
+            Button { fitWidth.toggle(); activeTool = .zoom } label: { Image(systemName: "arrow.left.and.right") }
                 .help(fitWidth ? "Fit width: on (tap to turn off)"
                                : "Fit width — fill the width, scroll vertically")
                 .accessibilityLabel("Fit width")
@@ -923,17 +964,17 @@ struct ContentView: View {
 
             Divider().frame(width: 26)
 
-            Button { setZoom(canvasZoom + zoomStep) } label: { Image(systemName: "plus") }
+            Button { setZoom(canvasZoom + zoomStep); activeTool = .zoom } label: { Image(systemName: "plus") }
                 .help("Zoom in")
                 .accessibilityLabel("Zoom in")
                 .disabled(canvasZoom >= maxZoom)
-            Button { setZoom(1) } label: {
+            Button { setZoom(1); activeTool = .zoom } label: {
                 Text("\(Int(canvasZoom * 100))%")
                     .font(.system(size: 11, weight: .semibold).monospacedDigit())
             }
             .help("Fit Screen — the whole canvas in view (100%)")
             .accessibilityLabel("Fit screen")
-            Button { setZoom(canvasZoom - zoomStep) } label: { Image(systemName: "minus") }
+            Button { setZoom(canvasZoom - zoomStep); activeTool = .zoom } label: { Image(systemName: "minus") }
                 .help("Zoom out")
                 .accessibilityLabel("Zoom out")
                 .disabled(canvasZoom <= minZoom)
@@ -5572,7 +5613,13 @@ struct CanvasView: View {
     /// letterboxed to fit inside the square area (a square canvas reduces to the old math).
     private func displayRect(in size: CGSize) -> CGSize {
         if fillFrame { return size }
-        let aspect = CGFloat(document.canvasWidth) / CGFloat(max(1, document.canvasHeight))
+        return Self.fittedDisplay(canvasWidth: document.canvasWidth,
+                                  canvasHeight: document.canvasHeight, in: size)
+    }
+
+    /// The fit rule on its own, so the PiP navigator uses the very same numbers.
+    static func fittedDisplay(canvasWidth: Int, canvasHeight: Int, in size: CGSize) -> CGSize {
+        let aspect = CGFloat(canvasWidth) / CGFloat(max(1, canvasHeight))
         let avail = min(size.width, size.height)
         return aspect >= 1
             ? CGSize(width: avail, height: avail / aspect)

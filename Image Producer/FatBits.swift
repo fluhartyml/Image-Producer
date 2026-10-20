@@ -173,6 +173,14 @@ struct ProductionPiP: View {
     /// The canvas display rect's size — corners are the CANVAS's, not the window's.
     let bounds: CGSize
 
+    /// ZOOMED IN, THE PiP IS A NAVIGATOR. Michael, 2026-10-19: "the PiP the pointer when
+    /// clicked centers to that exact point and click drag pans". `viewport` = the part
+    /// of the canvas in view (0…1 units), drawn as a box; nil at 1×, where there is
+    /// nothing to navigate and a drag moves the panel to a corner as before.
+    var viewport: CGRect? = nil
+    /// Called with a point on the canvas (0…1) to centre the view there.
+    var onNavigate: ((CGPoint) -> Void)? = nil
+
     /// Persisted: which corner. Defaults to bottom-LEADING because the canvas zoom
     /// controls already live bottom-trailing.
     @AppStorage("ip.pip.corner") private var cornerRaw: Int = PiPCorner.bottomLeading.rawValue
@@ -201,14 +209,32 @@ struct ProductionPiP: View {
         // looks BROKEN. He diagnosed a PERCEIVED bug, not a real one.
         // RULE: do not display a value the user cannot change and does not need.
         // It reads as a control that is failing.
+        let thumb = ProductionThumbnail.fitted(document.canvasPixelSize, side: side)
         ProductionThumbnail(document: document, side: side)
+            .frame(width: thumb.width, height: thumb.height)
+            .overlay {
+                if let v = viewport?.intersection(CGRect(x: 0, y: 0, width: 1, height: 1)), !v.isNull {
+                    Rectangle()
+                        .stroke(Color.accentColor, lineWidth: 2)
+                        .frame(width: max(4, v.width * thumb.width), height: max(4, v.height * thumb.height))
+                        .position(x: v.midX * thumb.width, y: v.midY * thumb.height)
+                        .allowsHitTesting(false)
+                }
+            }
+            .contentShape(Rectangle())
+            // Click = centre there; drag = keep centring under the pointer, i.e. pan.
+            .gesture(viewport == nil ? nil : DragGesture(minimumDistance: 0).onChanged { v in
+                onNavigate?(CGPoint(x: min(max(v.location.x / thumb.width, 0), 1),
+                                    y: min(max(v.location.y / thumb.height, 0), 1)))
+            })
             .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.25)))
         .shadow(radius: dragging ? 12 : 6, y: 2)
         .scaleEffect(dragging ? 1.04 : 1)          // it lifts while held
         .position(x: home.x + drag.width, y: home.y + drag.height)
-        .gesture(
+        // At 1× the drag moves the panel to a corner; zoomed in, the thumbnail navigates.
+        .gesture(viewport != nil ? nil :
             DragGesture()
                 .onChanged { v in
                     dragging = true
@@ -227,6 +253,7 @@ struct ProductionPiP: View {
                     }
                 }
         )
-        .help("Production preview — drag it to any corner. Never follows the canvas zoom.")
+        .help(viewport == nil ? "Production preview — drag it to any corner. Never follows the canvas zoom."
+                              : "Navigator — click to centre the view there, drag to pan")
     }
 }
