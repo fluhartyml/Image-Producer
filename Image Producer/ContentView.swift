@@ -4427,14 +4427,26 @@ struct MoveTransformInspector: View {
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Scale  \(Int(document.layers[idx].transform.scale * 100))%")
+                        // TYPE THE NUMBER. Michael, 2026-10-19: "i need to be able to enter
+                        // the scale number manually and the pixel number because the updown
+                        // arrow is too slow and 2 is too small where 2.5 is too large."
+                        // Both are fields: percent (tenths allowed) and the pixel size of
+                        // the LONGER side — the same unit the arrows jog. Return commits.
+                        Text("Scale")
                             .font(.system(size: 18))
-                        // THE PIXEL READOUT IS NOT DECORATION — without it the arrows read
-                        // as broken. See `scalePixelLabel`.
-                        Text(scalePixelLabel(idx))
+                        TextField("", value: scalePercentBinding(idx),
+                                  format: .number.precision(.fractionLength(0...1)))
                             .font(.system(size: 18))
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .frame(width: 72)
+                            .help("Scale in percent — type a value and press Return")
+                        Text("%").font(.system(size: 18))
+                        TextField("", value: scalePixelsBinding(idx), format: .number.grouping(.never))
+                            .font(.system(size: 18))
+                            .monospacedDigit()
+                            .frame(width: 72)
+                            .help("Size of the longer side in pixels — type a value and press Return")
+                        Text("px").font(.system(size: 18))
                         // JOG BY ONE PIXEL. His ask, 2026-09-15: "can you add an up down
                         // arrow to jog the scale by one pixel." The slider is deliberately
                         // unstepped (see below) and cannot be dragged finer than a few
@@ -4524,6 +4536,28 @@ struct MoveTransformInspector: View {
         let w = Int((size.width  * ref).rounded())
         let h = Int((size.height * ref).rounded())
         return w == h ? "\(w) px" : "W \(w) × H \(h) px"
+    }
+
+    /// The typed Scale field, in percent. Same limits as the slider (0.1×–4×).
+    private func scalePercentBinding(_ idx: Int) -> Binding<Double> {
+        Binding(
+            get: { document.layers.indices.contains(idx) ? document.layers[idx].transform.scale * 100 : 100 },
+            set: { pct in
+                guard document.layers.indices.contains(idx) else { return }
+                document.layers[idx].transform.scale = min(max(pct / 100, 0.1), 4.0)
+            })
+    }
+
+    /// The typed pixel field: the longer side in pixels, `scale × ref` — the unit `jogScale`
+    /// moves by, so typing and the arrows always agree. Floor one pixel, ceiling 4×.
+    private func scalePixelsBinding(_ idx: Int) -> Binding<Double> {
+        let ref = Double(max(1, min(document.canvasWidth, document.canvasHeight)))
+        return Binding(
+            get: { document.layers.indices.contains(idx) ? (document.layers[idx].transform.scale * ref).rounded() : ref },
+            set: { px in
+                guard document.layers.indices.contains(idx) else { return }
+                document.layers[idx].transform.scale = min(max(px.rounded(), 1) / ref, 4.0)
+            })
     }
 
     /// Nudge the layer's SIZE by whole pixels.
