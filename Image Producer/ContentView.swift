@@ -785,7 +785,8 @@ struct ContentView: View {
                            activeLayerID: $activeLayerID,
                            showTransformBox: activeTool == .move,
                            activeTool: activeTool,
-                           fillColor: $fillColor)
+                           fillColor: $fillColor,
+                           zoom: canvasZoom)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(GeometryReader { g in
                         Color.clear
@@ -4582,13 +4583,13 @@ struct MoveTransformInspector: View {
         return w == h ? "\(w) px" : "W \(w) × H \(h) px"
     }
 
-    /// The typed Scale field, in percent. Same limits as the slider (0.1×–4×).
+    /// The typed Scale field, in percent: 1%–400% (a corner drag reaches 1% too).
     private func scalePercentBinding(_ idx: Int) -> Binding<Double> {
         Binding(
             get: { document.layers.indices.contains(idx) ? document.layers[idx].transform.scale * 100 : 100 },
             set: { pct in
                 guard document.layers.indices.contains(idx) else { return }
-                document.layers[idx].transform.scale = min(max(pct / 100, 0.1), 4.0)
+                document.layers[idx].transform.scale = min(max(pct / 100, 0.01), 4.0)
             })
     }
 
@@ -5167,6 +5168,8 @@ struct CanvasView: View {
     /// frame supplies the aspect; here we just fill it so it can run taller than the
     /// viewport and scroll vertically.
     var fillFrame: Bool = false
+    /// The canvas zoom, so the Move box can keep its handles one size ON SCREEN.
+    var zoom: CGFloat = 1
     @EnvironmentObject var pen: PixelPen
     /// Live cursor position (in canvas space) for the brush-eraser footprint ring.
     @State private var brushHover: CGPoint?
@@ -5554,7 +5557,7 @@ struct CanvasView: View {
             .overlay {
                 ZStack {
                     if showTransformBox, let idx = activeIndex {
-                        TransformBox(document: document, index: idx, size: disp)
+                        TransformBox(document: document, index: idx, size: disp, zoom: zoom)
                     }
                 }
                 .frame(width: disp.width, height: disp.height)
@@ -5800,6 +5803,10 @@ struct TransformBox: View {
     @Bindable var document: ImageDocument
     let index: Int
     let size: CGSize
+    /// Canvas zoom. The box is drawn inside the zoomed canvas, so without this the
+    /// handles grew with the zoom — at 337% four of them covered a small layer entirely
+    /// and there was nowhere left to grab it to MOVE (Michael, 2026-10-19).
+    var zoom: CGFloat = 1
     @State private var startCenter: CGPoint?
     @State private var startAnchor: CGPoint?
 
@@ -5881,12 +5888,17 @@ struct TransformBox: View {
                         .onEnded { _ in startCenter = nil }
                 )
 
-            // Corner grabbers — drag to scale (aspect-locked, around the center).
+            // Corner grabbers — drag to scale. ONE SIZE ON SCREEN at any zoom (divided by
+            // the zoom the canvas is drawn at), and when the box is too small to hold them
+            // they sit OUTSIDE its corners, so the middle is always free to grab and move.
+            let z = max(zoom, 1)
+            let hv = grabVisual / z, ht = grabTarget / z
+            let push: CGFloat = (boxW < ht * 3 || boxH < ht * 3) ? ht / 2 : 0
             ForEach(Array(corners.enumerated()), id: \.offset) { _, off in
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: 2 / z)
                     .fill(Color.accentColor)
-                    .frame(width: grabVisual, height: grabVisual)
-                    .frame(width: grabTarget, height: grabTarget)   // invisible margin
+                    .frame(width: hv, height: hv)
+                    .frame(width: ht, height: ht)   // invisible margin
                     .contentShape(Rectangle())
                     #if os(macOS)
                     // A diagonal double-arrow for the corner under the pointer — his ask,
@@ -5897,8 +5909,8 @@ struct TransformBox: View {
                         : (off.height < 0 ? .topTrailing : .bottomTrailing)))
                     #endif
                     .position(center.offsetBy(
-                        rotate(CGSize(width: off.width * boxW / 2,
-                                      height: off.height * boxH / 2), by: radians)))
+                        rotate(CGSize(width: off.width * (boxW / 2 + push),
+                                      height: off.height * (boxH / 2 + push)), by: radians)))
                     .highPriorityGesture(
                         DragGesture(minimumDistance: 1, coordinateSpace: .named("canvas"))
                             .onChanged { value in
@@ -5923,33 +5935,39 @@ struct TransformBox: View {
                                     document.layers[index].transform.scale = min(max(max(nW, nH), 0.05), 4.0)
                                     document.layers[index].transform.contentAspect = min(max(nW / nH, 0.05), 20)
                                 } else {
-                                    // Non-text = uniform aspect-locked scale, about the layer's
-                                    // own centre (which is what `scale` means).
+                                    // PICTURES: the OPPOSITE corner stays put, the shape never
+                                    // changes. Michael, 2026-10-19: "i want to be able to move
+                                    // all four handles but i want them to maintain the aspect
+                                    // ratio without skewing the image" — it used to scale about
+                                    // the centre, so a corner could not be pinned to a spot.
                                     //
-                                    // The grabbed corner sits at  squareCenter + scale * v,
-                                    // where v is fixed by which corner it is and where the art
-                                    // sits in the layer. So the scale that puts that corner
-                                    // nearest the pointer is the projection of the drag onto v.
-                                    // Solving it this way keeps the corner under the pointer
-                                    // even when the art is off-centre in its layer — the old
-                                    // max(|dx|,|dy|) assumed the box was the whole square.
-                                    let v = rotate(CGSize(
-                                        width: (art.midX - 0.5 + off.width * art.width / 2) * ref,
-                                        height: (art.midY - 0.5 + off.height * art.height / 2) * ref),
-                                                   by: radians)
-                                    let vv = v.width * v.width + v.height * v.height
-                                    let newScale: Double
-                                    if vv > 0.0001 {
-                                        let dx = value.location.x - squareCenter.x
-                                        let dy = value.location.y - squareCenter.y
-                                        newScale = (dx * v.width + dy * v.height) / vv
-                                    } else {
-                                        // Degenerate (no measurable art): the old behavior.
-                                        let half = max(abs(value.location.x - squareCenter.x),
-                                                       abs(value.location.y - squareCenter.y))
-                                        newScale = (half * 2) / ref
+                                    // A corner sits at  squareCenter + scale · u(corner), u fixed
+                                    // by which corner and where the art sits in its layer. Pin
+                                    // the opposite corner A; the dragged one is then A + scale·d,
+                                    // d = u(this) − u(opposite) — the picture's own diagonal. The
+                                    // scale nearest the pointer is the projection onto d, and the
+                                    // square moves so A does not.
+                                    func u(_ o: CGSize) -> CGSize {
+                                        rotate(CGSize(width: (art.midX - 0.5 + o.width * art.width / 2) * ref,
+                                                      height: (art.midY - 0.5 + o.height * art.height / 2) * ref),
+                                               by: radians)
                                     }
-                                    document.layers[index].transform.scale = min(max(newScale, 0.1), 4.0)
+                                    let here = u(off)
+                                    let opposite = u(CGSize(width: -off.width, height: -off.height))
+                                    let s0 = document.layers[index].transform.scale
+                                    let anchor = startAnchor ?? CGPoint(x: squareCenter.x + s0 * opposite.width,
+                                                                        y: squareCenter.y + s0 * opposite.height)
+                                    if startAnchor == nil { startAnchor = anchor }
+                                    let d = CGSize(width: here.width - opposite.width,
+                                                   height: here.height - opposite.height)
+                                    let dd = d.width * d.width + d.height * d.height
+                                    guard dd > 0.0001 else { return }
+                                    let px = value.location.x - anchor.x, py = value.location.y - anchor.y
+                                    let newScale = min(max((px * d.width + py * d.height) / dd, 0.01), 4.0)
+                                    document.layers[index].transform.scale = newScale
+                                    document.layers[index].transform.center = CGPoint(
+                                        x: (anchor.x - newScale * opposite.width) / size.width,
+                                        y: (anchor.y - newScale * opposite.height) / size.height)
                                 }
                             }
                             .onEnded { _ in startAnchor = nil }
