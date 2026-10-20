@@ -352,6 +352,34 @@ private func rasterizePDFPage(_ page: PDFPage, pixelSize: CGSize) -> CGImage? {
     return added
 }
 
+/// THE SCALE THAT FITS (or fills) THE CANVAS with content of width÷height `aspect`.
+///
+/// The renderer draws an image inside a SQUARE of (short canvas edge × scale) and fits
+/// the picture into that square. On a square canvas scale 1.0 therefore fits — and that
+/// is all the old code ever assumed. On a tall canvas a tall picture fitted into a
+/// short-edge square came out at short÷long of the canvas: Michael's 1170×2532 iPhone
+/// screenshot imported at 46%, 2026-10-19 — *"it has done this before."*
+///
+/// Content `aspect` wide and 1 high is scaled by `k` to fit (min) or fill (max) the
+/// canvas; the square must be as big as that content's LONGER side.
+/// A square picture returns exactly the old 1.0, so nothing that already worked moves.
+func canvasFitScale(aspect a: Double, canvasWidth w: Int, canvasHeight h: Int,
+                    fill: Bool = false) -> Double {
+    let W = Double(max(1, w)), H = Double(max(1, h))
+    guard a > 0 else { return 1 }
+    let k = fill ? max(W / a, H) : min(W / a, H)
+    return max(a * k, k) / min(W, H)
+}
+
+/// Width÷height of a PNG's pixels, read from its header without decoding the image.
+func pngPixelAspect(_ png: Data) -> Double? {
+    guard let src = CGImageSourceCreateWithData(png as CFData, nil),
+          let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+          let pw = props[kCGImagePropertyPixelWidth] as? Int,
+          let ph = props[kCGImagePropertyPixelHeight] as? Int, pw > 0, ph > 0 else { return nil }
+    return Double(pw) / Double(ph)
+}
+
 /// Seed a document from a single IMAGE file — the new-document twin of `importPDFAsLayers`
 /// for the one-page case. The picture becomes one content layer and nothing else is
 /// invented (no Light/Dark floors), matching the PDF rule that the import IS the template.
@@ -371,6 +399,10 @@ private func rasterizePDFPage(_ page: PDFPage, pixelSize: CGSize) -> CGImage? {
     document.captureHistoryBaselineIfNeeded()
     var layer = ImageLayer(name: url.deletingPathExtension().lastPathComponent, role: .content)
     layer.setImage(png)
+    // The canvas IS the image, so the picture must fill it edge to edge.
+    let aspect = Double(cg.width) / Double(cg.height)
+    layer.transform.contentAspect = aspect
+    layer.transform.scale = canvasFitScale(aspect: aspect, canvasWidth: cg.width, canvasHeight: cg.height)
     document.layers.append(layer)          // append = top of the visual stack
     document.recordHistory(toolID: Tool.image.rawValue, groupTitle: Tool.image.title,
                            actionLabel: "Import Image", layerID: layer.id)

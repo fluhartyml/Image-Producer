@@ -3399,6 +3399,12 @@ struct ImageImportInspector: View {
         let name = url.deletingPathExtension().lastPathComponent
         var layer = ImageLayer(name: name.isEmpty ? "Image" : name, role: .content)
         layer.setImage(png)
+        // Fit the picture to the canvas by its real shape (see canvasFitScale).
+        if let aspect = pngPixelAspect(png) {
+            layer.transform.contentAspect = aspect
+            layer.transform.scale = canvasFitScale(aspect: aspect, canvasWidth: document.canvasWidth,
+                                                   canvasHeight: document.canvasHeight)
+        }
         layer.nameLinkedToText = false   // the name is the file's, not a text mirror
         document.captureHistoryBaselineIfNeeded()
         // Directly above the selected layer — where the user is working — or on top.
@@ -4630,15 +4636,25 @@ struct MoveTransformInspector: View {
         )
     }
 
-    /// Snap the active object to the canvas, centered. Fit = the limiting (larger)
-    /// dimension fills the canvas, the other letterboxes (scale 1.0). Fill = the
-    /// smaller dimension fills the canvas, the larger overflows and is clipped
-    /// (scale = max(aspect, 1/aspect), capped to the slider's 4× ceiling). Uses the
-    /// content's recorded aspect; a square object behaves identically either way.
+    /// Snap the active object to the canvas, centered. Fit = the whole object shows,
+    /// touching the canvas on its limiting side. Fill = the canvas is covered, the
+    /// overflow clipped (capped to the slider's 4× ceiling). Both now use the CANVAS's
+    /// shape too (canvasFitScale) — the old fixed 1.0 only fit a square canvas.
+    /// Aspect: the recorded one, else the picture's own pixels (a layer imported before
+    /// 2026-10-19 has none recorded), else square.
     private func applyFitFill(_ mode: FitFillMode, _ idx: Int) {
         guard document.layers.indices.contains(idx) else { return }
-        let aspect = document.layers[idx].transform.contentAspect ?? 1
-        let scale: Double = (mode == .fit) ? 1.0 : min(max(aspect, 1 / aspect), 4.0)
+        let picture = document.layers[idx].elements.lazy.compactMap { el -> Double? in
+            if case .image(let img) = el.content { return pngPixelAspect(img.pngData) }
+            return nil
+        }.first
+        let aspect = document.layers[idx].transform.contentAspect ?? picture ?? 1
+        if document.layers[idx].transform.contentAspect == nil, picture != nil {
+            document.layers[idx].transform.contentAspect = aspect
+        }
+        var scale = canvasFitScale(aspect: aspect, canvasWidth: document.canvasWidth,
+                                   canvasHeight: document.canvasHeight, fill: mode == .fill)
+        if mode == .fill { scale = min(scale, 4.0) }
         document.layers[idx].transform.scale = scale
         document.layers[idx].transform.center = CGPoint(x: 0.5, y: 0.5)
     }
