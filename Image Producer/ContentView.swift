@@ -4467,27 +4467,30 @@ struct MoveTransformInspector: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 10) {
+                    // "Scale" on its own line: at 18 pt the label, two fields, two units and
+                    // the arrows do not fit the inspector, and in one row the labels were
+                    // squeezed to nothing (build 334, his screen 2026-10-19).
+                    Text("Scale")
+                        .font(.system(size: 18))
+                    HStack(spacing: 8) {
                         // TYPE THE NUMBER. Michael, 2026-10-19: "i need to be able to enter
                         // the scale number manually and the pixel number because the updown
                         // arrow is too slow and 2 is too small where 2.5 is too large."
                         // Both are fields: percent (tenths allowed) and the pixel size of
                         // the LONGER side — the same unit the arrows jog. Return commits.
-                        Text("Scale")
-                            .font(.system(size: 18))
                         TextField("", value: scalePercentBinding(idx),
                                   format: .number.precision(.fractionLength(0...1)))
                             .font(.system(size: 18))
                             .monospacedDigit()
                             .frame(width: 72)
                             .help("Scale in percent — type a value and press Return")
-                        Text("%").font(.system(size: 18))
+                        Text("%").font(.system(size: 18)).fixedSize()
                         TextField("", value: scalePixelsBinding(idx), format: .number.grouping(.never))
                             .font(.system(size: 18))
                             .monospacedDigit()
                             .frame(width: 72)
                             .help("Size of the longer side in pixels — type a value and press Return")
-                        Text("px").font(.system(size: 18))
+                        Text("px").font(.system(size: 18)).fixedSize()
                         // JOG BY ONE PIXEL. His ask, 2026-09-15: "can you add an up down
                         // arrow to jog the scale by one pixel." The slider is deliberately
                         // unstepped (see below) and cannot be dragged finer than a few
@@ -5125,9 +5128,8 @@ struct CanvasView: View {
                 CropOverlay(crop: crop, size: disp)
                     .allowsHitTesting(false)
             }
-            if showTransformBox, let idx = activeIndex {
-                TransformBox(document: document, index: idx, size: disp)
-            }
+            // The Move box is NOT drawn here any more — see the overlay after the canvas
+            // gesture in `body`: in here its handles were inside the canvas's click area.
             // MASK TOOL: the same dimming, but around a four-cornered mask you can grab.
             // The overlay is inert; the box on top of it owns every gesture. Its handles
             // move the MASK ONLY — the artwork is never touched, which is the whole reason
@@ -5543,6 +5545,21 @@ struct CanvasView: View {
                             || activeTool == .text
                             || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
+            // THE MOVE BOX LIVES ABOVE THE CANVAS'S CLICK AREA. Michael, 2026-10-19: "the
+            // handles arnt grabbable". The canvas takes clicks only inside the picture
+            // (`.contentShape(Rectangle())` above), and the box used to be drawn inside it —
+            // so a layer bigger than the canvas (his 60's album art at 216%) had handles
+            // you could see but not grab. Same size, same origin, its own "canvas" space,
+            // so the box's drag math is unchanged; only the click area is new.
+            .overlay {
+                ZStack {
+                    if showTransformBox, let idx = activeIndex {
+                        TransformBox(document: document, index: idx, size: disp)
+                    }
+                }
+                .frame(width: disp.width, height: disp.height)
+                .coordinateSpace(name: "canvas")
+            }
             .modifier(ToolPointer(tool: activeTool, fillColor: fillColor))   // cursor reflects the active tool, and the bucket carries its color (macOS)
             // The production preview, floating over the canvas and visible with ANY
             // tool active — which is the whole point (R2: it updates as each pixel
