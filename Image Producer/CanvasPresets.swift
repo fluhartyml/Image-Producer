@@ -121,6 +121,16 @@ extension CanvasPreset {
             CanvasPresetSubset(title: "Icon", presets: [
                 .pixels("App icon", 1024, 1024),
             ]),
+            // REM  APP STORE CREATIVE ASSETS (iOS/iPadOS 27 and later) — his word, 2026-10-21: "add the sizes to image
+            // REM  producers pre defined canvases". Source: Apple, App Store Connect Help → Creative assets specifications,
+            // REM  read 2026-10-21. No transparency; the 16:9 sizes are PNG only. Search results 3:2 runs from 1920 × 1280
+            // REM  to 3840 × 2560 — the largest is the preset.
+            CanvasPresetSubset(title: "Creative assets", presets: [
+                .pixels("Product page header 21:9", 3840, 1646),
+                .pixels("Product page header 16:9", 5244, 2950),
+                .pixels("Search results 3:2", 3840, 2560),
+                .pixels("Search results 16:9", 5244, 2950),
+            ]),
         ]),
         CanvasPresetGroup(title: "Wallpapers", subsets: [
             CanvasPresetSubset(title: "iPhone & iPad", presets: [
