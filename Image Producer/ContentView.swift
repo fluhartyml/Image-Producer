@@ -7393,6 +7393,21 @@ struct ExportSheet: View {
                     ColorPicker("Matte color", selection: $matte, supportsOpacity: false)
                 }
             }
+            if format == .lsr {
+                // A WARNING, NEVER A GATE — same as the print-shop size warning. The export
+                // always runs; Apple's rule is stated, the choice stays his.
+                let n = parallaxLayers(document).count
+                Text("\(n) visible layer\(n == 1 ? "" : "s"), bottom layer at the back. "
+                     + "Apple TV uses 2 to 5 layers, with a solid back layer."
+                     + (n < 2 || n > 5 ? " This project is outside that." : ""))
+                    .font(.system(size: 18))
+                    .foregroundStyle(n < 2 || n > 5 ? .orange : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Tilt preview. Hover or drag to tilt.")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.secondary)
+                ParallaxTiltPreview(document: document)
+            }
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }

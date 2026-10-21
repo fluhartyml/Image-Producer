@@ -524,6 +524,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     case pdfFlat = "PDF (flat)"
     case pdfLayers = "PDF (one page per layer)"
     case psd = ".psd (layers preserved)"
+    case lsr = ".lsr (Apple TV parallax)"
     case gifAnimated = "Animated GIF (one frame per layer)"
     case gif3DText = "Animated GIF (3D text loop)"
 
@@ -539,6 +540,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .bmp:  return .bmp
         case .pdfFlat, .pdfLayers: return .pdf
         case .psd:  return .photoshopDocument
+        case .lsr:  return .layeredSourceImage
         }
     }
 
@@ -550,6 +552,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .pdfFlat:   return makeFlatPDF(document)
         case .pdfLayers: return makeLayerPDF(document, matte: matte)
         case .psd:       return makeLayeredPSD(document)
+        case .lsr:       return makeLSR(document)
         case .gifAnimated: return makeAnimatedGIF(document, fps: fps, loop: loop, cameraOnly: cameraOnly)
         case .gif3DText: return makeText3DLoopGIF(document, fps: fps, loop: loop)
         default:
@@ -570,7 +573,7 @@ extension UTType {
 /// A plain data file for SwiftUI's `.fileExporter` — any format the Export sheet writes.
 struct CanvasDataDocument: FileDocument {
     static var readableContentTypes: [UTType] {
-        [.png, .jpeg, .tiff, .gif, .bmp, .pdf, UTType("public.heic") ?? .png, .photoshopDocument]
+        [.png, .jpeg, .tiff, .gif, .bmp, .pdf, UTType("public.heic") ?? .png, .photoshopDocument, .layeredSourceImage]
     }
     static var writableContentTypes: [UTType] { readableContentTypes }
     var data: Data
