@@ -106,6 +106,9 @@ final class ImageDocument {
     var adjustmentRequested: Adjustment?
     /// Move / Transform's Apply button asks the editor to commit the placement. Not saved.
     var moveApplyRequested = false
+    /// Move / Transform's Flip buttons ask the editor to commit the placement, then flip
+    /// the active layer (Flip.swift). Not saved; consumed at once.
+    var moveFlipRequested: FlipAxis?
     /// Set by a fluid canvas resize, which rewrites every layer's placement at once:
     /// tells the linked-layer follower to skip that one change. Not saved; consumed once.
     @ObservationIgnored var skipLinkFollowOnce = false

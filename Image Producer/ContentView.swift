@@ -856,6 +856,18 @@ struct ContentView: View {
             commitMoveSession()
             beginMoveSessionIfNeeded()
         }
+        // Move's Flip buttons: commit any placement first (so the kept original records
+        // it), flip, then open a fresh session on the flipped layer.
+        .onChange(of: document.moveFlipRequested) { _, axis in
+            guard let axis else { return }
+            document.moveFlipRequested = nil
+            commitMoveSession()
+            if let id = activeLayerID,
+               let i = document.layers.firstIndex(where: { $0.id == id }) {
+                document.flipLayer(at: i, axis: axis)
+            }
+            beginMoveSessionIfNeeded()
+        }
         // Selecting a different layer commits the one you were placing.
         .onChange(of: activeLayerID) {
             commitMoveSession()
@@ -4543,6 +4555,24 @@ struct MoveTransformInspector: View {
                     Label("Apply", systemImage: "checkmark").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                // FLIP — Michael, 2026-10-23: "build flip". Apple's own names (Preview,
+                // Photos). Each press leaves the original hidden underneath (Flip.swift).
+                HStack {
+                    Button {
+                        document.moveFlipRequested = .horizontal
+                    } label: {
+                        Label("Flip Horizontal", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+                    }
+                    .help("Mirror this layer left to right — the original stays hidden underneath")
+                    Button {
+                        document.moveFlipRequested = .vertical
+                    } label: {
+                        Label("Flip Vertical", systemImage: "arrow.up.and.down.righttriangle.up.righttriangle.down")
+                    }
+                    .help("Turn this layer upside down — the original stays hidden underneath")
+                }
+                .font(.system(size: 18))
+                .buttonStyle(.bordered)
                 HStack {
                     Button("Center") {
                         guard document.layers.indices.contains(idx) else { return }
