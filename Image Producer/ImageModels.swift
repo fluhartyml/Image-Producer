@@ -1003,6 +1003,17 @@ struct LayerTransform: Codable, Equatable {
     /// saved before crop set it. Lets the Move box hug a non-square object and lets
     /// Fit/Fill snap it to the canvas with the right geometry.
     var contentAspect: Double? = nil
+    /// FLIP for LIVE content (text, symbols) — mirrored at draw time so the words stay
+    /// typeable. Michael, 2026-10-23: "yes fix it" (keep text live), under his rule "no
+    /// rasterization please unless specifically asked". nil = not flipped (older files).
+    /// Pictures never use these: their own pixels are flipped instead (Flip.swift).
+    var mirrorX: Bool? = nil
+    var mirrorY: Bool? = nil
+
+    /// The draw-time scale for the mirror flags: -1 on a flipped axis, else 1.
+    var mirrorScale: CGSize {
+        CGSize(width: mirrorX == true ? -1 : 1, height: mirrorY == true ? -1 : 1)
+    }
 
     /// True when nothing has ever placed this layer — the transform is still exactly as
     /// constructed. Used to tell "the user put it here" apart from "no one has decided
@@ -1010,6 +1021,7 @@ struct LayerTransform: Codable, Equatable {
     /// draws at the SHORT edge, i.e. half width on a 2:1 banner.
     var isUntouchedDefault: Bool {
         contentAspect == nil
+        && mirrorX != true && mirrorY != true
         && rotationDegrees == 0
         && abs(scale - 1.0) < 0.000_001
         && abs(center.x - 0.5) < 0.000_001

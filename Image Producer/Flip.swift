@@ -7,23 +7,32 @@
 //  "build flip and go over with me how to use it", after he wanted to mirror the
 //  background of his Lab A wallpaper and found the app could not.
 //
-//  // REM: Flip follows the NON-DESTRUCTIVE RULE (GlowTool `apply`): it never mutates a
-//  // layer in place. Undo is OFF on purpose (UndoManager crashed this app), so layering
-//  // IS the undo — the untouched original goes directly BELOW, hidden, and the flipped
-//  // copy sits on top with the original's id, so the selection stays on it.
+//  // REM: NOTHING IS RASTERIZED. His rule (2026-10-03): "no rasterization please unless
+//  // specifically asked to by the user." The first cut (build 341) flipped a render of
+//  // the layer, which turned text into pixels — he said "yes fix it" the same morning.
+//  // Now each element flips in its OWN kind:
+//  //   • text / symbol → the transform's mirror flags; drawn mirrored, still typeable;
+//  //   • image / pixels → their own pixels are mirrored (they were pixels already);
+//  //   • live effects (glow, shadow, gradient…) are untouched and follow the art.
 //
-//  // REM: It flips the layer AS IT LOOKS — the same render Apply uses, so a glow, shadow
-//  // or text all flip with it. The catch is the same as Apply's: the result is pixels,
-//  // so a flipped text layer is no longer typeable. The hidden original still is.
+//  // REM: Follows the NON-DESTRUCTIVE RULE (GlowTool `apply`). Undo is OFF on purpose
+//  // (UndoManager crashed this app), so layering IS the undo — the untouched original
+//  // goes directly BELOW, hidden, and the flipped copy sits on top keeping the
+//  // original's id, so the selection stays on it.
 //
-//  // REM: The mirror line runs through the middle of the layer's VISIBLE ART, not the
-//  // middle of the canvas — so the art flips where it stands instead of jumping to the
-//  // other side. A full-canvas layer (a background) has its art box = the canvas, so it
-//  // mirrors about the canvas centre, which is what he asked for.
+//  // REM: Flipping a ROTATED layer mirrors the whole thing about its centre, which is
+//  // the same as flipping the art and turning the angle the other way (θ → −θ).
+//
+//  // REM: Where the mirror line runs. Text and symbols fill their own box, so the
+//  // layer's centre is the art's centre. A picture with rotation 0 mirrors about its
+//  // VISIBLE ART — a Remove Background cutout keeps the full canvas size, and mirroring
+//  // the whole canvas would throw the subject to the other side. A full-canvas
+//  // background's art IS the canvas, so it mirrors about the canvas centre.
 //
 
 import SwiftUI
 import CoreGraphics
+import ImageIO
 
 enum FlipAxis: String {
     case horizontal, vertical
@@ -41,36 +50,53 @@ extension ImageDocument {
         guard layers.indices.contains(i) else { return false }
         let source = layers[i]
         // A solid background layer has no picture to turn over.
-        guard case .content = source.role else {
-            say("Flip works on picture and text layers, not a solid background", kind: .warning)
+        guard case .content = source.role, !source.elements.isEmpty else {
+            say("Flip works on picture, text and symbol layers", kind: .warning)
             return false
         }
-        // Fail-safe: if the render or the art box fails, change nothing.
-        guard let cg = renderLayerImage(source, in: self) else {
-            say("Flip failed — the layer could not be rendered", kind: .warning)
-            return false
-        }
-        guard let box = Self.opaquePixelBox(of: cg) else {
-            say("This layer is empty — nothing to flip", kind: .warning)
-            return false
-        }
-        guard let flipped = Self.mirrored(cg, across: axis, about: box),
-              let png = pngData(from: flipped) else {
-            say("Flip failed — the layer could not be rendered", kind: .warning)
-            return false
+
+        // Build every flipped element first. Fail-safe: if any picture can't be
+        // flipped, change nothing at all.
+        let keepsArtInPlace = source.transform.rotationDegrees == 0
+        var elements: [LayerElement] = []
+        var flipsTransform = false
+        for element in source.elements {
+            var e = element
+            switch element.content {
+            case .text, .symbol:
+                flipsTransform = true
+            case .image(var image):
+                guard let png = Self.mirroredPNG(image.pngData, across: axis,
+                                                 aboutArt: keepsArtInPlace) else {
+                    say("Flip failed — the picture could not be read", kind: .warning)
+                    return false
+                }
+                image.pngData = png
+                e.content = .image(image)
+            case .pixels(var pixels):
+                // A pixel layer fills the canvas with no rotation: always about its art.
+                guard let png = Self.mirroredPNG(pixels.pngData, across: axis, aboutArt: true) else {
+                    say("Flip failed — the picture could not be read", kind: .warning)
+                    return false
+                }
+                pixels.pngData = png
+                e.content = .pixels(pixels)
+            }
+            elements.append(e)
         }
 
         captureHistoryBaselineIfNeeded()
 
-        // The original, exactly as it was (live effects and all), hidden underneath.
-        // Fresh id — it is a second layer now. Unlinked, so it stays where it was.
+        // The original, exactly as it was, hidden underneath. Fresh id — it is a second
+        // layer now. Unlinked, so it stays where it was.
         var original = source
         original.id = UUID()
         original.isVisible = false
         original.linkGroup = nil
 
         // Naming follows Apply and Move: strip an earlier "(Flipped)" / "(Flipped n)" so
-        // flipping twice numbers instead of compounding.
+        // flipping twice numbers instead of compounding. The suffix is a LABEL
+        // (`ImageLayer.splitLabel`), so a text layer stays linked to its words.
         var base = source.name
         if let r = base.range(of: #" \(Flipped(?: \d+)?\)$"#, options: .regularExpression) {
             base.removeSubrange(r)
@@ -80,19 +106,21 @@ extension ImageDocument {
         var n = 1
         while taken.contains(candidate(n)) { n += 1 }
 
+        var t = source.transform
+        if flipsTransform {
+            switch axis {
+            case .horizontal: t.mirrorX = !(t.mirrorX ?? false)
+            case .vertical:   t.mirrorY = !(t.mirrorY ?? false)
+            }
+        }
+        if t.rotationDegrees != 0 { t.rotationDegrees = -t.rotationDegrees }
+        // A flip is not a move: don't let linked layers follow it (LayerLink).
+        if source.linkGroup != nil, t != source.transform { skipLinkFollowOnce = true }
+
         layers[i].name = candidate(n)
-        layers[i].setImage(png)
-        layers[i].transform = coveringTransform(forPNG: png)
-        // Baked into the pixels, exactly as Apply clears them.
-        layers[i].glow = nil
-        layers[i].shadow = nil
-        layers[i].opacity = 1.0
-        layers[i].greenKey = nil
-        layers[i].gradient = nil
+        layers[i].elements = elements
+        layers[i].transform = t
         layers[i].isVisible = true
-        // A text layer names itself from its words; left linked, the next keystroke
-        // would wipe the "(Flipped)" label off a layer that is pixels now.
-        layers[i].nameLinkedToText = false
 
         let flippedID = layers[i].id
         layers.insert(original, at: i)    // directly BELOW the flipped copy
@@ -103,6 +131,18 @@ extension ImageDocument {
                       layerID: flippedID)
         say("\(axis.title) — the original is hidden underneath")
         return true
+    }
+
+    /// PNG bytes mirrored across `axis`. `aboutArt` puts the mirror line through the
+    /// middle of the visible pixels; otherwise through the middle of the picture.
+    nonisolated static func mirroredPNG(_ data: Data, across axis: FlipAxis, aboutArt: Bool) -> Data? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return nil }
+        let whole = CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
+        // A fully transparent picture has nothing to move; mirror it whole.
+        let box = aboutArt ? (opaquePixelBox(of: cg) ?? whole) : whole
+        guard let out = mirrored(cg, across: axis, about: box) else { return nil }
+        return pngData(from: out)
     }
 
     /// The box around every pixel that is at least faintly visible, in pixel

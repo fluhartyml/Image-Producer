@@ -5817,6 +5817,7 @@ struct CanvasView: View {
                 .scaledToFit()
                 .foregroundStyle(Color(hex: symbol.tintHex) ?? .primary)
                 .frame(width: ref * t.scale, height: ref * t.scale)
+                .scaleEffect(t.mirrorScale)   // Flip, kept live (Flip.swift)
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .text(let text):
@@ -7504,6 +7505,7 @@ struct TextElementView: View {
             Text3DElementView(text: text, style: s,
                               box: CGSize(width: t.contentSize.width * ref,
                                           height: t.contentSize.height * ref))
+                .scaleEffect(t.mirrorScale)   // Flip, kept live (Flip.swift)
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         } else {
@@ -7517,6 +7519,7 @@ struct TextElementView: View {
             }
             glyphs(Color(hex: text.colorHex) ?? .primary, ref)
         }
+        .scaleEffect(t.mirrorScale)   // Flip, kept live — still real, typeable text (Flip.swift)
         .rotationEffect(.degrees(t.rotationDegrees))
         .position(x: t.center.x * size.width, y: t.center.y * size.height)
         }
@@ -7643,6 +7646,7 @@ struct ImageCompositeView: View {
                 .scaledToFit()
                 .foregroundStyle(Color(hex: symbol.tintHex) ?? .primary)
                 .frame(width: ref * t.scale, height: ref * t.scale)
+                .scaleEffect(t.mirrorScale)   // Flip, kept live (Flip.swift)
                 .rotationEffect(.degrees(t.rotationDegrees))
                 .position(x: t.center.x * size.width, y: t.center.y * size.height)
         case .text(let text):
