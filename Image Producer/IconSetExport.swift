@@ -194,7 +194,12 @@ enum IconSetExport {
 
     // MARK: - Contents.json
 
-    /// Two filled wells plus the empty tinted one.
+    /// Two filled wells, the empty tinted one, and the Mac's.
+    ///
+    /// ⭐ THE MAC WELL — his, 2026-10-28, when B&W Movie Colorizer's Mac build came out with no icon: "it is suppoed to
+    /// give you a WHOLE icon set, not a partial." The iOS single-size well covers iPhone and iPad only; macOS ignores
+    /// it. One `mac` 512×512 @2x well pointing at the SAME light 1024 file is enough: actool builds the whole
+    /// AppIcon.icns (16 through 1024) from it, with no warnings — tested that day. No new file, no per-size art.
     ///
     /// The tinted entry is declared WITHOUT a filename on purpose. Declaring it keeps
     /// the slot visible in Xcode so it can be filled later; leaving it empty is what
@@ -209,6 +214,7 @@ enum IconSetExport {
              "platform": "ios", "size": "1024x1024"],
             ["appearances": [["appearance": "luminosity", "value": "tinted"]],
              "idiom": "universal", "platform": "ios", "size": "1024x1024"],
+            ["filename": lightFile, "idiom": "mac", "scale": "2x", "size": "512x512"],
         ]
         let root: [String: Any] = ["images": images,
                                    "info": ["author": "xcode", "version": 1]]
@@ -452,7 +458,7 @@ enum IconSetExport {
                 Wrote \(lightFile) and \(darkFile) to \(set.path).
 
                 The tinted well is declared but left empty — iOS derives it from the \
-                light icon.
+                light icon. The Mac well uses the light icon too.
 
                 \(tvLine)
 
