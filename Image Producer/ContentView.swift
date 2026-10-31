@@ -598,6 +598,8 @@ struct ContentView: View {
         // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
         // targeting the focused document.
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
+        // ⌘C — copy the pixels inside the ants to the clipboard (see copySelectionToClipboard).
+        .focusedSceneValue(\.copySelectionAction, { copySelectionToClipboard() })
         .focusedSceneValue(\.saveAsAction, { saveAsWithFormat() })
         // The Canvas inspector's "Single image…" button asks for the same sheet.
         .onChange(of: document.exportSheetRequested) {
@@ -4459,7 +4461,10 @@ struct MoveTransformInspector: View {
     }
 
     private func centeredRect(width: Double, height: Double) -> CGRect {
-        CGRect(x: (1 - width) / 2, y: (1 - height) / 2, width: width, height: height)
+        // REM: centered on WHERE THE SQUARE IS NOW, not the canvas — since the square can be
+        // dragged (2026-10-31), changing its size must not snap it back to the middle.
+        let c = document.cropRect.map { CGPoint(x: $0.midX, y: $0.midY) } ?? CGPoint(x: 0.5, y: 0.5)
+        return clampedUnitRect(CGRect(x: c.x - width / 2, y: c.y - height / 2, width: width, height: height))
     }
 
     /// Reflect an existing saved crop back into the picker on open (best-effort): match
@@ -5643,7 +5648,22 @@ struct CanvasView: View {
             // so the box's drag math is unchanged; only the click area is new.
             .overlay {
                 ZStack {
-                    if showTransformBox, let idx = activeIndex {
+                    // REM: ONE BOX. Michael, 2026-10-31: "the one with handles was supposed to
+                    // be the square aspect not another selection on its own" and "the ants go
+                    // marching on should have done the moving, not the canvas". While a crop
+                    // aspect is chosen, the crop square IS the box: drag inside to move it, a
+                    // corner to resize it (ratio held). The picture and canvas stay put, and
+                    // the layer's Move box is hidden so only one set of ants marches.
+                    if showTransformBox, let crop = document.cropRect {
+                        let cw = CGFloat(document.canvasWidth), ch = CGFloat(document.canvasHeight)
+                        let pixelAspect = (crop.height * ch) > 0 ? (crop.width * cw) / (crop.height * ch) : 1
+                        MaskBox(mask: Binding(
+                                    get: { CropMask(rect: document.cropRect ?? crop) },
+                                    set: { document.cropRect = clampedUnitRect($0.bounds) }),
+                                size: disp,
+                                canvasPixels: CGSize(width: cw, height: ch),
+                                mode: .ratio(pixelAspect))
+                    } else if showTransformBox, let idx = activeIndex {
                         TransformBox(document: document, index: idx, size: disp, zoom: zoom)
                     }
                 }
@@ -8312,6 +8332,84 @@ extension ContentView {
                 }
             }
         }
+    }
+}
+#endif
+
+
+/// Keep a normalized rect inside the canvas (0...1), same size where it fits.
+func clampedUnitRect(_ r: CGRect) -> CGRect {
+    let w = min(max(r.width, 0.01), 1), h = min(max(r.height, 0.01), 1)
+    let x = min(max(r.minX, 0), 1 - w), y = min(max(r.minY, 0), 1 - h)
+    return CGRect(x: x, y: y, width: w, height: h)
+}
+
+#if os(macOS)
+extension ContentView {
+    /// ⌘C — the pixels inside the marching ants go to the clipboard, ready for ⌘V in
+    /// Messages, Pages or any app that takes a picture. Michael, 2026-10-31 (TestFlight
+    /// feedback on 345): "the pixels within the ants marching on should be command c
+    /// copied to the clipboard and command v to paste anywhere pixels can be pasted".
+    ///
+    /// REM: WHAT "INSIDE THE ANTS" MEANS. With a crop square up, it is everything you SEE
+    /// inside the square (all visible layers). Otherwise the ants are around the active
+    /// layer, so it is that layer alone, trimmed to its visible pixels.
+    func copySelectionToClipboard() {
+        let w = CGFloat(document.canvasWidth), h = CGFloat(document.canvasHeight)
+        let layers: [ImageLayer]
+        if document.cropRect != nil {
+            layers = document.layers
+        } else if let id = activeLayerID, let layer = document.layers.first(where: { $0.id == id }) {
+            layers = [layer]
+        } else {
+            document.say("Nothing selected to copy", kind: .info); return
+        }
+        let flat = ImageDocument(name: document.name, canvasWidth: document.canvasWidth,
+                                 canvasHeight: document.canvasHeight, layers: layers,
+                                 palette: document.palette, cropRect: nil)
+        let renderer = ImageRenderer(content: ImageCompositeView(document: flat, size: document.canvasPixelSize))
+        renderer.scale = 1
+        guard let full = renderer.cgImage else { document.say("Copy failed", kind: .info); return }
+        let cut: CGImage?
+        if let crop = document.cropRect {
+            let px = CGRect(x: crop.minX * w, y: crop.minY * h,
+                            width: crop.width * w, height: crop.height * h).integral
+            cut = full.cropping(to: px)
+        } else {
+            cut = opaqueBounds(of: full).flatMap { full.cropping(to: $0) }
+        }
+        guard let image = cut, let png = pngData(from: image) else {
+            document.say("Nothing visible to copy", kind: .info); return
+        }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        // PNG keeps transparency; TIFF is what older apps read. Both, so ⌘V works anywhere.
+        pb.declareTypes([.png, .tiff], owner: nil)
+        pb.setData(png, forType: .png)
+        if let tiff = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height)).tiffRepresentation {
+            pb.setData(tiff, forType: .tiff)
+        }
+        document.say("Copied \(image.width) × \(image.height)", kind: .info)
+    }
+
+    /// Bounding box of pixels with any opacity, in image pixel coordinates.
+    private func opaqueBounds(of img: CGImage) -> CGRect? {
+        let w = img.width, h = img.height
+        var buf = [UInt8](repeating: 0, count: w * h * 4)
+        guard let ctx = CGContext(data: &buf, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var minX = w, minY = h, maxX = -1, maxY = -1
+        for y in 0..<h {
+            let row = y * w * 4
+            for x in 0..<w where buf[row + x * 4 + 3] > 0 {
+                if x < minX { minX = x }; if x > maxX { maxX = x }
+                if y < minY { minY = y }; if y > maxY { maxY = y }
+            }
+        }
+        guard maxX >= minX, maxY >= minY else { return nil }
+        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 }
 #endif

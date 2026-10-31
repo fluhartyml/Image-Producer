@@ -26,7 +26,16 @@ struct SaveAsActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
 
+/// ⌘C on the canvas — copy the pixels inside the marching ants (2026-10-31).
+struct CopySelectionActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
 extension FocusedValues {
+    var copySelectionAction: (() -> Void)? {
+        get { self[CopySelectionActionKey.self] }
+        set { self[CopySelectionActionKey.self] = newValue }
+    }
     var exportAction: (() -> Void)? {
         get { self[ExportActionKey.self] }
         set { self[ExportActionKey.self] = newValue }
@@ -261,6 +270,7 @@ struct Image_ProducerApp: App {
             // document is frontmost).
             ExportCommands()
             CryochamberCommands()
+            ClipboardCommands()
             #endif
 
             #if os(macOS)
@@ -424,3 +434,37 @@ extension View {
         #endif
     }
 }
+
+
+#if os(macOS)
+/// Edit ▸ Cut / Copy / Paste / Select All. While you are typing in a text box they act on
+/// the text exactly as before; otherwise ⌘C copies the pixels inside the marching ants.
+/// REM: Michael, 2026-10-31 — "command c copied to the clipboard and command v to paste
+/// anywhere pixels can be pasted like imessages or a pages document".
+struct ClipboardCommands: Commands {
+    @FocusedValue(\.copySelectionAction) private var copySelection
+
+    private var isEditingText: Bool {
+        NSApp.keyWindow?.firstResponder is NSText
+    }
+
+    var body: some Commands {
+        CommandGroup(replacing: .pasteboard) {
+            Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }
+                .keyboardShortcut("x", modifiers: .command)
+            Button("Copy") {
+                if !isEditingText, let copySelection {
+                    copySelection()
+                } else {
+                    NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil)
+                }
+            }
+            .keyboardShortcut("c", modifiers: .command)
+            Button("Paste") { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }
+                .keyboardShortcut("v", modifiers: .command)
+            Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }
+                .keyboardShortcut("a", modifiers: .command)
+        }
+    }
+}
+#endif
