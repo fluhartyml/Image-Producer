@@ -590,12 +590,18 @@ struct LayerInspector: View {
 
     @ViewBuilder
     private func stylePicker(_ i: Int) -> some View {
-        Picker("Style", selection: glowBinding(i).style) {
-            ForEach(GlowStyle.allCases) { style in
-                Text(style.title).tag(style)
+        // REM: the label sits ABOVE the switch. Inline, a narrow panel squeezed it to
+        // "St / yle" (his screen, 2026-10-31 build 349).
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Style").font(.system(size: 18)).foregroundStyle(.secondary)
+            Picker("Style", selection: glowBinding(i).style) {
+                ForEach(GlowStyle.allCases) { style in
+                    Text(style.title).tag(style)
+                }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
         }
-        .pickerStyle(.segmented)
     }
 
     @ViewBuilder
