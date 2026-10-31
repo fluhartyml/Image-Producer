@@ -67,6 +67,9 @@ struct ContentView: View {
     @StateObject private var window = DocumentWindow()
     @State private var moveSessionLayerID: ImageLayer.ID?
     @State private var moveSessionTransform: LayerTransform?
+    /// Canvas size when the Move session began. A crop or canvas resize re-expresses every
+    /// layer's transform; that is not a move, so a changed canvas must never fork a copy.
+    @State private var moveSessionCanvas: CGSize?
     @State private var bottomPanel: BottomPanel = .layers
     /// Paint Bucket's current color (roadmap 2.1) — the user's own light/dark choice.
     @State private var fillColor: Color = .white
@@ -896,6 +899,7 @@ struct ContentView: View {
         document.captureHistoryBaselineIfNeeded()
         moveSessionLayerID = id
         moveSessionTransform = layer.transform
+        moveSessionCanvas = CGSize(width: document.canvasWidth, height: document.canvasHeight)
     }
 
     /// Commit the open Move session: keep the moved layer where it is, rename it with the
@@ -904,10 +908,18 @@ struct ContentView: View {
         defer {
             moveSessionLayerID = nil
             moveSessionTransform = nil
+            moveSessionCanvas = nil
         }
         guard let id = moveSessionLayerID,
               let before = moveSessionTransform,
               let i = document.layers.firstIndex(where: { $0.id == id }) else { return }
+        // REM: A CROP IS NOT A MOVE. Michael, 2026-10-31: "technically it blew up the original
+        // image and lied saying it cropped." Apply Crop shrank the canvas and re-expressed the
+        // layer's placement for it; this commit then read that as a move, forked a
+        // "(Move)" copy and put the original back at its PRE-crop transform — wrong size on
+        // the new canvas. If the canvas changed during the session, end it without forking.
+        if let c = moveSessionCanvas,
+           c != CGSize(width: document.canvasWidth, height: document.canvasHeight) { return }
         // Nothing actually moved — selecting a layer and leaving it alone must not litter
         // the stack with copies.
         guard document.layers[i].transform != before else { return }
@@ -4387,7 +4399,9 @@ struct MoveTransformInspector: View {
                 let w0 = Double(document.canvasWidth), h0 = Double(document.canvasHeight)
                 let W1 = Double(px.width), H1 = Double(px.height)
                 let ref0 = min(w0, h0), ref1 = min(W1, H1)
-                for k in document.layers.indices where k != ni {
+                // REM: Light/Dark floors always fill the canvas (drawn as a flat color, no
+                // transform), so they are never re-expressed — 2026-10-31, his "fix all three".
+                for k in document.layers.indices where k != ni && !document.layers[k].isBackgroundFloor {
                     var t = document.layers[k].transform
                     t.scale = t.scale * ref0 / ref1
                     t.center = CGPoint(x: (t.center.x * w0 - Double(px.minX)) / W1,
