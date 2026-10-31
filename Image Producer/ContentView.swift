@@ -1193,7 +1193,7 @@ struct ToolInspector: View {
         case .colorPalette:
             ColorPaletteInspector(document: document, fillColor: $fillColor)
         case .move:
-            MoveTransformInspector(document: document, activeLayerID: activeLayerID)
+            MoveTransformInspector(document: document, activeLayerID: $activeLayerID)
         case .mask:
             MaskInspector(document: document)
         case .fill:
@@ -4226,7 +4226,9 @@ private struct HistoryEntryRow: View {
 /// shrink-only — v1) plus scale / rotation / center / reset on the ACTIVE layer.
 struct MoveTransformInspector: View {
     @Bindable var document: ImageDocument
-    let activeLayerID: ImageLayer.ID?
+    // REM: a Binding (was a plain let) so Apply Crop can SELECT the new cropped layer.
+    // Michael, 2026-10-31: after crop the Move box stayed on the hidden original.
+    @Binding var activeLayerID: ImageLayer.ID?
 
     @State private var cropAspect: CropAspect = .original
     @State private var cropSize: Double = 0.8       // limiting-dimension fraction for a locked ratio
@@ -4375,11 +4377,34 @@ struct MoveTransformInspector: View {
             document.captureHistoryBaselineIfNeeded()
             if let newID = document.addResultLayer(png, above: i, nameSuffix: "cropped"),
                let ni = document.layers.firstIndex(where: { $0.id == newID }) {
+                // REM: CROP RESIZES THE CANVAS. Michael, 2026-10-31: "i clicked crop but it
+                // didnt resize the canvas." The canvas becomes the crop's pixel rect, and every
+                // OTHER layer is re-expressed in the new canvas so it stays exactly where it
+                // was on screen (same math as extendCanvas: scale is a fraction of the SHORT
+                // edge, center a fraction of width × height) — the crop just trims the edges.
+                let w0 = Double(document.canvasWidth), h0 = Double(document.canvasHeight)
+                let W1 = Double(px.width), H1 = Double(px.height)
+                let ref0 = min(w0, h0), ref1 = min(W1, H1)
+                for k in document.layers.indices where k != ni {
+                    var t = document.layers[k].transform
+                    t.scale = t.scale * ref0 / ref1
+                    t.center = CGPoint(x: (t.center.x * w0 - Double(px.minX)) / W1,
+                                       y: (t.center.y * h0 - Double(px.minY)) / H1)
+                    document.layers[k].transform = t
+                }
+                document.skipLinkFollowOnce = true
+                document.canvasWidth = Int(W1)
+                document.canvasHeight = Int(H1)
+                // The cut-out fills the new canvas edge to edge.
+                let aspect = H1 > 0 ? W1 / H1 : 1
                 document.layers[ni].transform = LayerTransform(
                     center: CGPoint(x: 0.5, y: 0.5),
-                    scale: max(crop.width, crop.height),
+                    scale: canvasFitScale(aspect: aspect, canvasWidth: Int(W1), canvasHeight: Int(H1)),
                     rotationDegrees: 0,
-                    contentAspect: crop.height > 0 ? crop.width / crop.height : 1)
+                    contentAspect: aspect)
+                // REM: select the new layer so the Move box (marching ants) lands on the
+                // picture you just cropped, not on the hidden original.
+                activeLayerID = newID
                 // Crop is a destructive Apply (new layer, source hidden) → one history step.
                 document.recordHistory(toolID: Tool.move.rawValue, groupTitle: "Crop",
                                        actionLabel: "Crop", layerID: newID)

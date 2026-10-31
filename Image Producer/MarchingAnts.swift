@@ -42,29 +42,31 @@ struct MarchingAnts<S: Shape>: View {
     /// required for anything being exported or screenshotted.
     var animated: Bool = true
 
-    @State private var phase: CGFloat = 0
-
     var body: some View {
-        ZStack {
-            // The light half of the pattern.
-            shape.stroke(style: StrokeStyle(lineWidth: 1, dash: [dash, dash], dashPhase: phase))
-                .foregroundStyle(.white)
-            // The dark half, offset by one dash so the two interleave.
-            shape.stroke(style: StrokeStyle(lineWidth: 1, dash: [dash, dash], dashPhase: phase + dash))
-                .foregroundStyle(.black)
+        // REM: FRAME CLOCK, NOT withAnimation. StrokeStyle.dashPhase is NOT animatable:
+        // withAnimation { phase = ... } jumps to the end value and the ants sit still
+        // (Skills Lab: draw-a-selection-border-as-a-dash-phase-offset, "THE TRAP").
+        // Michael, 2026-10-31: the ants were "orphaned and never used" — they never moved.
+        // TimelineView computes the phase from the clock each frame; paused = frozen.
+        TimelineView(.animation(paused: !animated)) { context in
+            let phase = animated ? currentPhase(at: context.date) : 0
+            ZStack {
+                // The light half of the pattern.
+                shape.stroke(style: StrokeStyle(lineWidth: 1, dash: [dash, dash], dashPhase: phase))
+                    .foregroundStyle(.white)
+                // The dark half, offset by one dash so the two interleave.
+                shape.stroke(style: StrokeStyle(lineWidth: 1, dash: [dash, dash], dashPhase: phase + dash))
+                    .foregroundStyle(.black)
+            }
         }
         .allowsHitTesting(false)
-        .onAppear { start() }
-        .onChange(of: animated) { _, _ in start() }
     }
 
-    private func start() {
-        phase = 0
-        guard animated else { return }
-        // One period of travel is two dashes — the light run plus the dark run.
-        withAnimation(.linear(duration: period).repeatForever(autoreverses: false)) {
-            phase = dash * 2
-        }
+    /// One period of travel is two dashes — the light run plus the dark run.
+    private func currentPhase(at date: Date) -> CGFloat {
+        guard period > 0 else { return 0 }
+        let t = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period)
+        return CGFloat(t / period) * dash * 2
     }
 }
 
