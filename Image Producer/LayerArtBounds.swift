@@ -34,7 +34,10 @@ enum LayerArtBounds {
 
     /// A pixel counts as art at alpha >= this. Anti-aliased edges fade to nothing,
     /// and including a 2%-opaque halo would grow the box past what anyone can see.
-    private static let alphaFloor: UInt8 = 8
+    // REM: 75% OPAQUE (191/255), was 8 (~3%). Michael, 2026-10-31, on the Legend iPhone
+    // cut-out: "it should wrap the black iphone" / "maybe it keeps 75 or higher". Remove
+    // Background left a ~14 px faint fringe (of 2048) that the 3% floor counted as art.
+    private static let alphaFloor: UInt8 = 191
 
     /// Cached answers, keyed by the raster's byte count + a hash of its bytes.
     /// Rasters are immutable once written (every edit makes a NEW layer), so a hit
