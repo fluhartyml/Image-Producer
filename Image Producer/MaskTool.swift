@@ -291,7 +291,8 @@ struct CropMask: Equatable, Codable {
         let b = bounds
         let dx = min(max(delta.width, -b.minX), 1 - b.maxX)
         let dy = min(max(delta.height, -b.minY), 1 - b.maxY)
-        return CropMask(corners: corners.map { CGPoint(x: $0.x + dx, y: $0.y + dy) })
+        return CropMask(corners: corners.map { CGPoint(x: $0.x + dx, y: $0.y + dy) },
+                        form: form, polygonSides: polygonSides)
     }
 
     /// ⌘ drag: move ONE corner and leave the other three where they are. The mask stops
@@ -300,7 +301,7 @@ struct CropMask: Equatable, Codable {
     func movingCornerFreely(_ i: Int, to p: CGPoint) -> CropMask {
         var c = corners
         c[i] = CGPoint(x: min(max(p.x, 0), 1), y: min(max(p.y, 0), 1))
-        return CropMask(corners: c)
+        return CropMask(corners: c, form: form, polygonSides: polygonSides)
     }
 
     /// Plain drag: the opposite corner stays locked and the shape stays a rectangle, so
@@ -315,7 +316,10 @@ struct CropMask: Equatable, Codable {
         if maxY - minY < Self.minSide { maxY = minY + Self.minSide }
         (minX, maxX) = (min(minX, 1 - Self.minSide), min(maxX, 1))
         (minY, maxY) = (min(minY, 1 - Self.minSide), min(maxY, 1))
-        return CropMask(rect: CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY))
+        // REM: keep the silhouette — a moved or resized oval/star/freehand must stay that
+        // shape, not snap back to a rectangle (2026-10-31, Selection tool).
+        return CropMask(rect: CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY),
+                        form: form, polygonSides: polygonSides)
     }
 
     /// Locked-ratio drag: opposite corner still anchors, but the rectangle is forced back
@@ -342,7 +346,8 @@ struct CropMask: Equatable, Codable {
         w = max(w, Self.minSide); h = max(h, Self.minSide)
         let x = px >= anchor.x ? anchor.x : anchor.x - w
         let y = py >= anchor.y ? anchor.y : anchor.y - h
-        return CropMask(rect: CGRect(x: min(max(x, 0), 1 - w), y: min(max(y, 0), 1 - h), width: w, height: h))
+        return CropMask(rect: CGRect(x: min(max(x, 0), 1 - w), y: min(max(y, 0), 1 - h), width: w, height: h),
+                        form: form, polygonSides: polygonSides)
     }
 }
 

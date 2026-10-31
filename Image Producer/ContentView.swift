@@ -603,6 +603,19 @@ struct ContentView: View {
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
         // ⌘C — copy the pixels inside the ants to the clipboard (see copySelectionToClipboard).
         .focusedSceneValue(\.copySelectionAction, { copySelectionToClipboard() })
+        #if os(macOS)
+        // Selection tool: Delete clears inside the ants, Escape cancels a path / deselects.
+        .background(SelectionKeyMonitor(
+            enabled: activeTool == .select
+                && (document.selection != nil || !document.selectionPathPoints.isEmpty),
+            onDelete: {
+                if let id = document.clearInsideSelection(activeLayerID: activeLayerID) { activeLayerID = id }
+            },
+            onEscape: {
+                if !document.selectionPathPoints.isEmpty { document.selectionPathPoints = [] }
+                else { document.selection = nil }
+            }))
+        #endif
         .focusedSceneValue(\.saveAsAction, { saveAsWithFormat() })
         // The Canvas inspector's "Single image…" button asks for the same sheet.
         .onChange(of: document.exportSheetRequested) {
@@ -1210,6 +1223,13 @@ struct ToolInspector: View {
             MoveTransformInspector(document: document, activeLayerID: $activeLayerID)
         case .mask:
             MaskInspector(document: document)
+        case .select:
+            SelectionInspector(document: document,
+                               onClear: {
+                                   if let id = document.clearInsideSelection(activeLayerID: activeLayerID) { activeLayerID = id }
+                               },
+                               onCopy: { document.copySelectionPixels() },
+                               onClosePath: { document.closeSelectionPath() })
         case .fill:
             PaintBucketInspector(document: document,
                                  activeLayerID: activeLayerID,
@@ -5048,7 +5068,9 @@ private struct ToolPointer: ViewModifier {
                                  hotSpot: UnitPoint(x: 0.5, y: 0.5))
         // The mask is dragged by its corners and its middle, so the pointer is the frame
         // itself, centered — same reasoning as Move.
-        case .mask:       .image(Image(systemName: "square.dashed"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        case .mask:       .image(Image(systemName: "theatermasks"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
+        // Selection draws from the exact click point, so a crosshair centered on it.
+        case .select:     .image(Image(systemName: "plus"), hotSpot: UnitPoint(x: 0.5, y: 0.5))
         case .zoom:       .image(zoomPointer(),                    hotSpot: UnitPoint(x: 0.45, y: 0.45))
         case .symbol:     .image(Image(systemName: "star"),        hotSpot: UnitPoint(x: 0.5, y: 0.5))
 
@@ -5253,6 +5275,14 @@ struct CanvasView: View {
                               ? .free
                               : (document.maskRatio.map { MaskCornerMode.ratio($0) } ?? .rectangle))
             }
+            // SELECTION: ants around the selection, plus the Path points / Freehand stroke
+            // while drawing. Inert; the canvas gesture and the box above own the clicks.
+            if activeTool == .select {
+                SelectionOverlay(selection: document.selection,
+                                 pathPoints: document.selectionPathPoints,
+                                 freehand: freehandPoints,
+                                 size: disp)
+            }
             // Brush eraser footprint ring — follows the cursor so you see WHICH pixels
             // a stroke will clear before committing (no undo). Circle ring / square box.
             if activeTool == .eraser, pen.eraserMode == .brush, let hp = brushHover {
@@ -5279,6 +5309,9 @@ struct CanvasView: View {
     @EnvironmentObject var pen: PixelPen
     /// Live cursor position (in canvas space) for the brush-eraser footprint ring.
     @State private var brushHover: CGPoint?
+    /// Selection tool: where a Rectangle/Oval drag began, and the Freehand stroke so far.
+    @State private var selectDragStart: CGPoint?
+    @State private var freehandPoints: [CGPoint] = []
     /// Live cursor position (canvas space) for the paint-bucket fill-region preview.
     @State private var bucketHover: CGPoint?
     /// The layer the Magic Lasso made on its first click, so later clicks keep editing it
@@ -5501,6 +5534,34 @@ struct CanvasView: View {
         pen.refreshErasePreview(png: png, layerKey: "\(id)-\(png.count)", target: fillColor.rgb8)
     }
 
+    /// Selection tool: finish a drag or click. A plain click with Rectangle/Oval/Freehand
+    /// deselects (Photoshop's habit); with Path it places a point, and clicking the first
+    /// point again closes the shape.
+    @MainActor private func endSelectionGesture(at n: CGPoint, canvas: CGSize) {
+        switch document.selectionShape {
+        case .rectangle, .oval:
+            if let s = selectDragStart,
+               hypot((n.x - s.x) * canvas.width, (n.y - s.y) * canvas.height) <= 3 {
+                document.selection = nil
+            }
+            selectDragStart = nil
+        case .freehand:
+            let pts = freehandPoints
+            freehandPoints = []
+            document.selection = SelectionGeometry.outline(pts, label: "Freehand")
+        case .path:
+            var pts = document.selectionPathPoints
+            if pts.count >= 3, let f = pts.first,
+               hypot((n.x - f.x) * canvas.width, (n.y - f.y) * canvas.height) <= 12 {
+                document.closeSelectionPath()
+            } else {
+                if pts.isEmpty { document.selection = nil }
+                pts.append(SelectionGeometry.clamp(n))
+                document.selectionPathPoints = pts
+            }
+        }
+    }
+
     /// Brush eraser (option b): the first stroke on a layer auto-duplicates it (original
     /// kept + hidden) and erases the COPY — with Cmd-Z off, the copy IS the undo. Maps the
     /// canvas point through the layer transform to the right image pixel, then clears a dab.
@@ -5620,6 +5681,22 @@ struct CanvasView: View {
                 DragGesture(minimumDistance: 0, coordinateSpace: .named("canvas"))
                     .onChanged { value in
                         let n = CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height)
+                        if activeTool == .select {
+                            switch document.selectionShape {
+                            case .rectangle, .oval:
+                                let start = selectDragStart ?? n
+                                if selectDragStart == nil { selectDragStart = n }
+                                if hypot((n.x - start.x) * disp.width, (n.y - start.y) * disp.height) > 3 {
+                                    document.selection = SelectionGeometry.dragged(from: start, to: n,
+                                                                                   shape: document.selectionShape)
+                                }
+                            case .freehand:
+                                freehandPoints.append(SelectionGeometry.clamp(n))
+                            case .path:
+                                break
+                            }
+                            return
+                        }
                         if activeTool == .eraser, pen.eraserMode == .brush {
                             brushHover = value.location   // ring follows the finger/cursor mid-stroke too
                             eraseAt(n, canvas: disp); return
@@ -5645,6 +5722,9 @@ struct CanvasView: View {
                             if pen.eraserMode == .brush { endEraseStroke() }
                         case .text:
                             startTextAt(CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height))
+                        case .select:
+                            endSelectionGesture(at: CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height),
+                                                canvas: disp)
                         default:
                             break
                         }
@@ -5652,6 +5732,7 @@ struct CanvasView: View {
                 including: (activeTool == .pen || activeTool == .fill || activeTool == .eyedropper
                             || activeTool == .magicLasso
                             || activeTool == .text
+                            || activeTool == .select
                             || (activeTool == .eraser && pen.eraserMode == .brush)) ? .all : .subviews
             )
             // THE MOVE BOX LIVES ABOVE THE CANVAS'S CLICK AREA. Michael, 2026-10-19: "the
@@ -5662,6 +5743,16 @@ struct CanvasView: View {
             // so the box's drag math is unchanged; only the click area is new.
             .overlay {
                 ZStack {
+                    // SELECTION: its own handles — drag inside the ants to move them, a corner
+                    // to resize. Hidden while a Path is being placed so clicks reach the canvas.
+                    if activeTool == .select, document.selection != nil, document.selectionPathPoints.isEmpty {
+                        MaskBox(mask: Binding(
+                                    get: { document.selection ?? CropMask(rect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8)) },
+                                    set: { document.selection = $0 }),
+                                size: disp,
+                                canvasPixels: CGSize(width: document.canvasWidth, height: document.canvasHeight),
+                                mode: .rectangle)
+                    }
                     // REM: ONE BOX. Michael, 2026-10-31: "the one with handles was supposed to
                     // be the square aspect not another selection on its own" and "the ants go
                     // marching on should have done the moving, not the canvas". While a crop
@@ -8369,6 +8460,10 @@ extension ContentView {
     /// inside the square (all visible layers). Otherwise the ants are around the active
     /// layer, so it is that layer alone, trimmed to its visible pixels.
     func copySelectionToClipboard() {
+        // Selection tool: the ants ARE the selection — copy what you see inside them.
+        if activeTool == .select, document.selection != nil {
+            document.copySelectionPixels(); return
+        }
         let w = CGFloat(document.canvasWidth), h = CGFloat(document.canvasHeight)
         let layers: [ImageLayer]
         if document.cropRect != nil {

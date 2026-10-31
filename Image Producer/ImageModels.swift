@@ -235,6 +235,15 @@ final class ImageDocument {
     var maskRatio: CGFloat?
     var maskFreeCorners: Bool = false
 
+    /// Selection tool state — NOT persisted: a selection is a moment, not part of the
+    /// picture. `selection` is the marching-ants region (normalized canvas space);
+    /// `selectionPathPoints` holds the Path shape's clicked points until it is closed.
+    var selection: CropMask?
+    var selectionShape: SelectionShape = .rectangle
+    var selectionPathPoints: [CGPoint] = []
+    /// The "(cleared)" layer the last Delete made, so repeat Deletes edit it in place.
+    var selectionClearLayerID: ImageLayer.ID?
+
     /// Output resolution in pixels-per-inch. Physical/print size = pixels ÷ ppi. Changing
     /// it is LOSSLESS — it reinterprets the SAME pixels at a new physical size; it never
     /// resamples. Saved with the document (absent in older files → defaults to 72).

@@ -21,6 +21,7 @@ enum Tool: String, CaseIterable, Identifiable {
     case canvas        // central hub for the open project (name/dimensions/print/export)
     case colorPalette  // the project's color library + gatekeeper (all colors live here)
     case move
+    case select        // the Selection — marching ants; Delete clears inside, ⌘C copies (2026-10-31)
     case mask          // the mask/selection frame — grabbers move the MASK, never the artwork
     case fill          // paint bucket
     case pen           // pixel painter
@@ -58,6 +59,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .canvas:     "Canvas"
         case .colorPalette: "Color Palette"
         case .move:       "Move / Transform"
+        case .select:     "Selection"
         case .mask:       "Mask"
         case .fill:       "Paint Drop / Bucket"   // his name, 2026-10-03
         case .pen:        "Pen (Pixels)"
@@ -84,7 +86,10 @@ enum Tool: String, CaseIterable, Identifiable {
         case .canvas:     "photo.artframe"
         case .colorPalette: "paintpalette"
         case .move:       "arrow.up.and.down.and.arrow.left.and.right"
-        case .mask:       "square.dashed"
+        // REM: the dashed rectangle is the SELECTION's glyph (Photoshop's marquee) — Michael,
+        // 2026-10-31: "the dash would be a selection tool not a mask tool". Mask moved off it.
+        case .select:     "rectangle.dashed"
+        case .mask:       "theatermasks"
         case .fill:       "drop.fill"
         case .pen:        "pencil.tip"
         case .eraser:     "eraser.fill"
