@@ -2437,26 +2437,49 @@ struct CanvasInspector: View {
 /// A palette swatch grid that sets a tool's color FROM the palette (the gatekeeper) — no
 /// free color picking in the tools. Tap a swatch → `color` becomes that palette color.
 /// Custom colors are added in the Color Palette tool.
+// REM: EVERY SPLOTCH IS THE ACTIVE COLOR. His rule, 2026-10-31: the Eyedropper's "Picked
+// color" splotch "was supposed to be the active color for all tools that use splotches."
+// Glow was written months after the Paint Bucket, got its own private grid, and the rule
+// was lost there — so was Text outline. Tapping ANY splotch here sets that tool's color AND
+// makes it the active color everywhere (pen.color + pen.selectedSlot; ContentView mirrors
+// pen.color into fillColor). ⛔ A new tool that takes a color uses THIS row — never its own
+// grid — so it gets the rule by construction instead of by memory.
 struct PaletteSwatchRow: View {
+    @EnvironmentObject var pen: PixelPen
     @Bindable var document: ImageDocument
     @Binding var color: Color
     var label = "Color (from palette)"
+    /// The "Colors come from…" line. Off where several rows stack in one panel.
+    var showsFooter = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.system(size: 18))
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
-                ForEach(document.palette.indices, id: \.self) { i in
-                    let c = Color(hex: document.palette[i]) ?? .black
-                    let isSel = c.hexString() == color.hexString()
-                    RoundedRectangle(cornerRadius: 6).fill(c).frame(height: 28)
-                        .overlay(RoundedRectangle(cornerRadius: 6)
-                            .stroke(isSel ? Color.accentColor : Color.gray.opacity(0.4), lineWidth: isSel ? 3 : 1))
-                        .onTapGesture { color = c }
+            if !label.isEmpty { Text(label).font(.system(size: 18)) }
+            if document.palette.isEmpty {
+                Text("The palette is empty — add colors in Color Palette first.")
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
+            } else {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
+                    ForEach(document.palette.indices, id: \.self) { i in
+                        let c = Color(hex: document.palette[i]) ?? .black
+                        let isSel = c.hexString() == color.hexString()
+                        RoundedRectangle(cornerRadius: 6).fill(c).frame(height: 28)
+                            .overlay(RoundedRectangle(cornerRadius: 6)
+                                .stroke(isSel ? Color.accentColor : Color.gray.opacity(0.4), lineWidth: isSel ? 3 : 1))
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                color = c
+                                pen.selectedSlot = i
+                                pen.color = c
+                            }
+                            .help(document.palette[i])
+                    }
                 }
             }
-            Text("Colors come from the Color Palette tool.")
-                .font(.system(size: 18)).foregroundStyle(.secondary)
+            if showsFooter {
+                Text("Colors come from the Color Palette tool.")
+                    .font(.system(size: 18)).foregroundStyle(.secondary)
+            }
         }
     }
 }
@@ -3034,7 +3057,14 @@ struct FontPickerInspector: View {
                 styleToggle("bold", "Bold", $bold)
                 styleToggle("italic", "Italic", $italic)
                 styleToggle("underline", "Underline", $underline)
-                styleToggle("character.textbox", "Outline", $outline)
+                styleToggle("character.textbox", "Outline", Binding(
+                    get: { outline },
+                    // REM: turning Outline ON starts it in the active color (his rule
+                    // 2026-10-31); loading a layer's saved outline does not come through here.
+                    set: { on in
+                        if on && !outline { outlineColor = pen.color }
+                        outline = on
+                    }))
             }
 
             // SIZE — his ask, 2026-10-03: "font size (it is not shown and needs to be added)".
@@ -5821,6 +5851,9 @@ struct CanvasView: View {
             .onChange(of: pen.eraseContiguous) { refreshEraserPreview() }
             .onChange(of: pen.bucketTolerance) { refreshBucketPreview(canvas: disp, force: true) }
             .onChange(of: pen.lassoTolerance) { refreshBucketPreview(canvas: disp, force: true) }
+            // REM: pen.color IS the active color; fillColor follows it, so a splotch tapped in
+            // any tool (PaletteSwatchRow) reaches the Paint Bucket and Magic Eraser too.
+            .onChange(of: pen.color) { if fillColor != pen.color { fillColor = pen.color } }
             .onChange(of: fillColor) {
                 if activeTool == .eraser { refreshEraserPreview() }
                 if activeTool == .fill { refreshBucketPreview(canvas: disp, force: true) }

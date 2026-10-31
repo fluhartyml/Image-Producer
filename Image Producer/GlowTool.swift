@@ -399,6 +399,7 @@ struct GradientVeil<Content: View>: View {
 /// Guideline 2.1 rejects visible "coming soon" controls). It joins the list the day
 /// it works.
 struct LayerInspector: View {
+    @EnvironmentObject var pen: PixelPen
     @Bindable var document: ImageDocument
     var activeLayerID: ImageLayer.ID?
 
@@ -577,7 +578,11 @@ struct LayerInspector: View {
     private func enabledBinding(_ i: Int) -> Binding<Bool> {
         Binding(get: { self.document.layers[i].glow?.isEnabled ?? false },
                 set: { on in
-                    var g = self.document.layers[i].glow ?? LayerGlow()
+                    var g = self.document.layers[i].glow ?? {
+                        var fresh = LayerGlow()
+                        if let hex = self.activeHex { fresh.innerHex = hex }
+                        return fresh
+                    }()
                     g.isEnabled = on
                     self.document.layers[i].glow = on ? g : nil
                 })
@@ -617,31 +622,29 @@ struct LayerInspector: View {
 
     /// Color comes from the project palette — the palette is this app's gatekeeper
     /// for every color, so a glow does not get its own private color well.
+    ///
+    /// REM: THIS USED TO BE ITS OWN GRID, and that is how the active-color rule was lost.
+    /// His rule, 2026-10-31: every splotch is the active color. Glow was built months after
+    /// the Paint Bucket and never got it. Now every row in this panel is PaletteSwatchRow
+    /// (ContentView.swift): a tap sets this effect's color AND the active color everywhere.
+    /// Don't put a private grid back here.
     private func swatches(title: String, selection: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.system(size: 18)).foregroundStyle(.secondary)
-            if document.palette.isEmpty {
-                Text("The palette is empty — add colors in Color Palette first.")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 34), spacing: 8)], spacing: 8) {
-                    ForEach(document.palette, id: \.self) { hex in
-                        let picked = hex.caseInsensitiveCompare(selection.wrappedValue) == .orderedSame
-                        Button { selection.wrappedValue = hex } label: {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: hex) ?? .gray)
-                                .frame(height: 30)
-                                .overlay(RoundedRectangle(cornerRadius: 6)
-                                    .stroke(picked ? Color.accentColor : Color.secondary.opacity(0.35),
-                                            lineWidth: picked ? 3 : 1))
-                        }
-                        .buttonStyle(.plain)
-                        .help(hex)
-                    }
-                }
-            }
-        }
+        PaletteSwatchRow(document: document,
+                         color: Binding(get: { Color(hex: selection.wrappedValue) ?? .gray },
+                                        set: { selection.wrappedValue = $0.hexString() ?? selection.wrappedValue }),
+                         label: title, showsFooter: false)
+            .foregroundStyle(.secondary)
+    }
+
+    /// The active color as hex — what each effect starts in when first switched on
+    /// (his rule, 2026-10-31). A color already chosen is never recolored by a later pick.
+    private var activeHex: String? { pen.color.hexString() }
+
+    /// A gradient that has never been touched starts FROM the active color.
+    private func freshGradient() -> LayerGradient {
+        var g = LayerGradient()
+        if let hex = activeHex { g.startHex = hex }
+        return g
     }
 
     private func labelledSlider(_ title: String,
@@ -707,7 +710,11 @@ struct LayerInspector: View {
     private func shadowEnabled(_ i: Int) -> Binding<Bool> {
         Binding(get: { self.document.layers[i].shadow?.isEnabled ?? false },
                 set: { on in
-                    var sh = self.document.layers[i].shadow ?? LayerShadow()
+                    var sh = self.document.layers[i].shadow ?? {
+                        var fresh = LayerShadow()
+                        if let hex = self.activeHex { fresh.colorHex = hex }
+                        return fresh
+                    }()
                     sh.isEnabled = on
                     self.document.layers[i].shadow = on ? sh : nil
                 })
@@ -757,7 +764,11 @@ struct LayerInspector: View {
     private func greenKeyEnabled(_ i: Int) -> Binding<Bool> {
         Binding(get: { self.document.layers[i].greenKey?.isEnabled ?? false },
                 set: { on in
-                    var k = self.document.layers[i].greenKey ?? LayerGreenKey()
+                    var k = self.document.layers[i].greenKey ?? {
+                        var fresh = LayerGreenKey()
+                        if let hex = self.activeHex { fresh.colorHex = hex }
+                        return fresh
+                    }()
                     k.isEnabled = on
                     self.document.layers[i].greenKey = on ? k : nil
                 })
@@ -886,14 +897,14 @@ struct LayerInspector: View {
     }
 
     private func gradientBinding(_ i: Int) -> Binding<LayerGradient> {
-        Binding(get: { self.document.layers[i].gradient ?? LayerGradient() },
+        Binding(get: { self.document.layers[i].gradient ?? freshGradient() },
                 set: { self.document.layers[i].gradient = $0 })
     }
 
     private func gradientEnabled(_ i: Int) -> Binding<Bool> {
         Binding(get: { self.document.layers[i].gradient?.isEnabled ?? false },
                 set: { on in
-                    var g = self.document.layers[i].gradient ?? LayerGradient()
+                    var g = self.document.layers[i].gradient ?? freshGradient()
                     g.isEnabled = on
                     self.document.layers[i].gradient = on ? g : nil
                 })
@@ -941,7 +952,7 @@ struct LayerInspector: View {
     /// Where the two-color blend starts and ends along the direction.
     @ViewBuilder
     private func blendStops(_ i: Int) -> some View {
-        let g = document.layers[i].gradient ?? LayerGradient()
+        let g = document.layers[i].gradient ?? freshGradient()
         let start = Binding<Double>(
             get: { g.blendStart },
             set: { v in gradientBinding(i).wrappedValue.startStop = min(v, g.blendEnd) })
@@ -956,7 +967,7 @@ struct LayerInspector: View {
 
     @ViewBuilder
     private func opacityEnds(_ i: Int) -> some View {
-        let g = document.layers[i].gradient ?? LayerGradient()
+        let g = document.layers[i].gradient ?? freshGradient()
         labelledSlider("From", value: gradientBinding(i).startOpacity, range: 0...1,
                        readout: String(format: "%.0f%%", g.startOpacity * 100))
         labelledSlider("To", value: gradientBinding(i).endOpacity, range: 0...1,

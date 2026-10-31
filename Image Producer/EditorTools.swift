@@ -17,6 +17,10 @@ import SwiftUI
 
 /// A tool in the toolbox. Order here = left-to-right order in the strip (which
 /// scrolls horizontally when there are more tools than fit — see DeveloperNotes).
+// REM: A TOOL THAT TAKES A COLOR USES PaletteSwatchRow (ContentView.swift) — never its own
+// splotch grid. His rule, 2026-10-31: every splotch IS the active color; the Eyedropper's
+// picked color reaches every tool, and a tap in any tool's splotches becomes the active color
+// everywhere. Glow, added months after the Paint Bucket, built a private grid and lost it.
 enum Tool: String, CaseIterable, Identifiable {
     case canvas        // central hub for the open project (name/dimensions/print/export)
     case colorPalette  // the project's color library + gatekeeper (all colors live here)
