@@ -4642,11 +4642,40 @@ struct MoveTransformInspector: View {
     }
 
     // MARK: Active-layer transform
+    // 012b — the no-modifier path to a straight-line drag. Tap one to lock, tap it again to
+    // free. Spoken names are 3 words max (his rule): "Up down only", "Left right only".
+    @AppStorage(MoveAxisLock.storageKey) private var axisLock: MoveAxisLock = .none
+
+    private var axisLockControls: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Straight line").font(.system(size: 18))
+            HStack {
+                axisLockButton(.vertical, "Up/Down only", spoken: "Up down only")
+                axisLockButton(.horizontal, "Left/Right only", spoken: "Left right only")
+            }
+            #if os(macOS)
+            Text("Or hold Shift while dragging.").font(.system(size: 18)).foregroundStyle(.secondary)
+            #endif
+        }
+    }
+
+    private func axisLockButton(_ lock: MoveAxisLock, _ title: String, spoken: String) -> some View {
+        let on = axisLock == lock
+        return Button { axisLock = on ? .none : lock } label: {
+            Text(title).font(.system(size: 18))
+        }
+        .buttonStyle(.bordered)
+        .tint(on ? .accentColor : nil)
+        .accessibilityLabel(spoken)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
     @ViewBuilder private func layerControls(_ idx: Int) -> some View {
         // Bounds-guard the whole section: the active layer can be removed (e.g. Apply
         // Crop collapses the stack) while a stale `idx` is still in flight.
         if document.layers.indices.contains(idx) {
             VStack(alignment: .leading, spacing: 18) {
+                axisLockControls
                 // Fit / Fill — snap the active object to the canvas. Live and explicit:
                 // each tap re-snaps so what you see is exactly the result (no inferred
                 // position). Only meaningful for a content layer that has something on it
@@ -6164,6 +6193,9 @@ struct TransformBox: View {
     var zoom: CGFloat = 1
     @State private var startCenter: CGPoint?
     @State private var startAnchor: CGPoint?
+    // 012b — straight-line drag. The panel's lock (buttons), and the axis Shift-drag picked.
+    @AppStorage(MoveAxisLock.storageKey) private var axisLock: MoveAxisLock = .none
+    @State private var shiftAxis: MoveAxisLock?
 
     /// Unit offsets of the four corners from the box center.
     private let corners: [CGSize] = [
@@ -6177,6 +6209,29 @@ struct TransformBox: View {
     /// target is 30 and invisible, so the handle looks the same and catches far more.
     private let grabVisual: CGFloat = 14
     private let grabTarget: CGFloat = 30
+
+    // REM: 012b STRAIGHT-LINE DRAG, his yes 11-04: precise up/down "no sporratic left or
+    // rights", and the reverse. A panel button locks it (no modifier — Sticky Keys and Voice
+    // Control); on the Mac, Shift-drag locks to the direction the drag STARTED in, the
+    // Keynote/Photoshop convention. Release Shift mid-drag and it moves freely again.
+    private func constrained(_ t: CGSize) -> CGSize {
+        var lock = axisLock
+        #if os(macOS)
+        if lock == .none {
+            if NSEvent.modifierFlags.contains(.shift) {
+                if shiftAxis == nil { shiftAxis = abs(t.height) > abs(t.width) ? .vertical : .horizontal }
+                lock = shiftAxis ?? .none
+            } else {
+                shiftAxis = nil
+            }
+        }
+        #endif
+        switch lock {
+        case .vertical:   return CGSize(width: 0, height: t.height)
+        case .horizontal: return CGSize(width: t.width, height: 0)
+        case .none:       return t
+        }
+    }
 
     var body: some View {
         // Guard: the active layer can be deleted while this box is still mounted,
@@ -6236,11 +6291,12 @@ struct TransformBox: View {
                             guard index < document.layers.count else { return }
                             let start = startCenter ?? document.layers[index].transform.center
                             if startCenter == nil { startCenter = start }
-                            let nx = min(max(start.x + value.translation.width / size.width, 0), 1)
-                            let ny = min(max(start.y + value.translation.height / size.height, 0), 1)
+                            let d = constrained(value.translation)
+                            let nx = min(max(start.x + d.width / size.width, 0), 1)
+                            let ny = min(max(start.y + d.height / size.height, 0), 1)
                             document.layers[index].transform.center = CGPoint(x: nx, y: ny)
                         }
-                        .onEnded { _ in startCenter = nil }
+                        .onEnded { _ in startCenter = nil; shiftAxis = nil }
                 )
 
             // Corner grabbers — drag to scale. ONE SIZE ON SCREEN at any zoom (divided by
@@ -8753,3 +8809,11 @@ struct ToolShortcutMonitor: NSViewRepresentable {
     }
 }
 #endif
+
+
+/// 012b — which way a Move drag may go. Stored, so the lock is the same in the panel and on
+/// the canvas (and survives a relaunch, like every other setting).
+enum MoveAxisLock: String {
+    case none, vertical, horizontal
+    static let storageKey = "moveAxisLock"
+}
