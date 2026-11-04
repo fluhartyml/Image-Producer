@@ -2483,13 +2483,12 @@ struct PaletteSwatchRow: View {
                             .overlay(RoundedRectangle(cornerRadius: 6)
                                 .stroke(isSel ? Color.accentColor : Color.gray.opacity(0.4), lineWidth: isSel ? 3 : 1))
                             .contentShape(Rectangle())
-                            .onTapGesture {
+                            .help(document.palette[i])
+                            .paletteSwatchAccessibility(index: i, hex: document.palette[i], isSelected: isSel) {
                                 color = c
                                 pen.selectedSlot = i
                                 pen.color = c
                             }
-                            .help(document.palette[i])
-                            .paletteSwatchAccessibility(index: i, hex: document.palette[i], isSelected: isSel)
                     }
                 }
             }
@@ -2507,11 +2506,19 @@ struct PaletteSwatchRow: View {
 // and marks the active color selected (the accent ring is the only other sign, and it is
 // visual). Shared, so the three splotch grids cannot drift apart.
 extension View {
-    func paletteSwatchAccessibility(index: Int, hex: String, isSelected: Bool) -> some View {
+    // REM: 009a, his yes 11-04. A NAME IS NOT A PRESS. The swatches were named and marked
+    // buttons, but a tap gesture answers only a pointer, so an accessibility press
+    // (VoiceOver, Switch Control, a script driving the app) did nothing — found making the
+    // MediaWorks Top Shelf image hands-off, when the white glow could not be picked. `onPress`
+    // is the SAME closure the tap runs, so the two paths cannot drift apart.
+    func paletteSwatchAccessibility(index: Int, hex: String, isSelected: Bool,
+                                    onPress: @escaping () -> Void) -> some View {
         self
+            .onTapGesture(perform: onPress)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Color \(index + 1), \(hex)")
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction(.default, onPress)
     }
 }
 
@@ -2581,8 +2588,9 @@ struct ColorPaletteInspector: View {
                         .overlay(RoundedRectangle(cornerRadius: 6)
                             .stroke(i == selected ? Color.accentColor : Color.gray.opacity(0.4),
                                     lineWidth: i == selected ? 3 : 1))
-                        .onTapGesture { pen.selectedSlot = i; applyActive() }
-                        .paletteSwatchAccessibility(index: i, hex: document.palette[i], isSelected: i == selected)
+                        .paletteSwatchAccessibility(index: i, hex: document.palette[i], isSelected: i == selected) {
+                            pen.selectedSlot = i; applyActive()
+                        }
                         .contextMenu {
                             if document.palette.count > 8 {
                                 Button(role: .destructive) { document.removePaletteColor(at: i) } label: {
@@ -3655,11 +3663,10 @@ struct PenInspector: View {
                             .overlay(RoundedRectangle(cornerRadius: 6)
                                 .stroke(i == pen.selectedSlot ? Color.accentColor : Color.gray.opacity(0.4),
                                         lineWidth: i == pen.selectedSlot ? 2.5 : 1))
-                            .onTapGesture {
+                            .paletteSwatchAccessibility(index: i, hex: document.palette[i], isSelected: i == pen.selectedSlot) {
                                 pen.selectedSlot = i
                                 pen.color = Color(hex: document.palette[i]) ?? .black
                             }
-                            .paletteSwatchAccessibility(index: i, hex: document.palette[i], isSelected: i == pen.selectedSlot)
                             .contextMenu { Button("Change color…") { editing = EditSlot(id: i) } }
                     }
                 }
