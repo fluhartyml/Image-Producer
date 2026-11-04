@@ -5968,6 +5968,25 @@ struct CanvasView: View {
                 }
                 .frame(width: disp.width, height: disp.height)
                 .coordinateSpace(name: "canvas")
+                // The shakedown's probe (UITestDoor.swift): invisible, untouchable, DEBUG +
+                // -ImageProducerUITest only. Its frame is the canvas; its value the active layer.
+                .overlay {
+                    if UITestDoor.isOpen {
+                        let l = activeIndex.map { document.layers[$0] }
+                        Color.clear
+                            .allowsHitTesting(false)
+                            .accessibilityElement()
+                            .accessibilityIdentifier("uitest.canvas")
+                            .accessibilityLabel("Test probe")
+                            .accessibilityValue(String(format: "w=%d h=%d layers=%d hidden=%d active=%@ x=%.4f y=%.4f",
+                                                       document.canvasWidth, document.canvasHeight,
+                                                       document.layers.count,
+                                                       document.layers.filter { !$0.isVisible }.count,
+                                                       l?.name ?? "none",
+                                                       Double(l?.transform.center.x ?? -1),
+                                                       Double(l?.transform.center.y ?? -1)))
+                    }
+                }
             }
             .modifier(ToolPointer(tool: activeTool, fillColor: fillColor))   // cursor reflects the active tool, and the bucket carries its color (macOS)
             // The production preview, floating over the canvas and visible with ANY

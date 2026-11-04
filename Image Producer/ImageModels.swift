@@ -1856,7 +1856,10 @@ extension ImageDocument {
     nonisolated static func projectsDirectory() -> URL? {
         let fm = FileManager.default
         let dir: URL
-        if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.image-producer") {
+        if UITestDoor.isOpen {
+            // The shakedown never writes into his iCloud folder (UITestDoor.swift).
+            dir = UITestDoor.projectsDirectory
+        } else if let icloud = fm.url(forUbiquityContainerIdentifier: "iCloud.com.nightgard.image-producer") {
             dir = icloud.appendingPathComponent("Documents", isDirectory: true)
         } else if let local = try? fm.url(for: .documentDirectory, in: .userDomainMask,
                                           appropriateFor: nil, create: true) {
@@ -1887,7 +1890,8 @@ extension ImageDocument {
         }
         var candidate = url(n)
         while fm.fileExists(atPath: candidate.path) { n += 1; candidate = url(n) }
-        defaults.set(n, forKey: lifetimeCountKey)
+        // The shakedown's projects don't count toward his lifetime number (UITestDoor.swift).
+        if !UITestDoor.isOpen { defaults.set(n, forKey: lifetimeCountKey) }
         return candidate
     }
 

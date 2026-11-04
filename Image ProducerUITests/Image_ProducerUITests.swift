@@ -2,42 +2,251 @@
 //  Image_ProducerUITests.swift
 //  Image ProducerUITests
 //
-//  Created by Michael Fluharty on 6/20/26.
+//  REM: THE SHAKEDOWN, his ask 11-04: "can you do a shake down like you do during the white hat
+//  security shakedown / inventory" — the Legend pattern. Drives the Mac app by accessibility
+//  name and keyboard (his rule: drive our apps through VoiceOver and keyboard, not screenshots),
+//  checks builds 356–359, inventories each screen (*.txt) and runs Apple's accessibility audit
+//  (ACCESSIBILITY.md). Launches with -ImageProducerUITest (UITestDoor.swift): the test's image
+//  lives in the app's temporary folder, not his iCloud folder; his recents and lifetime project
+//  number are untouched. Results: RESULTS.md in the runner's tmp/ImageProducerUITestResults,
+//  copied into the repo by Scripts/run-ui-tests.sh.
 //
 
 import XCTest
 
 final class Image_ProducerUITests: XCTestCase {
+    var app: XCUIApplication!
 
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+    static let dir: URL = {
+        let d = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ImageProducerUITestResults")
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }()
 
-        // In UI tests it is usually best to stop immediately when a failure occurs.
-        continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
+    override func setUp() {
+        continueAfterFailure = true
+        app = XCUIApplication()
+        app.launchArguments += ["-ImageProducerUITest"]
         app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
+        app.activate()
     }
 
-    @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+    override func tearDown() {
+        app.terminate()
+    }
+
+    // MARK: Helpers
+
+    func record(_ line: String) {
+        let url = Self.dir.appendingPathComponent("RESULTS.md")
+        let text = line + "\n"
+        if let h = try? FileHandle(forWritingTo: url) {
+            h.seekToEndOfFile(); h.write(Data(text.utf8)); try? h.close()
+        } else {
+            try? ("# Image Producer shakedown\n\n| Build | Result | Check |\n|---|---|---|\n" + text)
+                .write(to: url, atomically: true, encoding: .utf8)
         }
+    }
+
+    func check(_ build: String, _ what: String, _ ok: Bool, _ detail: String = "") {
+        record("| \(build) | \(ok ? "✅ PASS" : "❌ FAIL") | \(what)\(detail.isEmpty ? "" : " — \(detail)") |")
+        XCTAssertTrue(ok, "\(build): \(what) \(detail)")
+    }
+
+    func snapshot(_ name: String) {
+        try? app.debugDescription.write(to: Self.dir.appendingPathComponent("\(name).txt"),
+                                        atomically: true, encoding: .utf8)
+    }
+
+    func audit(_ screen: String) {
+        var issues: [String] = []
+        do {
+            try app.performAccessibilityAudit(for: .all) { issue in
+                let who = issue.element.map { "\($0.elementType.rawValue) '\($0.label)'" } ?? "screen"
+                issues.append("\(issue.auditType) · \(who) · \(issue.compactDescription)")
+                return true
+            }
+        } catch {
+            issues.append("audit couldn't run: \(error.localizedDescription)")
+        }
+        let url = Self.dir.appendingPathComponent("ACCESSIBILITY.md")
+        var text = "\n### \(screen) — \(issues.count) issue(s)\n"
+        for i in issues { text += "- \(i)\n" }
+        if let h = try? FileHandle(forWritingTo: url) {
+            h.seekToEndOfFile(); h.write(Data(text.utf8)); try? h.close()
+        } else {
+            try? ("# Accessibility audit\n" + text).write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
+    func button(_ label: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch
+    }
+
+    @discardableResult
+    func press(_ label: String, _ seconds: TimeInterval = 8) -> Bool {
+        let b = button(label)
+        guard b.waitForExistence(timeout: seconds) else { return false }
+        b.click()
+        return true
+    }
+
+    // MARK: Probe (UITestDoor.swift)
+
+    struct Probe {
+        var w = 0.0, h = 0.0, layers = 0, hidden = 0, active = "", x = 0.0, y = 0.0
+    }
+
+    var probeElement: XCUIElement { app.descendants(matching: .any)["uitest.canvas"].firstMatch }
+
+    func probe() -> Probe? {
+        guard probeElement.waitForExistence(timeout: 5), let v = probeElement.value as? String else { return nil }
+        var p = Probe()
+        // "w=1920 h=720 layers=2 hidden=0 active=Layer 1 x=0.5000 y=0.5000"
+        func num(_ key: String) -> Double? {
+            guard let r = v.range(of: "\(key)=") else { return nil }
+            return Double(v[r.upperBound...].prefix { "0123456789.-".contains($0) })
+        }
+        p.w = num("w") ?? 0; p.h = num("h") ?? 0
+        p.layers = Int(num("layers") ?? 0); p.hidden = Int(num("hidden") ?? 0)
+        p.x = num("x") ?? -1; p.y = num("y") ?? -1
+        if let a = v.range(of: "active="), let e = v.range(of: " x=") { p.active = String(v[a.upperBound..<e.lowerBound]) }
+        return p
+    }
+
+    /// Drag the active layer by (dx, dy) screen points, starting on the layer's center.
+    func dragLayer(dx: CGFloat, dy: CGFloat, modifiers: XCUIElement.KeyModifierFlags = []) {
+        guard let p = probe() else { return }
+        let start = probeElement.coordinate(withNormalizedOffset: CGVector(dx: p.x, dy: p.y))
+        let end = start.withOffset(CGVector(dx: dx, dy: dy))
+        let drag = { start.press(forDuration: 0.3, thenDragTo: end) }
+        if modifiers.isEmpty { drag() } else { XCUIElement.perform(withKeyModifiers: modifiers, block: drag) }
+        sleep(1)
+    }
+
+    /// Commit the Move session by leaving the tool, then come back.
+    func commitMove() {
+        press("Canvas"); sleep(1); press("Move"); sleep(1)
+    }
+
+    // MARK: The shakedown
+
+    func testShakedown() throws {
+        record("Run: \(Date())  ·  Mac  ·  -ImageProducerUITest (temporary image; his files untouched)")
+        record("")
+
+        // Welcome
+        let welcome = app.windows["Welcome to Image Producer"]
+        if welcome.waitForExistence(timeout: 10) {
+            snapshot("00-welcome"); audit("Welcome")
+        }
+
+        // New image in the temporary folder.
+        app.typeKey("n", modifierFlags: .command)
+        if press("Create", 10) { sleep(2) }
+        check("—", "A new image opens (in the test's temporary folder)", probe() != nil)
+        snapshot("01-editor"); audit("Editor (Canvas tool)")
+
+        // 356 — swatches are named buttons that answer an accessibility press.
+        press("Color Palette"); sleep(1)
+        let swatches = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Color '"))
+        check("356", "Palette swatches are named buttons", swatches.count >= 2, "\(swatches.count) found")
+        snapshot("02-color-palette"); audit("Color Palette")
+
+        // A layer to move.
+        press("Add a layer"); sleep(1)
+        press("Move"); sleep(1)
+        snapshot("03-move"); audit("Move / Transform")
+        guard let p0 = probe() else { check("—", "Probe readable", false); return }
+        check("—", "A layer is active in Move", p0.active.hasPrefix("Layer"), p0.active)
+
+        // 357 — arrow-key nudge: 5 × Down (1 px) + 1 × Shift-Down (10 px) = 15 px down.
+        for _ in 0..<5 { app.typeKey(.downArrow, modifierFlags: []) }
+        app.typeKey(.downArrow, modifierFlags: .shift)
+        sleep(1)
+        if let p = probe() {
+            let dyPx = (p.y - p0.y) * p.h, dxPx = (p.x - p0.x) * p.w
+            check("357", "Arrow keys: Down ×5 + Shift-Down = 15 px down, none sideways",
+                  abs(dyPx - 15) < 0.6 && abs(dxPx) < 0.6, String(format: "moved %.1f px down, %.1f px sideways", dyPx, dxPx))
+        }
+        commitMove()
+        if let p = probe() {
+            check("357", "Leaving Move keeps the nudge as one Move step (hidden original kept)",
+                  p.active.contains("(Move)") && p.hidden == p0.hidden + 1, "\(p.active), hidden \(p.hidden)")
+        }
+
+        // 358 — lock buttons.
+        let upDown = button("Up down only"), leftRight = button("Left right only")
+        check("358", "Straight-line buttons are there by their spoken names", upDown.exists && leftRight.exists)
+        upDown.click(); sleep(1)
+        check("358", "Up down only shows as selected when on", upDown.isSelected)
+        if let a = probe() {
+            dragLayer(dx: 60, dy: 40)
+            if let b = probe() {
+                let dx = (b.x - a.x) * b.w, dy = (b.y - a.y) * b.h
+                check("358", "Up down only: a diagonal drag moves only up/down",
+                      abs(dx) < 0.6 && abs(dy) > 5, String(format: "%.1f px sideways, %.1f px down", dx, dy))
+            }
+        }
+        upDown.click(); sleep(1)
+        check("358", "Tapping Up down only again turns it off", !upDown.isSelected)
+        leftRight.click(); sleep(1)
+        if let a = probe() {
+            dragLayer(dx: 60, dy: 40)
+            if let b = probe() {
+                let dx = (b.x - a.x) * b.w, dy = (b.y - a.y) * b.h
+                check("358", "Left right only: a diagonal drag moves only sideways",
+                      abs(dy) < 0.6 && abs(dx) > 5, String(format: "%.1f px sideways, %.1f px down", dx, dy))
+            }
+        }
+        leftRight.click(); sleep(1)
+        check("358", "Left right only turns off again", !leftRight.isSelected)
+        if let a = probe() {
+            dragLayer(dx: 80, dy: 25, modifiers: .shift)
+            if let b = probe() {
+                let dx = (b.x - a.x) * b.w, dy = (b.y - a.y) * b.h
+                check("358", "Shift-drag locks to the starting direction (mostly sideways → sideways only)",
+                      abs(dy) < 0.6 && abs(dx) > 5, String(format: "%.1f px sideways, %.1f px down", dx, dy))
+            }
+        }
+        commitMove()
+
+        // 359 — Option-drag drags a copy; the original stays.
+        if let a = probe() {
+            dragLayer(dx: -80, dy: 0, modifiers: .option)
+            if let b = probe() {
+                let dx = (b.x - a.x) * b.w
+                check("359", "Option-drag makes one new layer and selects it as \"(copy)\"",
+                      b.layers == a.layers + 1 && b.active.hasSuffix("(copy)"), "\(b.active), layers \(a.layers)→\(b.layers)")
+                check("359", "The copy moved", abs(dx) > 5, String(format: "%.1f px", dx))
+            }
+            commitMove()
+            if let c = probe() {
+                check("359", "Committing the copy adds no hidden fork", c.hidden == a.hidden, "hidden \(a.hidden)→\(c.hidden)")
+            }
+            // The original is still where it was: select it in the Layers list and read it.
+            let rows = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", a.active))
+            if rows.firstMatch.waitForExistence(timeout: 3) {
+                rows.firstMatch.click(); sleep(1)
+                if let o = probe(), o.active == a.active {
+                    check("359", "The original stayed where it was",
+                          abs((o.x - a.x) * o.w) < 0.6 && abs((o.y - a.y) * o.h) < 0.6,
+                          String(format: "x %.4f→%.4f", a.x, o.x))
+                }
+            } else {
+                record("| 359 | ⚠️ NOT CHECKED | Original's position — its row wasn't found by name '\(a.active)' |")
+            }
+        }
+        // Option-Shift: a mostly-sideways copy drag stays level.
+        if let a = probe() {
+            dragLayer(dx: 70, dy: 20, modifiers: [.option, .shift])
+            if let b = probe() {
+                let dy = (b.y - a.y) * b.h
+                check("359", "Option-Shift-drag copy stays in a straight line",
+                      b.layers == a.layers + 1 && abs(dy) < 0.6, String(format: "%.1f px down", dy))
+            }
+            commitMove()
+        }
+        snapshot("04-after"); audit("Move / Transform after copies")
     }
 }

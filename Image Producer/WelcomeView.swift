@@ -48,6 +48,8 @@ enum RecentProjects {
     /// Put `url` at the top, de-duplicated, capped. Called from every path that opens
     /// or creates a project.
     static func note(_ url: URL) {
+        // The shakedown must not push one of his 8 recents out (UITestDoor.swift).
+        if UITestDoor.isOpen { return }
         guard let bookmark = try? url.bookmarkData(options: .withSecurityScope,
                                                    includingResourceValuesForKeys: nil,
                                                    relativeTo: nil) else {
