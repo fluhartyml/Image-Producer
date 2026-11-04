@@ -861,6 +861,10 @@ struct ContentView: View {
         .overlay(alignment: .bottomTrailing) { canvasControls }
         // Safeguard: if a tool is marked incompatible with Fit Width, picking it drops
         // back to the normal fitted view so the tool can't break (Michael 2026-06-23).
+        #if os(macOS)
+        // A3 — one key picks a tool (letters locked in 005a). See ToolShortcutMonitor.
+        .background(ToolShortcutMonitor { activeTool = $0 })
+        #endif
         .onChange(of: activeTool) { _, newTool in
             if fitWidth && !newTool.fitWidthCompatible { fitWidth = false }
             // Leaving the Move tool commits whatever was being placed.
@@ -1063,7 +1067,7 @@ struct ToolStrip: View {
                             // .simultaneousGesture for double-tap, and the gesture wrapper
                             // swallows the hover tracking .help() depends on. Attaching it to
                             // the drawn content puts it in front of that.
-                            .help(tool.title)
+                            .help(tool.helpWithShortcut)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
                                     // SELECTED beats HOVERED beats nothing. The hover tint is
@@ -1138,7 +1142,7 @@ struct ToolRail: View {
                             // .simultaneousGesture for double-tap, and the gesture wrapper
                             // swallows the hover tracking .help() depends on. Attaching it to
                             // the drawn content puts it in front of that.
-                            .help(tool.title)
+                            .help(tool.helpWithShortcut)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
                                     // SELECTED beats HOVERED beats nothing. The hover tint is
@@ -3223,6 +3227,9 @@ struct FontPickerInspector: View {
                 // TYPE-TO-JUMP: click the list, then type.
                 .focusable()
                 .focused($fontListFocused)
+                // Type-to-jump owns letters while this list has focus — tool shortcuts step aside.
+                .onChange(of: fontListFocused) { _, f in ToolShortcuts.typeToJumpActive = f }
+                .onDisappear { ToolShortcuts.typeToJumpActive = false }
                 .focusEffectDisabled()
                 .overlay(RoundedRectangle(cornerRadius: 6)
                     .stroke(fontListFocused ? Color.accentColor.opacity(0.6) : Color.clear, lineWidth: 2))
@@ -8643,6 +8650,56 @@ extension ContentView {
         }
         guard maxX >= minX, maxY >= minY else { return nil }
         return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+    }
+}
+#endif
+
+
+/// Shared on every platform: the font list sets it so type-to-jump keeps its letters.
+enum ToolShortcuts { static var typeToJumpActive = false }
+
+#if os(macOS)
+// REM: TOOL SHORTCUTS ON THE MAC (roadmap A3, his 005/005a). A local key monitor, the same
+// pattern as the Selection's Delete/Escape monitor, because SwiftUI's no-modifier
+// .keyboardShortcut would also fire while he types in a text field. It lets the key through
+// untouched when a text field or text view has focus, when the font list's type-to-jump
+// has focus, when ⌘ ⌥ or ⌃ is held (menu shortcuts keep working), or when the key is
+// a repeat. Shift is allowed, so B and b both pick Paint Drop Bucket.
+struct ToolShortcutMonitor: NSViewRepresentable {
+    var onPick: (Tool) -> Void
+
+    func makeNSView(context: Context) -> MonitorView { let v = MonitorView(); v.onPick = onPick; return v }
+    func updateNSView(_ view: MonitorView, context: Context) { view.onPick = onPick }
+    static func dismantleNSView(_ view: MonitorView, coordinator: ()) { view.stop() }
+
+    final class MonitorView: NSView {
+        var onPick: (Tool) -> Void = { _ in }
+        private var monitor: Any?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            stop()
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, let win = self.window, event.window === win,
+                      win.attachedSheet == nil,
+                      !event.isARepeat,
+                      !ToolShortcuts.typeToJumpActive,
+                      !(win.firstResponder is NSText),
+                      event.modifierFlags.intersection([.command, .option, .control]).isEmpty,
+                      let chars = event.charactersIgnoringModifiers, chars.count == 1,
+                      let ch = chars.first, let tool = Tool.forShortcut(ch) else { return event }
+                self.onPick(tool)
+                return nil
+            }
+        }
+
+        func stop() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+        }
+
+        deinit { stop() }
     }
 }
 #endif

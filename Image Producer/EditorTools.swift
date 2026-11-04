@@ -111,6 +111,34 @@ enum Tool: String, CaseIterable, Identifiable {
         }
     }
 
+    // REM: SINGLE-LETTER TOOL SHORTCUTS — his locked rulings 005/005a, 11-04: "single letter
+    // shortcuts are okay a puffer switch may need it one letter vs a wake word" and "lock the
+    // letters in they look relatable to the command". First letter where free, else a sound in
+    // the name. No modifier on purpose: he uses Sticky Keys, and a switch user can send one key.
+    // Shape and Path are held back from shipping, so they get none.
+    var shortcutLetter: Character? {
+        switch self {
+        case .canvas: "c";  case .colorPalette: "k"; case .move: "m";   case .select: "s"
+        case .mask: "q";    case .fill: "b";         case .pen: "p";    case .eraser: "e"
+        case .eyedropper: "i"; case .text: "t";      case .symbol: "y"; case .image: "g"
+        case .imagePlayground: "a"; case .layer: "l"; case .cutout: "r"; case .magicLasso: "w"
+        case .adjust: "j";  case .zoom: "z";         case .camera: "h"
+        case .shape, .path: nil
+        }
+    }
+
+    /// Hover text for the tile: the printed name plus its key, e.g. "Paint Drop / Bucket (B)".
+    var helpWithShortcut: String {
+        guard let k = shortcutLetter else { return title }
+        return "\(title) (\(k.uppercased()))"
+    }
+
+    /// The shipping tool whose letter this is, if any.
+    static func forShortcut(_ ch: Character) -> Tool? {
+        let lower = Character(ch.lowercased())
+        return shipping.first { $0.shortcutLetter == lower }
+    }
+
     /// SF Symbol used for the tool's button in the strip.
     var systemImage: String {
         switch self {
