@@ -70,6 +70,8 @@ struct ContentView: View {
     /// Canvas size when the Move session began. A crop or canvas resize re-expresses every
     /// layer's transform; that is not a move, so a changed canvas must never fork a copy.
     @State private var moveSessionCanvas: CGSize?
+    /// 012c — the session is on a copy an Option-drag just made (commit skips the fork).
+    @State private var moveSessionIsFreshCopy = false
     @State private var bottomPanel: BottomPanel = .layers
     /// Paint Bucket's current color (roadmap 2.1) — the user's own light/dark choice.
     @State private var fillColor: Color = .white
@@ -896,6 +898,12 @@ struct ContentView: View {
             commitMoveSession()
             beginMoveSessionIfNeeded()
         }
+        // 012c — an Option-drag made a copy mid-drag: select it. The change of selection
+        // above then commits the original (unmoved = no-op) and opens the copy's session.
+        .onChange(of: document.moveCopyLayerID) { _, id in
+            guard let id else { return }
+            if activeLayerID == id { beginMoveSessionIfNeeded() } else { activeLayerID = id }
+        }
         // Cover the launch case: Move is the default tool, so a layer can be active and
         // draggable before either change above has ever fired.
         .onAppear { beginMoveSessionIfNeeded() }
@@ -918,6 +926,13 @@ struct ContentView: View {
         moveSessionLayerID = id
         moveSessionTransform = layer.transform
         moveSessionCanvas = CGSize(width: document.canvasWidth, height: document.canvasHeight)
+        // 012c — a copy made by Option-drag is new: there is no "before" worth keeping.
+        if document.moveCopyLayerID == id {
+            moveSessionIsFreshCopy = true
+            document.moveCopyLayerID = nil
+        } else {
+            moveSessionIsFreshCopy = false
+        }
     }
 
     // REM: 012a ARROW-KEY NUDGE, his yes 11-04: "i think that would help the accessability
@@ -947,10 +962,21 @@ struct ContentView: View {
             moveSessionLayerID = nil
             moveSessionTransform = nil
             moveSessionCanvas = nil
+            moveSessionIsFreshCopy = false
         }
         guard let id = moveSessionLayerID,
               let before = moveSessionTransform,
               let i = document.layers.firstIndex(where: { $0.id == id }) else { return }
+        // REM: 012c OPTION-DRAG COPY, his yes 11-04 ("should you add option drag to drag a
+        // new copy?"). The original never moved, so it IS the kept "before": no hidden fork,
+        // no "(Move)" rename on the copy. One History step records the copy where it landed.
+        if moveSessionIsFreshCopy {
+            document.recordHistory(toolID: Tool.move.rawValue,
+                                   groupTitle: Tool.move.title,
+                                   actionLabel: "Copy",
+                                   layerID: id)
+            return
+        }
         // REM: A CROP IS NOT A MOVE. Michael, 2026-10-31: "technically it blew up the original
         // image and lied saying it cropped." Apply Crop shrank the canvas and re-expressed the
         // layer's placement for it; this commit then read that as a move, forked a
@@ -6196,6 +6222,31 @@ struct TransformBox: View {
     // 012b — straight-line drag. The panel's lock (buttons), and the axis Shift-drag picked.
     @AppStorage(MoveAxisLock.storageKey) private var axisLock: MoveAxisLock = .none
     @State private var shiftAxis: MoveAxisLock?
+    /// 012c — where the Option-drag copy sits, until the selection catches up to it.
+    @State private var copyIndex: Int?
+
+    // REM: 012c OPTION-DRAG COPY, his yes 11-04. Option held when a Move drag STARTS: the
+    // original stays where it is and the drag carries a new copy on its own layer, directly
+    // above (Duplicate's place and "(copy)" label). The copy is unlinked, or a link group
+    // would drag the original along. Option-Shift keeps it straight (012b). Mac only — the
+    // no-modifier path is Duplicate, then Move (Sticky Keys rule).
+    private func startCopyIfOptionHeld() -> Bool {
+        #if os(macOS)
+        guard NSEvent.modifierFlags.contains(.option),
+              index >= 0, index < document.layers.count else { return false }
+        document.captureHistoryBaselineIfNeeded()
+        var copy = document.layers[index]
+        copy.id = UUID()
+        copy.name = document.layers[index].name + " (copy)"   // a label, never typed on canvas
+        copy.linkGroup = nil
+        document.layers.insert(copy, at: index + 1)
+        copyIndex = index + 1
+        document.moveCopyLayerID = copy.id
+        return true
+        #else
+        return false
+        #endif
+    }
 
     /// Unit offsets of the four corners from the box center.
     private let corners: [CGSize] = [
@@ -6289,14 +6340,20 @@ struct TransformBox: View {
                     DragGesture(minimumDistance: 6, coordinateSpace: .named("canvas"))
                         .onChanged { value in
                             guard index < document.layers.count else { return }
-                            let start = startCenter ?? document.layers[index].transform.center
-                            if startCenter == nil { startCenter = start }
+                            if startCenter == nil {
+                                startCenter = document.layers[index].transform.center
+                                _ = startCopyIfOptionHeld()
+                            }
+                            guard let start = startCenter else { return }
+                            // The copy, while the selection is still on the original.
+                            let target = copyIndex ?? index
+                            guard target < document.layers.count else { return }
                             let d = constrained(value.translation)
                             let nx = min(max(start.x + d.width / size.width, 0), 1)
                             let ny = min(max(start.y + d.height / size.height, 0), 1)
-                            document.layers[index].transform.center = CGPoint(x: nx, y: ny)
+                            document.layers[target].transform.center = CGPoint(x: nx, y: ny)
                         }
-                        .onEnded { _ in startCenter = nil; shiftAxis = nil }
+                        .onEnded { _ in startCenter = nil; shiftAxis = nil; copyIndex = nil }
                 )
 
             // Corner grabbers — drag to scale. ONE SIZE ON SCREEN at any zoom (divided by

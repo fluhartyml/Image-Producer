@@ -109,6 +109,9 @@ final class ImageDocument {
     /// Move / Transform's Flip buttons ask the editor to commit the placement, then flip
     /// the active layer (Flip.swift). Not saved; consumed at once.
     var moveFlipRequested: FlipAxis?
+    /// 012c — an Option-drag in Move just made this copy. The editor selects it and opens
+    /// its Move session as a fresh copy (no hidden "before" fork). Not saved; consumed once.
+    var moveCopyLayerID: ImageLayer.ID?
     /// Set by a fluid canvas resize, which rewrites every layer's placement at once:
     /// tells the linked-layer follower to skip that one change. Not saved; consumed once.
     @ObservationIgnored var skipLinkFollowOnce = false
