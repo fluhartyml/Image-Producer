@@ -540,6 +540,19 @@ struct MaskInspector: View {
                 Divider()
                 cornerControls
                 Divider()
+                // REM: 012 / A4 — the mask by number: Left, Top, Width, Height in pixels of
+                // its bounding box. A bent (⌘) quad or a star keeps its shape; every corner
+                // is mapped to the new box (`CropMask.fitted(to:)`). A locked corner ratio
+                // holds here too — Width moves Height and back — unless Free corners is on.
+                if let m = document.cropMask {
+                    Text("Position and size").font(.system(size: 18)).foregroundStyle(.secondary)
+                    BoxNumberFields(noun: "Mask", box: m.bounds,
+                                    canvasWidth: document.canvasWidth,
+                                    canvasHeight: document.canvasHeight,
+                                    lockedRatio: document.maskFreeCorners ? nil : document.maskRatio,
+                                    onChange: { r in document.cropMask = document.cropMask?.fitted(to: r) })
+                    Divider()
+                }
                 Button(role: .destructive) { document.cropMask = nil } label: {
                     Label("Remove Mask", systemImage: "xmark.square.dashed").frame(maxWidth: .infinity)
                 }

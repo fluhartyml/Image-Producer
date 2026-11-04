@@ -273,5 +273,22 @@ final class Image_ProducerUITests: XCTestCase {
             commitMove()
         }
         snapshot("04-after"); audit("Move / Transform after copies")
+
+        // 366 — 012 / A4 number fields: type the layer's center, no drag.
+        func typeInto(_ spoken: String, _ text: String) -> Bool {
+            let f = app.textFields[spoken]
+            guard f.waitForExistence(timeout: 3) else { return false }
+            f.click(); f.typeKey("a", modifierFlags: .command); f.typeText(text + "\r"); sleep(1)
+            return true
+        }
+        check("366", "Position X, Position Y and Rotation degrees fields are there by name",
+              app.textFields["Position X"].exists && app.textFields["Position Y"].exists
+                && app.textFields["Rotation degrees"].exists)
+        if typeInto("Position X", "100"), typeInto("Position Y", "200"), let p = probe() {
+            check("366", "Typing X 100, Y 200 puts the layer's center there",
+                  abs(p.x * p.w - 100) < 0.6 && abs(p.y * p.h - 200) < 0.6,
+                  String(format: "center %.1f, %.1f px", p.x * p.w, p.y * p.h))
+        }
+        commitMove()
     }
 }

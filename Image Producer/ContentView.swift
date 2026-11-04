@@ -4465,6 +4465,17 @@ struct MoveTransformInspector: View {
 
                 cropSizeControls
 
+                // REM: 012 / A4 — the crop box by number (Left, Top, Width, Height in
+                // pixels), so lining it up never needs a drag. See NumberFields.swift.
+                if let r = document.cropRect {
+                    BoxNumberFields(noun: "Crop", box: r,
+                                    canvasWidth: document.canvasWidth,
+                                    canvasHeight: document.canvasHeight,
+                                    minSide: 0.1,
+                                    lockedRatio: cropLockedRatio,
+                                    onChange: setCropFromFields)
+                }
+
                 InfoTip("More about this", label: "Crop info", "Live preview is non-destructive (Export/Share trim to it). Apply Crop makes a new cropped layer and hides the original (kept).")
             }
         }
@@ -4598,6 +4609,34 @@ struct MoveTransformInspector: View {
             }
             document.cropRect = nil
             cropAspect = .original
+        }
+    }
+
+    /// The crop's pixel width ÷ height when the chosen aspect locks it; nil for Freeform.
+    private var cropLockedRatio: CGFloat? {
+        switch cropAspect {
+        case .ratio(let w, let h): return h > 0 ? CGFloat(w) / CGFloat(h) : nil
+        case .custom: return customH > 0 ? CGFloat(customW) / CGFloat(customH) : nil
+        default: return nil
+        }
+    }
+
+    /// A typed Left/Top/Width/Height lands here.
+    ///
+    /// REM: The size sliders are @State that re-center the crop on every change, so the
+    /// typed size is written back into them too — otherwise the next onChange would pull
+    /// the crop back to the slider's old size. The rect is set FIRST so `centeredRect`
+    /// re-centers on the typed position, which makes the slider round-trip a no-op.
+    private func setCropFromFields(_ r: CGRect) {
+        document.cropRect = r
+        switch cropAspect {
+        case .freeform:
+            freeWidth = max(0.1, min(1.0, r.width))
+            freeHeight = max(0.1, min(1.0, r.height))
+        case .ratio, .custom:
+            cropSize = max(0.1, min(1.0, max(r.width, r.height)))
+        case .original:
+            break
         }
     }
 
@@ -4786,10 +4825,36 @@ struct MoveTransformInspector: View {
                         .accessibilityValue(scaleSpokenValue(idx))
                     ScaleTicks()
                 }
+                // REM: 012 / A4 — POSITION BY NUMBER. Where the layer's CENTER sits, in
+                // canvas pixels from the top-left, because the center is what the model
+                // stores and what Center sets (half the canvas reads back exactly).
+                // Spoken "Position X" / "Position Y" — three words max, his rule.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Position (center)").font(.system(size: 18))
+                    HStack(spacing: 10) {
+                        PixelNumberField(title: "X", spoken: "Position X",
+                                         help: "Pixels from the canvas's left edge to the layer's center — type a value and press Return",
+                                         value: positionBinding(idx, horizontal: true))
+                        PixelNumberField(title: "Y", spoken: "Position Y",
+                                         help: "Pixels from the canvas's top edge to the layer's center — type a value and press Return",
+                                         value: positionBinding(idx, horizontal: false))
+                        Spacer(minLength: 0)
+                    }
+                }
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Rotation  \(Int(document.layers[idx].transform.rotationDegrees))°")
+                        Text("Rotation").font(.system(size: 18))
+                        // REM: 012 / A4 — type the angle. Tenths allowed; -180…180, the
+                        // slider's own range, so the two can never disagree.
+                        TextField("", value: rotationTypedBinding(idx),
+                                  format: .number.precision(.fractionLength(0...1)))
                             .font(.system(size: 18))
+                            .monospacedDigit()
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 72)
+                            .help("Rotation in degrees, -180 to 180 — type a value and press Return")
+                            .accessibilityLabel("Rotation degrees")
+                        Text("°").font(.system(size: 18)).fixedSize()
                         Stepper(onIncrement: { jogRotation(idx, byDegrees:  1) },
                                 onDecrement: { jogRotation(idx, byDegrees: -1) }) { EmptyView() }
                             .labelsHidden()
@@ -4923,6 +4988,35 @@ struct MoveTransformInspector: View {
         guard document.layers.indices.contains(idx) else { return }
         let deg = document.layers[idx].transform.rotationDegrees.rounded() + delta
         document.layers[idx].transform.rotationDegrees = min(180, max(-180, deg))
+    }
+
+    /// Typed Position: the layer's center in canvas pixels. Free to leave the canvas —
+    /// the same as a drag can — but kept within one canvas of it so a typo can't lose
+    /// the layer somewhere it would take a lifetime of arrow presses to bring back.
+    private func positionBinding(_ idx: Int, horizontal: Bool) -> Binding<Double> {
+        let edge = Double(max(1, horizontal ? document.canvasWidth : document.canvasHeight))
+        return Binding(
+            get: {
+                guard document.layers.indices.contains(idx) else { return edge / 2 }
+                let c = document.layers[idx].transform.center
+                return ((horizontal ? c.x : c.y) * edge).rounded()
+            },
+            set: { px in
+                guard document.layers.indices.contains(idx), px.isFinite else { return }
+                let n = min(max(px.rounded() / edge, -1), 2)
+                if horizontal { document.layers[idx].transform.center.x = n }
+                else { document.layers[idx].transform.center.y = n }
+            })
+    }
+
+    /// Typed Rotation, unsnapped (the slider snaps; a typed number is exact).
+    private func rotationTypedBinding(_ idx: Int) -> Binding<Double> {
+        Binding(
+            get: { document.layers.indices.contains(idx) ? document.layers[idx].transform.rotationDegrees : 0 },
+            set: { deg in
+                guard document.layers.indices.contains(idx), deg.isFinite else { return }
+                document.layers[idx].transform.rotationDegrees = min(180, max(-180, deg))
+            })
     }
 
     /// Degrees the Rotation SLIDER snaps to.
