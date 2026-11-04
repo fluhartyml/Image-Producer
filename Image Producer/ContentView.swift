@@ -867,6 +867,10 @@ struct ContentView: View {
         // A3 — one key picks a tool (letters locked in 005a). See ToolShortcutMonitor.
         .background(ToolShortcutMonitor(onPick: { activeTool = $0 },
                                         onArrow: { dx, dy, big in nudgeActiveLayer(dx: dx, dy: dy, big: big) }))
+        #elseif canImport(UIKit)
+        // A3 + 012a on the iPad with a hardware keyboard — same letters, same arrows. See IPadToolKeys.
+        .background(IPadToolKeys(onPick: { activeTool = $0 },
+                                 onArrow: { dx, dy, big in nudgeActiveLayer(dx: dx, dy: dy, big: big) }))
         #endif
         .onChange(of: activeTool) { _, newTool in
             if fitWidth && !newTool.fitWidthCompatible { fitWidth = false }
