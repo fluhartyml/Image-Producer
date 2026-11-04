@@ -5977,8 +5977,7 @@ struct CanvasView: View {
                             .allowsHitTesting(false)
                             .accessibilityElement()
                             .accessibilityIdentifier("uitest.canvas")
-                            .accessibilityLabel("Test probe")
-                            .accessibilityValue(String(format: "w=%d h=%d layers=%d hidden=%d active=%@ x=%.4f y=%.4f",
+                            .accessibilityLabel(String(format: "Test probe w=%d h=%d layers=%d hidden=%d active=%@ x=%.4f y=%.4f",
                                                        document.canvasWidth, document.canvasHeight,
                                                        document.layers.count,
                                                        document.layers.filter { !$0.isVisible }.count,

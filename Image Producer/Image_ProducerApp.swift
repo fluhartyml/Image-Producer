@@ -224,6 +224,13 @@ struct Image_ProducerApp: App {
 #endif
 
     init() {
+        // The shakedown's windows must never be restored, in the test or in his own copy
+        // later. Argument domain = in memory for this launch only, never saved (UITestDoor.swift).
+        if UITestDoor.isOpen {
+            var args = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+            args["ApplePersistenceIgnoreState"] = true
+            UserDefaults.standard.setVolatileDomain(args, forName: UserDefaults.argumentDomain)
+        }
         // A session that crashed never discarded its chamber. Clear those now.
         Cryochamber.sweepAbandoned()
     }

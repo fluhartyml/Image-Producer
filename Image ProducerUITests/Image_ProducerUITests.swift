@@ -26,7 +26,7 @@ final class Image_ProducerUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = true
         app = XCUIApplication()
-        app.launchArguments += ["-ImageProducerUITest"]
+        app.launchArguments += ["-ImageProducerUITest"]   // the app turns window restore off for itself (UITestDoor)
         app.launch()
         app.activate()
     }
@@ -97,10 +97,13 @@ final class Image_ProducerUITests: XCTestCase {
         var w = 0.0, h = 0.0, layers = 0, hidden = 0, active = "", x = 0.0, y = 0.0
     }
 
-    var probeElement: XCUIElement { app.descendants(matching: .any)["uitest.canvas"].firstMatch }
+    var probeElement: XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "identifier == 'uitest.canvas' AND NOT (label CONTAINS 'active=none')")).firstMatch
+    }
 
     func probe() -> Probe? {
-        guard probeElement.waitForExistence(timeout: 5), let v = probeElement.value as? String else { return nil }
+        guard probeElement.waitForExistence(timeout: 5) else { return nil }
+        let v = probeElement.label   // the readings ride in the label (a value is not passed through)
         var p = Probe()
         // "w=1920 h=720 layers=2 hidden=0 active=Layer 1 x=0.5000 y=0.5000"
         func num(_ key: String) -> Double? {
@@ -117,6 +120,10 @@ final class Image_ProducerUITests: XCTestCase {
     /// Drag the active layer by (dx, dy) screen points, starting on the layer's center.
     func dragLayer(dx: CGFloat, dy: CGFloat, modifiers: XCUIElement.KeyModifierFlags = []) {
         guard let p = probe() else { return }
+        // Bring the test's window forward first: a mouse press on a window that isn't in front
+        // only activates it, and the drag is lost (his own copy of the app is usually in front).
+        let win = app.windows.matching(NSPredicate(format: "title CONTAINS '.imgprd'")).firstMatch
+        if win.exists { win.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12)).click(); sleep(1) }
         let start = probeElement.coordinate(withNormalizedOffset: CGVector(dx: p.x, dy: p.y))
         let end = start.withOffset(CGVector(dx: dx, dy: dy))
         let drag = { start.press(forDuration: 0.3, thenDragTo: end) }
@@ -142,9 +149,14 @@ final class Image_ProducerUITests: XCTestCase {
         }
 
         // New image in the temporary folder.
-        app.typeKey("n", modifierFlags: .command)
+        // File ▸ New Image by the menu (a keypress can land in his own copy of the app, in front).
+        app.menuBars.menuBarItems["File"].click()
+        let newItem = app.menuItems["New Image"]
+        if newItem.waitForExistence(timeout: 5) { newItem.click() } else { app.typeKey(.escape, modifierFlags: []) }
+        _ = app.windows.firstMatch.waitForExistence(timeout: 10)
         if press("Create", 10) { sleep(2) }
-        check("—", "A new image opens (in the test's temporary folder)", probe() != nil)
+        check("—", "A new image opens (in the test's temporary folder)",
+              app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 10))
         snapshot("01-editor"); audit("Editor (Canvas tool)")
 
         // 356 — swatches are named buttons that answer an accessibility press.
@@ -155,6 +167,8 @@ final class Image_ProducerUITests: XCTestCase {
 
         // A layer to move.
         press("Add a layer"); sleep(1)
+        // An empty layer has no art to grab; fill it edge to edge so the Move box is the canvas.
+        press("Paint Drop Bucket"); sleep(1); press("Fill Layer"); sleep(1)
         press("Move"); sleep(1)
         snapshot("03-move"); audit("Move / Transform")
         guard let p0 = probe() else { check("—", "Probe readable", false); return }
