@@ -543,7 +543,7 @@ struct MaskInspector: View {
                 Button(role: .destructive) { document.cropMask = nil } label: {
                     Label("Remove Mask", systemImage: "xmark.square.dashed").frame(maxWidth: .infinity)
                 }
-                InfoTip("More about this", "Drag a corner to resize. Hold ⌘ while dragging a corner to move that corner on its own. Drag inside the frame to reposition.")
+                InfoTip("More about this", label: "About resizing the mask", "Drag a corner to resize. Hold ⌘ while dragging a corner to move that corner on its own. Drag inside the frame to reposition.")
             }
         }
         .padding()
@@ -590,7 +590,7 @@ struct MaskInspector: View {
                     .buttonStyle(.bordered)
                 }
             }
-            InfoTip("More about this", "Any character from any installed font works — the mask uses the real glyph outline, so the marching ants trace its exact shape.")
+            InfoTip("More about this", label: "About character masks", "Any character from any installed font works — the mask uses the real glyph outline, so the marching ants trace its exact shape.")
         }
 
         Divider()
@@ -617,6 +617,7 @@ struct MaskInspector: View {
                         Image(systemName: n).font(.system(size: 18)).frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityLabel(Self.quickSymbolNames[n] ?? n)
                 }
             }
         }
@@ -636,6 +637,15 @@ struct MaskInspector: View {
         document.cropMask?.form = .path(loops: loops, label: name)
     }
 
+    // REM: SPOKEN NAMES FOR THE QUICK SYMBOLS. An icon-only button is read by its SF name
+    // ("pawprint.fill") or not at all, so VoiceOver, Voice Control, and Switch Control need
+    // a plain word. Keyed by the names in `SymbolMaskResolver.quick` — add one here when
+    // a symbol is added there.
+    private static let quickSymbolNames: [String: String] = [
+        "heart.fill": "Heart", "star.fill": "Star", "bolt.fill": "Bolt", "leaf.fill": "Leaf",
+        "flame.fill": "Flame", "drop.fill": "Drop", "moon.fill": "Moon", "pawprint.fill": "Paw print",
+    ]
+
     @ViewBuilder private func sidesStepper(label: String) -> some View {
         Stepper("\(label)  \(document.cropMask?.polygonSides ?? 6)",
                 value: Binding(get: { document.cropMask?.polygonSides ?? 6 },
@@ -653,6 +663,7 @@ struct MaskInspector: View {
         }
         .pickerStyle(.menu)
         .labelsHidden()
+        .accessibilityLabel("Corner ratio")
         .disabled(document.maskFreeCorners)
 
         Toggle("Free corners (any angle)", isOn: Binding(get: { document.maskFreeCorners },

@@ -228,7 +228,7 @@ struct AdjustInspector: View {
     var body: some View {
         if hasPicture {
             VStack(alignment: .leading, spacing: 14) {
-                InfoTip("More about this", "Each opens its own window with a live preview. Nothing changes until you press OK.")
+                InfoTip("More about this", label: "About adjustments", "Each opens its own window with a live preview. Nothing changes until you press OK.")
                 ForEach(Adjustment.allCases) { a in
                     Button { document.adjustmentRequested = a } label: {
                         Label("\(a.title)…", systemImage: a.systemImage)
@@ -355,8 +355,12 @@ struct GaussianBlurWindow: View {
                     Spacer()
                     Text(String(format: "%.1f px", radius)).font(.system(size: 18).monospacedDigit())
                     Stepper("", value: $radius, in: 0...250, step: 0.5).labelsHidden()
+                        .accessibilityLabel("Radius")
+                        .accessibilityValue(String(format: "%.1f pixels", radius))
                 }
                 Slider(value: $radius, in: 0...250)
+                    .accessibilityLabel("Radius")
+                    .accessibilityValue(String(format: "%.1f pixels", radius))
                 if hasMask {
                     Toggle("Only inside the Mask", isOn: $onlyInMask).font(.system(size: 18))
                 }

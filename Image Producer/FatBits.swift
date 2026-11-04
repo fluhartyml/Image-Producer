@@ -113,10 +113,10 @@ struct ZoomInspector: View {
                 Text("Floating preview").font(.system(size: 18))
             }
             .toggleStyle(.switch)
-            InfoTip("More about this", "Keeps the production preview on the canvas with ANY tool active — "
+            InfoTip("More about this", label: "About the floating preview", "Keeps the production preview on the canvas with ANY tool active — "
                  + "drag it to any corner.")
 
-            InfoTip("More about this", "The preview never follows the canvas zoom — that is the point. "
+            InfoTip("More about this", label: "About the preview zoom", "The preview never follows the canvas zoom — that is the point. "
                  + "Work up close, judge at size.")
 
             Spacer(minLength: 0)

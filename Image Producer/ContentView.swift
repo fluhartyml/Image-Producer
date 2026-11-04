@@ -1080,7 +1080,9 @@ struct ToolStrip: View {
                     // and replacing it would stop single-click tool selection working.
                     .simultaneousGesture(TapGesture(count: 2).onEnded { onDoubleTap?(tool) })
                     .onHover { hoveredTool = $0 ? tool : (hoveredTool == tool ? nil : hoveredTool) }
-                    .accessibilityLabel(tool.title)   // VoiceOver everywhere
+                    .accessibilityLabel(tool.accessibilityName)   // VoiceOver everywhere
+                    .accessibilityInputLabels(tool.voiceInputNames)  // Voice Control — his spoken names
+                    .accessibilityAddTraits(activeTool == tool ? .isSelected : [])
                 }
             }
             .padding(.horizontal, 8)
@@ -1153,7 +1155,9 @@ struct ToolRail: View {
                     // and replacing it would stop single-click tool selection working.
                     .simultaneousGesture(TapGesture(count: 2).onEnded { onDoubleTap?(tool) })
                     .onHover { hoveredTool = $0 ? tool : (hoveredTool == tool ? nil : hoveredTool) }
-                    .accessibilityLabel(tool.title)
+                    .accessibilityLabel(tool.accessibilityName)   // VoiceOver everywhere
+                    .accessibilityInputLabels(tool.voiceInputNames)  // Voice Control — his spoken names
+                    .accessibilityAddTraits(activeTool == tool ? .isSelected : [])
                 }
             }
             .padding(.vertical, 6)
@@ -1322,10 +1326,11 @@ struct PaintBucketInspector: View {
             if activeHasImage {
                 Divider()
                 Text("Flood fill — pour color up to the lines").font(.system(size: 18)).bold()
-                InfoTip("More about this", "Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
+                InfoTip("More about this", label: "About flood fill", "Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Tolerance  \(Int(pen.bucketTolerance))").font(.system(size: 18))
                     Slider(value: $pen.bucketTolerance, in: 0...160, step: 1)
+                        .accessibilityLabel("Tolerance")
                 }
             }
             Spacer()
@@ -1629,6 +1634,7 @@ struct CanvasInspector: View {
                         Button("3 mm") { document.bleedInches = 3.0 / 25.4 }
                     } label: { Image(systemName: "chevron.down.circle").font(.system(size: 18)) }
                     .fixedSize()
+                    .accessibilityLabel("Bleed presets")
                     InfoTip("What is bleed?",
                             "Extra picture past the edge of the page. The shop trims just inside it, so the color runs right to the edge with no white sliver. 1/8 inch is the U.S. standard; 3 mm is metric.")
                 }
@@ -2473,6 +2479,7 @@ struct PaletteSwatchRow: View {
                                 pen.color = c
                             }
                             .help(document.palette[i])
+                            .paletteSwatchAccessibility(index: i, hex: document.palette[i], isSelected: isSel)
                     }
                 }
             }
@@ -2481,6 +2488,20 @@ struct PaletteSwatchRow: View {
                     .font(.system(size: 18)).foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+// REM: ONE NAME FOR EVERY PALETTE SPLOTCH. The swatches are bare RoundedRectangles with a
+// tap gesture, so VoiceOver, Voice Control, and Switch Control found nothing to name or press.
+// This gives each the same spoken shape everywhere — "Color 3, #FF8800" — marks it a button,
+// and marks the active color selected (the accent ring is the only other sign, and it is
+// visual). Shared, so the three splotch grids cannot drift apart.
+extension View {
+    func paletteSwatchAccessibility(index: Int, hex: String, isSelected: Bool) -> some View {
+        self
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Color \(index + 1), \(hex)")
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
@@ -2551,6 +2572,7 @@ struct ColorPaletteInspector: View {
                             .stroke(i == selected ? Color.accentColor : Color.gray.opacity(0.4),
                                     lineWidth: i == selected ? 3 : 1))
                         .onTapGesture { pen.selectedSlot = i; applyActive() }
+                        .paletteSwatchAccessibility(index: i, hex: document.palette[i], isSelected: i == selected)
                         .contextMenu {
                             if document.palette.count > 8 {
                                 Button(role: .destructive) { document.removePaletteColor(at: i) } label: {
@@ -2572,7 +2594,7 @@ struct ColorPaletteInspector: View {
             }
             .font(.system(size: 18)).buttonStyle(.bordered)
 
-            InfoTip("More about this", "Tap a swatch to make it the active color; edit it above. Add grows the box (8–24); the 8 base colors can't be removed. This palette is the only place colors are defined — every tool picks from it.")
+            InfoTip("More about this", label: "About the color palette", "Tap a swatch to make it the active color; edit it above. Add grows the box (8–24); the 8 base colors can't be removed. This palette is the only place colors are defined — every tool picks from it.")
 
             Divider()
 
@@ -2833,7 +2855,7 @@ struct SymbolPickerInspector: View {
                     .background(RoundedRectangle(cornerRadius: 8)
                         .fill(isHighlighted(result) ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
             }
-            .buttonStyle(.plain).accessibilityLabel(name)
+            .buttonStyle(.plain).accessibilityLabel(symbolLayerName(name))   // spoken words, not "star.fill"
         case .unicode(let g):
             Button { picked = result } label: {
                 Text(g.char)
@@ -3051,7 +3073,7 @@ struct FontPickerInspector: View {
             }
             .buttonStyle(.borderedProminent)
             // Kept to one line at his word, 2026-10-03: "the blurb under new text layer is too long".
-            InfoTip("More about this", "Type, then press New Text Layer. Renaming the layer changes its text.")
+            InfoTip("More about this", label: "About new text layers", "Type, then press New Text Layer. Renaming the layer changes its text.")
 
             HStack(spacing: 8) {
                 styleToggle("bold", "Bold", $bold)
@@ -3081,8 +3103,12 @@ struct FontPickerInspector: View {
                             in: 5...400, step: 1)
                         .labelsHidden()
                         .help("Jog the text size by 1%")
+                        .accessibilityLabel("Text size")
+                        .accessibilityValue("\(Int((size * 100).rounded())) percent")
                 }
                 Slider(value: $size, in: 0.05...4.0)
+                    .accessibilityLabel("Text size")
+                    .accessibilityValue("\(Int((size * 100).rounded())) percent")
             }
 
             // OUTLINE — a stroke around the letters, live, on this same layer.
@@ -3096,8 +3122,12 @@ struct FontPickerInspector: View {
                         Stepper("", value: $outlineWidth, in: 1...40, step: 1)
                             .labelsHidden()
                             .help("Jog the outline by one pixel")
+                            .accessibilityLabel("Outline width")
+                            .accessibilityValue("\(Int(outlineWidth)) pixels")
                     }
                     Slider(value: $outlineWidth, in: 1...40, step: 1)
+                        .accessibilityLabel("Outline width")
+                        .accessibilityValue("\(Int(outlineWidth)) pixels")
                     PaletteSwatchRow(document: document, color: $outlineColor, label: "Outline color")
                 }
             }
@@ -3159,6 +3189,7 @@ struct FontPickerInspector: View {
                     Button { findText = "" } label: { Image(systemName: "xmark.circle.fill") }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                         .help("Show every font")
+                        .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 5)
@@ -3235,7 +3266,7 @@ struct FontPickerInspector: View {
 
             PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
 
-            InfoTip("More about this", "The text layer updates live, named after the text. Reposition with the Move tool; rename the layer (Layers panel) to edit it later.")
+            InfoTip("More about this", label: "About editing a text layer", "The text layer updates live, named after the text. Reposition with the Move tool; rename the layer (Layers panel) to edit it later.")
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -3441,6 +3472,7 @@ struct ImageImportInspector: View {
                     Button { showInfo.toggle() } label: { Image(systemName: "info.circle") }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                         .help("More about importing")
+                        .accessibilityLabel("More about importing")
                         .popover(isPresented: $showInfo) {
                             Text("Selected Layer replaces that layer's picture. New Layer goes above the selected one. Opens PNG, JPEG, HEIC, TIFF, GIF, BMP and .psd. A PSD to a New Layer keeps all its layers; to the Selected Layer it comes in flattened. Use Move to size and place it.")
                                 .font(.system(size: 18))
@@ -3614,6 +3646,7 @@ struct PenInspector: View {
                                 pen.selectedSlot = i
                                 pen.color = Color(hex: document.palette[i]) ?? .black
                             }
+                            .paletteSwatchAccessibility(index: i, hex: document.palette[i], isSelected: i == pen.selectedSlot)
                             .contextMenu { Button("Change color…") { editing = EditSlot(id: i) } }
                     }
                 }
@@ -3621,7 +3654,7 @@ struct PenInspector: View {
                     ColorPicker("Slot color", selection: slotColorBinding(slot.id), supportsOpacity: false)
                         .padding().frame(minWidth: 220)
                 }
-                InfoTip("More about this", "Tap to use · right-click (long-press) to change. Saved with the file; new docs inherit it.")
+                InfoTip("More about this", label: "About palette colors", "Tap to use · right-click (long-press) to change. Saved with the file; new docs inherit it.")
 
                 VStack(spacing: 6) {
                     Button {
@@ -3642,7 +3675,7 @@ struct PenInspector: View {
                 }
                 .font(.system(size: 18))
                 .buttonStyle(.bordered)
-                InfoTip("More about this", "Save these colors as a reusable brand palette, or load one into this icon.")
+                InfoTip("More about this", label: "About brand palettes", "Save these colors as a reusable brand palette, or load one into this icon.")
                 if paletteLoadFailed {
                     Text("Couldn't read that palette file.").font(.system(size: 18)).foregroundStyle(.red)
                 }
@@ -3654,6 +3687,9 @@ struct PenInspector: View {
                         get: { Double(resolutionRungs.firstIndex(of: pen.resolution) ?? 4) },
                         set: { pen.resolution = resolutionRungs[min(max(Int($0.rounded()), 0), resolutionRungs.count - 1)] }
                     ), in: 0...Double(resolutionRungs.count - 1), step: 1)
+                    // The slider moves a RUNG INDEX (0…10); speak the real size, not the index.
+                    .accessibilityLabel("Resolution")
+                    .accessibilityValue("\(pen.resolution) px")
                     // Ruler graduations: first / middle / last detent (indices 0, 5, 10 of 11
                     // rungs). Deliberately below the usual min font size — these are reference
                     // ticks, not body text. Start minimal (3 labels); add more if it reads sparse.
@@ -3683,6 +3719,8 @@ struct PenInspector: View {
                     Text("Brush  \(pen.brush) cell\(pen.brush == 1 ? "" : "s")").font(.system(size: 18))
                     Slider(value: Binding(get: { Double(pen.brush) },
                                           set: { pen.brush = Int($0) }), in: 1...8, step: 1)
+                        .accessibilityLabel("Brush size")
+                        .accessibilityValue("\(pen.brush) cell\(pen.brush == 1 ? "" : "s")")
                 }
 
                 Text("Drag on the canvas to drop pixels into the grid cells.")
@@ -3767,6 +3805,7 @@ enum BottomPanel: String, CaseIterable, Identifiable {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                    .accessibilityLabel("Panel")
                     .padding(8)
                 }
 
@@ -3872,6 +3911,7 @@ struct LayersHistoryColumn: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .accessibilityLabel("Panel")
             .padding(8)
             Divider()
             switch tab {
@@ -4059,6 +4099,7 @@ struct HistoryPanel: View {
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
+                .accessibilityLabel("History options")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -4208,6 +4249,7 @@ private struct HistoryEntryRow: View {
                         .frame(width: 16)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(expanded ? "Hide steps" : "Show steps")
                 Button(action: viewEntry) {
                     HStack {
                         // Step number, 1 = OLDEST (Michael 2026-08-24: "it should also
@@ -4352,7 +4394,7 @@ struct MoveTransformInspector: View {
 
                 cropSizeControls
 
-                InfoTip("More about this", "Live preview is non-destructive (Export/Share trim to it). Apply Crop makes a new cropped layer and hides the original (kept).")
+                InfoTip("More about this", label: "About cropping", "Live preview is non-destructive (Export/Share trim to it). Apply Crop makes a new cropped layer and hides the original (kept).")
             }
         }
         // ⚠️ ALSO ON APPEAR, NOT ONLY ON CHANGE. Every call to applyCrop() used to come
@@ -4377,8 +4419,12 @@ struct MoveTransformInspector: View {
         case .freeform:
             Text("Width  \(Int(freeWidth * 100))%").font(.system(size: 18))
             Slider(value: $freeWidth, in: 0.1...1.0)
+                .accessibilityLabel("Width")
+                .accessibilityValue("\(Int(freeWidth * 100)) percent")
             Text("Height  \(Int(freeHeight * 100))%").font(.system(size: 18))
             Slider(value: $freeHeight, in: 0.1...1.0)
+                .accessibilityLabel("Height")
+                .accessibilityValue("\(Int(freeHeight * 100)) percent")
         case .custom:
             HStack {
                 Stepper("W \(customW)", value: $customW, in: 1...32)
@@ -4387,9 +4433,13 @@ struct MoveTransformInspector: View {
             .font(.system(size: 18))
             Text("Crop size  \(Int(cropSize * 100))%").font(.system(size: 18))
             Slider(value: $cropSize, in: 0.1...1.0)
+                .accessibilityLabel("Crop size")
+                .accessibilityValue("\(Int(cropSize * 100)) percent")
         default:
             Text("Crop size  \(Int(cropSize * 100))%").font(.system(size: 18))
             Slider(value: $cropSize, in: 0.1...1.0)
+                .accessibilityLabel("Crop size")
+                .accessibilityValue("\(Int(cropSize * 100)) percent")
         }
     }
 
@@ -4570,7 +4620,7 @@ struct MoveTransformInspector: View {
                             Button("Fill") { applyFitFill(.fill, idx) }
                         }
                         .buttonStyle(.bordered)
-                        InfoTip("More about this", "Fit insets the object inside the canvas (letterbox if it isn't square). Fill covers the canvas and clips the overflow.")
+                        InfoTip("More about this", label: "About Fit and Fill", "Fit insets the object inside the canvas (letterbox if it isn't square). Fill covers the canvas and clips the overflow.")
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
@@ -4591,12 +4641,14 @@ struct MoveTransformInspector: View {
                             .monospacedDigit()
                             .frame(width: 72)
                             .help("Scale in percent — type a value and press Return")
+                            .accessibilityLabel("Scale percent")
                         Text("%").font(.system(size: 18)).fixedSize()
                         TextField("", value: scalePixelsBinding(idx), format: .number.grouping(.never))
                             .font(.system(size: 18))
                             .monospacedDigit()
                             .frame(width: 72)
                             .help("Size of the longer side in pixels — type a value and press Return")
+                            .accessibilityLabel("Size in pixels")
                         Text("px").font(.system(size: 18)).fixedSize()
                         // JOG BY ONE PIXEL. His ask, 2026-09-15: "can you add an up down
                         // arrow to jog the scale by one pixel." The slider is deliberately
@@ -4607,6 +4659,8 @@ struct MoveTransformInspector: View {
                                 onDecrement: { jogScale(idx, byPixels: -1) }) { EmptyView() }
                             .labelsHidden()
                             .help("Jog the layer's size by one pixel")
+                            .accessibilityLabel("Scale")
+                            .accessibilityValue(scaleSpokenValue(idx))
                         Spacer()
                     }
                     // 100% SITS AT THE CENTRE. Michael, 2026-09-02, after saying Rotation
@@ -4626,6 +4680,10 @@ struct MoveTransformInspector: View {
                     // NO `step:` ANYWHERE — he asked for that explicitly. The marks below
                     // are drawn, not enforced; the slider passes straight through them.
                     Slider(value: scaleSliderBinding(idx), in: -1...1)
+                        // The track is a POSITION (-1…1), so the default reading is wrong;
+                        // speak the real scale.
+                        .accessibilityLabel("Scale")
+                        .accessibilityValue(scaleSpokenValue(idx))
                     ScaleTicks()
                 }
                 VStack(alignment: .leading, spacing: 4) {
@@ -4636,9 +4694,13 @@ struct MoveTransformInspector: View {
                                 onDecrement: { jogRotation(idx, byDegrees: -1) }) { EmptyView() }
                             .labelsHidden()
                             .help("Jog the layer's rotation by one degree")
+                            .accessibilityLabel("Rotation")
+                            .accessibilityValue("\(Int(document.layers[idx].transform.rotationDegrees)) degrees")
                         Spacer()
                     }
                     Slider(value: rotationSliderBinding(idx), in: -180...180)
+                        .accessibilityLabel("Rotation")
+                        .accessibilityValue("\(Int(document.layers[idx].transform.rotationDegrees)) degrees")
                     RotationTicks()
                 }
                 // APPLY — his choice, 2026-10-04, over a "choose another tool" note: a clear
@@ -4708,6 +4770,12 @@ struct MoveTransformInspector: View {
     }
 
     /// The typed Scale field, in percent: 1%–400% (a corner drag reaches 1% too).
+    /// What VoiceOver says for Scale — the real percent, tenths kept ("102.5 percent").
+    private func scaleSpokenValue(_ idx: Int) -> String {
+        let pct = scalePercentBinding(idx).wrappedValue
+        return pct.formatted(.number.precision(.fractionLength(0...1))) + " percent"
+    }
+
     private func scalePercentBinding(_ idx: Int) -> Binding<Double> {
         Binding(
             get: { document.layers.indices.contains(idx) ? document.layers[idx].transform.scale * 100 : 100 },
@@ -6765,6 +6833,8 @@ struct LayerRow: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(isChecked ? Color.accentColor : .secondary)
                     .help(isChecked ? "Uncheck this layer" : "Check this layer")
+                    .accessibilityLabel("Select layer")
+                    .accessibilityAddTraits(isChecked ? .isSelected : [])
                 } else {
                     // Light and Dark keep the row aligned without offering the control.
                     Color.clear.frame(width: 20, height: 1)
@@ -6781,6 +6851,7 @@ struct LayerRow: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    .accessibilityLabel(isCollapsed ? "Expand group" : "Collapse group")
                 } else {
                     // Keep ungrouped rows aligned with grouped ones.
                     Color.clear.frame(width: 16, height: 1)
@@ -7490,14 +7561,22 @@ struct MenuInvite: View {
 struct InfoTip: View {
     let help: String
     let text: String
+    /// REM: THE SPOKEN NAME, separate from the hover tooltip. Thirty of these all said
+    /// "More about this", so VoiceOver, Voice Control, and Switch Control heard thirty
+    /// identical buttons with nothing to tell them apart. `label` names the one control
+    /// ("About tolerance"); the tooltip text is unchanged. Optional with a default, so a
+    /// call site that already passes a specific `help` ("What is bleed?") needs no edit.
+    let label: String?
     @State private var shown = false
-    init(_ help: String, _ text: String) { self.help = help; self.text = text }
+    init(_ help: String, label: String? = nil, _ text: String) {
+        self.help = help; self.label = label; self.text = text
+    }
 
     var body: some View {
         Button { shown.toggle() } label: { Image(systemName: "info.circle").font(.system(size: 18)) }
             .buttonStyle(.plain).foregroundStyle(.secondary)
             .help(help)
-            .accessibilityLabel(help)
+            .accessibilityLabel(label ?? help)
             .popover(isPresented: $shown) {
                 Text(text)
                     .font(.system(size: 18))
@@ -7583,6 +7662,8 @@ struct ExportSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(Int(gifFPS)) frames a second").font(.system(size: 18))
                     Slider(value: $gifFPS, in: 1...24, step: 1)
+                        .accessibilityLabel("Frames per second")
+                        .accessibilityValue("\(Int(gifFPS))")
                 }
                 Toggle("Loop", isOn: $gifLoop).font(.system(size: 18))
             }
@@ -7598,6 +7679,8 @@ struct ExportSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(Int(gifFPS)) frames a second").font(.system(size: 18))
                     Slider(value: $gifFPS, in: 1...24, step: 1)
+                        .accessibilityLabel("Frames per second")
+                        .accessibilityValue("\(Int(gifFPS))")
                 }
                 Toggle("Loop", isOn: $gifLoop).font(.system(size: 18))
             }

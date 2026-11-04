@@ -195,9 +195,13 @@ struct LiquifyWindow: View {
                 }
                 labeled("Brush size", "\(Int(brushSize)) px") {
                     Slider(value: $brushSize, in: 5...1500)
+                        .accessibilityLabel("Brush size")
+                        .accessibilityValue("\(Int(brushSize)) px")
                 }
                 labeled("Density", "\(Int(density))") {
                     Slider(value: $density, in: 1...100)
+                        .accessibilityLabel("Density")
+                        .accessibilityValue("\(Int(density))")
                 }
                 Text("Drag to \(mode == .pucker ? "pull the picture in" : "push the picture out"). Hold still to keep going.")
                     .foregroundStyle(.secondary)
@@ -240,6 +244,10 @@ struct LiquifyWindow: View {
                     }
                 }
                 .contentShape(Rectangle())
+                // The warp canvas is drag-only; name it so it is not an unlabeled image.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Liquify preview")
+                .accessibilityAddTraits(.isImage)
                 .gesture(DragGesture(minimumDistance: 0)
                     .onChanged { v in
                         pressing = v.location

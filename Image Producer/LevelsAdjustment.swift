@@ -215,7 +215,21 @@ struct LevelsWindow: View {
     let dismiss: () -> Void
 
     enum Dropper: String { case black, gray, white }
-    enum Marker { case inBlack, gamma, inWhite, outBlack, outWhite }
+    enum Marker {
+        case inBlack, gamma, inWhite, outBlack, outWhite
+
+        /// REM: the case names ("inBlack") were what VoiceOver read for the triangles.
+        /// VoiceOver, Voice Control, and Switch Control need words a person would say.
+        var spokenName: String {
+            switch self {
+            case .inBlack:  "Input black point"
+            case .gamma:    "Input gray point"
+            case .inWhite:  "Input white point"
+            case .outBlack: "Output black point"
+            case .outWhite: "Output white point"
+            }
+        }
+    }
 
     @State private var settings = LevelsSettings()
     @State private var target: LevelsTarget = .rgb
@@ -358,7 +372,21 @@ struct LevelsWindow: View {
         }
         .buttonStyle(.plain)
         .help(help)
-        .accessibilityLabel(help)
+        // REM: short name, long sentence as the hint. The full help line ("Set black point —
+        // click the darkest thing…") is too long to hear on every pass and too long to say
+        // to Voice Control; the part before the dash is the name, the rest is the hint.
+        .accessibilityLabel(Self.dropperName(help))
+        .accessibilityHint(Self.dropperHint(help))
+        .accessibilityAddTraits(dropper == d ? .isSelected : [])
+    }
+
+    private static func dropperName(_ help: String) -> String {
+        help.components(separatedBy: " — ").first ?? help
+    }
+
+    private static func dropperHint(_ help: String) -> String {
+        let rest = help.components(separatedBy: " — ").dropFirst().joined(separator: " — ")
+        return rest.prefix(1).uppercased() + rest.dropFirst()
     }
 
     private func numberField(_ label: String, value: Binding<Double>, range: ClosedRange<Double>,
@@ -407,17 +435,22 @@ struct LevelsWindow: View {
         let c = settings[target]
         let mid = c.inBlack + (c.inWhite - c.inBlack) * pow(0.5, c.gamma)
         return [
-            .init(id: .inBlack, fraction: c.inBlack / 255, fill: .black),
-            .init(id: .gamma, fraction: mid / 255, fill: .gray),
-            .init(id: .inWhite, fraction: c.inWhite / 255, fill: .white),
+            .init(id: .inBlack, fraction: c.inBlack / 255, fill: .black,
+                  spokenValue: "\(Int(c.inBlack.rounded()))"),
+            .init(id: .gamma, fraction: mid / 255, fill: .gray,
+                  spokenValue: String(format: "%.2f", c.gamma)),
+            .init(id: .inWhite, fraction: c.inWhite / 255, fill: .white,
+                  spokenValue: "\(Int(c.inWhite.rounded()))"),
         ]
     }
 
     private var outputMarkers: [LevelsMarkerBar.MarkerSpec] {
         let c = settings[target]
         return [
-            .init(id: .outBlack, fraction: c.outBlack / 255, fill: .black),
-            .init(id: .outWhite, fraction: c.outWhite / 255, fill: .white),
+            .init(id: .outBlack, fraction: c.outBlack / 255, fill: .black,
+                  spokenValue: "\(Int(c.outBlack.rounded()))"),
+            .init(id: .outWhite, fraction: c.outWhite / 255, fill: .white,
+                  spokenValue: "\(Int(c.outWhite.rounded()))"),
         ]
     }
 
@@ -531,6 +564,8 @@ struct LevelsMarkerBar: View {
         let id: LevelsWindow.Marker
         let fraction: Double
         let fill: Color
+        /// The number beside it in the fields below, for VoiceOver.
+        var spokenValue: String = ""
     }
     let markers: [MarkerSpec]
     @Binding var dragging: LevelsWindow.Marker?
@@ -551,7 +586,8 @@ struct LevelsMarkerBar: View {
                                 onDrag(m.id, min(1, max(0, v.location.x / max(1, geo.size.width))))
                             }
                             .onEnded { _ in dragging = nil })
-                        .accessibilityLabel(String(describing: m.id))
+                        .accessibilityLabel(m.id.spokenName)
+                        .accessibilityValue(m.spokenValue)
                 }
             }
         }

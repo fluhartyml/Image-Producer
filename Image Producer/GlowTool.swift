@@ -509,6 +509,8 @@ struct LayerInspector: View {
                         .foregroundStyle(.secondary)
                 }
                 Slider(value: opacity, in: 0...1)
+                    .accessibilityLabel("Layer opacity")
+                    .accessibilityValue(String(format: "%.0f percent", opacity.wrappedValue * 100))
                 Text("The whole layer, artwork and glow together.")
                     .font(.system(size: 18))
                     .foregroundStyle(.secondary)
@@ -663,7 +665,12 @@ struct LayerInspector: View {
                 Spacer()
                 Text(readout).font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
             }
+            // REM: THE CAPTION IS NOT THE SLIDER'S NAME. The title Text above is a separate
+            // element, so VoiceOver, Voice Control, and Switch Control met an unnamed slider
+            // reading a raw fraction. Every call site's title and readout go on the slider.
             Slider(value: value, in: range)
+                .accessibilityLabel(title)
+                .accessibilityValue(readout)
         }
     }
 
@@ -809,7 +816,7 @@ struct LayerInspector: View {
             .controlSize(.small)
             Spacer()
         }
-        InfoTip("More about this", "Samples the most common opaque color in this layer. For a specific spot, "
+        InfoTip("More about this", label: "About sampling from the layer", "Samples the most common opaque color in this layer. For a specific spot, "
              + "pick it with the Eyedropper tool first.")
     }
 
@@ -840,7 +847,9 @@ struct LayerInspector: View {
                     .font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
             }
             Slider(value: tol, in: 0...128)
-            InfoTip("More about this", "How far from that color still counts as a match. Higher reaches more "
+                .accessibilityLabel("Tolerance")
+                .accessibilityValue("\(Int(tol.wrappedValue))")
+            InfoTip("More about this", label: "About tolerance", "How far from that color still counts as a match. Higher reaches more "
                  + "shades — and more of the subject.")
         }
     }
@@ -860,7 +869,9 @@ struct LayerInspector: View {
                     .font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
             }
             Slider(value: soft, in: 0...128)
-            InfoTip("More about this", "Shades just past the tolerance fade out instead of cutting off, with the "
+                .accessibilityLabel("Softness")
+                .accessibilityValue("\(Int(soft.wrappedValue))")
+            InfoTip("More about this", label: "About softness", "Shades just past the tolerance fade out instead of cutting off, with the "
                  + "key color taken out of them — so a glow on black stays a glow. 0 is a hard edge.")
         }
     }
@@ -1009,7 +1020,7 @@ struct LayerInspector: View {
                     labelledSlider("Strength", value: strength, range: 0...1,
                                    readout: String(format: "%.0f%%", document.layers[i].blendAmount * 100))
                 }
-                InfoTip("More about this", "Blend needs something underneath to mix with — a layer on its own "
+                InfoTip("More about this", label: "About blend modes", "Blend needs something underneath to mix with — a layer on its own "
                      + "looks the same in every mode.")
             }
             .padding(.top, 4)

@@ -392,7 +392,7 @@ struct Text3DSection: View {
                     .buttonStyle(.bordered)
                     .font(.system(size: 18))
                 }
-                InfoTip("More about this",
+                InfoTip("More about this", label: "About exporting 3D text",
                         "Export → Animated GIF (3D text loop) saves one full turn or swing.")
             }
         }
@@ -411,7 +411,12 @@ struct Text3DSection: View {
                 Spacer()
                 Text(readout).font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
             }
+            // REM: THE CAPTION IS NOT THE SLIDER'S NAME. The title Text above is a separate
+            // element, so VoiceOver, Voice Control, and Switch Control met an unnamed slider
+            // reading a raw fraction. Every call site's title and readout go on the slider.
             Slider(value: value, in: range)
+                .accessibilityLabel(title)
+                .accessibilityValue(readout)
         }
     }
 

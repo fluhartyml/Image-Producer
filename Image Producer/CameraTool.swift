@@ -379,6 +379,8 @@ struct CameraInspector: View {
                         Text("Strength  \(Int(camera.onionStrength * 100))%")
                             .font(.system(size: 15))
                         Slider(value: $camera.onionStrength, in: 0.05...0.6)
+                            .accessibilityLabel("Onion skin strength")
+                            .accessibilityValue("\(Int(camera.onionStrength * 100)) percent")
                     }
                 }
             }
@@ -410,6 +412,8 @@ struct CameraInspector: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(Int(camera.fps)) fps").font(.system(size: 15))
                     Slider(value: $camera.fps, in: 1...24)
+                        .accessibilityLabel("Frames per second")
+                        .accessibilityValue("\(Int(camera.fps))")
                 }
                 if frameCount > 1 {
                     VStack(alignment: .leading, spacing: 2) {
@@ -425,6 +429,8 @@ struct CameraInspector: View {
                                     document.playbackTimeline.firstIndex(of: f)
                             }),
                                in: 1...Double(frameCount))
+                            .accessibilityLabel("Frame")
+                            .accessibilityValue("\(camera.soloFrameIndex ?? 0) of \(frameCount)")
                     }
                 }
                 // Retime the frame you are looking at — the cutout animator's real control.
@@ -448,13 +454,15 @@ struct CameraInspector: View {
                 Picker("Easing", selection: $camera.easing) {
                     ForEach(CameraEasing.allCases) { Text($0.title).tag($0) }
                 }
-                InfoTip("More about this", "Linear reads as mechanical — real motion starts slow and settles.")
+                InfoTip("More about this", label: "About easing", "Linear reads as mechanical — real motion starts slow and settles.")
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Path smoothing  \(Int(camera.smoothing * 100))%")
                         .font(.system(size: 15))
                     Slider(value: $camera.smoothing, in: 0...1)
+                        .accessibilityLabel("Path smoothing")
+                        .accessibilityValue("\(Int(camera.smoothing * 100)) percent")
                 }
-                InfoTip("More about this", "Pulls each shot toward its neighbors. Full smoothing flattens intentional motion too.")
+                InfoTip("More about this", label: "About path smoothing", "Pulls each shot toward its neighbors. Full smoothing flattens intentional motion too.")
                 HStack {
                     Button("Generate") { generateCameraInBetweens(document, camera: camera) }
                         .disabled(shotCount < 2)

@@ -573,6 +573,11 @@ struct WelcomeView: View {
                                     newName = url.deletingPathExtension().lastPathComponent
                                     nameTaken = nil; openError = nil
                                 }
+                                // A tap-gesture row is not a button to VoiceOver or Switch
+                                // Control; say it is one, say which is staged, and give the
+                                // double-click open a named action they can reach.
+                                .accessibilityAddTraits(staged ? [.isButton, .isSelected] : .isButton)
+                                .accessibilityAction(named: "Open") { Task { await openRecent(url) } }
                         }
                     }
                     .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)

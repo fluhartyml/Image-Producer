@@ -84,6 +84,33 @@ enum Tool: String, CaseIterable, Identifiable {
         }
     }
 
+    // REM: SPOKEN NAMES — VoiceOver, Voice Control, and Switch Control need a name a person can
+    // say, and the printed title is not always one ("Paint Drop / Bucket" reads the slash,
+    // "Layer…" reads the ellipsis). His locked rulings: Paint Drop / Bucket is spoken
+    // "Paint Drop Bucket" (Voice Control also answers to "Paint Drop" and "Bucket"); Move /
+    // Transform is spoken "Move" (also answers to "Transform"); the Pixel Pen answers to
+    // "Pixel Pen", "Pen", and "Pen Tool"; "Layer…" is spoken "Layer". The printed tile text
+    // (`title`) does not change.
+    var accessibilityName: String {
+        switch self {
+        case .fill:  "Paint Drop Bucket"
+        case .move:  "Move"
+        case .pen:   "Pixel Pen"
+        case .layer: "Layer"
+        default:     title
+        }
+    }
+
+    /// What Voice Control will accept for this tool. The first entry is the one it shows.
+    var voiceInputNames: [String] {
+        switch self {
+        case .fill: ["Paint Drop Bucket", "Paint Drop", "Bucket"]
+        case .move: ["Move", "Transform"]
+        case .pen:  ["Pixel Pen", "Pen", "Pen Tool"]
+        default:    [accessibilityName]
+        }
+    }
+
     /// SF Symbol used for the tool's button in the strip.
     var systemImage: String {
         switch self {
