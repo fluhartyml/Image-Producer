@@ -863,7 +863,8 @@ struct ContentView: View {
         // back to the normal fitted view so the tool can't break (Michael 2026-06-23).
         #if os(macOS)
         // A3 — one key picks a tool (letters locked in 005a). See ToolShortcutMonitor.
-        .background(ToolShortcutMonitor { activeTool = $0 })
+        .background(ToolShortcutMonitor(onPick: { activeTool = $0 },
+                                        onArrow: { dx, dy, big in nudgeActiveLayer(dx: dx, dy: dy, big: big) }))
         #endif
         .onChange(of: activeTool) { _, newTool in
             if fitWidth && !newTool.fitWidthCompatible { fitWidth = false }
@@ -917,6 +918,26 @@ struct ContentView: View {
         moveSessionLayerID = id
         moveSessionTransform = layer.transform
         moveSessionCanvas = CGSize(width: document.canvasWidth, height: document.canvasHeight)
+    }
+
+    // REM: 012a ARROW-KEY NUDGE, his yes 11-04: "i think that would help the accessability
+    // too". Found making the MediaWorks Top Shelf image hands-off: Move had no way to place a
+    // layer except a drag. With Move active, an arrow moves the selected layer 1 canvas
+    // pixel; Shift-arrow moves 10. Shift is an extra, never the only path (Sticky Keys).
+    // It edits the SAME live Move session a drag does, so leaving Move commits it the same
+    // way — hidden "before" copy and one History step — however many presses it took.
+    /// Returns true when the key was used (Move active with a layer selected).
+    private func nudgeActiveLayer(dx: Int, dy: Int, big: Bool) -> Bool {
+        guard activeTool == .move, let id = activeLayerID,
+              let i = document.layers.firstIndex(where: { $0.id == id }) else { return false }
+        if moveSessionLayerID != id { beginMoveSessionIfNeeded() }
+        let px = CGFloat(big ? 10 : 1)
+        let w = max(1, document.canvasPixelSize.width), h = max(1, document.canvasPixelSize.height)
+        let c = document.layers[i].transform.center
+        document.layers[i].transform.center = CGPoint(
+            x: min(max(c.x + CGFloat(dx) * px / w, 0), 1),
+            y: min(max(c.y + CGFloat(dy) * px / h, 0), 1))
+        return true
     }
 
     /// Commit the open Move session: keep the moved layer where it is, rename it with the
@@ -8674,13 +8695,18 @@ enum ToolShortcuts { static var typeToJumpActive = false }
 // a repeat. Shift is allowed, so B and b both pick Paint Drop Bucket.
 struct ToolShortcutMonitor: NSViewRepresentable {
     var onPick: (Tool) -> Void
+    /// 012a: an arrow key (dx, dy, Shift held). Returns true when it was used.
+    var onArrow: (Int, Int, Bool) -> Bool = { _, _, _ in false }
 
-    func makeNSView(context: Context) -> MonitorView { let v = MonitorView(); v.onPick = onPick; return v }
-    func updateNSView(_ view: MonitorView, context: Context) { view.onPick = onPick }
+    func makeNSView(context: Context) -> MonitorView {
+        let v = MonitorView(); v.onPick = onPick; v.onArrow = onArrow; return v
+    }
+    func updateNSView(_ view: MonitorView, context: Context) { view.onPick = onPick; view.onArrow = onArrow }
     static func dismantleNSView(_ view: MonitorView, coordinator: ()) { view.stop() }
 
     final class MonitorView: NSView {
         var onPick: (Tool) -> Void = { _ in }
+        var onArrow: (Int, Int, Bool) -> Bool = { _, _, _ in false }
         private var monitor: Any?
 
         override func viewDidMoveToWindow() {
@@ -8688,6 +8714,23 @@ struct ToolShortcutMonitor: NSViewRepresentable {
             stop()
             guard window != nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                // 012a — arrows nudge in Move. Same step-aside rules as the letters, except a
+                // held arrow REPEATS, so holding it keeps the layer moving.
+                if let self, let win = self.window, event.window === win,
+                   win.attachedSheet == nil,
+                   !ToolShortcuts.typeToJumpActive,
+                   !(win.firstResponder is NSText),
+                   event.modifierFlags.intersection([.command, .option, .control]).isEmpty {
+                    let big = event.modifierFlags.contains(.shift)
+                    let d: (Int, Int)? = switch event.keyCode {
+                        case 123: (-1, 0)   // left
+                        case 124: (1, 0)    // right
+                        case 125: (0, 1)    // down
+                        case 126: (0, -1)   // up
+                        default: nil
+                    }
+                    if let d { return self.onArrow(d.0, d.1, big) ? nil : event }
+                }
                 guard let self, let win = self.window, event.window === win,
                       win.attachedSheet == nil,
                       !event.isARepeat,
