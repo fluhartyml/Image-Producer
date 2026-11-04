@@ -26,6 +26,16 @@ enum UITestDoor {
     nonisolated static let isOpen = false
     #endif
 
+    // REM: THE TEST KEEPS ITS OWN SETTINGS. The 11-04 run found "Up down only" already on
+    // when the test started: the Move lock is a saved setting, and the test's copy of the app
+    // shares his. So under the door, settings the test flips (the Move lock) live in their own
+    // suite, wiped at each launch so every run starts from the default — his stay untouched.
+    nonisolated(unsafe) static let defaults: UserDefaults = {
+        guard isOpen, let suite = UserDefaults(suiteName: "ImageProducerUITest") else { return .standard }
+        suite.removePersistentDomain(forName: "ImageProducerUITest")
+        return suite
+    }()
+
     /// Where the test's projects go: the sandbox's own temporary folder.
     nonisolated static var projectsDirectory: URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("ImageProducerUITest", isDirectory: true)

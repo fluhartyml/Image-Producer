@@ -4670,7 +4670,7 @@ struct MoveTransformInspector: View {
     // MARK: Active-layer transform
     // 012b — the no-modifier path to a straight-line drag. Tap one to lock, tap it again to
     // free. Spoken names are 3 words max (his rule): "Up down only", "Left right only".
-    @AppStorage(MoveAxisLock.storageKey) private var axisLock: MoveAxisLock = .none
+    @AppStorage(MoveAxisLock.storageKey, store: UITestDoor.defaults) private var axisLock: MoveAxisLock = .none
 
     private var axisLockControls: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -6238,7 +6238,7 @@ struct TransformBox: View {
     @State private var startCenter: CGPoint?
     @State private var startAnchor: CGPoint?
     // 012b — straight-line drag. The panel's lock (buttons), and the axis Shift-drag picked.
-    @AppStorage(MoveAxisLock.storageKey) private var axisLock: MoveAxisLock = .none
+    @AppStorage(MoveAxisLock.storageKey, store: UITestDoor.defaults) private var axisLock: MoveAxisLock = .none
     @State private var shiftAxis: MoveAxisLock?
     /// 012c — where the Option-drag copy sits, until the selection catches up to it.
     @State private var copyIndex: Int?

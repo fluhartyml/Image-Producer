@@ -120,13 +120,17 @@ final class Image_ProducerUITests: XCTestCase {
     /// Drag the active layer by (dx, dy) screen points, starting on the layer's center.
     func dragLayer(dx: CGFloat, dy: CGFloat, modifiers: XCUIElement.KeyModifierFlags = []) {
         guard let p = probe() else { return }
-        // Bring the test's window forward first: a mouse press on a window that isn't in front
-        // only activates it, and the drag is lost (his own copy of the app is usually in front).
+        // Bring the editor forward first: a mouse press on a window that isn't in front only
+        // activates it, and the drag is lost. REM: the 11-04 runs clicked the title bar's
+        // MIDDLE — where the Welcome window sat on top — so every drag re-activated the editor
+        // and moved nothing. Welcome is closed after New Image now; this clicks near the
+        // title bar's left end, just right of the window buttons, for good measure.
         let win = app.windows.matching(NSPredicate(format: "title CONTAINS '.imgprd'")).firstMatch
-        if win.exists { win.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12)).click(); sleep(1) }
+        if win.exists { win.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 120, dy: 12)).click(); sleep(1) }
         let start = probeElement.coordinate(withNormalizedOffset: CGVector(dx: p.x, dy: p.y))
         let end = start.withOffset(CGVector(dx: dx, dy: dy))
-        let drag = { start.press(forDuration: 0.3, thenDragTo: end) }
+        start.hover(); usleep(300_000)
+        let drag = { start.click(forDuration: 0.3, thenDragTo: end) }
         if modifiers.isEmpty { drag() } else { XCUIElement.perform(withKeyModifiers: modifiers, block: drag) }
         sleep(1)
     }
@@ -155,6 +159,11 @@ final class Image_ProducerUITests: XCTestCase {
         if newItem.waitForExistence(timeout: 5) { newItem.click() } else { app.typeKey(.escape, modifierFlags: []) }
         _ = app.windows.firstMatch.waitForExistence(timeout: 10)
         if press("Create", 10) { sleep(2) }
+        // Close the test copy's Welcome window: it overlapped the editor's title bar and took
+        // the clicks meant to bring the editor forward before each drag.
+        if welcome.exists {
+            welcome.buttons["_XCUI:CloseWindow"].click(); sleep(1)
+        }
         check("—", "A new image opens (in the test's temporary folder)",
               app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 10))
         snapshot("01-editor"); audit("Editor (Canvas tool)")
@@ -239,7 +248,9 @@ final class Image_ProducerUITests: XCTestCase {
                 check("359", "Committing the copy adds no hidden fork", c.hidden == a.hidden, "hidden \(a.hidden)→\(c.hidden)")
             }
             // The original is still where it was: select it in the Layers list and read it.
-            let rows = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", a.active))
+            // REM: the Layers list shows names as static text whose VALUE is the name (the
+            // 11-04 15:28 run found no row by label).
+            let rows = app.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", a.active, a.active))
             if rows.firstMatch.waitForExistence(timeout: 3) {
                 rows.firstMatch.click(); sleep(1)
                 if let o = probe(), o.active == a.active {

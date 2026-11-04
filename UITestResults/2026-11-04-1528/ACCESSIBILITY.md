@@ -1,0 +1,172 @@
+# Accessibility audit
+
+### Welcome — 20 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 8589934592) · screen · Parent/Child mismatch
+- XCUIAccessibilityAuditType(rawValue: 8) · 3 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Image has no label
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 1) · 43 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 49 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 9 'Mediaworks Top Shelf.imgprd' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 9 'Mediaworks 2.imgprd' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 8) · 9 'Mediaworks.imgprd' · Label not human-readable
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 9 'Mediaworks.imgprd' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 8) · 9 'ImageProducer0044.imgprd' · Label not human-readable
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 9 'ImageProducer0044.imgprd' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 9 'Legend menu images.imgprd' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 9 'Legent menu images.imgprd' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 8) · 81 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 14 'emoji & symbols' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 14 'emoji & symbols' · Action is missing
+
+### Editor (Canvas tool) — 20 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 8) · 3 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 'Production icon preview at 96 points' · Unknown role
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 'Test probe w=1024 h=1024 layers=5 hidden=0 active=none x=-1.0000 y=-1.0000' · Unknown role
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 14 'Size rule' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 16 '' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 16 '' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 16 '' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 29 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 81 '' · Element has no description
+
+### Color Palette — 11 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 8) · 3 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 'Production icon preview at 96 points' · Unknown role
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 'Test probe w=1024 h=1024 layers=5 hidden=0 active=none x=-1.0000 y=-1.0000' · Unknown role
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 29 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 81 '' · Element has no description
+
+### Move / Transform — 31 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 8) · 3 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 'Test probe w=1024 h=1024 layers=6 hidden=0 active=Layer 6 x=0.5000 y=0.5000' · Unknown role
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Image has no label
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Image has no label
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 14 'Aspect' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 8) · 63 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 63 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 29 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 81 '' · Element has no description
+
+### Move / Transform after copies — 79 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 8) · 3 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 'Test probe w=1024 h=1024 layers=10 hidden=2 active=Layer 6 (Move 2) (copy) (copy) x=0.7808 y=0.6010' · Unknown role
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Image has no label
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Image has no label
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Image has no label
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 1) · 43 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 1) · 43 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Image has no label
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 1) · 43 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 1) · 43 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Image has no label
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 1) · 43 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 1) · 43 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Image has no label
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 1) · 43 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 1) · 43 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 2) · 43 '' · Potentially inaccessible text
+- XCUIAccessibilityAuditType(rawValue: 8) · 1 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 4294967296) · 14 'Aspect' · Action is missing
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 8) · 63 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 63 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 29 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 8) · 81 '' · Element has no description
