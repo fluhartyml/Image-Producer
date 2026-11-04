@@ -228,7 +228,7 @@ struct AdjustInspector: View {
     var body: some View {
         if hasPicture {
             VStack(alignment: .leading, spacing: 14) {
-                InfoTip("More about this", label: "About adjustments", "Each opens its own window with a live preview. Nothing changes until you press OK.")
+                InfoTip("More about this", label: "Adjustments info", "Each opens its own window with a live preview. Nothing changes until you press OK.")
                 ForEach(Adjustment.allCases) { a in
                     Button { document.adjustmentRequested = a } label: {
                         Label("\(a.title)…", systemImage: a.systemImage)

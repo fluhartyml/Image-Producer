@@ -392,7 +392,7 @@ struct Text3DSection: View {
                     .buttonStyle(.bordered)
                     .font(.system(size: 18))
                 }
-                InfoTip("More about this", label: "About exporting 3D text",
+                InfoTip("More about this", label: "3D export info",
                         "Export → Animated GIF (3D text loop) saves one full turn or swing.")
             }
         }

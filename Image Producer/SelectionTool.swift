@@ -243,7 +243,7 @@ struct SelectionInspector: View {
             .controlSize(.large)
             .disabled(document.selection == nil && document.selectionPathPoints.isEmpty)
 
-            InfoTip("More about this", label: "About Clear Inside and Copy", "Clear Inside works on the selected layer: the first clear makes a new layer and hides the original (kept). Copy takes everything you see inside the ants. Drag inside the ants to move them; drag a corner to resize.")
+            InfoTip("More about this", label: "Clear Inside info", "Clear Inside works on the selected layer: the first clear makes a new layer and hides the original (kept). Copy takes everything you see inside the ants. Drag inside the ants to move them; drag a corner to resize.")
         }
         .font(.system(size: 18))
         .padding()

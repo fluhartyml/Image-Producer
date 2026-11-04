@@ -346,7 +346,7 @@ struct EyedropperInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            InfoTip("More about this", label: "About sampling a color", "Tap the canvas to sample a color. The circle averages the pixels under it — grow it for a steadier read of a soft background.")
+            InfoTip("More about this", label: "Sampling info", "Tap the canvas to sample a color. The circle averages the pixels under it — grow it for a steadier read of a soft background.")
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sample size  \(pen.eyedropperRadius == 0 ? "point" : "\(pen.eyedropperRadius * 2 + 1) px")")
@@ -427,7 +427,7 @@ struct EraserInspector: View {
     /// Manual brush eraser — drag on the canvas; the first stroke auto-copies the layer.
     @ViewBuilder private var brushControls: some View {
         Text("Manual eraser — wipe pixels to transparent").font(.system(size: 18)).bold()
-        InfoTip("More about this", label: "About the manual eraser", "Drag on the canvas to erase. The first stroke automatically copies the layer and erases the copy — your original is kept (hidden), since there's no undo yet.")
+        InfoTip("More about this", label: "Eraser info", "Drag on the canvas to erase. The first stroke automatically copies the layer and erases the copy — your original is kept (hidden), since there's no undo yet.")
 
         Picker("Shape", selection: $pen.eraserSquare) {
             Text("Circle").tag(false)
@@ -446,7 +446,7 @@ struct EraserInspector: View {
     /// Magic Eraser — color mask, with the live magenta highlight on the canvas.
     @ViewBuilder private var magicControls: some View {
         Text("Magic Eraser — color mask").font(.system(size: 18)).bold()
-        InfoTip("More about this", label: "About the Magic Eraser", "Pick the background color with the Eyedropper first. Matching pixels light up magenta on the canvas — raise Tolerance until the whole background lights up, then erase.")
+        InfoTip("More about this", label: "Magic Eraser info", "Pick the background color with the Eyedropper first. Matching pixels light up magenta on the canvas — raise Tolerance until the whole background lights up, then erase.")
 
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: 6)

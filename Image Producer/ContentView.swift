@@ -1326,7 +1326,7 @@ struct PaintBucketInspector: View {
             if activeHasImage {
                 Divider()
                 Text("Flood fill — pour color up to the lines").font(.system(size: 18)).bold()
-                InfoTip("More about this", label: "About flood fill", "Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
+                InfoTip("More about this", label: "Flood fill info", "Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Tolerance  \(Int(pen.bucketTolerance))").font(.system(size: 18))
                     Slider(value: $pen.bucketTolerance, in: 0...160, step: 1)
@@ -1499,7 +1499,7 @@ struct CanvasInspector: View {
                 // "renames the file on disk is cluttered and should be behind (i)".
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("Project name").font(.system(size: 18, weight: .light)).foregroundStyle(.secondary)
-                    InfoTip("More about the project name",
+                    InfoTip("More about the project name", label: "Project name info",
                             fileURL == nil ? "Working name for this untitled project."
                                            : "Renames the file on disk. Press Return to apply.")
                 }
@@ -1526,7 +1526,7 @@ struct CanvasInspector: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("Dimensions & Resolution").font(.system(size: 20, weight: .semibold))
-                    InfoTip("More about size and resolution",
+                    InfoTip("More about size and resolution", label: "Size info",
                             "Resolution (PPI) changes the print size losslessly — pixels stay. Editing Pixels or applying a size preset changes the pixel count; existing art scales to fit, letterboxed on the background. Set Resolution first (300 for print), then pick a size.")
                 }
 
@@ -1556,7 +1556,7 @@ struct CanvasInspector: View {
                         ForEach(CanvasSizeRule.allCases) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.menu).labelsHidden().font(.system(size: 18)).fixedSize()
-                    InfoTip("What is the size rule?",
+                    InfoTip("What is the size rule?", label: "Size rule info",
                             "Exact: type any width and height. Fixed ratio: the shape is locked — change one side and the other follows. Fluid width: the height stays put and the width is free; fluid height is the reverse. A fluid change adds or removes canvas on that side and the artwork keeps its size and stays centered — nothing is letterboxed.")
                 }
 
@@ -1635,7 +1635,7 @@ struct CanvasInspector: View {
                     } label: { Image(systemName: "chevron.down.circle").font(.system(size: 18)) }
                     .fixedSize()
                     .accessibilityLabel("Bleed presets")
-                    InfoTip("What is bleed?",
+                    InfoTip("What is bleed?", label: "Bleed info",
                             "Extra picture past the edge of the page. The shop trims just inside it, so the color runs right to the edge with no white sliver. 1/8 inch is the U.S. standard; 3 mm is metric.")
                 }
                 HStack(spacing: 8) {
@@ -1643,17 +1643,17 @@ struct CanvasInspector: View {
                     TextField("in", value: $document.safeMarginInches, format: .number.precision(.fractionLength(0...3)))
                         .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
                     Text("in").font(.system(size: 18)).foregroundStyle(.secondary)
-                    InfoTip("What is the safe margin?",
+                    InfoTip("What is the safe margin?", label: "Safe margin info",
                             "Keep text and faces inside this line. The cut can drift a little, and anything too close to the edge may get trimmed off.")
                 }
                 HStack(spacing: 6) {
                     Toggle("Crop / trim marks", isOn: $document.cropMarks).font(.system(size: 18))
-                    InfoTip("What are crop marks?",
+                    InfoTip("What are crop marks?", label: "Crop marks info",
                             "Small lines at the corners that show the shop exactly where to cut.")
                 }
                 HStack(spacing: 6) {
                     Toggle("Registration marks", isOn: $document.registrationMarks).font(.system(size: 18))
-                    InfoTip("What are registration marks?",
+                    InfoTip("What are registration marks?", label: "Registration info",
                             "Target marks a printing press uses to line up each ink. Home and copy-shop printers don't need them.")
                 }
                 HStack(spacing: 8) {
@@ -1662,7 +1662,7 @@ struct CanvasInspector: View {
                         Text("RGB").tag(false); Text("CMYK").tag(true)
                     }
                     .pickerStyle(.segmented).labelsHidden()
-                    InfoTip("RGB or CMYK?",
+                    InfoTip("RGB or CMYK?", label: "Color mode info",
                             "RGB is screen color, made of light. CMYK is printing ink: cyan, magenta, yellow and black. Shops convert RGB for you, so pick CMYK only if the printer asks for it.\n\nFor now the PDF always exports RGB; CMYK is saved with the project for later.")
                 }
             }
@@ -1673,7 +1673,7 @@ struct CanvasInspector: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("Export").font(.system(size: 20, weight: .semibold))
-                    InfoTip("More about exporting", Self.exportInfo)
+                    InfoTip("More about exporting", label: "Export info", Self.exportInfo)
                 }
                 Button {
                     if let data = makePrintPDF(document) {
@@ -1716,7 +1716,7 @@ struct CanvasInspector: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("Layer PDF").font(.system(size: 20, weight: .semibold))
-                    InfoTip("More about layer PDFs",
+                    InfoTip("More about layer PDFs", label: "Layer PDF info",
                             "Export writes page 1 as the finished picture, then one page per layer, with see-through areas kept. Import brings each page of a PDF in as its own editable layer.\n\nFlatten puts a matte behind the see-through parts: a solid color, because most printers can't print \"nothing\". Flatten only for print.")
                 }
                 Button {
@@ -2594,7 +2594,7 @@ struct ColorPaletteInspector: View {
             }
             .font(.system(size: 18)).buttonStyle(.bordered)
 
-            InfoTip("More about this", label: "About the color palette", "Tap a swatch to make it the active color; edit it above. Add grows the box (8–24); the 8 base colors can't be removed. This palette is the only place colors are defined — every tool picks from it.")
+            InfoTip("More about this", label: "Palette info", "Tap a swatch to make it the active color; edit it above. Add grows the box (8–24); the 8 base colors can't be removed. This palette is the only place colors are defined — every tool picks from it.")
 
             Divider()
 
@@ -3073,7 +3073,7 @@ struct FontPickerInspector: View {
             }
             .buttonStyle(.borderedProminent)
             // Kept to one line at his word, 2026-10-03: "the blurb under new text layer is too long".
-            InfoTip("More about this", label: "About new text layers", "Type, then press New Text Layer. Renaming the layer changes its text.")
+            InfoTip("More about this", label: "Text layer info", "Type, then press New Text Layer. Renaming the layer changes its text.")
 
             HStack(spacing: 8) {
                 styleToggle("bold", "Bold", $bold)
@@ -3266,7 +3266,7 @@ struct FontPickerInspector: View {
 
             PaletteSwatchRow(document: document, color: $tint, label: "Tint (from palette)")
 
-            InfoTip("More about this", label: "About editing a text layer", "The text layer updates live, named after the text. Reposition with the Move tool; rename the layer (Layers panel) to edit it later.")
+            InfoTip("More about this", label: "Text editing info", "The text layer updates live, named after the text. Reposition with the Move tool; rename the layer (Layers panel) to edit it later.")
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -3654,7 +3654,7 @@ struct PenInspector: View {
                     ColorPicker("Slot color", selection: slotColorBinding(slot.id), supportsOpacity: false)
                         .padding().frame(minWidth: 220)
                 }
-                InfoTip("More about this", label: "About palette colors", "Tap to use · right-click (long-press) to change. Saved with the file; new docs inherit it.")
+                InfoTip("More about this", label: "Colors info", "Tap to use · right-click (long-press) to change. Saved with the file; new docs inherit it.")
 
                 VStack(spacing: 6) {
                     Button {
@@ -3675,7 +3675,7 @@ struct PenInspector: View {
                 }
                 .font(.system(size: 18))
                 .buttonStyle(.bordered)
-                InfoTip("More about this", label: "About brand palettes", "Save these colors as a reusable brand palette, or load one into this icon.")
+                InfoTip("More about this", label: "Brand palette info", "Save these colors as a reusable brand palette, or load one into this icon.")
                 if paletteLoadFailed {
                     Text("Couldn't read that palette file.").font(.system(size: 18)).foregroundStyle(.red)
                 }
@@ -4394,7 +4394,7 @@ struct MoveTransformInspector: View {
 
                 cropSizeControls
 
-                InfoTip("More about this", label: "About cropping", "Live preview is non-destructive (Export/Share trim to it). Apply Crop makes a new cropped layer and hides the original (kept).")
+                InfoTip("More about this", label: "Crop info", "Live preview is non-destructive (Export/Share trim to it). Apply Crop makes a new cropped layer and hides the original (kept).")
             }
         }
         // ⚠️ ALSO ON APPEAR, NOT ONLY ON CHANGE. Every call to applyCrop() used to come
@@ -4620,7 +4620,7 @@ struct MoveTransformInspector: View {
                             Button("Fill") { applyFitFill(.fill, idx) }
                         }
                         .buttonStyle(.bordered)
-                        InfoTip("More about this", label: "About Fit and Fill", "Fit insets the object inside the canvas (letterbox if it isn't square). Fill covers the canvas and clips the overflow.")
+                        InfoTip("More about this", label: "Fit info", "Fit insets the object inside the canvas (letterbox if it isn't square). Fill covers the canvas and clips the overflow.")
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
@@ -7564,7 +7564,9 @@ struct InfoTip: View {
     /// REM: THE SPOKEN NAME, separate from the hover tooltip. Thirty of these all said
     /// "More about this", so VoiceOver, Voice Control, and Switch Control heard thirty
     /// identical buttons with nothing to tell them apart. `label` names the one control
-    /// ("About tolerance"); the tooltip text is unchanged. Optional with a default, so a
+    /// ("Tolerance info"); the tooltip text is unchanged. His word 11-04: spoken names are
+    /// one or two words, three at most, because Voice Control truncates long badge names
+    /// ("More about the project..." could not be said until he guessed the rest). Optional with a default, so a
     /// call site that already passes a specific `help` ("What is bleed?") needs no edit.
     let label: String?
     @State private var shown = false

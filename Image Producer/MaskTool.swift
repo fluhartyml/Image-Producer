@@ -543,7 +543,7 @@ struct MaskInspector: View {
                 Button(role: .destructive) { document.cropMask = nil } label: {
                     Label("Remove Mask", systemImage: "xmark.square.dashed").frame(maxWidth: .infinity)
                 }
-                InfoTip("More about this", label: "About resizing the mask", "Drag a corner to resize. Hold ⌘ while dragging a corner to move that corner on its own. Drag inside the frame to reposition.")
+                InfoTip("More about this", label: "Resize info", "Drag a corner to resize. Hold ⌘ while dragging a corner to move that corner on its own. Drag inside the frame to reposition.")
             }
         }
         .padding()
@@ -590,7 +590,7 @@ struct MaskInspector: View {
                     .buttonStyle(.bordered)
                 }
             }
-            InfoTip("More about this", label: "About character masks", "Any character from any installed font works — the mask uses the real glyph outline, so the marching ants trace its exact shape.")
+            InfoTip("More about this", label: "Character info", "Any character from any installed font works — the mask uses the real glyph outline, so the marching ants trace its exact shape.")
         }
 
         Divider()

@@ -454,7 +454,7 @@ struct CameraInspector: View {
                 Picker("Easing", selection: $camera.easing) {
                     ForEach(CameraEasing.allCases) { Text($0.title).tag($0) }
                 }
-                InfoTip("More about this", label: "About easing", "Linear reads as mechanical — real motion starts slow and settles.")
+                InfoTip("More about this", label: "Easing info", "Linear reads as mechanical — real motion starts slow and settles.")
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Path smoothing  \(Int(camera.smoothing * 100))%")
                         .font(.system(size: 15))
@@ -462,7 +462,7 @@ struct CameraInspector: View {
                         .accessibilityLabel("Path smoothing")
                         .accessibilityValue("\(Int(camera.smoothing * 100)) percent")
                 }
-                InfoTip("More about this", label: "About path smoothing", "Pulls each shot toward its neighbors. Full smoothing flattens intentional motion too.")
+                InfoTip("More about this", label: "Smoothing info", "Pulls each shot toward its neighbors. Full smoothing flattens intentional motion too.")
                 HStack {
                     Button("Generate") { generateCameraInBetweens(document, camera: camera) }
                         .disabled(shotCount < 2)

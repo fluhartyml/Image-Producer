@@ -816,7 +816,7 @@ struct LayerInspector: View {
             .controlSize(.small)
             Spacer()
         }
-        InfoTip("More about this", label: "About sampling from the layer", "Samples the most common opaque color in this layer. For a specific spot, "
+        InfoTip("More about this", label: "Layer sampling info", "Samples the most common opaque color in this layer. For a specific spot, "
              + "pick it with the Eyedropper tool first.")
     }
 
@@ -849,7 +849,7 @@ struct LayerInspector: View {
             Slider(value: tol, in: 0...128)
                 .accessibilityLabel("Tolerance")
                 .accessibilityValue("\(Int(tol.wrappedValue))")
-            InfoTip("More about this", label: "About tolerance", "How far from that color still counts as a match. Higher reaches more "
+            InfoTip("More about this", label: "Tolerance info", "How far from that color still counts as a match. Higher reaches more "
                  + "shades — and more of the subject.")
         }
     }
@@ -871,7 +871,7 @@ struct LayerInspector: View {
             Slider(value: soft, in: 0...128)
                 .accessibilityLabel("Softness")
                 .accessibilityValue("\(Int(soft.wrappedValue))")
-            InfoTip("More about this", label: "About softness", "Shades just past the tolerance fade out instead of cutting off, with the "
+            InfoTip("More about this", label: "Softness info", "Shades just past the tolerance fade out instead of cutting off, with the "
                  + "key color taken out of them — so a glow on black stays a glow. 0 is a hard edge.")
         }
     }
@@ -1020,7 +1020,7 @@ struct LayerInspector: View {
                     labelledSlider("Strength", value: strength, range: 0...1,
                                    readout: String(format: "%.0f%%", document.layers[i].blendAmount * 100))
                 }
-                InfoTip("More about this", label: "About blend modes", "Blend needs something underneath to mix with — a layer on its own "
+                InfoTip("More about this", label: "Blend info", "Blend needs something underneath to mix with — a layer on its own "
                      + "looks the same in every mode.")
             }
             .padding(.top, 4)
