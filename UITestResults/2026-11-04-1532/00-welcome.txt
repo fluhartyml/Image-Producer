@@ -1,0 +1,234 @@
+Optional(Attributes: Application, 0x79dca69040, pid: 51842, title: 'Image Producer', Disabled
+Element subtree:
+ →Application, 0x79dca69040, pid: 51842, title: 'Image Producer', Disabled
+    Window (Main), 0x79dca69180, {{-1068.0, 167.0}, {440.0, 859.0}}, identifier: 'welcome', title: 'Welcome to Image Producer', Disabled
+      Group, 0x79dca692c0, {{-1068.0, 167.0}, {440.0, 859.0}}, Disabled
+        Image, 0x79dca69400, {{-896.0, 257.0}, {96.0, 96.0}}
+        StaticText, 0x79dca69540, {{-997.5, 378.9}, {299.0, 48.0}}, value: Image Producer
+        StaticText, 0x79dca69680, {{-913.0, 434.9}, {130.0, 14.0}}, value: GRAPHIC ARTS
+        StaticText, 0x79dca697c0, {{-901.0, 456.9}, {106.0, 13.0}}, value: Version 1.1 · Buil...
+        TextField, 0x79dca69900, {{-1029.0, 497.0}, {362.0, 31.0}}, placeholderValue: 'Name (optional)', Keyboard Focused
+        Button, 0x79dca69a40, {{-1028.0, 555.0}, {175.0, 28.0}}, label: 'New Image'
+        Button, 0x79dca69b80, {{-843.0, 555.0}, {175.0, 28.0}}, label: 'Open .psd'
+        Button, 0x79dca69cc0, {{-1028.0, 611.0}, {360.0, 28.0}}, label: 'Open…'
+        Button, 0x79dca69e00, {{-1028.0, 667.0}, {360.0, 29.0}}, label: 'New from Import…'
+        StaticText, 0x79dca69f40, {{-1028.0, 734.1}, {53.0, 16.0}}, value: Recents
+        Button, 0x79dca6a080, {{-1018.0, 756.0}, {340.0, 27.0}}, label: 'Mediaworks Top Shelf.imgprd'
+        Button, 0x79dca6a1c0, {{-1018.0, 789.0}, {340.0, 27.0}}, label: 'Mediaworks 2.imgprd'
+        Button, 0x79dca6a300, {{-1018.0, 822.0}, {340.0, 27.0}}, label: 'Mediaworks.imgprd'
+        Button, 0x79dca6a440, {{-1018.0, 855.0}, {340.0, 27.0}}, label: 'ImageProducer0044.imgprd'
+        Button, 0x79dca6a580, {{-1018.0, 888.0}, {340.0, 27.0}}, label: 'Legend menu images.imgprd'
+        Button, 0x79dca6a6c0, {{-1018.0, 921.0}, {340.0, 27.0}}, label: 'Legent menu images.imgprd'
+      Button, 0x79dca6a800, {{-1060.0, 175.0}, {16.0, 16.0}}, identifier: '_XCUI:CloseWindow'
+      Button, 0x79dca6a940, {{-1014.0, 175.0}, {16.0, 16.0}}, identifier: '_XCUI:ZoomWindow', Disabled
+        Group, 0x79dca6aa80, {{-1013.0, 176.0}, {14.0, 14.0}}, Disabled
+      Button, 0x79dca6abc0, {{-1037.0, 175.0}, {16.0, 16.0}}, identifier: '_XCUI:MinimizeWindow'
+      StaticText, 0x79dca6ad00, {{-986.0, 175.0}, {186.0, 16.0}}, value: Welcome to Image P...
+    MenuBar, 0x79dca6ae40, {{-1920.0, 0.0}, {1920.0, 30.0}}
+      MenuBarItem, 0x79dca6af80, {{-1910.0, 0.0}, {34.0, 30.0}}, title: 'Apple'
+        Menu, 0x79dca6b0c0, {{0.0, 1107.0}, {0.0, 0.0}}
+          MenuItem, 0x79dca6b200, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_aboutThisMacRequested:', title: 'About This Mac'
+          MenuItem, 0x79dca6b340, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_systemInformationRequested:', title: 'System Information'
+          MenuItem, 0x79dca6b480, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dca6b5c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_systemSettingsRequested:', title: 'System Settings…'
+          MenuItem, 0x79dca6b700, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_appStoreRequested:', title: 'App Store…, 47 updates'
+          MenuItem, 0x79dca6b840, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dca6b980, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentsRequested:', title: 'Recent Items'
+            Menu, 0x79dca6bac0, {{0.0, 1107.0}, {0.0, 0.0}}
+              MenuItem, 0x79dca6bc00, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Applications', Disabled
+              MenuItem, 0x79dca6bd40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Image Producer.app'
+              MenuItem, 0x79dca6be80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Image Producer.app” in Finder'
+              MenuItem, 0x79dc440000, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Image Producer.app'
+              MenuItem, 0x79dc440140, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Image Producer.app” in Finder'
+              MenuItem, 0x79dc440280, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Legend.app'
+              MenuItem, 0x79dc4403c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Legend.app” in Finder'
+              MenuItem, 0x79dc440500, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Mail.app'
+              MenuItem, 0x79dc440640, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Mail.app” in Finder'
+              MenuItem, 0x79dc440780, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Messages.app'
+              MenuItem, 0x79dc4408c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Messages.app” in Finder'
+              MenuItem, 0x79dc440a00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Pixelmator Pro.app'
+              MenuItem, 0x79dc440b40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Pixelmator Pro.app” in Finder'
+              MenuItem, 0x79dc440c80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Safari.app'
+              MenuItem, 0x79dc440dc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Safari.app” in Finder'
+              MenuItem, 0x79dc440f00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Shell Citadel 2.app'
+              MenuItem, 0x79dc441040, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Shell Citadel 2.app” in Finder'
+              MenuItem, 0x79dc441180, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'System Settings.app'
+              MenuItem, 0x79dc4412c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “System Settings.app” in Finder'
+              MenuItem, 0x79dc441400, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Terminal.app'
+              MenuItem, 0x79dc441540, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Terminal.app” in Finder'
+              MenuItem, 0x79dc441680, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+              MenuItem, 0x79dc4417c0, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Documents', Disabled
+              MenuItem, 0x79dc441900, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'ImageProducer0045.imgprd'
+              MenuItem, 0x79dc441a40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “ImageProducer0045.imgprd” in Finder'
+              MenuItem, 0x79dc441b80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'ImageProducer0046.imgprd'
+              MenuItem, 0x79dc441cc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “ImageProducer0046.imgprd” in Finder'
+              MenuItem, 0x79dc441e00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'ImageProducer0047.imgprd'
+              MenuItem, 0x79dc441f40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “ImageProducer0047.imgprd” in Finder'
+              MenuItem, 0x79dc442080, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'ImageProducer0048.imgprd'
+              MenuItem, 0x79dc4421c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “ImageProducer0048.imgprd” in Finder'
+              MenuItem, 0x79dc442300, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'ImageProducer0049.imgprd'
+              MenuItem, 0x79dc442440, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “ImageProducer0049.imgprd” in Finder'
+              MenuItem, 0x79dc442580, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'ImageProducer0050.imgprd'
+              MenuItem, 0x79dc4426c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “ImageProducer0050.imgprd” in Finder'
+              MenuItem, 0x79dc442800, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'ImageProducer0051.imgprd'
+              MenuItem, 0x79dc442940, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “ImageProducer0051.imgprd” in Finder'
+              MenuItem, 0x79dc442a80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'MacBook_Claude.command'
+              MenuItem, 0x79dc442bc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “MacBook_Claude.command” in Finder'
+              MenuItem, 0x79dc442d00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Mediaworks 2.imgprd'
+              MenuItem, 0x79dc442e40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Mediaworks 2.imgprd” in Finder'
+              MenuItem, 0x79dc442f80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Mediaworks Top Shelf.imgprd'
+              MenuItem, 0x79dc4430c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Show “Mediaworks Top Shelf.imgprd” in Finder'
+              MenuItem, 0x79dc443200, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+              MenuItem, 0x79dc443340, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Servers', Disabled
+              MenuItem, 0x79dc443480, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Drop'
+              MenuItem, 0x79dc4435c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Lexar 1.1TB'
+              MenuItem, 0x79dc443700, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Lexar 3 TB'
+              MenuItem, 0x79dc443840, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Macintosh HD'
+              MenuItem, 0x79dc443980, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Macintosh HD'
+              MenuItem, 0x79dc443ac0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'mint houz Samsung SSD 900 PRO 4TB A'
+              MenuItem, 0x79dc443c00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Nineveh'
+              MenuItem, 0x79dc443d40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Samsung SSD 900 PRO 4TB B'
+              MenuItem, 0x79dc443e80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Time Machine LAB-A'
+              MenuItem, 0x79dc444000, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_recentItemRequested:', title: 'Time Machine LAB-B'
+              MenuItem, 0x79dc444140, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+              MenuItem, 0x79dc444280, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_clearRecentItemsRequested:', title: 'Clear Menu'
+          MenuItem, 0x79dc4443c0, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc444500, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_forceQuitPanelRequested:', title: 'Force Quit…'
+          MenuItem, 0x79dc444640, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_forceQuitRequested:', title: 'Force Quit Image Producer'
+          MenuItem, 0x79dc444780, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc4448c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_sleepRequested:', title: 'Sleep'
+          MenuItem, 0x79dc444a00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_restartRequested:', title: 'Restart…'
+          MenuItem, 0x79dc444b40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_restartNowRequested:', title: 'Restart'
+          MenuItem, 0x79dc444c80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_shutDownRequested:', title: 'Shut Down…'
+          MenuItem, 0x79dc444dc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_shutDownNowRequested:', title: 'Shut Down'
+          MenuItem, 0x79dc444f00, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc445040, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_lockScreenRequested:', title: 'Lock Screen'
+          MenuItem, 0x79dc445180, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_logOutRequested:', title: 'Log Out Michael Fluharty…'
+          MenuItem, 0x79dc4452c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_logOutNowRequested:', title: 'Log Out Michael Fluharty'
+          MenuItem, 0x79dc445400, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+      MenuBarItem, 0x79dc445540, {{-1877.0, 0.0}, {123.0, 30.0}}, title: 'Image Producer'
+        Menu, 0x79dc445680, {{0.0, 1107.0}, {0.0, 0.0}}
+          MenuItem, 0x79dc4457c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'orderFrontStandardAboutPanel:', title: 'About Image Producer'
+          MenuItem, 0x79dc445900, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc445a40, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Services'
+            Menu, 0x79dc445b80, {{0.0, 1107.0}, {0.0, 0.0}}
+              MenuItem, 0x79dc445cc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_processRequest:', title: 'Activity Monitor'
+              MenuItem, 0x79dc445e00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_processRequest:', title: 'Allocations & Leaks'
+              MenuItem, 0x79dc445f40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_processRequest:', title: 'File Activity'
+              MenuItem, 0x79dc446080, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_processRequest:', title: 'System Trace'
+              MenuItem, 0x79dc4461c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_processRequest:', title: 'Time Profile Active Application'
+              MenuItem, 0x79dc446300, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_processRequest:', title: 'Time Profile App Under Mouse'
+              MenuItem, 0x79dc446440, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_processRequest:', title: 'Time Profile Entire System'
+              MenuItem, 0x79dc446580, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_processRequest:', title: 'Toggle Instruments Recording'
+              MenuItem, 0x79dc4466c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_configureServicesMenu:', title: 'Services Settings…'
+          MenuItem, 0x79dc446800, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc446940, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'hide:', title: 'Hide Image Producer'
+          MenuItem, 0x79dc446a80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'hideOtherApplications:', title: 'Hide Others'
+          MenuItem, 0x79dc446bc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'unhideAllApplications:', title: 'Show All', Disabled
+          MenuItem, 0x79dc446d00, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc446e40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'terminate:', title: 'Quit Image Producer'
+          MenuItem, 0x79dc446f80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'NSAlternateQuitMenuItem', title: 'Quit and Keep Windows'
+      MenuBarItem, 0x79dc4470c0, {{-1755.0, 0.0}, {42.0, 30.0}}, title: 'File'
+        Menu, 0x79dc447200, {{0.0, 1107.0}, {0.0, 0.0}}
+          MenuItem, 0x79dc447340, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'New Image'
+          MenuItem, 0x79dc447480, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'New from Import…'
+          MenuItem, 0x79dc4475c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'openDocument:', title: 'Open…'
+          MenuItem, 0x79dc447700, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc447840, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc447980, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'Save'
+          MenuItem, 0x79dc447ac0, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Save As…', Disabled
+          MenuItem, 0x79dc447c00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'Rename…'
+          MenuItem, 0x79dc447d40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'Move To…'
+          MenuItem, 0x79dc447e80, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Export…', Disabled
+          MenuItem, 0x79dc44c000, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Optimize History', Disabled
+          MenuItem, 0x79dc44c140, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc44c280, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Revert to Open…', Disabled
+          MenuItem, 0x79dc44c3c0, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Revert to Last Save…', Disabled
+      MenuBarItem, 0x79dc44c500, {{-1714.0, 0.0}, {45.0, 30.0}}, title: 'Edit'
+        Menu, 0x79dc44c640, {{0.0, 1107.0}, {0.0, 0.0}}
+          MenuItem, 0x79dc44c780, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc44c8c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'Cut'
+          MenuItem, 0x79dc44ca00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'Copy'
+          MenuItem, 0x79dc44cb40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'Paste'
+          MenuItem, 0x79dc44cc80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'Select All'
+          MenuItem, 0x79dc44cdc0, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc44cf00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_NSMenuItemAutoFillIdentifier', title: 'AutoFill'
+            Menu, 0x79dc44d040, {{0.0, 1107.0}, {0.0, 0.0}}
+              MenuItem, 0x79dc44d180, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_handleInsertFromContactsCommand:', title: 'Contact…'
+              MenuItem, 0x79dc44d2c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_handleInsertFromPasswordsCommand:', title: 'Passwords…'
+              MenuItem, 0x79dc44d400, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_handleInsertFromCreditCardsCommand:', title: 'Credit Card…'
+          MenuItem, 0x79dc44d540, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'orderFrontCharacterPalette:', title: 'Emoji & Symbols'
+      MenuBarItem, 0x79dc44d680, {{-1670.0, 0.0}, {50.0, 30.0}}, title: 'View'
+        Menu, 0x79dc44d7c0, {{0.0, 1107.0}, {0.0, 0.0}}
+          MenuItem, 0x79dc44d900, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'toggleFullScreen:', title: 'Enter Full Screen', Disabled
+      MenuBarItem, 0x79dc44da40, {{-1621.0, 0.0}, {58.0, 30.0}}, title: 'Image'
+        Menu, 0x79dc44db80, {{0.0, 1107.0}, {0.0, 0.0}}
+          MenuItem, 0x79dc44dcc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'ID(id: 15)', title: 'Adjustments'
+            Menu, 0x79dc44de00, {{0.0, 1107.0}, {0.0, 0.0}}
+              MenuItem, 0x79dc44df40, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Levels…', Disabled
+      MenuBarItem, 0x79dc44e080, {{-1564.0, 0.0}, {51.0, 30.0}}, title: 'Filter'
+        Menu, 0x79dc44e1c0, {{0.0, 1107.0}, {0.0, 0.0}}
+          MenuItem, 0x79dc44e300, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Gaussian Blur…', Disabled
+          MenuItem, 0x79dc44e440, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Liquify…', Disabled
+      MenuBarItem, 0x79dc44e580, {{-1514.0, 0.0}, {70.0, 30.0}}, title: 'Window'
+        Menu, 0x79dc44e6c0, {{0.0, 1107.0}, {0.0, 0.0}}
+          MenuItem, 0x79dc44e800, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'performMiniaturize:', title: 'Minimize'
+          MenuItem, 0x79dc44e940, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'miniaturizeAll:', title: 'Minimize All'
+          MenuItem, 0x79dc44ea80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'performZoom:', title: 'Zoom', Disabled
+          MenuItem, 0x79dc44ebc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'zoomAll:', title: 'Zoom All', Disabled
+          MenuItem, 0x79dc44ed00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomFill:', title: 'Fill', Disabled
+          MenuItem, 0x79dc44ee40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomCenter:', title: 'Center'
+          MenuItem, 0x79dc44ef80, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc44f0c0, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Move & Resize'
+            Menu, 0x79dc44f200, {{0.0, 1107.0}, {0.0, 0.0}}
+              MenuItem, 0x79dc44f340, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Halves', Disabled
+              MenuItem, 0x79dc44f480, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomLeft:', title: 'Left'
+              MenuItem, 0x79dc44f5c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomRight:', title: 'Right'
+              MenuItem, 0x79dc44f700, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomTop:', title: 'Top'
+              MenuItem, 0x79dc44f840, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomBottom:', title: 'Bottom'
+              MenuItem, 0x79dc44f980, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+              MenuItem, 0x79dc44fac0, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Quarters', Disabled
+              MenuItem, 0x79dc44fc00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomTopLeft:', title: 'Top Left'
+              MenuItem, 0x79dc44fd40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomTopRight:', title: 'Top Right'
+              MenuItem, 0x79dc44fe80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomBottomLeft:', title: 'Bottom Left'
+              MenuItem, 0x79dc470000, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomBottomRight:', title: 'Bottom Right'
+              MenuItem, 0x79dc470140, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+              MenuItem, 0x79dc470280, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Arrange', Disabled
+              MenuItem, 0x79dc4703c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomLeftAndRight:', title: 'Left & Right'
+              MenuItem, 0x79dc470500, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomLeftThreeUp:', title: 'Left & Quarters'
+              MenuItem, 0x79dc470640, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomRightAndLeft:', title: 'Right & Left'
+              MenuItem, 0x79dc470780, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomRightThreeUp:', title: 'Right & Quarters'
+              MenuItem, 0x79dc4708c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomTopAndBottom:', title: 'Top & Bottom'
+              MenuItem, 0x79dc470a00, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomTopThreeUp:', title: 'Top & Quarters'
+              MenuItem, 0x79dc470b40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomBottomAndTop:', title: 'Bottom & Top'
+              MenuItem, 0x79dc470c80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomBottomThreeUp:', title: 'Bottom & Quarters'
+              MenuItem, 0x79dc470dc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomQuarters:', title: 'Quarters'
+              MenuItem, 0x79dc470f00, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+              MenuItem, 0x79dc471040, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_zoomUntile:', title: 'Return to Previous Size', Disabled
+          MenuItem, 0x79dc471180, {{0.0, 1107.0}, {0.0, 0.0}}, title: 'Full Screen Tile', Disabled
+          MenuItem, 0x79dc4712c0, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc471400, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_moveToDisplay:', title: 'Move to Built-in Retina Display'
+          MenuItem, 0x79dc471540, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_moveAllToDisplay:', title: 'Move All to Built-in Retina Display'
+          MenuItem, 0x79dc471680, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc4717c0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'menuAction:', title: 'Welcome to Image Producer'
+          MenuItem, 0x79dc471900, {{0.0, 1107.0}, {0.0, 0.0}}, Disabled
+          MenuItem, 0x79dc471a40, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'arrangeInFront:', title: 'Bring All to Front'
+          MenuItem, 0x79dc471b80, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'alternateArrangeInFront:', title: 'Arrange in Front'
+          MenuItem, 0x79dc471cc0, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: '_removeWindowFromStageManagerSet:', title: 'Remove Window from Set', Disabled
+      MenuBarItem, 0x79dc471e00, {{-1445.0, 0.0}, {49.0, 30.0}}, title: 'Help'
+        Menu, 0x79dc471f40, {{0.0, 1107.0}, {0.0, 0.0}}
+          MenuItem, 0x79dc472080, {{0.0, 1107.0}, {0.0, 0.0}}, identifier: 'showHelp:', title: 'Image Producer Help'
+    TouchBar, 0x79dc4721c0, {{80.0, 0.0}, {685.0, 30.0}}, Disabled
+      PopUpButton, 0x79dc472300, {{79.0, -1.0}, {74.0, 32.0}}, label: 'emoji & symbols'
+      DisclosureTriangle, 0x79dc472440, {{320.0, 0.0}, {15.0, 30.0}}, title: 'Candidate Bar', value: 1, Disabled
+      Button, 0x79dc472580, {{337.0, 0.0}, {141.5, 30.0}}, title: 'I', value: 0, Disabled
+      Button, 0x79dc4726c0, {{480.5, 0.0}, {141.0, 30.0}}, title: 'You', value: 0, Disabled
+      Button, 0x79dc472800, {{623.5, 0.0}, {141.5, 30.0}}, title: 'Thank', value: 0, Disabled
+Path to element:
+ →Application, 0x79dca69040, pid: 51842, title: 'Image Producer', Disabled
+Query chain:
+ →Find: Target Application 'com.nightgard.Image-Producer'
+  Output: {
+    Application, 0x79dc472940, pid: 51842, title: 'Image Producer', Disabled
+  }
+)
