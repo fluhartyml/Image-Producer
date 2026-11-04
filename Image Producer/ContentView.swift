@@ -1690,24 +1690,28 @@ struct CanvasInspector: View {
                 } label: { Label("Print PDF (bleed + marks)", systemImage: "doc.richtext").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent)
                 .help("One PDF at trim size with bleed and crop marks, for a printer")
+                .accessibilityLabel("Print PDF")   // REM: spoken names 3 words max (his 11-04) — Voice Control truncates long badges
                 Button {
                     webBundle = ImageExportBundle(files: makeWebFolder(document, baseName: displayName))
                     folderFilename = "\(displayName) Web"; showWebExporter = true
                 } label: { Label("Web folder (PNG @1x/2x/3x)", systemImage: "globe").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
                 .help("A folder of PNGs at 1x, 2x and 3x for a website")
+                .accessibilityLabel("Web folder")
                 Button {
                     webBundle = ImageExportBundle(files: makeIconFolder(document))
                     folderFilename = "\(displayName) Icons"; showWebExporter = true
                 } label: { Label("Icon — all sizes (PNG folder)", systemImage: "square.and.arrow.up.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
                 .help("Every app-icon size from 16 to 1024, as a folder of PNGs")
+                .accessibilityLabel("Icon sizes")
                 // Every export from right here — no shortcut needed (an iPad has no ⌘ key).
                 Button { document.exportSheetRequested = true } label: {
                     Label("Single image…", systemImage: "photo").font(.system(size: 18)).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .help("One PNG, JPEG, TIFF or PDF — pick the format")
+                .accessibilityLabel("Single image")
             }
 
             Divider()
@@ -1727,6 +1731,7 @@ struct CanvasInspector: View {
                     }
                 } label: { Label("Export layers → PDF (one page each)", systemImage: "square.stack.3d.up").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .help("Page 1 is the composite, then one page per layer")
+                .accessibilityLabel("Export layer PDF")
                 .buttonStyle(.borderedProminent)
                 Toggle(isOn: $flattenLayerPDF) {
                     Text("Flatten transparency onto a matte").font(.system(size: 18))
@@ -1740,6 +1745,7 @@ struct CanvasInspector: View {
                     importingPDF = true
                 } label: { Label("Import PDF as layers…", systemImage: "square.and.arrow.down.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
                 .help("Bring each page of a PDF in as its own editable image layer")
+                .accessibilityLabel("Import layer PDF")
                 .buttonStyle(.bordered)
             }
 
