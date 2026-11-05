@@ -173,8 +173,25 @@ final class Image_ProducerUITests: XCTestCase {
 
         // 356 — swatches are named buttons that answer an accessibility press.
         press("Color Palette"); sleep(1)
-        let swatches = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Color '"))
+        let swatches = app.buttons.matching(NSPredicate(format: "label MATCHES 'Color [0-9]+, .*'"))
         check("356", "Palette swatches are named buttons", swatches.count >= 2, "\(swatches.count) found")
+
+        // REM: 009a, his yes 11-04 19:2x: "add the swatch press test". A NAME IS NOT A PRESS —
+        // press a swatch that is NOT the active color and check it becomes the selected one
+        // (the .isSelected trait rides on the same isSel the accent ring draws from), and that
+        // it is the only one selected. ("Color N, #hex" only — the 19:19 run's BEGINSWITH 'Color '
+        // also caught the selected "Color Palette" tool tile.) The robot's press is a pointer press; the accessibility
+        // action runs the SAME closure (paletteSwatchAccessibility), so they cannot drift apart.
+        if let target = swatches.allElementsBoundByIndex.first(where: { !$0.isSelected }) {
+            let name = target.label
+            target.click(); sleep(1)
+            let after = app.buttons.matching(NSPredicate(format: "label MATCHES 'Color [0-9]+, .*'")).allElementsBoundByIndex
+            let selected = after.filter { $0.isSelected }.map { $0.label }
+            check("356", "Pressing a swatch picks that color", selected == [name],
+                  "pressed \(name); selected now: \(selected.joined(separator: " · "))")
+        } else {
+            check("356", "Pressing a swatch picks that color", false, "no unselected swatch to press")
+        }
         snapshot("02-color-palette"); audit("Color Palette")
 
         // A layer to move.

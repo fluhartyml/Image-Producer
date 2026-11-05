@@ -157,7 +157,16 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         let candidates = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).allElementsBoundByIndex
             .filter { $0.isHittable }.sorted { $0.frame.minY < $1.frame.minY }
         if let launchButton = candidates.first { launchButton.tap() }
-        sleep(3); snapshot("00b-after-new-image")
+        sleep(3)
+        // REM: the 19:14 run's tap left the launch screen up (a file from the 18:44 run sat in
+        // On My iPad; the tap may have landed mid-refresh). One retry, then go on and report.
+        if !app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 5),
+           !app.buttons["Create"].exists, !app.alerts.firstMatch.exists {
+            let again = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).allElementsBoundByIndex
+                .filter { $0.isHittable }.sorted { $0.frame.minY < $1.frame.minY }
+            if let b = again.first { record("| — | ↻ RETRY | New Image tapped a second time |"); b.tap(); sleep(3) }
+        }
+        snapshot("00b-after-new-image")
         let alert = app.alerts.firstMatch
         if alert.exists {
             record("| — | ⚠️ ALERT | \(alert.label): \(alert.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " ")) |")
@@ -170,8 +179,25 @@ final class Image_ProducerUITests_iPad: XCTestCase {
 
         // 356 — swatches are named buttons.
         press("Color Palette"); sleep(1)
-        let swatches = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Color '"))
+        let swatches = app.buttons.matching(NSPredicate(format: "label MATCHES 'Color [0-9]+, .*'"))
         check("356", "Palette swatches are named buttons", swatches.count >= 2, "\(swatches.count) found")
+
+        // REM: 009a, his yes 11-04 19:2x: "add the swatch press test". A NAME IS NOT A PRESS —
+        // press a swatch that is NOT the active color and check it becomes the selected one
+        // (the .isSelected trait rides on the same isSel the accent ring draws from), and that
+        // it is the only one selected. ("Color N, #hex" only — the 19:19 run's BEGINSWITH 'Color '
+        // also caught the selected "Color Palette" tool tile.) The robot's press is a pointer press; the accessibility
+        // action runs the SAME closure (paletteSwatchAccessibility), so they cannot drift apart.
+        if let target = swatches.allElementsBoundByIndex.first(where: { !$0.isSelected }) {
+            let name = target.label
+            target.tap(); sleep(1)
+            let after = app.buttons.matching(NSPredicate(format: "label MATCHES 'Color [0-9]+, .*'")).allElementsBoundByIndex
+            let selected = after.filter { $0.isSelected }.map { $0.label }
+            check("356", "Pressing a swatch picks that color", selected == [name],
+                  "pressed \(name); selected now: \(selected.joined(separator: " · "))")
+        } else {
+            check("356", "Pressing a swatch picks that color", false, "no unselected swatch to press")
+        }
         snapshot("02-color-palette"); audit("Color Palette")
 
         // A3 (364) — tool letters from a hardware keyboard pick tools.
