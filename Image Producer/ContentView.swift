@@ -930,6 +930,12 @@ struct ContentView: View {
                                  onPaint: { paintAtPenCursor() }))
         #endif
         .onChange(of: activeTool) { _, newTool in
+            // REM: 022 PHONE LAYOUT (Duo pass, 11-04). On a phone-sized window the panel has
+            // no pills, only swipe + dots, and it opens on Layers — so picking a tool showed
+            // nothing of it until a SWIPE, which a switch, Voice Control or keyboard user
+            // can't do (his rule: "a blind person can't swipe"). Picking a tool there now
+            // brings its panel up, the same thing the iPad's pills do with a tap.
+            if isPhone { bottomPanel = .tool }
             if fitWidth && !newTool.fitWidthCompatible { fitWidth = false }
             // Leaving the Move tool commits whatever was being placed.
             commitMoveSession()

@@ -346,5 +346,51 @@ final class Image_ProducerUITests_iPad: XCTestCase {
               h0 > 0 && h1 > h0 * 1.3, String(format: "\"Active color\" %.1f pt tall → %.1f pt", h0, h1))
         snapshot("07-larger-text"); audit("Color Palette at Accessibility Large")
     }
+
+    // 022 — iPhone Duo, phone layout: on the Duo's narrow screen the system toolbar runs down
+    // the right edge (iOS 27.1). Every tool in the one-line strip must still be reachable:
+    // tap each in turn (the strip scrolls) and it must become the selected tool. A tool the
+    // toolbar covered would take the tap on the toolbar instead, and fail here.
+    func testPhoneLayout() throws {
+        openNewImage()
+        snapshot("p0-editor")
+        let tools = ["Canvas Tool", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
+                     "Pixel Pen", "Eraser", "Eyedropper", "Text", "Symbol", "Image",
+                     "Image Playground", "Layer", "Remove Background", "Magic Lasso", "Adjust",
+                     "Zoom", "Camera"]
+        var missed: [String] = []
+        // The system toolbar's left edge (its Back button); without one, the window's right edge.
+        let back = app.buttons["BackButton"].firstMatch
+        let limit = back.exists ? back.frame.minX : app.windows.firstMatch.frame.maxX
+        record("| — | ℹ️ INFO | Toolbar's left edge at x \(Int(limit)) of \(Int(app.windows.firstMatch.frame.width)) |")
+        let strip = app.scrollViews.element(boundBy: 0)
+        for t in tools {
+            let b = button(t)
+            guard b.waitForExistence(timeout: 3) else { missed.append("\(t) (not found)"); continue }
+            // Swipe the strip the way a person would until the tool sits fully clear of the
+            // toolbar. (isHittable throws for a tool not yet laid out, 21:18 run.)
+            var tries = 0
+            func clear() -> Bool { let f = b.frame; return f.width > 0 && f.minX >= 0 && f.maxX <= limit }
+            // Short drags, either way — a full swipe flung tools past the left edge (21:42 run).
+            func nudge(_ dx: CGFloat) {
+                let from = strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: dx, dy: 0)))
+                sleep(1)
+            }
+            while !clear() && tries < 12 {
+                let f = b.frame
+                nudge(f.width > 0 && f.minX < 0 ? 120 : -120); tries += 1
+            }
+            if !clear() { missed.append("\(t) (stays under the toolbar, x \(Int(b.frame.minX))–\(Int(b.frame.maxX)))"); continue }
+            b.tap(); sleep(1)
+            if app.sheets.firstMatch.exists || app.alerts.firstMatch.exists {
+                app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: []); sleep(1)
+            }
+            if !button(t).isSelected { missed.append(t) }
+        }
+        snapshot("p1-strip-end")
+        check("022", "Phone layout: every tool in the strip can be tapped and selected (\(tools.count))",
+              missed.isEmpty, missed.isEmpty ? "all \(tools.count)" : "missed: \(missed.joined(separator: ", "))")
+    }
 }
 #endif
