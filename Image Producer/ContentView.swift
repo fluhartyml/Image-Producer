@@ -114,9 +114,11 @@ struct ContentView: View {
     /// AppStorage, so either surface can turn it on or off.
     @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
     /// 022 — the phone layout's detachable tool palette: floating or docked, and where.
-    @AppStorage("ip.phone.toolsFloating") private var toolsFloating = false
-    @AppStorage("ip.phone.toolsX") private var toolsX: Double = 0.05
-    @AppStorage("ip.phone.toolsY") private var toolsY: Double = 0.08
+    // Under the test door these live in the test's own wiped suite (UITestDoor.defaults), so a
+    // test run never floats or moves HIS tool box. Outside the door it is .standard, as before.
+    @AppStorage("ip.phone.toolsFloating", store: UITestDoor.defaults) private var toolsFloating = false
+    @AppStorage("ip.phone.toolsX", store: UITestDoor.defaults) private var toolsX: Double = 0.05
+    @AppStorage("ip.phone.toolsY", store: UITestDoor.defaults) private var toolsY: Double = 0.08
     @State private var paletteDrag: CGSize = .zero
 
     /// Zoom at the moment a pinch began, so the gesture scales from where you were
@@ -312,6 +314,11 @@ struct ContentView: View {
     // palette dragged anywhere, and the box under the canvas is all inspector and layers.
     // The grip is ALSO a button (float / dock) — a switch, Voice Control or Sticky Keys user
     // must never need a drag (his rules). Position and state persist across launches.
+    // REM: EVERY LAYOUT, his word 11-05 08:1x: "i want it to be movable like the PiP everywhere
+    // on open closed iphone duo" · "yes iPad too the mac can be movable". The opened Duo runs
+    // the iPad layouts, so the grip and the floating palette live in all four branches of
+    // editorBody (phone portrait/landscape, regular portrait, wide = iPad landscape + Mac).
+    // The "ip.phone.*" storage keys keep their old names so a saved position survives.
 
     private var toolPaletteGrip: some View {
         Button { withAnimation(.snappy) { toolsFloating.toggle() } } label: {
@@ -329,7 +336,7 @@ struct ContentView: View {
     @ViewBuilder
     private func floatingToolPalette(in area: CGSize) -> some View {
         let cols = 4
-        let side: CGFloat = 38
+        let side: CGFloat = isPhone ? 38 : 46
         let w = CGFloat(cols) * side + 26
         let rows = Int((Double(Tool.shipping.count) / Double(cols)).rounded(.up))
         let h = CGFloat(rows) * (side + 2) + 12
@@ -405,14 +412,22 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Divider()
                 VStack(spacing: 0) {
-                    ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, lines: 1)
-                    Divider()
+                    if !toolsFloating {
+                        HStack(spacing: 0) {
+                            toolPaletteGrip
+                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, lines: 1)
+                        }
+                        Divider()
+                    }
                     BottomPanel.PanelView(document: document,
                                           camera: camera, activeTool: activeTool,
                                           activeLayerID: $activeLayerID, selection: $bottomPanel,
                                           fillColor: $fillColor, fileURL: fileURL, compact: true)
                 }
                 .frame(width: 300)
+            }
+            .overlay(alignment: .topLeading) {
+                if toolsFloating { floatingToolPalette(in: geo.size) }
             }
         }
     }
@@ -452,7 +467,12 @@ struct ContentView: View {
                     canvasArea
                         .frame(height: geo.size.height / 2)
                     Divider()
-                    ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
+                    if !toolsFloating {
+                        HStack(spacing: 0) {
+                            toolPaletteGrip
+                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
+                        }
+                    }
                     ActiveToolLabel(tool: activeTool)
                     Divider()
                     BottomPanel.PanelView(document: document,
@@ -462,6 +482,9 @@ struct ContentView: View {
                                           selection: $bottomPanel,
                                           fillColor: $fillColor,
                                           fileURL: fileURL)
+                }
+                .overlay(alignment: .topLeading) {
+                    if toolsFloating { floatingToolPalette(in: geo.size) }
                 }
             } else {
                 // Landscape / wide: canvas | tool rail | inspector | layers — all
@@ -480,9 +503,14 @@ struct ContentView: View {
                     VStack(spacing: 0) {
                         canvasArea
                             .frame(maxHeight: .infinity)
-                        Divider()
-                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
+                        if !toolsFloating {
+                            Divider()
+                            HStack(spacing: 0) {
+                                toolPaletteGrip
+                                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
+                            }
                             .frame(height: 104)
+                        }
                     }
                     .frame(width: geo.size.width / 2)
                     Divider()
@@ -537,6 +565,9 @@ struct ContentView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .overlay(alignment: .topLeading) {
+                    if toolsFloating { floatingToolPalette(in: geo.size) }
                 }
             }
         }

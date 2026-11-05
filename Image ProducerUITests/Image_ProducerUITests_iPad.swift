@@ -329,6 +329,30 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         check("015", "Every tool picked by its spoken name shows as selected (\(tools.count) tools)",
               missed.isEmpty, missed.isEmpty ? "all \(tools.count)" : "missed: \(missed.joined(separator: ", "))")
         audit("After the tool walk")
+
+        // REM: 022, his word 11-05 08:1x: "yes iPad too" — the movable tool box on the iPad
+        // (and the opened Duo, which runs these layouts). Float, drag, pick, dock.
+        if press("Float tools", 5) {
+            sleep(1)
+            let grip = button("Dock tools")
+            check("022", "Float tools turns the tool box into a floating palette",
+                  grip.waitForExistence(timeout: 3) && button("Move").exists)
+            let f0 = grip.frame
+            let start = grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            start.press(forDuration: 0.3, thenDragTo: start.withOffset(CGVector(dx: 160, dy: 120)))
+            sleep(1)
+            let f1 = grip.frame
+            check("022", "Dragging the grip moves the palette",
+                  hypot(f1.minX - f0.minX, f1.minY - f0.minY) > 40,
+                  String(format: "moved %.0f right, %.0f down", f1.minX - f0.minX, f1.minY - f0.minY))
+            press("Eraser"); sleep(1)
+            check("022", "A tool in the floating palette picks", button("Eraser").isSelected)
+            snapshot("07-floating-tools")
+            press("Dock tools"); sleep(1)
+            check("022", "Dock tools puts it back under the canvas", button("Float tools").waitForExistence(timeout: 3))
+        } else {
+            check("022", "Float tools button is there by name", false)
+        }
     }
 
     // 015a — A8: text follows the system text size. Runs after testShakedownIPad (alphabetical),
