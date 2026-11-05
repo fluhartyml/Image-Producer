@@ -4657,6 +4657,14 @@ struct MoveTransformInspector: View {
     @State private var freeHeight: Double = 0.8     // Freeform height fraction
     @State private var customW: Int = 4             // Custom ratio width
     @State private var customH: Int = 3             // Custom ratio height
+    // REM: HOLD TO SPEED UP. Michael, 2026-11-05: "the up and down arrow is SOOOOOoooooo
+    // REM: Slow probably at one step per px" → his yes to: one click = 1 px (his 09-15 ask
+    // REM: stays), holding the arrow speeds up to 10 px, then 50 px per step.
+    // REM: A hold is detected from the Stepper's own auto-repeat: calls closer together than
+    // REM: jogRepeatWindow count as one run. No modifier key (Sticky Keys rule).
+    @State private var jogLast: Date = .distantPast
+    @State private var jogRun: Int = 0
+    private let jogRepeatWindow: TimeInterval = 0.2
 
     private var index: Int? {
         guard let id = activeLayerID else { return nil }
@@ -5038,10 +5046,10 @@ struct MoveTransformInspector: View {
                         // unstepped (see below) and cannot be dragged finer than a few
                         // percent; on the 1024 icon canvas one pixel is 0.098% of scale,
                         // so these arrows are the only way to reach an exact size.
-                        Stepper(onIncrement: { jogScale(idx, byPixels:  1) },
-                                onDecrement: { jogScale(idx, byPixels: -1) }) { EmptyView() }
+                        Stepper(onIncrement: { jogScale(idx, byPixels:  scaleJogStep()) },
+                                onDecrement: { jogScale(idx, byPixels: -scaleJogStep()) }) { EmptyView() }
                             .labelsHidden()
-                            .help("Jog the layer's size by one pixel")
+                            .help("Click to change the size by one pixel; hold to go faster")
                             .accessibilityLabel("Scale")
                             .accessibilityValue(scaleSpokenValue(idx))
                         Spacer()
@@ -5218,6 +5226,19 @@ struct MoveTransformInspector: View {
     /// pixel" has to mean if the readout is to be trusted.
     ///
     /// Floor is ONE pixel: scale can never reach zero or go negative.
+    /// Pixels for this arrow step: 1 for a click; while held (auto-repeat), 1 for the
+    /// first 10 steps, then 10 px, then 50 px after 30 steps. Letting go resets it.
+    private func scaleJogStep() -> Double {
+        let now = Date()
+        jogRun = now.timeIntervalSince(jogLast) < jogRepeatWindow ? jogRun + 1 : 0
+        jogLast = now
+        switch jogRun {
+        case ..<10: return 1
+        case ..<30: return 10
+        default:    return 50
+        }
+    }
+
     private func jogScale(_ idx: Int, byPixels delta: Double) {
         guard document.layers.indices.contains(idx) else { return }
         let ref = Double(max(1, min(document.canvasWidth, document.canvasHeight)))

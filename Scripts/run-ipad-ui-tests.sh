@@ -9,6 +9,7 @@ LOG=/tmp/imageproducer-ipad-uitests.log
 # ONLY picks the test methods; default = the iPad shakedown + text size. Duo: ONLY=phone.
 case "${ONLY:-ipad}" in
   phone) T1=testPhoneLayout;    T2=testPhoneLayout ;;
+  hold)  T1=testScaleArrowHold; T2=testScaleArrowHold ;;
   *)     T1=testShakedownIPad;  T2=testTextSizeIPad ;;
 esac
 # SIM_ID picks one simulator when two share a name (022: two "iPhone Duo" devices).

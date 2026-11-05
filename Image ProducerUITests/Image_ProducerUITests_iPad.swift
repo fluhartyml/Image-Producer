@@ -357,6 +357,31 @@ final class Image_ProducerUITests_iPad: XCTestCase {
 
     // 015a — A8: text follows the system text size. Runs after testShakedownIPad (alphabetical),
     // which measured the Color Palette's "Active color" line (18 pt) at the default size.
+    /// Scale arrows (his 2026-11-05 "SOOOOOoooooo Slow"): one tap = 1 px; holding speeds up.
+    func testScaleArrowHold() throws {
+        openNewImage()
+        press("Add a layer"); sleep(1)
+        press("Paint Drop Bucket"); sleep(1); press("Fill Layer"); sleep(1)
+        press("Move"); sleep(1)
+        let field = app.textFields["Size in pixels"]
+        guard field.waitForExistence(timeout: 5) else { check("383", "Size in pixels field found", false); return }
+        func px() -> Int { Int((field.value as? String ?? "").filter(\.isNumber)) ?? -1 }
+        let stepper = app.steppers["Scale"]
+        let inc = stepper.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Increment'")).firstMatch
+        guard inc.waitForExistence(timeout: 5) else {
+            check("383", "Scale arrow found", false, app.steppers.allElementsBoundByIndex.map(\.label).joined(separator: ", ")); return
+        }
+        let start = px()
+        inc.tap(); sleep(1)
+        let afterTap = px()
+        check("383", "One tap on the up arrow adds 1 px", afterTap - start == 1, "\(start) → \(afterTap)")
+        inc.press(forDuration: 5); sleep(1)
+        let afterHold = px()
+        check("383", "Holding the up arrow 5 s speeds up past 1 px a step", afterHold - afterTap > 100,
+              "\(afterTap) → \(afterHold) (+\(afterHold - afterTap))")
+        snapshot("scale-hold")
+    }
+
     func testTextSizeIPad() throws {
         app.terminate()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
