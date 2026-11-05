@@ -1492,7 +1492,9 @@ extension ImageDocument {
     nonisolated static func packageWrapper(_ data: Data) -> FileWrapper {
         let manifest = FileWrapper(regularFileWithContents: data)
         manifest.preferredFilename = "manifest.json"
-        return FileWrapper(directoryWithFileWrappers: ["manifest.json": manifest])
+        var files = ["manifest.json": manifest]
+        if let pic = ProjectThumbnail.wrapper(forManifest: data) { files[ProjectThumbnail.folder] = pic }   // 016
+        return FileWrapper(directoryWithFileWrappers: files)
     }
 }
 
@@ -1709,6 +1711,7 @@ extension ImageDocument: Document {
         }
         let data = try JSONEncoder().encode(snapshotManifest())
         lastWrittenManifestHash = data.hashValue
+        stashThumbnail(forManifest: data)   // 016 — the Finder / Files picture
         // The save notification he asked for.
         say("Saved — \(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file))",
             kind: .save)
@@ -1748,6 +1751,7 @@ extension ImageDocument {
         let data = try JSONEncoder().encode(snapshotManifest())
         // Remember what we wrote, so the document system re-reading it is recognized as us.
         lastWrittenManifestHash = data.hashValue
+        stashThumbnail(forManifest: data)   // 016 — the Finder / Files picture
         return data
     }
 
@@ -1783,7 +1787,9 @@ extension ImageDocument {
         } else {
             let mf = FileWrapper(regularFileWithContents: data)
             mf.preferredFilename = "manifest.json"
-            dir = FileWrapper(directoryWithFileWrappers: ["manifest.json": mf])
+            var files = ["manifest.json": mf]
+            if let pic = ProjectThumbnail.wrapper(forManifest: data) { files[ProjectThumbnail.folder] = pic }   // 016
+            dir = FileWrapper(directoryWithFileWrappers: files)
         }
 
         var coordError: NSError?
