@@ -206,7 +206,8 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             check("356", "Pressing a swatch picks that color", false, "no unselected swatch to press")
         }
         snapshot("02-color-palette"); audit("Color Palette")
-        Self.footerHeightAtDefault = app.staticTexts["Colors come from the Color Palette tool."].firstMatch.frame.height
+        let footer = app.staticTexts["Active color"].firstMatch
+        Self.footerHeightAtDefault = footer.waitForExistence(timeout: 3) ? footer.frame.height : 0
 
         // A3 (364) — tool letters from a hardware keyboard pick tools.
         // Tap the canvas first so the key-catcher (not a field) has the keyboard.
@@ -328,18 +329,18 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     }
 
     // 015a — A8: text follows the system text size. Runs after testShakedownIPad (alphabetical),
-    // which measured the Color Palette footer ("Colors come from…", 18 pt) at the default size.
+    // which measured the Color Palette's "Active color" line (18 pt) at the default size.
     func testTextSizeIPad() throws {
         app.terminate()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
         app.launch()
         openNewImage()
         press("Color Palette"); sleep(1)
-        let big = app.staticTexts["Colors come from the Color Palette tool."].firstMatch
+        let big = app.staticTexts["Active color"].firstMatch
         let h0 = Self.footerHeightAtDefault
         let h1 = big.waitForExistence(timeout: 5) ? big.frame.height : 0
         check("015a", "Text grows with the system text size (Accessibility Large)",
-              h0 > 0 && h1 > h0 * 1.3, String(format: "footer line %.0f pt tall → %.0f pt", h0, h1))
+              h0 > 0 && h1 > h0 * 1.3, String(format: "\"Active color\" %.1f pt tall → %.1f pt", h0, h1))
         snapshot("07-larger-text"); audit("Color Palette at Accessibility Large")
     }
 }
