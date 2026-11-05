@@ -138,7 +138,7 @@ struct ImagePlaygroundInspector: View {
     @ViewBuilder private var supported: some View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Describe what Image Playground should make:")
-                    .font(.system(size: 18))
+                    .scaledFont(18)
 
                 // Plain text box on a LIGHTER fill so it stands out against the dark
                 // inspector (Michael 2026-06-21). Autocomplete off.
@@ -167,11 +167,11 @@ struct ImagePlaygroundInspector: View {
                 .disabled(activeFilterable == nil)
 
                 Text(filterAvailabilityMessage)
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                    .scaledFont(18).foregroundStyle(.secondary)
 
                 if failed {
                     Text("Couldn't place the generated image.")
-                        .font(.system(size: 18)).foregroundStyle(.red)
+                        .scaledFont(18).foregroundStyle(.red)
                 }
                 Spacer(minLength: 0)
             }

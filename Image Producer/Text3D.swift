@@ -358,7 +358,7 @@ struct Text3DSection: View {
             Toggle("3D letters", isOn: Binding(
                 get: { current?.isEnabled ?? false },
                 set: { on in edit("3D text") { $0 = on ? ($0 ?? Text3D()) : nil } }))
-                .font(.system(size: 18))
+                .scaledFont(18)
             if let s = current, s.isEnabled {
                 Picker("Motion", selection: binding(\.motion, "3D motion")) {
                     ForEach(Text3D.Motion.allCases) { Text($0.title).tag($0) }
@@ -390,7 +390,7 @@ struct Text3DSection: View {
                         edit("3D side color") { $0?.sideColorHex = nil }
                     }
                     .buttonStyle(.bordered)
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                 }
                 InfoTip("More about this", label: "3D export info",
                         "Export → Animated GIF (3D text loop) saves one full turn or swing.")
@@ -407,9 +407,9 @@ struct Text3DSection: View {
                         _ readout: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(title).font(.system(size: 18)).foregroundStyle(.secondary)
+                Text(title).scaledFont(18).foregroundStyle(.secondary)
                 Spacer()
-                Text(readout).font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
+                Text(readout).scaledFont(18, monospacedDigit: true).foregroundStyle(.secondary)
             }
             // REM: THE CAPTION IS NOT THE SLIDER'S NAME. The title Text above is a separate
             // element, so VoiceOver, Voice Control, and Switch Control met an unnamed slider

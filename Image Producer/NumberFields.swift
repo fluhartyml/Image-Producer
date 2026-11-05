@@ -36,12 +36,12 @@ struct PixelNumberField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)   // the field carries the spoken name
             TextField("", value: $value,
                       format: .number.grouping(.never).precision(.fractionLength(fractionDigits)))
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .monospacedDigit()
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 84)

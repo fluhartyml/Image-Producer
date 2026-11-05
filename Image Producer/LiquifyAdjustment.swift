@@ -206,7 +206,7 @@ struct LiquifyWindow: View {
                 Text("Drag to \(mode == .pucker ? "pull the picture in" : "push the picture out"). Hold still to keep going.")
                     .foregroundStyle(.secondary)
             }
-            .font(.system(size: 18))
+            .scaledFont(18)
         }
         .onAppear(perform: prepare)
         .onDisappear(perform: stopHold)

@@ -119,9 +119,9 @@ struct AngleDial: View {
                                                             .truncatingRemainder(dividingBy: 360) }),
                           format: .number.precision(.fractionLength(0)))
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 18).monospacedDigit())
+                    .scaledFont(18, monospacedDigit: true)
                     .frame(width: 70)
-                Text("°").font(.system(size: 18))
+                Text("°").scaledFont(18)
             }
         }
     }

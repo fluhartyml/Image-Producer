@@ -321,9 +321,9 @@ struct LevelsWindow: View {
                 dropperButton(.gray, "eyedropper", "Set gray point — click something that should be neutral gray")
                 dropperButton(.white, "eyedropper.full", "Set white point — click the brightest thing that should be pure white")
             }
-            .font(.system(size: 18))
+            .scaledFont(18)
 
-            Text("Input Levels").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Input Levels").scaledFont(18).foregroundStyle(.secondary)
             histogramView.frame(height: 110)
             LevelsMarkerBar(markers: inputMarkers, dragging: $dragging) { marker, x in
                 setInput(marker, fraction: x)
@@ -337,7 +337,7 @@ struct LevelsWindow: View {
                 numberField("White", value: channel.inWhite, range: 2...255)
             }
 
-            Text("Output Levels").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Output Levels").scaledFont(18).foregroundStyle(.secondary)
             LinearGradient(colors: [.black, .white], startPoint: .leading, endPoint: .trailing)
                 .frame(height: 12).clipShape(RoundedRectangle(cornerRadius: 3))
             LevelsMarkerBar(markers: outputMarkers, dragging: $dragging) { marker, x in
@@ -358,7 +358,7 @@ struct LevelsWindow: View {
                 Button("Reset") { settings = LevelsSettings() }
                     .disabled(settings.isIdentity)
             }
-            .font(.system(size: 18))
+            .scaledFont(18)
         }
     }
 
@@ -392,12 +392,12 @@ struct LevelsWindow: View {
     private func numberField(_ label: String, value: Binding<Double>, range: ClosedRange<Double>,
                              decimals: Int = 0) -> some View {
         HStack(spacing: 6) {
-            Text(label).font(.system(size: 18)).foregroundStyle(.secondary)
+            Text(label).scaledFont(18).foregroundStyle(.secondary)
             TextField(label, value: Binding(get: { value.wrappedValue },
                                             set: { value.wrappedValue = min(range.upperBound, max(range.lowerBound, $0)) }),
                       format: .number.precision(.fractionLength(decimals)))
                 .textFieldStyle(.roundedBorder)
-                .font(.system(size: 18).monospacedDigit())
+                .scaledFont(18, monospacedDigit: true)
                 .frame(width: 80)
         }
     }

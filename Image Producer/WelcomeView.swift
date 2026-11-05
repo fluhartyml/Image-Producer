@@ -364,7 +364,7 @@ struct WelcomeView: View {
                             .fill(Color(white: 0.89))
                     )
                 Text("Image Producer")
-                    .font(.system(size: 40, weight: .semibold, design: .serif))
+                    .scaledFont(40, weight: .semibold, design: .serif)
                 Text("GRAPHIC ARTS")
                     .font(.subheadline)
                     .tracking(4)
@@ -377,7 +377,7 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 6) {
                 TextField("Name (optional)", text: $newName)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .onSubmit { createNew() }
                     .onChange(of: newName) {
                         nameTaken = nil; openError = nil
@@ -387,7 +387,7 @@ struct WelcomeView: View {
                 if let taken = nameTaken {
                     HStack {
                         Text("“\(taken.deletingPathExtension().lastPathComponent)” already exists.")
-                            .font(.system(size: 18)).foregroundStyle(.secondary)
+                            .scaledFont(18).foregroundStyle(.secondary)
                         Spacer()
                         Button("Open It") {
                             Task {
@@ -395,7 +395,7 @@ struct WelcomeView: View {
                                 if (try? await openDocument(at: taken)) != nil { dismissWindow(id: "welcome") }
                             }
                         }
-                        .font(.system(size: 18))
+                        .scaledFont(18)
                     }
                 }
             }
@@ -421,7 +421,7 @@ struct WelcomeView: View {
 
             if let openError {
                 Text(openError)
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(.red)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
@@ -560,7 +560,7 @@ struct WelcomeView: View {
                             // Full file name, extension and all — his word, 2026-10-11, so a
                             // project and its .psd twin can be told apart.
                             Label(url.lastPathComponent, systemImage: "doc")
-                                .font(.system(size: 18))
+                                .scaledFont(18)
                                 .foregroundStyle(staged ? Color.white : Color.accentColor)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                 .frame(maxWidth: .infinity, alignment: .leading)

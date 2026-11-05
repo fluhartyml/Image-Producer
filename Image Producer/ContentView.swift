@@ -561,7 +561,7 @@ struct ContentView: View {
                                                 set: { if !$0 { iconSetResult = nil } })) {
             Button("OK", role: .cancel) { iconSetResult = nil }
         } message: {
-            Text(iconSetResult ?? "").font(.system(size: 18))
+            Text(iconSetResult ?? "").scaledFont(18)
         }
         .sheet(isPresented: $showAbout) { AboutView() }
         // The autosave's reload hands this window a NEW document instance — point it here.
@@ -843,6 +843,7 @@ struct ContentView: View {
                 .allowsHitTesting(false)
                 .accessibilityElement()
                 .accessibilityLabel("Canvas")
+                .accessibilityIdentifier("canvas.element")   // tells it apart from the Canvas TOOL tile
                 .accessibilityAddTraits(.isImage)
                 .accessibilityHint("Actions: More about canvas, zoom.")
                 .accessibilityAction(.default) { announceCanvasDetails() }
@@ -907,7 +908,7 @@ struct ContentView: View {
         // "a deaf person cant swipe"). Hidden from VoiceOver: the canvas element carries it.
         .overlay(alignment: .bottomLeading) {
             Text(canvasDetails)
-                .font(.system(size: 18).monospacedDigit())
+                .scaledFont(18, monospacedDigit: true)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
@@ -1135,7 +1136,7 @@ struct ContentView: View {
                 .disabled(canvasZoom >= maxZoom)
             Button { setZoom(1); activeTool = .zoom } label: {
                 Text("\(Int(canvasZoom * 100))%")
-                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                    .scaledFont(11, weight: .semibold, monospacedDigit: true)
             }
             .help("Fit Screen — the whole canvas in view (100%)")
             .accessibilityLabel("Fit screen")
@@ -1144,7 +1145,7 @@ struct ContentView: View {
                 .accessibilityLabel("Zoom out")
                 .disabled(canvasZoom <= minZoom)
         }
-        .font(.system(size: 15, weight: .semibold))
+        .scaledFont(15, weight: .semibold)
         .buttonStyle(.plain)
         .frame(width: 30)
         .padding(8)
@@ -1312,15 +1313,15 @@ struct ToolInspector: View {
             // need hover to know which tool you're on (Michael 2026-06-11).
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: activeTool.systemImage)
-                    .font(.system(size: 20, weight: .semibold))
+                    .scaledFont(20, weight: .semibold)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(activeTool.title).font(.system(size: 20, weight: .semibold))
+                    Text(activeTool.title).scaledFont(20, weight: .semibold)
                     // "Duplicate with a purpose" (Michael 2026-06-11): the active
                     // layer is also highlighted in the list, but spelling it out
                     // here CONFIRMS which layer you're about to act on.
                     if let name = activeLayerName {
                         Text("Layer: \(name)")
-                            .font(.system(size: 18))
+                            .scaledFont(18)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -1445,15 +1446,15 @@ struct PaintBucketInspector: View {
             }
             .buttonStyle(.borderedProminent)
             Text("Fills the whole layer, edge to edge.")
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .foregroundStyle(.secondary)
 
             if activeHasImage {
                 Divider()
-                Text("Flood fill — pour color up to the lines").font(.system(size: 18)).bold()
+                Text("Flood fill — pour color up to the lines").scaledFont(18).bold()
                 InfoTip("More about this", label: "Flood fill info", "Hover to preview the region (shown in the fill color), then tap inside an outlined area to flood it up to the surrounding lines. Tolerance sets how strict those \"walls\" are. Fills onto a new layer — your original is kept.")
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Tolerance  \(Int(pen.bucketTolerance))").font(.system(size: 18))
+                    Text("Tolerance  \(Int(pen.bucketTolerance))").scaledFont(18)
                     Slider(value: $pen.bucketTolerance, in: 0...160, step: 1)
                         .accessibilityLabel("Tolerance")
                 }
@@ -1623,7 +1624,7 @@ struct CanvasInspector: View {
                 // How the field works lives behind (i), not under it — his call, 2026-10-04:
                 // "renames the file on disk is cluttered and should be behind (i)".
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Project name").font(.system(size: 18, weight: .light)).foregroundStyle(.secondary)
+                    Text("Project name").scaledFont(18, weight: .light).foregroundStyle(.secondary)
                     InfoTip("More about the project name", label: "Project name info",
                             fileURL == nil ? "Working name for this untitled project."
                                            : "Renames the file on disk. Press Return to apply.")
@@ -1631,16 +1632,16 @@ struct CanvasInspector: View {
                 if fileURL == nil {
                     // Untitled: editable working name (becomes the manifest name on first save).
                     TextField("Project name", text: $draftName)
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18, weight: .semibold))
+                        .textFieldStyle(.roundedBorder).scaledFont(18, weight: .semibold)
                         .onSubmit { commitName() }
                 } else {
                     // Saved: editing here renames the FILE on disk (one-stop — no trip to Finder).
                     TextField("Project name", text: $draftName)
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18, weight: .semibold))
+                        .textFieldStyle(.roundedBorder).scaledFont(18, weight: .semibold)
                         .onSubmit { renameFile() }
                     if renameError {
                         Text(renameErrorText ?? "Couldn't rename — a file with that name may already exist.")
-                            .font(.system(size: 18)).foregroundStyle(.red)
+                            .scaledFont(18).foregroundStyle(.red)
                     }
                 }
             }
@@ -1650,7 +1651,7 @@ struct CanvasInspector: View {
             // --- B · Dimensions & Resolution ---
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Dimensions & Resolution").font(.system(size: 20, weight: .semibold))
+                    Text("Dimensions & Resolution").scaledFont(20, weight: .semibold)
                     InfoTip("More about size and resolution", label: "Size info",
                             "Resolution (PPI) changes the print size losslessly — pixels stay. Editing Pixels or applying a size preset changes the pixel count; existing art scales to fit, letterboxed on the background. Set Resolution first (300 for print), then pick a size.")
                 }
@@ -1658,29 +1659,29 @@ struct CanvasInspector: View {
                 // Pixels — editable W × H. This is the explicit pixel-count change; existing
                 // art scales-to-fit the new shape, letterboxed on the background.
                 HStack(spacing: 4) {
-                    Text("Pixels").font(.system(size: 18)).frame(width: 92, alignment: .leading)
+                    Text("Pixels").scaledFont(18).frame(width: 92, alignment: .leading)
                     // W and H labels — his ask, 2026-10-11 ("H and W are not shown"). The
                     // trailing "px" went to make room (his screen: the row clipped W, H and
                     // px); the px/in/mm/pt switch right below already names the unit.
-                    Text("W").font(.system(size: 18)).foregroundStyle(.secondary).help("Width")
+                    Text("W").scaledFont(18).foregroundStyle(.secondary).help("Width")
                         .fixedSize()
                     CommitIntField(placeholder: "W", value: widthBinding)
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
+                        .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
                         .disabled(sizeRule == .fluidHeight)
-                    Text("×").font(.system(size: 18)).fixedSize()
-                    Text("H").font(.system(size: 18)).foregroundStyle(.secondary).help("Height")
+                    Text("×").scaledFont(18).fixedSize()
+                    Text("H").scaledFont(18).foregroundStyle(.secondary).help("Height")
                         .fixedSize()
                     CommitIntField(placeholder: "H", value: heightBinding)
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
+                        .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
                         .disabled(sizeRule == .fluidWidth)
                 }
 
                 HStack(spacing: 8) {
-                    Text("Size rule").font(.system(size: 18)).frame(width: 92, alignment: .leading)
+                    Text("Size rule").scaledFont(18).frame(width: 92, alignment: .leading)
                     Picker("Size rule", selection: $sizeRule) {
                         ForEach(CanvasSizeRule.allCases) { Text($0.rawValue).tag($0) }
                     }
-                    .pickerStyle(.menu).labelsHidden().font(.system(size: 18)).fixedSize()
+                    .pickerStyle(.menu).labelsHidden().scaledFont(18).fixedSize()
                     InfoTip("What is the size rule?", label: "Size rule info",
                             "Exact: type any width and height. Fixed ratio: the shape is locked — change one side and the other follows. Fluid width: the height stays put and the width is free; fluid height is the reverse. A fluid change adds or removes canvas on that side and the artwork keeps its size and stays centered — nothing is letterboxed.")
                 }
@@ -1693,11 +1694,11 @@ struct CanvasInspector: View {
 
                 // Resolution: manual field + a preset menu for when you don't know the number.
                 HStack(spacing: 8) {
-                    Text("Resolution").font(.system(size: 18)).frame(width: 92, alignment: .leading)
+                    Text("Resolution").scaledFont(18).frame(width: 92, alignment: .leading)
                     TextField("PPI", value: $document.ppi, format: .number.precision(.fractionLength(0...2)))
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 76)
+                        .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 76)
                         .onSubmit { if document.ppi < 1 { document.ppi = 1 } }
-                    Text("PPI").font(.system(size: 18)).foregroundStyle(.secondary)
+                    Text("PPI").scaledFont(18).foregroundStyle(.secondary)
                 }
                 Menu {
                     Button("72 — Screen / web")                  { document.ppi = 72 }
@@ -1713,7 +1714,7 @@ struct CanvasInspector: View {
                 attrRow("Print size", printSizeText)
 
                 // Standard non-square shapes. A preset sets pixels = physical × current PPI.
-                Toggle("Landscape", isOn: landscapeBinding).font(.system(size: 18)).fixedSize()
+                Toggle("Landscape", isOn: landscapeBinding).scaledFont(18).fixedSize()
                 // The catalog, by job, in subsets (CanvasPresets.swift). Each item shows its
                 // numbers, shape and size rule on a second line.
                 Menu {
@@ -1737,7 +1738,7 @@ struct CanvasInspector: View {
 
                 if let aspectWarning {
                     Text(aspectWarning)
-                        .font(.system(size: 18)).foregroundStyle(.orange)
+                        .scaledFont(18).foregroundStyle(.orange)
                 }
             }
 
@@ -1747,42 +1748,42 @@ struct CanvasInspector: View {
             // Every term is explained behind (i), in words for someone new to printing —
             // his call, 2026-10-04. The screen keeps only the controls.
             VStack(alignment: .leading, spacing: 10) {
-                Text("Print setup").font(.system(size: 20, weight: .semibold))
+                Text("Print setup").scaledFont(20, weight: .semibold)
                 HStack(spacing: 8) {
-                    Text("Bleed").font(.system(size: 18)).frame(width: 92, alignment: .leading)
+                    Text("Bleed").scaledFont(18).frame(width: 92, alignment: .leading)
                     TextField("in", value: $document.bleedInches, format: .number.precision(.fractionLength(0...3)))
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
-                    Text("in").font(.system(size: 18)).foregroundStyle(.secondary)
+                        .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
+                    Text("in").scaledFont(18).foregroundStyle(.secondary)
                     Menu {
                         Button("None") { document.bleedInches = 0 }
                         Button("0.125 in (1/8\")") { document.bleedInches = 0.125 }
                         Button("3 mm") { document.bleedInches = 3.0 / 25.4 }
-                    } label: { Image(systemName: "chevron.down.circle").font(.system(size: 18)) }
+                    } label: { Image(systemName: "chevron.down.circle").scaledFont(18) }
                     .fixedSize()
                     .accessibilityLabel("Bleed presets")
                     InfoTip("What is bleed?", label: "Bleed info",
                             "Extra picture past the edge of the page. The shop trims just inside it, so the color runs right to the edge with no white sliver. 1/8 inch is the U.S. standard; 3 mm is metric.")
                 }
                 HStack(spacing: 8) {
-                    Text("Safe margin").font(.system(size: 18)).frame(width: 92, alignment: .leading)
+                    Text("Safe margin").scaledFont(18).frame(width: 92, alignment: .leading)
                     TextField("in", value: $document.safeMarginInches, format: .number.precision(.fractionLength(0...3)))
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 64)
-                    Text("in").font(.system(size: 18)).foregroundStyle(.secondary)
+                        .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
+                    Text("in").scaledFont(18).foregroundStyle(.secondary)
                     InfoTip("What is the safe margin?", label: "Safe margin info",
                             "Keep text and faces inside this line. The cut can drift a little, and anything too close to the edge may get trimmed off.")
                 }
                 HStack(spacing: 6) {
-                    Toggle("Crop / trim marks", isOn: $document.cropMarks).font(.system(size: 18))
+                    Toggle("Crop / trim marks", isOn: $document.cropMarks).scaledFont(18)
                     InfoTip("What are crop marks?", label: "Crop marks info",
                             "Small lines at the corners that show the shop exactly where to cut.")
                 }
                 HStack(spacing: 6) {
-                    Toggle("Registration marks", isOn: $document.registrationMarks).font(.system(size: 18))
+                    Toggle("Registration marks", isOn: $document.registrationMarks).scaledFont(18)
                     InfoTip("What are registration marks?", label: "Registration info",
                             "Target marks a printing press uses to line up each ink. Home and copy-shop printers don't need them.")
                 }
                 HStack(spacing: 8) {
-                    Text("Color").font(.system(size: 18)).frame(width: 92, alignment: .leading)
+                    Text("Color").scaledFont(18).frame(width: 92, alignment: .leading)
                     Picker("Color", selection: $document.colorSpaceCMYK) {
                         Text("RGB").tag(false); Text("CMYK").tag(true)
                     }
@@ -1797,7 +1798,7 @@ struct CanvasInspector: View {
             // --- D · Export ---
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Export").font(.system(size: 20, weight: .semibold))
+                    Text("Export").scaledFont(20, weight: .semibold)
                     InfoTip("More about exporting", label: "Export info", Self.exportInfo)
                 }
                 Button {
@@ -1812,27 +1813,27 @@ struct CanvasInspector: View {
                         exportData = data; exportType = .pdf
                         exportFilename = displayName; showDataExporter = true
                     }
-                } label: { Label("Print PDF (bleed + marks)", systemImage: "doc.richtext").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                } label: { Label("Print PDF (bleed + marks)", systemImage: "doc.richtext").scaledFont(18).frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent)
                 .help("One PDF at trim size with bleed and crop marks, for a printer")
                 .accessibilityLabel("Print PDF")   // REM: spoken names 3 words max (his 11-04) — Voice Control truncates long badges
                 Button {
                     webBundle = ImageExportBundle(files: makeWebFolder(document, baseName: displayName))
                     folderFilename = "\(displayName) Web"; showWebExporter = true
-                } label: { Label("Web folder (PNG @1x/2x/3x)", systemImage: "globe").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                } label: { Label("Web folder (PNG @1x/2x/3x)", systemImage: "globe").scaledFont(18).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
                 .help("A folder of PNGs at 1x, 2x and 3x for a website")
                 .accessibilityLabel("Web folder")
                 Button {
                     webBundle = ImageExportBundle(files: makeIconFolder(document))
                     folderFilename = "\(displayName) Icons"; showWebExporter = true
-                } label: { Label("Icon — all sizes (PNG folder)", systemImage: "square.and.arrow.up.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                } label: { Label("Icon — all sizes (PNG folder)", systemImage: "square.and.arrow.up.on.square").scaledFont(18).frame(maxWidth: .infinity) }
                 .buttonStyle(.bordered)
                 .help("Every app-icon size from 16 to 1024, as a folder of PNGs")
                 .accessibilityLabel("Icon sizes")
                 // Every export from right here — no shortcut needed (an iPad has no ⌘ key).
                 Button { document.exportSheetRequested = true } label: {
-                    Label("Single image…", systemImage: "photo").font(.system(size: 18)).frame(maxWidth: .infinity)
+                    Label("Single image…", systemImage: "photo").scaledFont(18).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .help("One PNG, JPEG, TIFF or PDF — pick the format")
@@ -1844,7 +1845,7 @@ struct CanvasInspector: View {
             // --- E · Layer PDF (round-trips with the importer below) ---
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Layer PDF").font(.system(size: 20, weight: .semibold))
+                    Text("Layer PDF").scaledFont(20, weight: .semibold)
                     InfoTip("More about layer PDFs", label: "Layer PDF info",
                             "Export writes page 1 as the finished picture, then one page per layer, with see-through areas kept. Import brings each page of a PDF in as its own editable layer.\n\nFlatten puts a matte behind the see-through parts: a solid color, because most printers can't print \"nothing\". Flatten only for print.")
                 }
@@ -1854,21 +1855,21 @@ struct CanvasInspector: View {
                         exportData = data; exportType = .pdf
                         exportFilename = "\(displayName) Layers"; showDataExporter = true
                     }
-                } label: { Label("Export layers → PDF (one page each)", systemImage: "square.stack.3d.up").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                } label: { Label("Export layers → PDF (one page each)", systemImage: "square.stack.3d.up").scaledFont(18).frame(maxWidth: .infinity) }
                 .help("Page 1 is the composite, then one page per layer")
                 .accessibilityLabel("Export layer PDF")
                 .buttonStyle(.borderedProminent)
                 Toggle(isOn: $flattenLayerPDF) {
-                    Text("Flatten transparency onto a matte").font(.system(size: 18))
+                    Text("Flatten transparency onto a matte").scaledFont(18)
                 }
                 if flattenLayerPDF {
                     ColorPicker(selection: $layerMatte, supportsOpacity: false) {
-                        Text("Matte color").font(.system(size: 18))
+                        Text("Matte color").scaledFont(18)
                     }
                 }
                 Button {
                     importingPDF = true
-                } label: { Label("Import PDF as layers…", systemImage: "square.and.arrow.down.on.square").font(.system(size: 18)).frame(maxWidth: .infinity) }
+                } label: { Label("Import PDF as layers…", systemImage: "square.and.arrow.down.on.square").scaledFont(18).frame(maxWidth: .infinity) }
                 .help("Bring each page of a PDF in as its own editable image layer")
                 .accessibilityLabel("Import layer PDF")
                 .buttonStyle(.bordered)
@@ -1880,12 +1881,12 @@ struct CanvasInspector: View {
             // the bottom". It is reference, not something you work in.
             // --- File attributes ---
             VStack(alignment: .leading, spacing: 8) {
-                Text("File").font(.system(size: 20, weight: .semibold))
+                Text("File").scaledFont(20, weight: .semibold)
                 attrRow("Location", locationText)
                 #if os(macOS)
                 if let url = fileURL {
                     Button { NSWorkspace.shared.activateFileViewerSelecting([url]) } label: {
-                        Label("Reveal in Finder", systemImage: "folder").font(.system(size: 18))
+                        Label("Reveal in Finder", systemImage: "folder").scaledFont(18)
                     }
                     .buttonStyle(.bordered)
                 }
@@ -1947,9 +1948,9 @@ struct CanvasInspector: View {
 
     @ViewBuilder private func attrRow(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Text(label).font(.system(size: 18)).foregroundStyle(.secondary)
+            Text(label).scaledFont(18).foregroundStyle(.secondary)
                 .frame(width: 92, alignment: .leading)
-            Text(value).font(.system(size: 18)).foregroundStyle(.primary).textSelection(.enabled)
+            Text(value).scaledFont(18).foregroundStyle(.primary).textSelection(.enabled)
             Spacer(minLength: 0)
         }
     }
@@ -2591,10 +2592,10 @@ struct PaletteSwatchRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if !label.isEmpty { Text(label).font(.system(size: 18)) }
+            if !label.isEmpty { Text(label).scaledFont(18) }
             if document.palette.isEmpty {
                 Text("The palette is empty — add colors in Color Palette first.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                    .scaledFont(18).foregroundStyle(.secondary)
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
                     ForEach(document.palette.indices, id: \.self) { i in
@@ -2615,7 +2616,7 @@ struct PaletteSwatchRow: View {
             }
             if showsFooter {
                 Text("Colors come from the Color Palette tool.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                    .scaledFont(18).foregroundStyle(.secondary)
             }
         }
     }
@@ -2689,18 +2690,18 @@ struct ColorPaletteInspector: View {
                     .frame(width: 44, height: 44)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.4)))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Active color").font(.system(size: 18))
-                    Text(document.palette[selected]).font(.system(size: 18))
+                    Text("Active color").scaledFont(18)
+                    Text(document.palette[selected]).scaledFont(18)
                         .foregroundStyle(.secondary).textSelection(.enabled)
                 }
             }
 
             ColorPicker("Edit selected swatch", selection: selectedColorBinding, supportsOpacity: false)
-                .font(.system(size: 18))
+                .scaledFont(18)
 
             Divider()
 
-            Text("Palette — \(document.palette.count) colors").font(.system(size: 20, weight: .semibold))
+            Text("Palette — \(document.palette.count) colors").scaledFont(20, weight: .semibold)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
                 ForEach(document.palette.indices, id: \.self) { i in
                     RoundedRectangle(cornerRadius: 6)
@@ -2731,7 +2732,7 @@ struct ColorPaletteInspector: View {
                 }
                 .disabled(document.palette.count <= 8)
             }
-            .font(.system(size: 18)).buttonStyle(.bordered)
+            .scaledFont(18).buttonStyle(.bordered)
 
             InfoTip("More about this", label: "Palette info", "Tap a swatch to make it the active color; edit it above. Add grows the box (8–24); the 8 base colors can't be removed. This palette is the only place colors are defined — every tool picks from it.")
 
@@ -2746,9 +2747,9 @@ struct ColorPaletteInspector: View {
                     Label("Load Palette", systemImage: "paintpalette").frame(maxWidth: .infinity)
                 }
             }
-            .font(.system(size: 18)).buttonStyle(.bordered)
+            .scaledFont(18).buttonStyle(.bordered)
             if loadFailed {
-                Text("Couldn't read that palette file.").font(.system(size: 18)).foregroundStyle(.red)
+                Text("Couldn't read that palette file.").scaledFont(18).foregroundStyle(.red)
             }
         }
         .padding()
@@ -2942,31 +2943,31 @@ struct SymbolPickerInspector: View {
                             .frame(width: 88, height: 88)
                             .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.15)))
                         Text(pickedTitle(picked))
-                            .font(.system(size: 18))
+                            .scaledFont(18)
                             .lineLimit(2)
                             .minimumScaleFactor(10.0 / 18.0)
                     }
                     Button { act(on: picked, newLayer: true) } label: {
                         Label("Create New Layer", systemImage: "plus.square.on.square")
-                            .font(.system(size: 18)).frame(maxWidth: .infinity)
+                            .scaledFont(18).frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     Button { act(on: picked, newLayer: false) } label: {
                         Label("Apply to Selected Layer", systemImage: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 18)).frame(maxWidth: .infinity)
+                            .scaledFont(18).frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .disabled(!activeIsSymbolLayer)
                 } else {
                     Text("Tap a glyph to preview it, then create a layer or apply it.")
-                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                        .scaledFont(18).foregroundStyle(.secondary)
                 }
 
                 TextField("Search SF & Unicode", text: $search)
                     .textFieldStyle(.roundedBorder)
                 if combinedResults.isEmpty {
                     Text("Can't find an SF or Unicode symbol matching “\(search.trimmingCharacters(in: .whitespaces))”.")
-                        .font(.system(size: 18)).foregroundStyle(.secondary).padding(.vertical, 8)
+                        .scaledFont(18).foregroundStyle(.secondary).padding(.vertical, 8)
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 8) {
@@ -2989,7 +2990,7 @@ struct SymbolPickerInspector: View {
         case .sf(let name):
             Button { picked = result } label: {
                 Image(systemName: name)
-                    .font(.system(size: 20))
+                    .scaledFont(20)
                     .frame(width: 44, height: 44)
                     .background(RoundedRectangle(cornerRadius: 8)
                         .fill(isHighlighted(result) ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
@@ -2998,7 +2999,7 @@ struct SymbolPickerInspector: View {
         case .unicode(let g):
             Button { picked = result } label: {
                 Text(g.char)
-                    .font(.system(size: 22))
+                    .scaledFont(22)
                     .frame(width: 44, height: 44)
                     .background(RoundedRectangle(cornerRadius: 8)
                         .fill(isHighlighted(result) ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
@@ -3022,7 +3023,7 @@ struct SymbolPickerInspector: View {
         case .sf(let name):
             Image(systemName: name).resizable().scaledToFit().padding(12).foregroundStyle(tint)
         case .unicode(let g):
-            Text(g.char).font(.system(size: 52)).foregroundStyle(tint)
+            Text(g.char).scaledFont(52).foregroundStyle(tint)
         }
     }
 
@@ -3147,7 +3148,7 @@ struct FontPickerInspector: View {
                     styled(Text(info.name).font(.custom(info.name, size: 18)))
                         .lineLimit(1)
                 } else {
-                    Text(info.name).font(.system(size: 18)).lineLimit(1)
+                    Text(info.name).scaledFont(18).lineLimit(1)
                     if !info.sample.isEmpty {
                         Text(info.sample).font(.custom(info.name, size: 18))
                             .lineLimit(1)
@@ -3201,10 +3202,10 @@ struct FontPickerInspector: View {
             // explicit alternative and always creates a fresh layer.
             // TYPE FIRST, THEN PRESS (Michael, 2026-10-03). Once the layer exists, typing
             // edits it live, and its name follows the text both ways.
-            Text("Text").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Text").scaledFont(18).foregroundStyle(.secondary)
             TextField("Type your text…", text: textBinding, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .lineLimit(1...4)
                 .autocorrectionDisabled()
             Button { newText() } label: {
@@ -3231,9 +3232,9 @@ struct FontPickerInspector: View {
             // SIZE — his ask, 2026-10-03: "font size (it is not shown and needs to be added)".
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text("Size").font(.system(size: 18)).foregroundStyle(.secondary)
+                    Text("Size").scaledFont(18).foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(Int((size * 100).rounded()))%").font(.system(size: 18).monospacedDigit())
+                    Text("\(Int((size * 100).rounded()))%").scaledFont(18, monospacedDigit: true)
                         .foregroundStyle(.secondary)
                     // Fine tune, 1% a click — his ask, 2026-10-03: "the size slider needs an
                     // arrow fine tune adjuster." Same jog-stepper idea as Move's Scale.
@@ -3254,9 +3255,9 @@ struct FontPickerInspector: View {
             if outline {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Outline width").font(.system(size: 18)).foregroundStyle(.secondary)
+                        Text("Outline width").scaledFont(18).foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(Int(outlineWidth)) px").font(.system(size: 18).monospacedDigit())
+                        Text("\(Int(outlineWidth)) px").scaledFont(18, monospacedDigit: true)
                             .foregroundStyle(.secondary)
                         Stepper("", value: $outlineWidth, in: 1...40, step: 1)
                             .labelsHidden()
@@ -3277,7 +3278,7 @@ struct FontPickerInspector: View {
                 Text3DSection(document: document, layerID: id)
             }
 
-            Text("Font").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Font").scaledFont(18).foregroundStyle(.secondary)
             // FIND FONT — his ask, 2026-10-11: "press f and it jumps to fonts beginning with
             // f … typed fut it would get closer without having to scroll".
             // AUTOCOMPLETE — his ask, 2026-10-11: "as they type the rest of the font name is
@@ -3297,7 +3298,7 @@ struct FontPickerInspector: View {
                        s.range(of: findText, options: [.caseInsensitive, .anchored]) != nil {
                         (Text(findText).foregroundStyle(.clear)
                          + Text(String(s.dropFirst(findText.count))).foregroundStyle(.secondary))
-                            .font(.system(size: 18))
+                            .scaledFont(18)
                             .lineLimit(1)
                             .allowsHitTesting(false)
                             .accessibilityHidden(true)
@@ -3306,7 +3307,7 @@ struct FontPickerInspector: View {
                     TextField("Find font", text: $findText,
                               prompt: Text("Type font name…").foregroundStyle(.secondary))
                         .textFieldStyle(.plain)
-                        .font(.system(size: 18))
+                        .scaledFont(18)
                         .autocorrectionDisabled()
                         .onSubmit { if let s = suggestion(in: shown) { pick(s); findText = "" } }
                         .onKeyPress(.downArrow) { moveSuggestion(+1, in: shown, proxy); return .handled }
@@ -3322,7 +3323,7 @@ struct FontPickerInspector: View {
                 // completed in place, so the whole suggested name shows beside the field.
                 if let s = suggestion(in: shown), !findText.isEmpty,
                    s.range(of: findText, options: [.caseInsensitive, .anchored]) == nil {
-                    Text("→ \(s)").font(.system(size: 18)).foregroundStyle(.secondary).lineLimit(1)
+                    Text("→ \(s)").scaledFont(18).foregroundStyle(.secondary).lineLimit(1)
                 }
                 if !findText.isEmpty {
                     Button { findText = "" } label: { Image(systemName: "xmark.circle.fill") }
@@ -3347,7 +3348,7 @@ struct FontPickerInspector: View {
                         }
                         if shown.isEmpty {
                             Text("No font matches “\(findText)”")
-                                .font(.system(size: 18)).foregroundStyle(.secondary)
+                                .scaledFont(18).foregroundStyle(.secondary)
                                 .padding(6)
                         }
                     }
@@ -3389,7 +3390,7 @@ struct FontPickerInspector: View {
 
             // Glyph browser (a real FontBook for the chosen font) — tapping a glyph APPENDS
             // it to the text, building a string from the keyboard AND the font's repertoire.
-            Text("Insert glyph — tap to add to your text").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Insert glyph — tap to add to your text").scaledFont(18).foregroundStyle(.secondary)
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 38), spacing: 6)], spacing: 6) {
                     ForEach(glyphs, id: \.self) { g in
@@ -3617,14 +3618,14 @@ struct ImageImportInspector: View {
                         .accessibilityLabel("More about importing")
                         .popover(isPresented: $showInfo) {
                             Text("Selected Layer replaces that layer's picture. New Layer goes above the selected one. Opens PNG, JPEG, HEIC, TIFF, GIF, BMP and .psd. A PSD to a New Layer keeps all its layers; to the Selected Layer it comes in flattened. Use Move to size and place it.")
-                                .font(.system(size: 18))
+                                .scaledFont(18)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(width: 300)
                                 .padding()
                         }
                 }
                 if failed {
-                    Text("Couldn't read that image.").font(.system(size: 18)).foregroundStyle(.red)
+                    Text("Couldn't read that image.").scaledFont(18).foregroundStyle(.red)
                 }
                 Spacer()
             }
@@ -3775,7 +3776,7 @@ struct PenInspector: View {
     var body: some View {
         if activeIsContent {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Colors").font(.system(size: 18))
+                Text("Colors").scaledFont(18)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
                     ForEach(document.palette.indices, id: \.self) { i in
                         RoundedRectangle(cornerRadius: 6)
@@ -3814,16 +3815,16 @@ struct PenInspector: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .buttonStyle(.bordered)
                 InfoTip("More about this", label: "Brand palette info", "Save these colors as a reusable brand palette, or load one into this icon.")
                 if paletteLoadFailed {
-                    Text("Couldn't read that palette file.").font(.system(size: 18)).foregroundStyle(.red)
+                    Text("Couldn't read that palette file.").scaledFont(18).foregroundStyle(.red)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("This layer's resolution — \(pen.resolution)\(pen.resolution == 2 ? " (control)" : "") px")
-                        .font(.system(size: 18))
+                        .scaledFont(18)
                     Slider(value: Binding(
                         get: { Double(resolutionRungs.firstIndex(of: pen.resolution) ?? 4) },
                         set: { pen.resolution = resolutionRungs[min(max(Int($0.rounded()), 0), resolutionRungs.count - 1)] }
@@ -3837,11 +3838,11 @@ struct PenInspector: View {
                     HStack {
                         Text("2"); Spacer(); Text("32"); Spacer(); Text("1024")
                     }
-                    .font(.system(size: 9))
+                    .scaledFont(9)
                     .foregroundStyle(.secondary)
                     .padding(.top, -2)
                     Text("Per-layer resolution; the grid matches. Lower = blockier.")
-                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                        .scaledFont(18).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -3857,7 +3858,7 @@ struct PenInspector: View {
                 Toggle("Show grid", isOn: $pen.showGrid)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Brush  \(pen.brush) cell\(pen.brush == 1 ? "" : "s")").font(.system(size: 18))
+                    Text("Brush  \(pen.brush) cell\(pen.brush == 1 ? "" : "s")").scaledFont(18)
                     Slider(value: Binding(get: { Double(pen.brush) },
                                           set: { pen.brush = Int($0) }), in: 1...8, step: 1)
                         .accessibilityLabel("Brush size")
@@ -3865,7 +3866,7 @@ struct PenInspector: View {
                 }
 
                 Text("Drag on the canvas to drop pixels into the grid cells.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                    .scaledFont(18).foregroundStyle(.secondary)
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -4000,10 +4001,10 @@ struct ToolInspectorPlaceholder: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: tool.systemImage)
-                .font(.system(size: 34))
+                .scaledFont(34)
                 .foregroundStyle(.secondary)
             Text("Inspector — coming soon")
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -4020,10 +4021,10 @@ struct PanelPlaceholder: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: systemImage)
-                .font(.system(size: 34))
+                .scaledFont(34)
                 .foregroundStyle(.secondary)
-            Text(title).font(.system(size: 20, weight: .semibold))
-            Text(subtitle).font(.system(size: 18)).foregroundStyle(.tertiary)
+            Text(title).scaledFont(20, weight: .semibold)
+            Text(subtitle).scaledFont(18).foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
@@ -4222,7 +4223,7 @@ struct HistoryPanel: View {
         VStack(spacing: 0) {
             HStack {
                 if showsHeader {
-                    Text("History").font(.system(size: 20, weight: .semibold))
+                    Text("History").scaledFont(20, weight: .semibold)
                 }
                 Spacer()
                 Menu {
@@ -4236,7 +4237,7 @@ struct HistoryPanel: View {
                     }
                     .disabled(document.history.entries.isEmpty && document.history.baseline == nil)
                 } label: {
-                    Image(systemName: "ellipsis.circle").font(.system(size: 18))
+                    Image(systemName: "ellipsis.circle").scaledFont(18)
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
@@ -4251,7 +4252,7 @@ struct HistoryPanel: View {
             if document.isViewingHistory {
                 Button(action: keepViewedStep) {
                     Label("Keep this step", systemImage: "checkmark.circle")
-                        .font(.system(size: 18, weight: .semibold))
+                        .scaledFont(18, weight: .semibold)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -4271,7 +4272,7 @@ struct HistoryPanel: View {
                             document.jumpToBaseline(); clampActiveLayer()
                         } label: {
                             Label("Original", systemImage: "photo")
-                                .font(.system(size: 16, weight: isCurrent ? .semibold : .regular))
+                                .scaledFont(16, weight: isCurrent ? .semibold : .regular)
                         }
                         .buttonStyle(.plain)
                         .listRowBackground(isCurrent ? Color.accentColor.opacity(0.15) : Color.clear)
@@ -4385,7 +4386,7 @@ private struct HistoryEntryRow: View {
             HStack(spacing: 6) {
                 Button(action: toggle) {
                     Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .scaledFont(12, weight: .semibold)
                         .foregroundStyle(.secondary)
                         .frame(width: 16)
                 }
@@ -4400,20 +4401,20 @@ private struct HistoryEntryRow: View {
                         Text(baseOrdinal == lastOrdinal
                              ? "\(baseOrdinal + 1)."
                              : "\(baseOrdinal + 1)–\(lastOrdinal + 1).")
-                            .font(.system(size: 13).monospacedDigit())
+                            .scaledFont(13, monospacedDigit: true)
                             .foregroundStyle(.secondary)
                         Image(systemName: toolSymbol)
                         Text(entry.title)
                         Spacer()
                         Text("\(entry.actions.count)")
-                            .font(.system(size: 13))
+                            .scaledFont(13)
                             .foregroundStyle(.secondary)
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
-            .font(.system(size: 16, weight: groupHoldsCursor ? .semibold : .regular))
+            .scaledFont(16, weight: groupHoldsCursor ? .semibold : .regular)
             .opacity(groupAhead ? 0.4 : 1)
             .contextMenu {
                 // Two choices that do genuinely different jobs — Michael 2026-08-24:
@@ -4436,15 +4437,15 @@ private struct HistoryEntryRow: View {
                     Button { viewAction(aIdx) } label: {
                         HStack {
                             Text("\(ord + 1).")
-                                .font(.system(size: 12).monospacedDigit())
+                                .scaledFont(12, monospacedDigit: true)
                                 .foregroundStyle(.secondary)
                             Text(action.label)
                             Spacer()
                             if isCurrent {
-                                Image(systemName: "eye.fill").font(.system(size: 11))
+                                Image(systemName: "eye.fill").scaledFont(11)
                             }
                         }
-                        .font(.system(size: 14, weight: isCurrent ? .semibold : .regular))
+                        .scaledFont(14, weight: isCurrent ? .semibold : .regular)
                         .foregroundStyle(isCurrent ? Color.accentColor : Color.secondary)
                         .padding(.leading, 30)
                         .padding(.vertical, 1)
@@ -4510,8 +4511,8 @@ struct MoveTransformInspector: View {
     // MARK: Crop (document-level, non-destructive, centered — Photos-style presets)
     @ViewBuilder private var cropSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Crop").font(.system(size: 18)).bold()
-            Text("Aspect ratio").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Crop").scaledFont(18).bold()
+            Text("Aspect ratio").scaledFont(18).foregroundStyle(.secondary)
             Picker("Aspect", selection: $cropAspect) {
                 Text("Original").tag(CropAspect.original)
                 Text("Freeform").tag(CropAspect.freeform)
@@ -4569,11 +4570,11 @@ struct MoveTransformInspector: View {
     @ViewBuilder private var cropSizeControls: some View {
         switch cropAspect {
         case .freeform:
-            Text("Width  \(Int(freeWidth * 100))%").font(.system(size: 18))
+            Text("Width  \(Int(freeWidth * 100))%").scaledFont(18)
             Slider(value: $freeWidth, in: 0.1...1.0)
                 .accessibilityLabel("Width")
                 .accessibilityValue("\(Int(freeWidth * 100)) percent")
-            Text("Height  \(Int(freeHeight * 100))%").font(.system(size: 18))
+            Text("Height  \(Int(freeHeight * 100))%").scaledFont(18)
             Slider(value: $freeHeight, in: 0.1...1.0)
                 .accessibilityLabel("Height")
                 .accessibilityValue("\(Int(freeHeight * 100)) percent")
@@ -4582,13 +4583,13 @@ struct MoveTransformInspector: View {
                 Stepper("W \(customW)", value: $customW, in: 1...32)
                 Stepper("H \(customH)", value: $customH, in: 1...32)
             }
-            .font(.system(size: 18))
-            Text("Crop size  \(Int(cropSize * 100))%").font(.system(size: 18))
+            .scaledFont(18)
+            Text("Crop size  \(Int(cropSize * 100))%").scaledFont(18)
             Slider(value: $cropSize, in: 0.1...1.0)
                 .accessibilityLabel("Crop size")
                 .accessibilityValue("\(Int(cropSize * 100)) percent")
         default:
-            Text("Crop size  \(Int(cropSize * 100))%").font(.system(size: 18))
+            Text("Crop size  \(Int(cropSize * 100))%").scaledFont(18)
             Slider(value: $cropSize, in: 0.1...1.0)
                 .accessibilityLabel("Crop size")
                 .accessibilityValue("\(Int(cropSize * 100)) percent")
@@ -4787,13 +4788,13 @@ struct MoveTransformInspector: View {
 
     private var axisLockControls: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Straight line").font(.system(size: 18))
+            Text("Straight line").scaledFont(18)
             HStack {
                 axisLockButton(.vertical, "Up/Down only", spoken: "Up down only")
                 axisLockButton(.horizontal, "Left/Right only", spoken: "Left right only")
             }
             #if os(macOS)
-            Text("Or hold Shift while dragging.").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Or hold Shift while dragging.").scaledFont(18).foregroundStyle(.secondary)
             #endif
         }
     }
@@ -4801,7 +4802,7 @@ struct MoveTransformInspector: View {
     private func axisLockButton(_ lock: MoveAxisLock, _ title: String, spoken: String) -> some View {
         let on = axisLock == lock
         return Button { axisLock = on ? .none : lock } label: {
-            Text(title).font(.system(size: 18))
+            Text(title).scaledFont(18)
         }
         .buttonStyle(.bordered)
         .tint(on ? .accentColor : nil)
@@ -4823,7 +4824,7 @@ struct MoveTransformInspector: View {
                 if case .content = document.layers[idx].role,
                    !document.layers[idx].elements.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Snap to Canvas").font(.system(size: 18))
+                        Text("Snap to Canvas").scaledFont(18)
                         HStack {
                             Button("Fit")  { applyFitFill(.fit,  idx) }
                             Button("Fill") { applyFitFill(.fill, idx) }
@@ -4837,7 +4838,7 @@ struct MoveTransformInspector: View {
                     // the arrows do not fit the inspector, and in one row the labels were
                     // squeezed to nothing (build 334, his screen 2026-10-19).
                     Text("Scale")
-                        .font(.system(size: 18))
+                        .scaledFont(18)
                     HStack(spacing: 8) {
                         // TYPE THE NUMBER. Michael, 2026-10-19: "i need to be able to enter
                         // the scale number manually and the pixel number because the updown
@@ -4846,19 +4847,19 @@ struct MoveTransformInspector: View {
                         // the LONGER side — the same unit the arrows jog. Return commits.
                         TextField("", value: scalePercentBinding(idx),
                                   format: .number.precision(.fractionLength(0...1)))
-                            .font(.system(size: 18))
+                            .scaledFont(18)
                             .monospacedDigit()
                             .frame(width: 72)
                             .help("Scale in percent — type a value and press Return")
                             .accessibilityLabel("Scale percent")
-                        Text("%").font(.system(size: 18)).fixedSize()
+                        Text("%").scaledFont(18).fixedSize()
                         TextField("", value: scalePixelsBinding(idx), format: .number.grouping(.never))
-                            .font(.system(size: 18))
+                            .scaledFont(18)
                             .monospacedDigit()
                             .frame(width: 72)
                             .help("Size of the longer side in pixels — type a value and press Return")
                             .accessibilityLabel("Size in pixels")
-                        Text("px").font(.system(size: 18)).fixedSize()
+                        Text("px").scaledFont(18).fixedSize()
                         // JOG BY ONE PIXEL. His ask, 2026-09-15: "can you add an up down
                         // arrow to jog the scale by one pixel." The slider is deliberately
                         // unstepped (see below) and cannot be dragged finer than a few
@@ -4900,7 +4901,7 @@ struct MoveTransformInspector: View {
                 // stores and what Center sets (half the canvas reads back exactly).
                 // Spoken "Position X" / "Position Y" — three words max, his rule.
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Position (center)").font(.system(size: 18))
+                    Text("Position (center)").scaledFont(18)
                     HStack(spacing: 10) {
                         PixelNumberField(title: "X", spoken: "Position X",
                                          help: "Pixels from the canvas's left edge to the layer's center — type a value and press Return",
@@ -4913,18 +4914,18 @@ struct MoveTransformInspector: View {
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 10) {
-                        Text("Rotation").font(.system(size: 18))
+                        Text("Rotation").scaledFont(18)
                         // REM: 012 / A4 — type the angle. Tenths allowed; -180…180, the
                         // slider's own range, so the two can never disagree.
                         TextField("", value: rotationTypedBinding(idx),
                                   format: .number.precision(.fractionLength(0...1)))
-                            .font(.system(size: 18))
+                            .scaledFont(18)
                             .monospacedDigit()
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 72)
                             .help("Rotation in degrees, -180 to 180 — type a value and press Return")
                             .accessibilityLabel("Rotation degrees")
-                        Text("°").font(.system(size: 18)).fixedSize()
+                        Text("°").scaledFont(18).fixedSize()
                         Stepper(onIncrement: { jogRotation(idx, byDegrees:  1) },
                                 onDecrement: { jogRotation(idx, byDegrees: -1) }) { EmptyView() }
                             .labelsHidden()
@@ -4962,7 +4963,7 @@ struct MoveTransformInspector: View {
                     }
                     .help("Turn this layer upside down — the original stays hidden underneath")
                 }
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .buttonStyle(.bordered)
                 HStack {
                     Button("Center") {
@@ -6841,7 +6842,7 @@ struct LayerPanel: View {
             Divider()
             HStack {
                 Text("\(checkedLayerIDs.count) checked")
-                    .font(.system(size: 12))
+                    .scaledFont(12)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Uncheck") { checkedLayerIDs.removeAll(); activeLayerID = nil }
@@ -7193,7 +7194,7 @@ struct LayerRow: View {
                 if isCheckable {
                     Button(action: onToggleCheck) {
                         Image(systemName: isChecked ? "checkmark.square.fill" : "square")
-                            .font(.system(size: 15))
+                            .scaledFont(15)
                             .frame(width: 20, height: 22)
                             .contentShape(Rectangle())
                     }
@@ -7212,7 +7213,7 @@ struct LayerRow: View {
                 if groupBase != nil {
                     Button(action: onToggleGroup) {
                         Image(systemName: isCollapsed ? "chevron.forward" : "chevron.down")
-                            .font(.system(size: 13, weight: .semibold))
+                            .scaledFont(13, weight: .semibold)
                             .frame(width: 16, height: 22)   // a real target, not a 13pt glyph
                             .contentShape(Rectangle())
                     }
@@ -7232,7 +7233,7 @@ struct LayerRow: View {
                     .frame(width: 18)
                     .foregroundStyle(.secondary)
                 Text(layer.name)
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
                     // SHRINK TO FIT, 18 → 10 pt — his explicit exception to the 18 pt rule,
                     // 2026-10-04: "shrink to fit with a minimum of 10? because it gets bigger
@@ -7241,7 +7242,7 @@ struct LayerRow: View {
                     .minimumScaleFactor(10.0 / 18.0)
                 if layer.linkGroup != nil {
                     Image(systemName: "link")
-                        .font(.system(size: 12))
+                        .scaledFont(12)
                         .foregroundStyle(.secondary)
                         .help("Linked — moves with its partners")
                 }
@@ -7256,14 +7257,14 @@ struct LayerRow: View {
                         .frame(width: 18)
                         .foregroundStyle(.secondary)
                     Text(layer.name)
-                        .font(.system(size: 18))
+                        .scaledFont(18)
                         .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
                         // SHRINK TO FIT, 18 → 10 pt — his explicit exception (see macOS twin).
                         .lineLimit(1)
                         .minimumScaleFactor(10.0 / 18.0)
                     if layer.linkGroup != nil {
                         Image(systemName: "link")
-                            .font(.system(size: 12))
+                            .scaledFont(12)
                             .foregroundStyle(.secondary)
                             .help("Linked — moves with its partners")
                     }
@@ -7278,7 +7279,7 @@ struct LayerRow: View {
             // count is to say what you cannot see, so it would be noise when open.
             if isCollapsed, hiddenCount > 0 {
                 Text("\(hiddenCount)")
-                    .font(.system(size: 15, weight: .medium))
+                    .scaledFont(15, weight: .medium)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 7).padding(.vertical, 2)
                     .background(Capsule().fill(Color.secondary.opacity(0.18)))
@@ -7299,7 +7300,7 @@ struct LayerRow: View {
             // separate red from green.
             Button(action: onToggleVisibility) {
                 Image(systemName: layer.isVisible ? "eye.fill" : "eye.slash.fill")
-                    .font(.system(size: 17, weight: .bold))
+                    .scaledFont(17, weight: .bold)
                     .foregroundStyle(layer.isVisible ? Color.green : Color.red)
                     .frame(width: 32, height: 26)   // a target worth aiming at
                     .contentShape(Rectangle())
@@ -7372,6 +7373,9 @@ struct RotationTicks: View {
                     Rectangle()
                         .frame(width: 1, height: mark.isMajor ? 6 : 3)
                     if mark.isMajor {
+                        // REM: 015a — the ONE fixed size left on purpose: these degree marks sit in a
+                        // 22-point ruler strip, and a larger number would spill out of it. The
+                        // typed Rotation box (012) carries the same value at the scaled size.
                         Text("\(Int(mark.degrees))")
                             .font(.system(size: 10,
                                           weight: mark.degrees == 0 ? .semibold : .regular))
@@ -7497,7 +7501,7 @@ struct ScaleTicks: View {
                     Rectangle()
                         .frame(width: 1, height: 5)
                     Text(mark.label)
-                        .font(.system(size: 11, weight: mark.scale == 1 ? .semibold : .regular))
+                        .scaledFont(11, weight: mark.scale == 1 ? .semibold : .regular)
                         .fixedSize()
                 }
                 .foregroundStyle(mark.scale == 1 ? Color.primary : Color.secondary)
@@ -7965,8 +7969,8 @@ struct MenuInvite: View {
     let title: String
     var body: some View {
         HStack(spacing: 6) {
-            Text(title).font(.system(size: 18, weight: .semibold))
-            Image(systemName: "chevron.down").font(.system(size: 18, weight: .semibold))
+            Text(title).scaledFont(18, weight: .semibold)
+            Image(systemName: "chevron.down").scaledFont(18, weight: .semibold)
         }
     }
 }
@@ -7988,13 +7992,13 @@ struct InfoTip: View {
     }
 
     var body: some View {
-        Button { shown.toggle() } label: { Image(systemName: "info.circle").font(.system(size: 18)) }
+        Button { shown.toggle() } label: { Image(systemName: "info.circle").scaledFont(18) }
             .buttonStyle(.plain).foregroundStyle(.secondary)
             .help(help)
             .accessibilityLabel(label ?? help)
             .popover(isPresented: $shown) {
                 Text(text)
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(width: 320)
                     .padding()
@@ -8045,9 +8049,9 @@ struct ExportSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Export").font(.system(size: 22, weight: .semibold))
+            Text("Export").scaledFont(22, weight: .semibold)
             HStack(spacing: 10) {
-                Text("Format").font(.system(size: 18)).foregroundStyle(.secondary)
+                Text("Format").scaledFont(18).foregroundStyle(.secondary)
                 Picker("Format", selection: $choice) {
                     ForEach(ExportFormat.allCases) { f in Text(f.rawValue).tag(Choice.file(f)) }
                     #if os(macOS)
@@ -8057,30 +8061,30 @@ struct ExportSheet: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .fixedSize()            // one line — a long format name must never wrap
                 Spacer()
             }
             if format == .gifAnimated {
                 let n = flipbookFrameLayers(document, cameraOnly: gifCameraOnly).count
                 if !document.cameraFrames.isEmpty {
-                    Toggle("Camera frames only", isOn: $gifCameraOnly).font(.system(size: 18))
+                    Toggle("Camera frames only", isOn: $gifCameraOnly).scaledFont(18)
                 }
                 Text((gifCameraOnly
                       ? "Each Camera frame is one frame, in shot order."
                       : "Each layer with artwork is one frame, bottom to top — a flipbook. "
                         + "Hidden layers are included; Light and Dark are left out.")
                      + " \(n) frame\(n == 1 ? "" : "s").")
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Int(gifFPS)) frames a second").font(.system(size: 18))
+                    Text("\(Int(gifFPS)) frames a second").scaledFont(18)
                     Slider(value: $gifFPS, in: 1...24, step: 1)
                         .accessibilityLabel("Frames per second")
                         .accessibilityValue("\(Int(gifFPS))")
                 }
-                Toggle("Loop", isOn: $gifLoop).font(.system(size: 18))
+                Toggle("Loop", isOn: $gifLoop).scaledFont(18)
             }
             if format == .gif3DText {
                 // 3D TEXT LOOP (Text3D.swift): one full turn or swing, whole picture.
@@ -8088,16 +8092,16 @@ struct ExportSheet: View {
                 Text(moving.isEmpty
                      ? "No moving 3D text. In the Text tool, turn on 3D letters and choose Spin or Wiggle."
                      : "One full turn or swing of the 3D text, the whole picture in every frame.")
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Int(gifFPS)) frames a second").font(.system(size: 18))
+                    Text("\(Int(gifFPS)) frames a second").scaledFont(18)
                     Slider(value: $gifFPS, in: 1...24, step: 1)
                         .accessibilityLabel("Frames per second")
                         .accessibilityValue("\(Int(gifFPS))")
                 }
-                Toggle("Loop", isOn: $gifLoop).font(.system(size: 18))
+                Toggle("Loop", isOn: $gifLoop).scaledFont(18)
             }
             if format == .pdfLayers {
                 Toggle("Flatten transparency onto a matte", isOn: $flattenMatte)
@@ -8112,11 +8116,11 @@ struct ExportSheet: View {
                 Text("\(n) visible layer\(n == 1 ? "" : "s"), bottom layer at the back. "
                      + "Apple TV uses 2 to 5 layers, with a solid back layer."
                      + (n < 2 || n > 5 ? " This project is outside that." : ""))
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(n < 2 || n > 5 ? .orange : .secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Tilt preview. Hover or drag to tilt.")
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(.secondary)
                 ParallaxTiltPreview(document: document)
             }
@@ -8144,7 +8148,7 @@ struct ExportSheet: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
             }
-            .font(.system(size: 18))
+            .scaledFont(18)
         }
         .padding(20)
         #if os(iOS)
@@ -8716,14 +8720,14 @@ struct AboutView: View {
                     .frame(width: 128, height: 128)
                     .padding(.top, 24)
                 Text("Image Producer")
-                    .font(.system(size: 40, weight: .semibold, design: .serif))
+                    .scaledFont(40, weight: .semibold, design: .serif)
                     .multilineTextAlignment(.center)
                 Text("GRAPHIC ARTS")
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .tracking(4)
                     .foregroundStyle(.secondary)
                 Text(appVersionLine)
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(.secondary)
 
                 Divider().padding(.vertical, 6)
@@ -8758,7 +8762,7 @@ struct AboutView: View {
         }
         .overlay(alignment: .topTrailing) {
             Button("Done") { dismiss() }
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .padding()
         }
         #if os(macOS)
@@ -8781,7 +8785,7 @@ struct AboutView: View {
     private func section<Content: View>(_ title: String,
                                         @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.system(size: 20, weight: .semibold))
+            Text(title).scaledFont(20, weight: .semibold)
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -8790,14 +8794,14 @@ struct AboutView: View {
 
     private func linkRow(_ label: String, _ shown: String, _ url: URL) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(label).font(.system(size: 18)).foregroundStyle(.secondary)
+            Text(label).scaledFont(18).foregroundStyle(.secondary)
                 .frame(width: 100, alignment: .leading)
-            Link(shown, destination: url).font(.system(size: 18))
+            Link(shown, destination: url).scaledFont(18)
         }
     }
 
     private func para(_ text: String) -> some View {
-        Text(text).font(.system(size: 18))
+        Text(text).scaledFont(18)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -8836,11 +8840,11 @@ struct StatusBar: View {
         HStack(spacing: 8) {
             Image(systemName: window.status?.systemImage ?? "circle.dashed")
                 .foregroundStyle(tint)
-                .font(.system(size: 12, weight: .semibold))
+                .scaledFont(12, weight: .semibold)
                 .frame(width: 16)
 
             Text(window.status?.text ?? "Ready")
-                .font(.system(size: 12))
+                .scaledFont(12)
                 .foregroundStyle(window.status == nil || faded ? .secondary : .primary)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -8849,7 +8853,7 @@ struct StatusBar: View {
 
             if let note = window.status {
                 Text(Self.clock.string(from: note.at))
-                    .font(.system(size: 11).monospacedDigit())
+                    .scaledFont(11, monospacedDigit: true)
                     .foregroundStyle(.secondary)
             }
         }

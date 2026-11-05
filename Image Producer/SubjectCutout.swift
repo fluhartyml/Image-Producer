@@ -171,7 +171,7 @@ struct RemoveBackgroundInspector: View {
                 if let n = instanceCount, n > 1 {
                     Divider()
                     Text("Found \(n) separate subjects. Pick the ones to keep.")
-                        .font(.system(size: 18))
+                        .scaledFont(18)
                     InfoTip("More about this", label: "Subjects info", "A lighthouse standing on a cliff often comes back as one piece — the model sees them as a single connected object. Where it splits them, this is where you drop the half you don't want.")
 
                     ScrollView(.horizontal) {
@@ -191,7 +191,7 @@ struct RemoveBackgroundInspector: View {
                 }
 
                 if let problem {
-                    Text(problem).font(.system(size: 18)).foregroundStyle(.red)
+                    Text(problem).scaledFont(18).foregroundStyle(.red)
                 }
 
                 InfoTip("More about this", label: "Cutout info", "The cutout lands on a new layer above this one. The original is hidden, not replaced.")
@@ -216,10 +216,10 @@ struct RemoveBackgroundInspector: View {
                 if let d = previews[i], let pi = PlatformImage(data: d) {
                     Image(platformImage: pi).resizable().scaledToFit().frame(width: 84, height: 84)
                 } else {
-                    Image(systemName: "square.dashed").font(.system(size: 32))
+                    Image(systemName: "square.dashed").scaledFont(32)
                         .frame(width: 84, height: 84)
                 }
-                Text("\(i + 1)").font(.system(size: 18))
+                Text("\(i + 1)").scaledFont(18)
             }
             .padding(6)
             .background(isOn ? Color.accentColor.opacity(0.25) : Color.clear)
@@ -325,7 +325,7 @@ struct MagicLassoInspector: View {
                 InfoTip("More about this", label: "Magic Lasso info", "Click a region on the canvas and it clears, so the layer below shows through. Hover first — the area that will go is highlighted in red.")
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Tolerance  \(Int(pen.lassoTolerance))").font(.system(size: 18))
+                    Text("Tolerance  \(Int(pen.lassoTolerance))").scaledFont(18)
                     Slider(value: $pen.lassoTolerance, in: 0...160, step: 1)
                         .accessibilityLabel("Tolerance")
                     InfoTip("More about this", label: "Tolerance info", "How different a pixel can be from the one you clicked and still go. Low stops at the faintest line. High walks through a soft sky or a gradient.")
@@ -334,7 +334,7 @@ struct MagicLassoInspector: View {
                 InfoTip("More about this", label: "Clicking info", "Click as many times as you need — sky, then ocean, then the rock. They all go on one layer rather than stacking a new one each click, and History steps back through them one at a time.")
 
                 Text("Your original layer is kept and hidden, never overwritten.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                    .scaledFont(18).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding()

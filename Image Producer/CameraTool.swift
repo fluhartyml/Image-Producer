@@ -138,7 +138,7 @@ struct CopiedPopup: View {
         ZStack {
             if showing {
                 Label("Copied", systemImage: "doc.on.clipboard")
-                    .font(.system(size: 18, weight: .semibold))
+                    .scaledFont(18, weight: .semibold)
                     .padding(.horizontal, 18).padding(.vertical, 10)
                     .background(.regularMaterial, in: Capsule())
                     .shadow(radius: 8)
@@ -315,14 +315,14 @@ struct CameraInspector: View {
             // Always says what happened. Landing on an inspector that does not confirm
             // the capture is the same failure shape as a Done button reporting nothing.
             Text(camera.lastResult ?? "No frames captured yet.")
-                .font(.system(size: 17))
+                .scaledFont(17)
                 .foregroundStyle(camera.lastResult == nil ? .secondary : .primary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Button {
                 captureCameraFrame(document, camera: camera, fileURL: fileURL)
             } label: {
-                Label("Capture", systemImage: "camera").font(.system(size: 18))
+                Label("Capture", systemImage: "camera").scaledFont(18)
             }
             .buttonStyle(.borderedProminent)
 
@@ -330,12 +330,12 @@ struct CameraInspector: View {
 
             // ── What a press captures
             Group {
-                Text("Capture").font(.system(size: 17, weight: .semibold))
+                Text("Capture").scaledFont(17, weight: .semibold)
                 Toggle("Include background", isOn: $camera.includeBackground)
                 Text(camera.includeBackground
                      ? "Bakes in whichever of Light/Dark is showing."
                      : "Transparent stamp of just the art.")
-                    .font(.system(size: 14)).foregroundStyle(.secondary)
+                    .scaledFont(14).foregroundStyle(.secondary)
 
                 Picker("Scale", selection: $camera.scale) {
                     Text("1×").tag(1.0); Text("2×").tag(2.0); Text("4×").tag(4.0)
@@ -349,35 +349,35 @@ struct CameraInspector: View {
                 Text(camera.exposures == 1
                      ? "On 1s — a new drawing every beat."
                      : "On \(camera.exposures)s — limited animation. Anime runs about 8 drawings a second by holding each for three.")
-                    .font(.system(size: 14)).foregroundStyle(.secondary)
+                    .scaledFont(14).foregroundStyle(.secondary)
             }
 
             Divider()
 
             // ── Stop motion
             Group {
-                Text("Stop Motion").font(.system(size: 17, weight: .semibold))
+                Text("Stop Motion").scaledFont(17, weight: .semibold)
                 Toggle("Animation mode", isOn: $camera.animationMode)
                 Text(camera.animationMode
                      ? "Move stops forking — the shutter is the commit. A nudge you did not photograph is gone."
                      : "Move keeps its own hidden copy of each placement.")
-                    .font(.system(size: 14)).foregroundStyle(.secondary)
+                    .scaledFont(14).foregroundStyle(.secondary)
                 Text("\(shotCount) shot · \(frameCount) frame\(frameCount == 1 ? "" : "s") total")
-                    .font(.system(size: 15)).foregroundStyle(.secondary)
+                    .scaledFont(15).foregroundStyle(.secondary)
             }
 
             Divider()
 
             // ── Lightbox — display only, never captured
             Group {
-                Text("Lightbox").font(.system(size: 17, weight: .semibold))
+                Text("Lightbox").scaledFont(17, weight: .semibold)
                 Toggle("Onion skin", isOn: $camera.onionSkin)
                 if camera.onionSkin {
                     Stepper("Frames back: \(camera.onionFrames)",
                             value: $camera.onionFrames, in: 1...5)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Strength  \(Int(camera.onionStrength * 100))%")
-                            .font(.system(size: 15))
+                            .scaledFont(15)
                         Slider(value: $camera.onionStrength, in: 0.05...0.6)
                             .accessibilityLabel("Onion skin strength")
                             .accessibilityValue("\(Int(camera.onionStrength * 100)) percent")
@@ -389,7 +389,7 @@ struct CameraInspector: View {
 
             // ── Playback — display only
             Group {
-                Text("Playback").font(.system(size: 17, weight: .semibold))
+                Text("Playback").scaledFont(17, weight: .semibold)
                 HStack {
                     Button {
                         camera.isPlaying.toggle()
@@ -410,7 +410,7 @@ struct CameraInspector: View {
                 }
                 Toggle("Loop", isOn: $camera.loop)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Int(camera.fps)) fps").font(.system(size: 15))
+                    Text("\(Int(camera.fps)) fps").scaledFont(15)
                     Slider(value: $camera.fps, in: 1...24)
                         .accessibilityLabel("Frames per second")
                         .accessibilityValue("\(Int(camera.fps))")
@@ -419,7 +419,7 @@ struct CameraInspector: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Frame \(camera.soloFrameIndex ?? 0) of \(frameCount)"
                              + "  ·  \(document.playbackTimeline.count) beats")
-                            .font(.system(size: 15))
+                            .scaledFont(15)
                         Slider(value: Binding(
                             get: { Double(camera.soloFrameIndex ?? 1) },
                             set: {
@@ -448,7 +448,7 @@ struct CameraInspector: View {
 
             // ── In-betweens
             Group {
-                Text("In-Betweens").font(.system(size: 17, weight: .semibold))
+                Text("In-Betweens").scaledFont(17, weight: .semibold)
                 Stepper("Frames between: \(camera.tweenSteps)",
                         value: $camera.tweenSteps, in: 1...7)
                 Picker("Easing", selection: $camera.easing) {
@@ -457,7 +457,7 @@ struct CameraInspector: View {
                 InfoTip("More about this", label: "Easing info", "Linear reads as mechanical — real motion starts slow and settles.")
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Path smoothing  \(Int(camera.smoothing * 100))%")
-                        .font(.system(size: 15))
+                        .scaledFont(15)
                     Slider(value: $camera.smoothing, in: 0...1)
                         .accessibilityLabel("Path smoothing")
                         .accessibilityValue("\(Int(camera.smoothing * 100)) percent")

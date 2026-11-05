@@ -110,7 +110,7 @@ struct ZoomInspector: View {
         VStack(alignment: .leading, spacing: 16) {
 
             Toggle(isOn: $showProductionPiP) {
-                Text("Floating preview").font(.system(size: 18))
+                Text("Floating preview").scaledFont(18)
             }
             .toggleStyle(.switch)
             InfoTip("More about this", label: "Preview info", "Keeps the production preview on the canvas with ANY tool active — "

@@ -232,17 +232,17 @@ struct AdjustInspector: View {
                 ForEach(Adjustment.allCases) { a in
                     Button { document.adjustmentRequested = a } label: {
                         Label("\(a.title)…", systemImage: a.systemImage)
-                            .font(.system(size: 18))
+                            .scaledFont(18)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .buttonStyle(.bordered)
                 }
                 if document.cropMask != nil {
                     Text("Gaussian Blur stays inside the Mask.")
-                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                        .scaledFont(18).foregroundStyle(.secondary)
                 }
                 Text("The result goes on a new layer above. Your original is hidden, never overwritten.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                    .scaledFont(18).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding()
@@ -269,14 +269,14 @@ struct AdjustmentWindow<Preview: View, Controls: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.system(size: 22, weight: .semibold))
+            Text(title).scaledFont(22, weight: .semibold)
             preview
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Checkerboard())
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             controls
             if let problem {
-                Text(problem).font(.system(size: 18)).foregroundStyle(.red)
+                Text(problem).scaledFont(18).foregroundStyle(.red)
             }
             HStack {
                 Spacer()
@@ -287,7 +287,7 @@ struct AdjustmentWindow<Preview: View, Controls: View>: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(working)
             }
-            .font(.system(size: 18))
+            .scaledFont(18)
         }
         .padding(20)
         #if os(macOS)
@@ -316,7 +316,7 @@ struct AdjustmentSheetHost: View {
         } else {
             VStack(spacing: 14) {
                 Text("Select a layer that has a picture or painted pixels on it.")
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                 Button("Close", action: dismiss).keyboardShortcut(.defaultAction)
             }
             .padding(30)
@@ -351,9 +351,9 @@ struct GaussianBlurWindow: View {
         } controls: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Radius").font(.system(size: 18))
+                    Text("Radius").scaledFont(18)
                     Spacer()
-                    Text(String(format: "%.1f px", radius)).font(.system(size: 18).monospacedDigit())
+                    Text(String(format: "%.1f px", radius)).scaledFont(18, monospacedDigit: true)
                     Stepper("", value: $radius, in: 0...250, step: 0.5).labelsHidden()
                         .accessibilityLabel("Radius")
                         .accessibilityValue(String(format: "%.1f pixels", radius))
@@ -362,7 +362,7 @@ struct GaussianBlurWindow: View {
                     .accessibilityLabel("Radius")
                     .accessibilityValue(String(format: "%.1f pixels", radius))
                 if hasMask {
-                    Toggle("Only inside the Mask", isOn: $onlyInMask).font(.system(size: 18))
+                    Toggle("Only inside the Mask", isOn: $onlyInMask).scaledFont(18)
                 }
             }
         }

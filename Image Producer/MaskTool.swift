@@ -526,11 +526,11 @@ struct MaskInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Mask").font(.system(size: 18)).bold()
+            Text("Mask").scaledFont(18).bold()
 
             if document.cropMask == nil {
                 Text("No mask. The mask marks what is KEPT — everything outside it dims, and Export trims to it.")
-                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                    .scaledFont(18).foregroundStyle(.secondary)
                 Button { addMask() } label: {
                     Label("Add Mask", systemImage: "square.dashed").frame(maxWidth: .infinity)
                 }
@@ -545,7 +545,7 @@ struct MaskInspector: View {
                 // is mapped to the new box (`CropMask.fitted(to:)`). A locked corner ratio
                 // holds here too — Width moves Height and back — unless Free corners is on.
                 if let m = document.cropMask {
-                    Text("Position and size").font(.system(size: 18)).foregroundStyle(.secondary)
+                    Text("Position and size").scaledFont(18).foregroundStyle(.secondary)
                     BoxNumberFields(noun: "Mask", box: m.bounds,
                                     canvasWidth: document.canvasWidth,
                                     canvasHeight: document.canvasHeight,
@@ -566,7 +566,7 @@ struct MaskInspector: View {
     // MARK: Shape
 
     @ViewBuilder private var shapeControls: some View {
-        Text("Shape").font(.system(size: 18)).foregroundStyle(.secondary)
+        Text("Shape").scaledFont(18).foregroundStyle(.secondary)
         Picker("Shape", selection: formBinding) {
             ForEach(MaskForm.pickable, id: \.self) { f in Text(f.label).tag(f) }
             Text("Character").tag(MaskForm.glyph(currentGlyph, fontName: nil))
@@ -586,7 +586,7 @@ struct MaskInspector: View {
         if case .glyph = document.cropMask?.form {
             HStack {
                 TextField("Character", text: $glyphText)
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .frame(width: 90)
                     .onChange(of: glyphText) { _, new in
                         guard let c = new.first else { return }
@@ -614,10 +614,10 @@ struct MaskInspector: View {
     /// outline in the mask — see `SymbolMaskResolver` for why it cannot simply be drawn
     /// like a font glyph.
     @ViewBuilder private var symbolControls: some View {
-        Text("SF Symbol").font(.system(size: 18)).foregroundStyle(.secondary)
+        Text("SF Symbol").scaledFont(18).foregroundStyle(.secondary)
         HStack {
             TextField("symbol name", text: $symbolName)
-                .font(.system(size: 18))
+                .scaledFont(18)
             Button("Use") { useSymbol(symbolName) }
                 .disabled(symbolName.isEmpty)
         }
@@ -627,7 +627,7 @@ struct MaskInspector: View {
             HStack(spacing: 6) {
                 ForEach(row, id: \.self) { n in
                     Button { useSymbol(n) } label: {
-                        Image(systemName: n).font(.system(size: 18)).frame(maxWidth: .infinity)
+                        Image(systemName: n).scaledFont(18).frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .accessibilityLabel(Self.quickSymbolNames[n] ?? n)
@@ -636,7 +636,7 @@ struct MaskInspector: View {
         }
         if symbolFailed {
             Text("No symbol by that name, or nothing traceable came back. Try a filled variant — an outline-only symbol has very thin contours.")
-                .font(.system(size: 18)).foregroundStyle(.red)
+                .scaledFont(18).foregroundStyle(.red)
         }
     }
 
@@ -664,13 +664,13 @@ struct MaskInspector: View {
                 value: Binding(get: { document.cropMask?.polygonSides ?? 6 },
                                set: { document.cropMask?.polygonSides = max(3, min($0, 12)) }),
                 in: 3...12)
-            .font(.system(size: 18))
+            .scaledFont(18)
     }
 
     // MARK: Corners
 
     @ViewBuilder private var cornerControls: some View {
-        Text("Corners").font(.system(size: 18)).foregroundStyle(.secondary)
+        Text("Corners").scaledFont(18).foregroundStyle(.secondary)
         Picker("Aspect", selection: Binding(get: { document.maskRatio }, set: { document.maskRatio = $0 })) {
             ForEach(Self.ratios, id: \.0) { name, value in Text(name).tag(value) }
         }
@@ -681,11 +681,11 @@ struct MaskInspector: View {
 
         Toggle("Free corners (any angle)", isOn: Binding(get: { document.maskFreeCorners },
                                                         set: { document.maskFreeCorners = $0 }))
-            .font(.system(size: 18))
+            .scaledFont(18)
         Text(document.maskFreeCorners
              ? "Every corner moves on its own — the mask can be any four-sided shape."
              : "Corners stay square. The opposite corner stays locked while you drag.")
-            .font(.system(size: 18)).foregroundStyle(.secondary)
+            .scaledFont(18).foregroundStyle(.secondary)
     }
 
     // MARK: Plumbing

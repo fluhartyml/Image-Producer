@@ -10,7 +10,7 @@ UDID0=$(xcrun simctl list devices | grep "$SIM (" | head -1 | sed -E 's/.*\(([0-
 # The runner's data container has no fixed bundle ID to ask simctl for, so find it by folder name.
 find "$HOME/Library/Developer/CoreSimulator/Devices/$UDID0/data/Containers/Data/Application" -maxdepth 3 -type d -name ImageProducerUITestResults -exec rm -rf {} + 2>/dev/null
 caffeinate -dimsu xcodebuild test -scheme "Image Producer" -destination "platform=iOS Simulator,name=$SIM" \
-  -parallel-testing-enabled NO -only-testing:"Image ProducerUITests/Image_ProducerUITests_iPad/testShakedownIPad" \
+  -parallel-testing-enabled NO -only-testing:"Image ProducerUITests/Image_ProducerUITests_iPad/testShakedownIPad" -only-testing:"Image ProducerUITests/Image_ProducerUITests_iPad/testTextSizeIPad" \
   -resultBundlePath "/tmp/imageproducer-ipad-$(date +%H%M%S).xcresult" \
   > "$LOG" 2>&1
 OUT="UITestResults/$(date +%Y-%m-%d-%H%M)-ipad"

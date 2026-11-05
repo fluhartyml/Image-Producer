@@ -289,7 +289,7 @@ struct ToolGlyph: View {
                 .frame(width: 28, height: 28)
         } else {
             Image(systemName: tool.systemImage)
-                .font(.system(size: 18))
+                .scaledFont(18)
         }
     }
 }

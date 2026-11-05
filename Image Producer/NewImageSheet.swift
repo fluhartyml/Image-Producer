@@ -38,42 +38,42 @@ struct NewImageSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("New Image").font(.system(size: 24, weight: .semibold))
+            Text("New Image").scaledFont(24, weight: .semibold)
 
             // A file he already named (Welcome's name field) is not asked again — only an
             // automatic ImageProducerNNNN name is. His word, 2026-10-11: the second ask was
             // "being a hover mom".
             if isAutoNamed {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Name").font(.system(size: 18)).foregroundStyle(.secondary)
+                Text("Name").scaledFont(18).foregroundStyle(.secondary)
                 // The suggestion is the FILE's real name. Found 2026-10-11: a blank project he had
                 // named "Font test", reopened, offered "Untitled" — the name stored inside the file
                 // never followed the rename on disk. His words: "it wants to rename to 'untitled'
                 // instead of … 'Font test'". Empty field + Create keeps this name.
                 TextField(document.pendingNewName ?? fileName ?? document.name, text: $name)
-                    .textFieldStyle(.roundedBorder).font(.system(size: 18))
+                    .textFieldStyle(.roundedBorder).scaledFont(18)
             }
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Size in pixels").font(.system(size: 18)).foregroundStyle(.secondary)
+                Text("Size in pixels").scaledFont(18).foregroundStyle(.secondary)
                 HStack(spacing: 6) {
                     // W and H labels — his ask, 2026-10-11, so width and height can't be confused.
-                    Text("W").font(.system(size: 18)).foregroundStyle(.secondary)
+                    Text("W").scaledFont(18).foregroundStyle(.secondary)
                         .help("Width")
                     TextField("W", value: $width, format: .number)
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 90)
-                    Text("×").font(.system(size: 18))
-                    Text("H").font(.system(size: 18)).foregroundStyle(.secondary)
+                        .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 90)
+                    Text("×").scaledFont(18)
+                    Text("H").scaledFont(18).foregroundStyle(.secondary)
                         .help("Height")
                     TextField("H", value: $height, format: .number)
-                        .textFieldStyle(.roundedBorder).font(.system(size: 18)).frame(width: 90)
+                        .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 90)
                     Menu("Sizes") {
                         ForEach(sizes, id: \.label) { s in
                             Button(s.label) { width = s.w; height = s.h }
                         }
                     }
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                 }
             }
 
@@ -86,7 +86,7 @@ struct NewImageSheet: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(width < 1 || height < 1)
             }
-            .font(.system(size: 18))
+            .scaledFont(18)
         }
         .padding(24)
         .frame(minWidth: 420)

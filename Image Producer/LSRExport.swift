@@ -187,7 +187,7 @@ struct ParallaxTiltPreview: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            Toggle("Animate", isOn: $animate).font(.system(size: 18))
+            Toggle("Animate", isOn: $animate).scaledFont(18)
         }
         .onAppear { images = parallaxLayers(document).compactMap { renderLayerImage($0, in: document) } }
     }

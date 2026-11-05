@@ -197,9 +197,9 @@ struct SelectionInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Selection").font(.system(size: 18)).bold()
+            Text("Selection").scaledFont(18).bold()
 
-            Text("Shape").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Shape").scaledFont(18).foregroundStyle(.secondary)
             Picker("Shape", selection: $document.selectionShape) {
                 ForEach(SelectionShape.allCases) { s in
                     Label(s.label, systemImage: s.systemImage).tag(s)
@@ -207,19 +207,19 @@ struct SelectionInspector: View {
             }
             .pickerStyle(.menu)
             .labelsHidden()
-            .font(.system(size: 18))
+            .scaledFont(18)
             .controlSize(.large)
 
             Text(document.selectionShape.howTo)
-                .font(.system(size: 18)).foregroundStyle(.secondary)
+                .scaledFont(18).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             if document.selectionShape == .path, !document.selectionPathPoints.isEmpty {
                 HStack {
-                    Button { onClosePath() } label: { Text("Close Path").font(.system(size: 18)) }
+                    Button { onClosePath() } label: { Text("Close Path").scaledFont(18) }
                         .disabled(document.selectionPathPoints.count < 3)
                     Button(role: .destructive) { document.selectionPathPoints = [] } label: {
-                        Text("Cancel Path").font(.system(size: 18))
+                        Text("Cancel Path").scaledFont(18)
                     }
                 }
                 .controlSize(.large)
@@ -228,24 +228,24 @@ struct SelectionInspector: View {
             Divider()
 
             Button { onClear() } label: {
-                Label("Clear Inside  (Delete)", systemImage: "eraser").font(.system(size: 18)).frame(maxWidth: .infinity)
+                Label("Clear Inside  (Delete)", systemImage: "eraser").scaledFont(18).frame(maxWidth: .infinity)
             }
             .controlSize(.large)
             .disabled(document.selection == nil)
             Button { onCopy() } label: {
-                Label("Copy  (⌘C)", systemImage: "doc.on.doc").font(.system(size: 18)).frame(maxWidth: .infinity)
+                Label("Copy  (⌘C)", systemImage: "doc.on.doc").scaledFont(18).frame(maxWidth: .infinity)
             }
             .controlSize(.large)
             .disabled(document.selection == nil)
             Button { document.selection = nil; document.selectionPathPoints = [] } label: {
-                Label("Deselect  (Esc)", systemImage: "xmark.square").font(.system(size: 18)).frame(maxWidth: .infinity)
+                Label("Deselect  (Esc)", systemImage: "xmark.square").scaledFont(18).frame(maxWidth: .infinity)
             }
             .controlSize(.large)
             .disabled(document.selection == nil && document.selectionPathPoints.isEmpty)
 
             InfoTip("More about this", label: "Clear Inside info", "Clear Inside works on the selected layer: the first clear makes a new layer and hides the original (kept). Copy takes everything you see inside the ants. Drag inside the ants to move them; drag a corner to resize.")
         }
-        .font(.system(size: 18))
+        .scaledFont(18)
         .padding()
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }

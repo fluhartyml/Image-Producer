@@ -434,7 +434,7 @@ struct LayerInspector: View {
                 header
                 if dressableLayers.isEmpty {
                     Text("No artwork layers yet. These effects need something to dress.")
-                        .font(.system(size: 18))
+                        .scaledFont(18)
                         .foregroundStyle(.secondary)
                 } else {
                     if let i = targetIndex, document.layers.indices.contains(i) {
@@ -454,7 +454,7 @@ struct LayerInspector: View {
             }
             .padding(14)
             // 18 pt — his minimum. Section names, switches and pickers inherit it.
-            .font(.system(size: 18))
+            .scaledFont(18)
         }
     }
 
@@ -463,7 +463,7 @@ struct LayerInspector: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             Text("Layer…")
-                .font(.system(size: 18, weight: .semibold))
+                .scaledFont(18, weight: .semibold)
             Spacer()
             Button("Apply") {
                 if let i = targetIndex { apply(at: i) }
@@ -502,17 +502,17 @@ struct LayerInspector: View {
         DisclosureGroup(isExpanded: $showTranslucent) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("Opacity").font(.system(size: 18)).foregroundStyle(.secondary)
+                    Text("Opacity").scaledFont(18).foregroundStyle(.secondary)
                     Spacer()
                     Text(String(format: "%.0f%%", opacity.wrappedValue * 100))
-                        .font(.system(size: 18).monospacedDigit())
+                        .scaledFont(18, monospacedDigit: true)
                         .foregroundStyle(.secondary)
                 }
                 Slider(value: opacity, in: 0...1)
                     .accessibilityLabel("Layer opacity")
                     .accessibilityValue(String(format: "%.0f percent", opacity.wrappedValue * 100))
                 Text("The whole layer, artwork and glow together.")
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(.secondary)
             }
             .padding(.top, 4)
@@ -561,7 +561,7 @@ struct LayerInspector: View {
             Text(name)
             if let detail {
                 Text(detail)
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(.secondary)
             }
         }
@@ -595,7 +595,7 @@ struct LayerInspector: View {
         // REM: the label sits ABOVE the switch. Inline, a narrow panel squeezed it to
         // "St / yle" (his screen, 2026-10-31 build 349).
         VStack(alignment: .leading, spacing: 6) {
-            Text("Style").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Style").scaledFont(18).foregroundStyle(.secondary)
             Picker("Style", selection: glowBinding(i).style) {
                 ForEach(GlowStyle.allCases) { style in
                     Text(style.title).tag(style)
@@ -661,9 +661,9 @@ struct LayerInspector: View {
                                 readout: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(title).font(.system(size: 18)).foregroundStyle(.secondary)
+                Text(title).scaledFont(18).foregroundStyle(.secondary)
                 Spacer()
-                Text(readout).font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
+                Text(readout).scaledFont(18, monospacedDigit: true).foregroundStyle(.secondary)
             }
             // REM: THE CAPTION IS NOT THE SLIDER'S NAME. The title Text above is a separate
             // element, so VoiceOver, Voice Control, and Switch Control met an unnamed slider
@@ -688,7 +688,7 @@ struct LayerInspector: View {
                     let sh = document.layers[i].shadow ?? LayerShadow()
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Light angle — the shadow falls away from the dot")
-                            .font(.system(size: 18)).foregroundStyle(.secondary)
+                            .scaledFont(18).foregroundStyle(.secondary)
                         AngleDial(degrees: shadowBinding(i).angleDegrees)
                     }
                     labelledSlider("Distance", value: shadowBinding(i).distanceFraction,
@@ -698,7 +698,7 @@ struct LayerInspector: View {
                     labelledSlider("Opacity", value: shadowBinding(i).opacity,
                                    range: 0...1, readout: String(format: "%.0f%%", sh.opacity * 100))
                     HStack {
-                        Text("Color").font(.system(size: 18)).foregroundStyle(.secondary)
+                        Text("Color").scaledFont(18).foregroundStyle(.secondary)
                         Spacer()
                         Button("Black") { shadowBinding(i).wrappedValue.colorHex = "#000000" }
                             .buttonStyle(.bordered).controlSize(.small)
@@ -751,7 +751,7 @@ struct LayerInspector: View {
                 Toggle("Key this layer", isOn: greenKeyEnabled(i))
                 if document.layers[i].greenKey?.isEnabled == true {
                     Text("Color Key")
-                        .font(.system(size: 18))
+                        .scaledFont(18)
                         .foregroundStyle(.secondary)
                     greenKeySwatch(i)
                     swatches(title: "", selection: greenKeyBinding(i).colorHex)
@@ -796,7 +796,7 @@ struct LayerInspector: View {
                 .fill(Color(hex: hex) ?? .green)
                 .frame(width: 44, height: 28)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.35)))
-            Text(hex).font(.system(size: 18).monospaced()).foregroundStyle(.secondary)
+            Text(hex).scaledFont(18, monospaced: true).foregroundStyle(.secondary)
             Spacer()
         }
     }
@@ -841,10 +841,10 @@ struct LayerInspector: View {
         )
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text("Tolerance").font(.system(size: 18)).foregroundStyle(.secondary)
+                Text("Tolerance").scaledFont(18).foregroundStyle(.secondary)
                 Spacer()
                 Text("\(Int(tol.wrappedValue))")
-                    .font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
+                    .scaledFont(18, monospacedDigit: true).foregroundStyle(.secondary)
             }
             Slider(value: tol, in: 0...128)
                 .accessibilityLabel("Tolerance")
@@ -863,10 +863,10 @@ struct LayerInspector: View {
         )
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text("Softness").font(.system(size: 18)).foregroundStyle(.secondary)
+                Text("Softness").scaledFont(18).foregroundStyle(.secondary)
                 Spacer()
                 Text("\(Int(soft.wrappedValue))")
-                    .font(.system(size: 18).monospacedDigit()).foregroundStyle(.secondary)
+                    .scaledFont(18, monospacedDigit: true).foregroundStyle(.secondary)
             }
             Slider(value: soft, in: 0...128)
                 .accessibilityLabel("Softness")
@@ -892,13 +892,13 @@ struct LayerInspector: View {
                 compass(i)
                 if pristine {
                     Text("This layer is empty, so the gradient DRAWS in these two colors.")
-                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                        .scaledFont(18).foregroundStyle(.secondary)
                     swatches(title: "From", selection: gradientBinding(i).startHex)
                     swatches(title: "To", selection: gradientBinding(i).endHex)
                     blendStops(i)
                 } else {
                     Text("This layer has artwork, so the gradient FADES it by position.")
-                        .font(.system(size: 18)).foregroundStyle(.secondary)
+                        .scaledFont(18).foregroundStyle(.secondary)
                     opacityEnds(i)
                 }
             }
@@ -936,7 +936,7 @@ struct LayerInspector: View {
                                             [.w,  nil, .e],
                                             [.sw, .s, .se]]
         VStack(alignment: .leading, spacing: 6) {
-            Text("Direction").font(.system(size: 18)).foregroundStyle(.secondary)
+            Text("Direction").scaledFont(18).foregroundStyle(.secondary)
             VStack(spacing: 4) {
                 ForEach(0..<3, id: \.self) { r in
                     HStack(spacing: 4) {
@@ -946,7 +946,7 @@ struct LayerInspector: View {
                                     gradientBinding(i).wrappedValue.direction = dir
                                 } label: {
                                     Text(dir.label)
-                                        .font(.system(size: 18, weight: .semibold))
+                                        .scaledFont(18, weight: .semibold)
                                         .frame(width: 48, height: 34)
                                         .background(RoundedRectangle(cornerRadius: 5)
                                             .fill(dir == current
@@ -1011,7 +1011,7 @@ struct LayerInspector: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 Text(current.blurb)
-                    .font(.system(size: 18))
+                    .scaledFont(18)
                     .foregroundStyle(.secondary)
                 if current != .normal {
                     let strength = Binding<Double>(

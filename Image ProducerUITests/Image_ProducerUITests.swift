@@ -83,7 +83,7 @@ final class Image_ProducerUITests: XCTestCase {
     }
 
     func button(_ label: String) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch
+        app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != 'canvas.element'", label)).firstMatch
     }
 
     @discardableResult
@@ -310,6 +310,49 @@ final class Image_ProducerUITests: XCTestCase {
                   String(format: "center %.1f, %.1f px", p.x * p.w, p.y * p.h))
         }
         commitMove()
+
+        // 013 — A5: the canvas is one VoiceOver element named "Canvas" (an image, not a button —
+        // the Canvas TOOL tile is the button of that name).
+        let canvasEl = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'canvas.element' AND label == 'Canvas'")).firstMatch
+        check("013", "The canvas is one element named Canvas", canvasEl.waitForExistence(timeout: 5))
+        snapshot("05-canvas-element")
+
+        // 014 — A6: pixel cursor. Pen, three Rights, Space twice → after the pause, ONE new
+        // "(Pixel n)" layer (two presses close together are one stroke, one History step).
+        press("Pixel Pen"); sleep(1)
+        let before = probe()
+        for _ in 0..<3 { app.typeKey(XCUIKeyboardKey.rightArrow.rawValue, modifierFlags: []) }
+        app.typeKey(" ", modifierFlags: []); app.typeKey(XCUIKeyboardKey.rightArrow.rawValue, modifierFlags: [])
+        app.typeKey(" ", modifierFlags: [])
+        sleep(3)
+        if let b = before, let a = probe() {
+            check("014", "Arrows + Space paint by keyboard: one stroke, one new pixel layer",
+                  a.layers == b.layers + 1 && a.active.contains("(Pixel"),
+                  "layers \(b.layers) → \(a.layers), active \(a.active)")
+        } else {
+            check("014", "Arrows + Space paint by keyboard: one stroke, one new pixel layer", false, "probe unreadable")
+        }
+        snapshot("06-pixel-cursor"); audit("Pixel Pen with cursor")
+
+        // 015 — A7: walk every tool by its spoken name; each must become the selected tool.
+        let tools = ["Canvas", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
+                     "Pixel Pen", "Eraser", "Eyedropper", "Text", "Symbol", "Image",
+                     "Image Playground", "Layer", "Remove Background", "Magic Lasso", "Adjust",
+                     "Zoom", "Camera"]
+        var missed: [String] = []
+        for t in tools {
+            let b = button(t)
+            guard b.waitForExistence(timeout: 3) else { missed.append("\(t) (not found)"); continue }
+            b.click(); sleep(1)
+            if app.sheets.firstMatch.exists || app.alerts.firstMatch.exists {
+                app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: []); sleep(1)
+            }
+            if !button(t).isSelected { missed.append(t) }
+        }
+        check("015", "Every tool picked by its spoken name shows as selected (\(tools.count) tools)",
+              missed.isEmpty, missed.isEmpty ? "all \(tools.count)" : "missed: \(missed.joined(separator: ", "))")
+        audit("After the tool walk")
     }
 }
 #endif
