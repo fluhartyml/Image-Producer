@@ -11,6 +11,8 @@
 //  an alpha layer even with no clear pixels."
 //
 
+// REM: Mac only (AppKit). Guarded 11-04 so the iPad simulator shakedown can build the test targets.
+#if os(macOS)
 import Testing
 import AppKit
 @testable import Image_Producer
@@ -110,3 +112,4 @@ struct IconSetExportTests {
         #expect(light.hasAlpha == false && dark.hasAlpha == false)
     }
 }
+#endif

@@ -14,6 +14,9 @@
 
 import XCTest
 
+#if os(macOS)
+// REM: Mac only — it drives the menu bar and the mouse. The iPad's own shakedown is
+// Image_ProducerUITests_iPad.swift (his ask 11-04: "write the ipad shakedown and run it").
 final class Image_ProducerUITests: XCTestCase {
     var app: XCUIApplication!
 
@@ -292,3 +295,4 @@ final class Image_ProducerUITests: XCTestCase {
         commitMove()
     }
 }
+#endif

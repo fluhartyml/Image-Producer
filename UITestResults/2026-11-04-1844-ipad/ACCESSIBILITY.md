@@ -1,0 +1,293 @@
+# Accessibility audit (iPad)
+
+### Launch — 0 issue(s)
+
+### Editor (Canvas tool) — 69 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Pixel Pen' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Camera' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color Palette' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Project name info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Size info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Size rule info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Bleed info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Safe margin info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Crop marks info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Registration info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color mode info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Export info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'in' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '18:42:08' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'H' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Canvas' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Print PDF (bleed + marks)' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Dimensions & Resolution' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Bleed' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Safe margin' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Background' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Pixels' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'in' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Size rule' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Print setup' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Project name' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '×' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'W' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'New image: Untitled, W 1024 × H 1024' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Crop / trim marks' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Export' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 '' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 '' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Resolution' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'PPI' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 '' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'W 14.22 × H 14.22 in' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Web folder (PNG @1x/2x/3x)' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Color' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Print size' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Landscape' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 '' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Common resolutions' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 '' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 '' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Registration marks' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Canvas size presets' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 131072) · 49 '' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 131072) · 49 '' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 131072) · 49 '' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New image: Untitled, W 1024 × H 1024' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '18:42:08' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Web folder (PNG @1x/2x/3x)' · Contrast failed
+
+### Color Palette — 37 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Pixel Pen' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Camera' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Palette info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New image: Untitled, W 1024 × H 1024' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '18:42:08' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Add color' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Remove' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Save Palette' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Load Palette' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Color Palette' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Active color' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '#000000' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Save Palette' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'New image: Untitled, W 1024 × H 1024' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '18:42:08' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Load Palette' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Palette — 8 colors' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Remove' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Add color' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Background' · Dynamic Type font sizes are unsupported
+
+### Move / Transform — 88 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Pixel Pen' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Camera' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color Palette' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Autosaved — 62 KB' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '18:42:53' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Fit' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Fill' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '¼' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '½' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '¾' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '1.5' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '2' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '2.5' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '3' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-180' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-135' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-90' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-45' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '45' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '90' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '135' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '180' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Center' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Reset' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Apply' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Flip Horizontal' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Flip Vertical' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '135' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'px' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '18:42:53' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '½' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Scale' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '90' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Move / Transform' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-90' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '1' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '45' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Straight line' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Layer: Layer 6' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Size in pixels' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '¾' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '%' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-135' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-180' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Aspect ratio' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '2' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Autosaved — 62 KB' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Crop' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Scale percent' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '1.5' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '¼' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Flip Horizontal' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '°' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '3' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Position (center)' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Position Y' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '2.5' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Snap to Canvas' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Rotation degrees' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '0' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '180' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-45' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Flip Vertical' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Position X' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Rotation' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+
+### Move / Transform after drags — 88 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Pixel Pen' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Camera' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color Palette' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '18:44:01' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Size in pixels' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Position X' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Rotation' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Move / Transform' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Rotation degrees' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Flip Horizontal' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '¼' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Scale percent' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Position (center)' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Layer: Layer 6 (Move 2)' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'px' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '90' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '%' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '½' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '2.5' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-45' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '°' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '¾' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '1.5' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-180' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Autosaved — 123 KB' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 49 'Position Y' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Crop' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '45' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-135' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '180' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '1' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '3' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Snap to Canvas' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '135' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Scale' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '2' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Flip Vertical' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Aspect ratio' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 'Straight line' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '0' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-90' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '18:44:01' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Fit' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Fill' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '¼' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '½' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '¾' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '1.5' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '2' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '2.5' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '3' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-180' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-135' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-90' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-45' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '45' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '90' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '135' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '180' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Center' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Reset' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Apply' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Flip Horizontal' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Flip Vertical' · Contrast failed

@@ -1,0 +1,236 @@
+Optional(Attributes: Application, 0x10e350000, pid: 67436, label: 'Image Producer'
+Element subtree:
+ →Application, 0x10e350000, pid: 67436, label: 'Image Producer'
+    Window (Main), 0x10e351b80, {{0.0, 0.0}, {1376.0, 1032.0}}
+      Other, 0x10e350f00, {{0.0, 0.0}, {1376.0, 1032.0}}
+        Other, 0x10e350280, {{0.0, 0.0}, {1376.0, 1032.0}}
+          Other, 0x10e3508c0, {{0.0, 0.0}, {1376.0, 1032.0}}
+            NavigationBar, 0x10e351a40, {{0.0, 32.0}, {1376.0, 54.0}}, identifier: 'Untitled'
+              Button, 0x10e350140, {{10.0, 32.0}, {44.0, 44.0}}, identifier: 'BackButton', label: 'Back'
+              Button, 0x10e3512c0, {{66.0, 37.5}, {57.5, 18.5}}, label: 'Untitled'
+              StaticText, 0x10e3503c0, {{66.0, 55.5}, {54.5, 15.0}}, label: 'Build 366'
+              Button, 0x10e350b40, {{1214.0, 36.0}, {37.5, 36.0}}, label: 'Export'
+              Button, 0x10e351900, {{1267.5, 36.0}, {38.5, 36.0}}, label: 'Share'
+              Button, 0x10e350a00, {{1322.0, 36.0}, {40.0, 36.0}}, label: 'About Image Producer'
+            Other, 0x10e350500, {{0.0, 0.0}, {1376.0, 1032.0}}
+              Other, 0x10e351400, {{0.0, 0.0}, {1376.0, 1032.0}}
+                Other, 0x10e351680, {{0.0, 0.0}, {1376.0, 1032.0}}
+                  Other, 0x10e351540, {{0.0, 0.0}, {1376.0, 1032.0}}
+                    Other, 0x10261a580, {{0.0, 0.0}, {1376.0, 1032.0}}
+                      Other, 0x1027ac3c0, {{0.0, 0.0}, {1376.0, 1032.0}}
+                        Other, 0x1027aca00, {{0.0, 0.0}, {1376.0, 1032.0}}
+                          Other, 0x10e3e6f80, {{0.0, 86.0}, {688.0, 794.5}}
+                          Image, 0x10e3e61c0, {{706.5, 99.5}, {23.5, 23.5}}, identifier: 'arrow.up.and.down.and.arrow.left.and.right', label: 'Up, Down, Left, And Right Arrows'
+                          StaticText, 0x10e3e6080, {{740.0, 98.0}, {159.0, 24.0}}, label: 'Move / Transform'
+                          SegmentedControl, 0x10e3e66c0, {{1109.0, 94.0}, {258.5, 31.0}}, label: 'Panel'
+                            Button, 0x10e3e6bc0, {{1109.0, 94.0}, {129.0, 32.0}}, label: 'Layers', Selected
+                            Button, 0x10e3e6d00, {{1238.0, 94.0}, {130.0, 32.0}}, label: 'History'
+                          StaticText, 0x10e3e6e40, {{740.0, 123.0}, {113.0, 21.5}}, label: 'Layer: Layer 6'
+                          Image, 0x10e3e5e00, {{16.0, 155.5}, {656.0, 656.0}}
+                          Image, 0x10e3e70c0, {{16.0, 155.5}, {656.0, 656.0}}
+                          Other, 0x10e3e6a80, {{16.0, 155.5}, {656.0, 656.0}}, identifier: 'uitest.canvas', label: 'Test probe w=1024 h=1024 layers=6 hidden=0 active=Layer 6 x=0.5000 y=0.5000'
+                          ScrollView, 0x10e3e5f40, {{688.5, 153.0}, {412.0, 832.0}}
+                            Other, 0x10e3e6800, {{688.5, 153.0}, {412.0, 841.5}}
+                              StaticText, 0x10e3e6940, {{704.5, 169.0}, {41.0, 21.5}}, label: 'Crop'
+                              StaticText, 0x10e3e6300, {{704.5, 198.5}, {97.5, 21.5}}, label: 'Aspect ratio'
+                              Button, 0x10e3e7e80, {{704.5, 228.0}, {98.5, 34.5}}, label: 'Aspect, Original'
+                                StaticText, 0x10e3e7c00, {{716.5, 235.0}, {58.5, 20.5}}, label: 'Original'
+                              StaticText, 0x10dd13200, {{704.5, 299.0}, {96.0, 21.5}}, label: 'Straight line'
+                              Button, 0x10dd13480, {{704.5, 324.5}, {136.5, 35.5}}, label: 'Up down only'
+                              Button, 0x10dd13c00, {{849.0, 324.5}, {140.5, 35.5}}, label: 'Left right only'
+                              StaticText, 0x10dd13ac0, {{704.5, 378.0}, {125.5, 21.5}}, label: 'Snap to Canvas'
+                              Button, 0x10dd13340, {{704.5, 403.5}, {43.0, 34.5}}, label: 'Fit'
+                              Button, 0x10dd13e80, {{755.5, 403.5}, {45.0, 34.5}}, label: 'Fill'
+                              Button, 0x10dd13840, {{706.0, 443.5}, {18.0, 18.0}}, identifier: 'info.circle', label: 'Fit info'
+                              StaticText, 0x10dd13980, {{704.5, 481.0}, {44.0, 21.5}}, label: 'Scale'
+                              TextField, 0x10dd13700, {{704.5, 511.0}, {72.0, 23.0}}, label: 'Scale percent', value: 100
+                              StaticText, 0x10dd130c0, {{784.5, 511.8}, {16.5, 21.5}}, label: '%'
+                              TextField, 0x10dd135c0, {{809.0, 511.0}, {72.0, 23.0}}, label: 'Size in pixels', value: 1024
+                              StaticText, 0x10e495040, {{889.0, 511.8}, {19.5, 21.5}}, label: 'px'
+                              Stepper, 0x10e495e00, {{916.5, 506.5}, {94.0, 32.0}}, label: 'Scale', value: 100 percent
+                                Button, 0x10e4948c0, {{916.5, 506.5}, {47.0, 32.0}}, identifier: 'Decrement', label: 'Scale, Decrement', value: 100 percent
+                                Button, 0x10e494000, {{963.5, 506.5}, {47.0, 32.0}}, identifier: 'Increment', label: 'Scale, Increment', value: 100 percent
+                              Slider, 0x10e494280, {{704.5, 542.5}, {380.0, 31.0}}, label: 'Scale', value: 100 percent
+                              StaticText, 0x10e494dc0, {{709.0, 585.2}, {9.0, 13.5}}, label: '¼'
+                              StaticText, 0x10e494a00, {{769.1, 585.2}, {9.5, 13.5}}, label: '½'
+                              StaticText, 0x10e494640, {{829.2, 585.2}, {10.0, 13.5}}, label: '¾'
+                              StaticText, 0x10e4957c0, {{891.5, 585.2}, {6.0, 13.5}}, label: '1'
+                              StaticText, 0x10e495cc0, {{917.2, 585.2}, {15.0, 13.5}}, label: '1.5'
+                              StaticText, 0x10e495540, {{951.3, 585.2}, {7.0, 13.5}}, label: '2'
+                              StaticText, 0x10e494500, {{976.8, 585.2}, {16.5, 13.5}}, label: '2.5'
+                              StaticText, 0x10e497200, {{1011.7, 585.2}, {7.0, 13.5}}, label: '3'
+                              StaticText, 0x10e494b40, {{704.5, 619.5}, {133.0, 21.5}}, label: 'Position (center)'
+                              TextField, 0x10e496bc0, {{704.5, 668.5}, {84.0, 34.0}}, label: 'Position X', value: 512
+                              TextField, 0x10e495f40, {{798.5, 668.5}, {84.0, 34.0}}, label: 'Position Y', value: 512
+                              StaticText, 0x10e494780, {{704.5, 726.8}, {67.0, 21.5}}, label: 'Rotation'
+                              TextField, 0x10e496a80, {{781.5, 720.5}, {72.0, 34.0}}, label: 'Rotation degrees', value: 0
+                              StaticText, 0x10e495400, {{863.5, 726.8}, {8.0, 21.5}}, label: '°'
+                              Stepper, 0x10e4961c0, {{881.5, 721.5}, {94.0, 32.0}}, label: 'Rotation', value: 0 degrees
+                                Button, 0x10e495a40, {{881.5, 721.5}, {47.0, 32.0}}, identifier: 'Decrement', label: 'Rotation, Decrement', value: 0 degrees
+                                Button, 0x10e496e40, {{928.5, 721.5}, {47.0, 32.0}}, identifier: 'Increment', label: 'Rotation, Increment', value: 0 degrees
+                              Slider, 0x10e494c80, {{704.5, 758.5}, {380.0, 31.0}}, label: 'Rotation', value: 0 degrees
+                              StaticText, 0x10e497340, {{702.0, 801.5}, {23.0, 12.0}}, label: '-180'
+                              StaticText, 0x10e495680, {{747.5, 801.5}, {22.5, 12.0}}, label: '-135'
+                              StaticText, 0x10e4970c0, {{795.0, 801.5}, {18.0, 12.0}}, label: '-90'
+                              StaticText, 0x10e496580, {{840.2, 801.5}, {18.0, 12.0}}, label: '-45'
+                              StaticText, 0x10e497480, {{891.0, 801.5}, {7.0, 12.0}}, label: '0'
+                              StaticText, 0x10e497c00, {{933.2, 801.5}, {13.0, 12.0}}, label: '45'
+                              StaticText, 0x10e497840, {{978.5, 801.5}, {13.0, 12.0}}, label: '90'
+                              StaticText, 0x10e497980, {{1021.5, 801.5}, {17.5, 12.0}}, label: '135'
+                              StaticText, 0x10e497e80, {{1066.5, 801.5}, {18.0, 12.0}}, label: '180'
+                              Button, 0x10e497d40, {{704.5, 835.5}, {380.0, 34.5}}, label: 'Apply'
+                                StaticText, 0x10e4975c0, {{704.5, 835.5}, {380.0, 34.5}}, label: 'Apply'
+                                Image, 0x10e497ac0, {{861.5, 845.5}, {14.5, 14.5}}, identifier: 'checkmark', label: 'Selected', Selected
+                              Button, 0x10e497700, {{704.5, 888.0}, {172.0, 38.0}}, label: 'Flip Horizontal'
+                                StaticText, 0x10ebc4dc0, {{704.5, 888.0}, {172.0, 38.0}}, label: 'Flip Horizontal'
+                                Image, 0x10ebc4b40, {{718.5, 896.5}, {21.0, 19.5}}, identifier: 'arrow.left.and.right.righttriangle.left.righttriangle.right', label: 'Flip Horizontal'
+                              Button, 0x10ebc48c0, {{884.5, 888.0}, {149.0, 38.0}}, label: 'Flip Vertical'
+                                StaticText, 0x10ebc4500, {{884.5, 888.0}, {149.0, 38.0}}, label: 'Flip Vertical'
+                                Image, 0x10ebc4640, {{898.5, 896.5}, {19.5, 21.0}}, identifier: 'arrow.up.and.down.righttriangle.up.righttriangle.down', label: 'Flip Vertical'
+                              Button, 0x10ebc4280, {{704.5, 944.0}, {75.5, 34.5}}, label: 'Center'
+                              Button, 0x10ebc4140, {{788.0, 944.0}, {67.5, 34.5}}, label: 'Reset'
+                            Other, 0x10ebc4000, {{1067.5, 153.0}, {30.0, 832.0}}, label: 'Vertical scroll bar, 2 pages', value: 0%
+                              Other, 0x10ebc43c0, {{1094.5, 114.0}, {3.0, 36.0}}
+                            Other, 0x10ebc4a00, {{1067.5, 153.0}, {30.0, 832.0}}, label: 'Vertical scroll bar, 2 pages', value: 0%
+                              Other, 0x10ebc4780, {{1094.5, 114.0}, {3.0, 36.0}}
+                          StaticText, 0x10ebc4c80, {{1116.9, 143.5}, {53.0, 20.5}}, label: 'Layers'
+                          Button, 0x10ebc4f00, {{1343.0, 146.5}, {14.5, 14.5}}, identifier: 'plus', label: 'Add a layer'
+                          CollectionView, 0x10ebc5040, {{1101.0, 174.5}, {274.5, 810.5}}
+                            Other, 0x10ebc5540, {{1101.0, -1444.5}, {274.5, 3598.0}}
+                            Cell, 0x10ebc7c00, {{1101.0, 174.5}, {274.5, 60.0}}
+                              Other, 0x10ebc57c0, {{1101.0, 174.5}, {274.5, 60.0}}
+                                Other, 0x10ebc5680, {{1101.0, 174.5}, {274.5, 60.0}}
+                                  Other, 0x10ebc5a40, {{1101.0, 174.5}, {274.5, 60.0}}
+                                    Other, 0x10ebc5900, {{1101.0, 174.5}, {274.5, 60.0}}
+                              Other, 0x10ebc7700, {{1101.0, 174.5}, {234.5, 60.0}}
+                                Other, 0x10ebc5e00, {{1101.0, 174.5}, {234.5, 60.0}}
+                                  Other, 0x10ebc5b80, {{1101.0, 174.5}, {234.5, 60.0}}
+                                    Button, 0x10ebc5cc0, {{1117.0, 193.5}, {20.0, 22.0}}, identifier: 'square', label: 'Select layer'
+                                    Button, 0x10ebc61c0, {{1163.0, 193.0}, {122.5, 23.5}}, label: 'Layer 6'
+                                      Image, 0x10ebc5f40, {{1161.5, 194.5}, {21.0, 20.5}}, identifier: 'square.stack.3d.up', label: 'Hdr'
+                                      StaticText, 0x10ebc6080, {{1191.0, 193.8}, {60.0, 21.5}}, label: 'Layer 6'
+                                    Button, 0x10ebc6300, {{1295.5, 191.5}, {32.0, 26.0}}, identifier: 'eye.fill', label: 'Hide layer'
+                              Button, 0x10ebc66c0, {{1334.0, 182.5}, {27.0, 44.0}}, label: 'Reorder Select layer'
+                                Image, 0x10ebc6440, {{1334.0, 197.0}, {27.0, 15.0}}, identifier: 'line.horizontal.3', label: 'drag'
+                            Cell, 0x10ebc6580, {{1101.0, 234.5}, {274.5, 60.0}}
+                              Other, 0x10ebc6a80, {{1101.0, 234.5}, {274.5, 60.0}}
+                                Other, 0x10ebc6800, {{1101.0, 234.5}, {274.5, 60.0}}
+                              Other, 0x10ebc6940, {{1101.0, 234.5}, {234.5, 60.0}}
+                                Other, 0x10ebc7340, {{1101.0, 234.5}, {234.5, 60.0}}
+                                  Other, 0x10ebc6bc0, {{1101.0, 234.5}, {234.5, 60.0}}
+                                    Button, 0x10ebc5400, {{1117.0, 253.5}, {20.0, 22.0}}, identifier: 'square', label: 'Select layer'
+                                    Button, 0x10ebc52c0, {{1163.0, 255.5}, {122.5, 18.5}}, label: 'Foreground'
+                                      Image, 0x10ebc5180, {{1164.5, 257.0}, {15.5, 15.5}}, identifier: 'square.dashed', label: 'Rectangular Selection'
+                                      StaticText, 0x10ebc6d00, {{1191.0, 255.8}, {76.0, 17.5}}, label: 'Foreground'
+                                    Button, 0x10ebc6e40, {{1295.5, 251.5}, {32.0, 26.0}}, identifier: 'eye.fill', label: 'Hide layer'
+                              Button, 0x10ebc6f80, {{1334.0, 242.5}, {27.0, 44.0}}, label: 'Reorder Select layer'
+                                Image, 0x10ebc70c0, {{1334.0, 257.0}, {27.0, 15.0}}, identifier: 'line.horizontal.3', label: 'drag'
+                            Other, 0x10ebc7200, {{1191.0, 233.5}, {168.5, 1.0}}
+                            Cell, 0x10ebc75c0, {{1101.0, 294.5}, {274.5, 60.0}}
+                              Other, 0x10ebc7480, {{1101.0, 294.5}, {274.5, 60.0}}
+                                Other, 0x10ebc7840, {{1101.0, 294.5}, {274.5, 60.0}}
+                              Other, 0x10ebc7ac0, {{1101.0, 294.5}, {234.5, 60.0}}
+                                Other, 0x10ebc7980, {{1101.0, 294.5}, {234.5, 60.0}}
+                                  Other, 0x10e488000, {{1101.0, 294.5}, {234.5, 60.0}}
+                                    Button, 0x10e488140, {{1117.0, 313.5}, {20.0, 22.0}}, identifier: 'square', label: 'Select layer'
+                                    Button, 0x10e488280, {{1163.0, 315.5}, {122.5, 18.5}}, label: 'Midground'
+                                      Image, 0x10e4883c0, {{1164.5, 317.0}, {15.5, 15.5}}, identifier: 'square.dashed', label: 'Rectangular Selection'
+                                      StaticText, 0x10e488500, {{1191.0, 315.2}, {76.5, 18.5}}, label: 'Midground'
+                                    Button, 0x10e488640, {{1295.5, 311.5}, {32.0, 26.0}}, identifier: 'eye.fill', label: 'Hide layer'
+                              Button, 0x10e488780, {{1334.0, 302.5}, {27.0, 44.0}}, label: 'Reorder Select layer'
+                                Image, 0x10e4888c0, {{1334.0, 317.0}, {27.0, 15.0}}, identifier: 'line.horizontal.3', label: 'drag'
+                            Other, 0x10e488a00, {{1191.0, 293.5}, {168.5, 1.0}}
+                            Cell, 0x10e488b40, {{1101.0, 354.5}, {274.5, 60.0}}
+                              Other, 0x10e488c80, {{1101.0, 354.5}, {274.5, 60.0}}
+                                Other, 0x10e488dc0, {{1101.0, 354.5}, {274.5, 60.0}}
+                              Other, 0x10e488f00, {{1101.0, 354.5}, {234.5, 60.0}}
+                                Other, 0x10e489040, {{1101.0, 354.5}, {234.5, 60.0}}
+                                  Other, 0x10e489180, {{1101.0, 354.5}, {234.5, 60.0}}
+                                    Button, 0x10e4892c0, {{1117.0, 373.5}, {20.0, 22.0}}, identifier: 'square', label: 'Select layer'
+                                    Button, 0x10e489400, {{1163.0, 375.5}, {122.5, 18.5}}, label: 'Background'
+                                      Image, 0x10e489540, {{1164.5, 377.0}, {15.5, 15.5}}, identifier: 'square.dashed', label: 'Rectangular Selection'
+                                      StaticText, 0x10e489680, {{1191.0, 376.2}, {76.5, 16.5}}, label: 'Background'
+                                    Button, 0x10e4897c0, {{1295.5, 371.5}, {32.0, 26.0}}, identifier: 'eye.fill', label: 'Hide layer'
+                              Button, 0x10e489900, {{1334.0, 362.5}, {27.0, 44.0}}, label: 'Reorder Select layer'
+                                Image, 0x10e489a40, {{1334.0, 377.0}, {27.0, 15.0}}, identifier: 'line.horizontal.3', label: 'drag'
+                            Other, 0x10e489b80, {{1191.0, 353.5}, {168.5, 1.0}}
+                            Cell, 0x10e489cc0, {{1101.0, 414.5}, {274.5, 60.0}}
+                              Other, 0x10e489e00, {{1101.0, 414.5}, {274.5, 60.0}}
+                                Other, 0x10e489f40, {{1101.0, 414.5}, {274.5, 60.0}}
+                              Other, 0x10e48a080, {{1101.0, 414.5}, {234.5, 60.0}}
+                                Other, 0x10e48a1c0, {{1101.0, 414.5}, {234.5, 60.0}}
+                                  Other, 0x10e48a300, {{1101.0, 414.5}, {234.5, 60.0}}
+                                    Button, 0x10e48a440, {{1163.0, 434.0}, {122.5, 21.5}}, label: 'Dark'
+                                      Image, 0x10e48a580, {{1163.5, 436.0}, {17.0, 17.0}}, identifier: 'moon', label: 'Do Not Disturb'
+                                      StaticText, 0x10e48a6c0, {{1191.0, 433.8}, {38.0, 21.5}}, label: 'Dark'
+                                    Button, 0x10e48a800, {{1295.5, 431.5}, {32.0, 26.0}}, identifier: 'eye.fill', label: 'Hide layer'
+                              Button, 0x10e48a940, {{1334.0, 422.5}, {27.0, 44.0}}, label: 'Reorder Dark'
+                                Image, 0x10e48aa80, {{1334.0, 437.0}, {27.0, 15.0}}, identifier: 'line.horizontal.3', label: 'drag'
+                            Other, 0x10e48abc0, {{1191.0, 413.5}, {168.5, 1.0}}
+                            Cell, 0x10e48ad00, {{1101.0, 474.5}, {274.5, 60.0}}
+                              Other, 0x10e48ae40, {{1101.0, 474.5}, {274.5, 60.0}}
+                                Other, 0x10e48af80, {{1101.0, 474.5}, {274.5, 60.0}}
+                              Other, 0x10e48b0c0, {{1101.0, 474.5}, {234.5, 60.0}}
+                                Other, 0x10e48b200, {{1101.0, 474.5}, {234.5, 60.0}}
+                                  Other, 0x10e48b340, {{1101.0, 474.5}, {234.5, 60.0}}
+                                    Button, 0x10e48b480, {{1163.0, 494.0}, {122.5, 21.5}}, label: 'Light'
+                                      Image, 0x10e48b5c0, {{1163.0, 495.5}, {18.0, 18.0}}, identifier: 'sun.max', label: 'Brightness Higher'
+                                      StaticText, 0x10e48b700, {{1191.0, 493.8}, {40.5, 21.5}}, label: 'Light'
+                                    Button, 0x10e48b840, {{1295.5, 491.5}, {32.0, 26.0}}, identifier: 'eye.fill', label: 'Hide layer'
+                              Button, 0x10e48b980, {{1334.0, 482.5}, {27.0, 44.0}}, label: 'Reorder Light'
+                                Image, 0x10e48bac0, {{1334.0, 497.0}, {27.0, 15.0}}, identifier: 'line.horizontal.3', label: 'drag'
+                            Other, 0x10e48bc00, {{1191.0, 473.5}, {168.5, 1.0}}
+                            Other, 0x10e48bd40, {{1191.0, 533.5}, {168.5, 1.0}}
+                            Other, 0x10e48be80, {{1342.5, 174.5}, {30.0, 810.5}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                              Other, 0x10e45c000, {{1369.5, 135.5}, {3.0, 36.0}}
+                            Other, 0x10e45c140, {{1342.5, 174.5}, {30.0, 810.5}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                              Other, 0x10e45c280, {{1369.5, 135.5}, {3.0, 36.0}}
+                          Image, 0x10e45c3c0, {{15.5, 752.0}, {113.0, 113.0}}, label: 'Production icon preview at 96 points'
+                          Button, 0x10e45c500, {{646.0, 748.0}, {14.5, 14.5}}, identifier: 'arrow.up.left.and.arrow.down.right', label: 'Full-screen canvas'
+                          Button, 0x10e45c640, {{645.5, 778.0}, {15.0, 9.5}}, identifier: 'arrow.left.and.right', label: 'Fit width'
+                          Button, 0x10e45c780, {{647.0, 803.0}, {12.5, 12.5}}, identifier: 'plus', label: 'Zoom in'
+                          Button, 0x10e45c8c0, {{642.0, 823.0}, {22.0, 26.5}}, label: 'Fit screen'
+                          Button, 0x10e45ca00, {{647.0, 857.0}, {12.5, 2.0}}, identifier: 'minus', label: 'Zoom out', Disabled
+                          ScrollView, 0x10e45cb40, {{0.0, 881.0}, {688.0, 104.0}}
+                            Other, 0x10e45cc80, {{0.0, 881.0}, {492.0, 104.0}}
+                              Other, 0x10e45cdc0, {{19.5, 887.0}, {453.5, 84.0}}
+                                Button, 0x10e45cf00, {{56.0, 887.0}, {44.0, 44.0}}, identifier: 'arrow.up.and.down.and.arrow.left.and.right', label: 'Move', Selected
+                                Button, 0x10e45d040, {{19.5, 901.0}, {21.0, 16.5}}, identifier: 'photo.artframe', label: 'Canvas'
+                                Button, 0x10e45d180, {{111.0, 898.5}, {30.5, 21.0}}, identifier: 'theatermasks', label: 'Mask'
+                                Button, 0x10e45d2c0, {{168.5, 900.5}, {11.5, 17.0}}, identifier: 'pencil.tip', label: 'Pixel Pen'
+                                Button, 0x10e45d400, {{213.0, 899.5}, {19.0, 19.0}}, identifier: 'eyedropper', label: 'Eyedropper'
+                                Button, 0x10e45d540, {{260.0, 899.5}, {20.0, 19.0}}, identifier: 'star.fill', label: 'Symbol'
+                                Button, 0x10e45d680, {{308.0, 899.0}, {20.0, 20.5}}, identifier: 'apple.image.playground', label: 'Image Playground'
+                                Button, 0x10e45d7c0, {{355.5, 900.0}, {21.0, 18.0}}, identifier: 'person.and.background.dotted', label: 'Remove Background'
+                                Button, 0x10e45d900, {{405.0, 901.5}, {18.0, 15.0}}, identifier: 'slider.horizontal.3', label: 'Adjust'
+                                Button, 0x10e45da40, {{451.0, 900.5}, {22.0, 17.0}}, identifier: 'camera', label: 'Camera'
+                                Button, 0x10e45db80, {{19.5, 948.0}, {21.5, 18.0}}, identifier: 'paintpalette', label: 'Color Palette'
+                                Button, 0x10e45dcc0, {{67.5, 949.0}, {21.0, 16.5}}, identifier: 'rectangle.dashed', label: 'Selection'
+                                Button, 0x10e45de00, {{120.0, 948.0}, {12.5, 18.0}}, identifier: 'drop.fill', label: 'Paint Drop Bucket'
+                                Button, 0x10e45df40, {{165.0, 948.0}, {18.0, 18.0}}, identifier: 'eraser.fill', label: 'Eraser'
+                                Button, 0x10e45e080, {{208.0, 943.0}, {28.0, 28.0}}, label: 'Text'
+                                Button, 0x10e45e1c0, {{256.0, 943.0}, {28.0, 28.0}}, label: 'Image'
+                                Button, 0x10e45e300, {{309.0, 947.0}, {18.0, 20.0}}, identifier: 'square.3.layers.3d.middle.filled', label: 'Layer'
+                                Button, 0x10e45e440, {{354.0, 946.0}, {21.5, 22.5}}, identifier: 'lasso.badge.sparkles', label: 'Magic Lasso'
+                                Button, 0x10e45e580, {{405.5, 948.5}, {17.5, 17.5}}, identifier: 'magnifyingglass', label: 'Zoom'
+                          Image, 0x10e45e6c0, {{13.0, 993.5}, {14.5, 10.5}}, identifier: 'internaldrive', label: 'Internal Hard Drive'
+                          StaticText, 0x10e45e800, {{36.0, 991.5}, {111.0, 14.5}}, label: 'Autosaved — 62 KB'
+                          StaticText, 0x10e45e940, {{1315.0, 992.0}, {49.0, 13.5}}, label: '18:42:53'
+                      Other, 0x10e45ea80, {{0.0, 0.0}, {1376.0, 1032.0}}
+                    Button, 0x10e45ebc0, {{617.0, 506.0}, {142.0, 20.5}}, label: 'New from Import…'
+                      StaticText, 0x10e45ed00, {{617.0, 506.0}, {142.0, 20.5}}, label: 'New from Import…'
+                    Button, 0x10e45ee40, {{645.5, 506.0}, {85.5, 20.5}}, label: 'New Image'
+                      StaticText, 0x10e45ef80, {{645.5, 506.0}, {85.5, 20.5}}, label: 'New Image'
+            Toolbar, 0x10e45f0c0, {{0.0, 0.0}, {1376.0, 1032.0}}, identifier: 'Toolbar', label: 'Toolbar'
+              Other, 0x10e45f200, {{0.0, 0.0}, {1376.0, 1032.0}}
+    Window, 0x10e45f340, {{0.0, 0.0}, {1376.0, 1032.0}}
+      Other, 0x10e45f480, {{0.0, 0.0}, {1376.0, 1032.0}}
+        Other, 0x10e45f5c0, {{0.0, 0.0}, {1376.0, 1032.0}}
+Path to element:
+ →Application, 0x10e350000, pid: 67436, label: 'Image Producer'
+Query chain:
+ →Find: Target Application 'com.nightgard.Image-Producer'
+  Output: {
+    Application, 0x10e45f700, pid: 67436, label: 'Image Producer'
+  }
+)
