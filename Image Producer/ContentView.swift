@@ -8856,8 +8856,11 @@ var appShortVersion: String {
     Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
 }
 
-/// The iPad launch screen's title: the name and Xcode's version, e.g. "Image Producer 1.1".
-var launchTitle: String { "Image Producer \(appShortVersion)" }
+/// The launch screen's title: the name, Xcode's version and the build, e.g. "Image Producer 1.1 (380)".
+/// REM: Michael, 2026-11-05 09:2x, looking at the closed Duo's launch screen — "put the build
+/// number on the launch screen title". The version line at the bottom sits behind the file list
+/// on the Duo, so the title is the one place it is always seen. Build = git commit count.
+var launchTitle: String { "Image Producer \(appShortVersion) (\(appBuildNumber))" }
 
 var appVersionLine: String {
     let info = Bundle.main.infoDictionary

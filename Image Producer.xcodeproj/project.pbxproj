@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 110;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -81,15 +81,11 @@
 		};
 		C001BCFC2FE6B4F70028267A /* Image ProducerTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "Image ProducerTests";
 			sourceTree = "<group>";
 		};
 		C001BD062FE6B4F80028267A /* Image ProducerUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "Image ProducerUITests";
 			sourceTree = "<group>";
 		};
@@ -106,18 +102,24 @@
 		};
 		C001BCE52FE6B4F60028267A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C001BCF62FE6B4F70028267A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C001BD002FE6B4F80028267A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -159,7 +161,6 @@
 				A2614EC3455E6F03593F07F2 /* ThumbnailProvider.swift */,
 				586925541A8C4B0A5628D445 /* Info.plist */,
 			);
-			name = "Image Producer Thumbnail";
 			path = "Image Producer Thumbnail";
 			sourceTree = "<group>";
 		};
@@ -187,6 +188,8 @@
 			dependencies = (
 			);
 			name = "Image Producer Thumbnail";
+			packageProductDependencies = (
+			);
 			productName = "Image Producer Thumbnail";
 			productReference = 8531FD03B2FF238864F8371E /* Image Producer Thumbnail.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -209,6 +212,8 @@
 				C001BCEA2FE6B4F60028267A /* Image Producer */,
 			);
 			name = "Image Producer";
+			packageProductDependencies = (
+			);
 			productName = "Image Producer";
 			productReference = C001BCE82FE6B4F60028267A /* Image Producer.app */;
 			productType = "com.apple.product-type.application";
@@ -230,6 +235,8 @@
 				C001BCFC2FE6B4F70028267A /* Image ProducerTests */,
 			);
 			name = "Image ProducerTests";
+			packageProductDependencies = (
+			);
 			productName = "Image ProducerTests";
 			productReference = C001BCF92FE6B4F70028267A /* Image ProducerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -251,6 +258,8 @@
 				C001BD062FE6B4F80028267A /* Image ProducerUITests */,
 			);
 			name = "Image ProducerUITests";
+			packageProductDependencies = (
+			);
 			productName = "Image ProducerUITests";
 			productReference = C001BD032FE6B4F80028267A /* Image ProducerUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -310,18 +319,24 @@
 		};
 		C001BCE62FE6B4F60028267A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C001BCF72FE6B4F70028267A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C001BD012FE6B4F80028267A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
@@ -336,18 +351,24 @@
 		};
 		C001BCE42FE6B4F60028267A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C001BCF52FE6B4F70028267A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C001BCFF2FE6B4F80028267A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
@@ -376,7 +397,7 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 379;
+				CURRENT_PROJECT_VERSION = 380;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -408,7 +429,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Image Producer/Image Producer.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 379;
+				CURRENT_PROJECT_VERSION = 380;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -469,7 +490,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Image Producer/Image Producer.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 379;
+				CURRENT_PROJECT_VERSION = 380;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -644,7 +665,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 379;
+				CURRENT_PROJECT_VERSION = 380;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
@@ -670,7 +691,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 379;
+				CURRENT_PROJECT_VERSION = 380;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
@@ -695,7 +716,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 379;
+				CURRENT_PROJECT_VERSION = 380;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
@@ -720,7 +741,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 379;
+				CURRENT_PROJECT_VERSION = 380;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
@@ -746,7 +767,7 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 379;
+				CURRENT_PROJECT_VERSION = 380;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -790,6 +811,7 @@
 				C001BD0D2FE6B4F80028267A /* Debug */,
 				C001BD0E2FE6B4F80028267A /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		C001BD0A2FE6B4F80028267A /* Build configuration list for PBXNativeTarget "Image Producer" */ = {
@@ -798,6 +820,7 @@
 				C001BD0B2FE6B4F80028267A /* Debug */,
 				C001BD0C2FE6B4F80028267A /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		C001BD0F2FE6B4F80028267A /* Build configuration list for PBXNativeTarget "Image ProducerTests" */ = {
@@ -806,6 +829,7 @@
 				C001BD102FE6B4F80028267A /* Debug */,
 				C001BD112FE6B4F80028267A /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		C001BD122FE6B4F80028267A /* Build configuration list for PBXNativeTarget "Image ProducerUITests" */ = {
@@ -814,6 +838,7 @@
 				C001BD132FE6B4F80028267A /* Debug */,
 				C001BD142FE6B4F80028267A /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
