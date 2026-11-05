@@ -214,6 +214,11 @@ struct DocumentEditorRoot: View {
             // BUILD NUMBER IN THE TITLE BAR — development builds only (his rulings,
             // 2026-10-03 / 10-04). The App Store build shows just the file name.
             .developmentBuildSubtitle()
+            #if os(iOS)
+            // REM: Duo launch page (DuoLaunch.swift) — it shows only while no editor is open.
+            .onAppear { DuoLaunch.editorAppeared() }
+            .onDisappear { DuoLaunch.editorDisappeared() }
+            #endif
     }
 }
 
@@ -494,6 +499,11 @@ struct LaunchHeroOverlay: View {
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 24)
         }
+        // REM: ON THE iPHONE DUO our own launch page goes on top of this screen (DuoLaunch.swift,
+        // Mockup 001–027). Apple's screen stays underneath because it is what opens files.
+        #if os(iOS)
+        .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { DuoLaunch.showIfNeeded() } }
+        #endif
     }
 }
 #endif
