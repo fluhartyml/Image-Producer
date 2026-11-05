@@ -58,6 +58,9 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     func snapshot(_ name: String) {
         try? app.debugDescription.write(to: Self.dir.appendingPathComponent("\(name).txt"),
                                         atomically: true, encoding: .utf8)
+        // 022 — a picture of each screen too, so a run on the iPhone Duo leaves screenshots.
+        try? XCUIScreen.main.screenshot().pngRepresentation
+            .write(to: Self.dir.appendingPathComponent("\(name).png"))
     }
 
     func audit(_ screen: String) {
@@ -149,7 +152,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         // said "No location available to save" (18:38 run). Pick On My iPad first.
         if press("Browse", 5) {
             sleep(1)
-            let onMyIPad = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'On My iPad'")).firstMatch
+            let onMyIPad = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'On My iPad' OR label == 'On My iPhone'")).firstMatch
             if onMyIPad.waitForExistence(timeout: 5) { onMyIPad.tap(); sleep(1) }
         }
         let candidates = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).allElementsBoundByIndex

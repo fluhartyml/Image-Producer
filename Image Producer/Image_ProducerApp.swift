@@ -401,19 +401,7 @@ struct Image_ProducerApp: App {
             // light/dark) is clipped to the iOS app-icon superellipse so it reads as the
             // home-screen icon. The version line stays pinned at the bottom — the
             // conventional spot for a build stamp on a launch screen.
-            VStack {
-                Image("LaunchHeroIcon")
-                    .resizable()
-                    .frame(width: 96, height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .shadow(radius: 8, y: 3)
-                    .padding(.top, 44)
-                Spacer()
-                Text(appVersionLine)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 24)
-            }
+            LaunchHeroOverlay()
         }
         #endif
 
@@ -475,6 +463,36 @@ struct ClipboardCommands: Commands {
                 .keyboardShortcut("v", modifiers: .command)
             Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }
                 .keyboardShortcut("a", modifiers: .command)
+        }
+    }
+}
+#endif
+
+#if !os(macOS)
+/// The launch screen's hero icon + version line.
+/// REM: 022 iPHONE DUO PASS (his November reminder). On the Duo's compact screen the system
+/// draws the launch title higher, and the icon pinned 44 pt from the top landed ON the title
+/// ("Image [icon] ucer 1.1", Duo simulator run 11-04 20:36). The icon is decoration — the
+/// title already names the app — so it shows only where there is room: regular width (iPad,
+/// an opened Duo). Compact width keeps the title clean.
+struct LaunchHeroOverlay: View {
+    @Environment(\.horizontalSizeClass) private var widthClass
+
+    var body: some View {
+        VStack {
+            if widthClass == .regular {
+                Image("LaunchHeroIcon")
+                    .resizable()
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .shadow(radius: 8, y: 3)
+                    .padding(.top, 44)
+            }
+            Spacer()
+            Text(appVersionLine)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 24)
         }
     }
 }
