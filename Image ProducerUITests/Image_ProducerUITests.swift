@@ -5,7 +5,7 @@
 //  REM: THE SHAKEDOWN, his ask 11-04: "can you do a shake down like you do during the white hat
 //  security shakedown / inventory" — the Legend pattern. Drives the Mac app by accessibility
 //  name and keyboard (his rule: drive our apps through VoiceOver and keyboard, not screenshots),
-//  checks builds 356–359, inventories each screen (*.txt) and runs Apple's accessibility audit
+//  checks builds 355–359 and 366, inventories each screen (*.txt) and runs Apple's accessibility audit
 //  (ACCESSIBILITY.md). Launches with -ImageProducerUITest (UITestDoor.swift): the test's image
 //  lives in the app's temporary folder, not his iCloud folder; his recents and lifetime project
 //  number are untouched. Results: RESULTS.md in the runner's tmp/ImageProducerUITestResults,
@@ -298,7 +298,31 @@ final class Image_ProducerUITests: XCTestCase {
         func typeInto(_ spoken: String, _ text: String) -> Bool {
             let f = app.textFields[spoken]
             guard f.waitForExistence(timeout: 3) else { return false }
-            f.click(); f.typeKey("a", modifierFlags: .command); f.typeText(text + "\r"); sleep(1)
+            // REM 11-05 07:29 run: Rotation sat low in the inspector (y 942) and a click gave it
+            // no keyboard focus, which stopped the whole run. Scroll the inspector under the
+            // field's column until a click takes, then type; give up cleanly (a FAIL, not a crash).
+            func focused() -> Bool { (f.value(forKey: "hasKeyboardFocus") as? Bool) ?? false }
+            let win = app.windows.matching(NSPredicate(format: "title CONTAINS '.imgprd'")).firstMatch
+            for dy in [0.0, -250, -250, -250, 500, 500] {
+                if dy != 0, win.exists {
+                    win.coordinate(withNormalizedOffset: .zero)
+                        .withOffset(CGVector(dx: f.frame.midX - win.frame.minX, dy: win.frame.height * 0.5))
+                        .scroll(byDeltaX: 0, deltaY: dy)
+                    sleep(1)
+                }
+                f.click(); usleep(300_000)
+                if focused() { break }
+            }
+            guard focused() else {
+                record("| — | ⚠️ NOT TYPED | '\(spoken)' never took keyboard focus (frame \(f.frame)) |")
+                return false
+            }
+            // REM 11-05 07:35 run: "Crop width" read 922 after typing 400 — exactly the clamp a
+            // huge number hits (819 box, left edge 102 → 922 of room), so ⌘A had not selected
+            // and 400 was appended. Clear for certain: end of field, delete everything, type.
+            f.typeKey(XCUIKeyboardKey.rightArrow.rawValue, modifierFlags: .command)
+            f.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 12))
+            f.typeText(text + "\r"); sleep(1)
             return true
         }
         check("366", "Position X, Position Y and Rotation degrees fields are there by name",
@@ -309,6 +333,79 @@ final class Image_ProducerUITests: XCTestCase {
                   abs(p.x * p.w - 100) < 0.6 && abs(p.y * p.h - 200) < 0.6,
                   String(format: "center %.1f, %.1f px", p.x * p.w, p.y * p.h))
         }
+
+        // REM: 011 / A3 (355), his ask 11-05 07:2x: "yes add the checks and run it" — the 07:14
+        // run never tried the Mac letters or the guard. A letter typed INTO a number box stays
+        // in the box; it must not switch tools (the key monitor skips an NSText first responder).
+        let px = app.textFields["Position X"]
+        if px.exists {
+            px.click(); px.typeKey("a", modifierFlags: .command); px.typeText("b"); sleep(1)
+            check("355", "Typing B in a number box leaves the tool alone (still Move)", button("Move").isSelected)
+            px.typeKey("a", modifierFlags: .command); px.typeText("100\r"); sleep(1)
+        }
+
+        // REM: 012 / A4 (366) remainder, same ask — the typed Rotation box, and the Crop and Mask
+        // boxes, were never typed into. The probe carries no rotation; the Rotation stepper's
+        // spoken value ("N degrees") is read from the model, so it proves the typed value landed.
+        func fieldNumber(_ spoken: String) -> Double {
+            Double((app.textFields[spoken].value as? String ?? "").replacingOccurrences(of: ",", with: "")) ?? -1
+        }
+        if !typeInto("Rotation degrees", "30") {
+            check("366", "Typing Rotation 30 turns the layer to 30 degrees", false, "couldn't type into the box")
+        } else {
+            let turned = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label == 'Rotation' AND value == '30 degrees'")).firstMatch.exists
+            check("366", "Typing Rotation 30 turns the layer to 30 degrees", turned,
+                  "field reads \(app.textFields["Rotation degrees"].value as? String ?? "?")")
+            _ = typeInto("Rotation degrees", "0")
+        }
+
+        // Crop: pick Square (a locked 1:1 ratio), then type the box.
+        let aspect = app.popUpButtons["Aspect"].exists ? app.popUpButtons["Aspect"] : app.menuButtons["Aspect"]
+        if aspect.waitForExistence(timeout: 3) {
+            aspect.click(); sleep(1)
+            if app.menuItems["Square"].waitForExistence(timeout: 3) { app.menuItems["Square"].click(); sleep(1) }
+            let cropNames = ["Crop left", "Crop top", "Crop width", "Crop height"]
+            check("366", "Crop left, top, width and height fields are there by name",
+                  cropNames.allSatisfy { app.textFields[$0].waitForExistence(timeout: 3) })
+            if typeInto("Crop width", "400") {
+                let w = fieldNumber("Crop width"), h = fieldNumber("Crop height")
+                check("366", "Square crop: typing Width 400 makes Height 400 (ratio held)",
+                      w == 400 && h == 400, "width \(w), height \(h)")
+            }
+            if typeInto("Crop left", "100"), typeInto("Crop top", "50") {
+                let l = fieldNumber("Crop left"), t = fieldNumber("Crop top")
+                check("366", "Typing Crop left 100, top 50 moves the crop box there", l == 100 && t == 50, "left \(l), top \(t)")
+            }
+            // Back to Original so the crop can't touch the checks after this one.
+            aspect.click(); sleep(1)
+            if app.menuItems["Original"].waitForExistence(timeout: 3) { app.menuItems["Original"].click(); sleep(1) }
+        } else {
+            record("| 366 | ⚠️ NOT CHECKED | Crop fields — the Aspect menu wasn't found by name |")
+        }
+        snapshot("04b-number-fields")
+
+        // Mask: add one, type its box, remove it.
+        press("Mask"); sleep(1)
+        if press("Add Mask", 5) {
+            sleep(1)
+            let maskNames = ["Mask left", "Mask top", "Mask width", "Mask height"]
+            check("366", "Mask left, top, width and height fields are there by name",
+                  maskNames.allSatisfy { app.textFields[$0].waitForExistence(timeout: 3) })
+            if typeInto("Mask left", "100"), typeInto("Mask top", "80") {
+                let l = fieldNumber("Mask left"), t = fieldNumber("Mask top")
+                check("366", "Typing Mask left 100, top 80 moves the mask there", l == 100 && t == 80, "left \(l), top \(t)")
+            }
+            if typeInto("Mask width", "300") {
+                let w = fieldNumber("Mask width")
+                check("366", "Typing Mask width 300 sizes the mask", w == 300, "width \(w), height \(fieldNumber("Mask height"))")
+            }
+            snapshot("04c-mask-fields")
+            press("Remove Mask"); sleep(1)
+        } else {
+            record("| 366 | ⚠️ NOT CHECKED | Mask fields — Add Mask wasn't found by name |")
+        }
+        press("Move"); sleep(1)
         commitMove()
 
         // 013 — A5: the canvas is one VoiceOver element named "Canvas" (an image, not a button —
@@ -353,6 +450,25 @@ final class Image_ProducerUITests: XCTestCase {
         check("015", "Every tool picked by its spoken name shows as selected (\(tools.count) tools)",
               missed.isEmpty, missed.isEmpty ? "all \(tools.count)" : "missed: \(missed.joined(separator: ", "))")
         audit("After the tool walk")
+
+        // REM: 011 / A3 (355), his ask 11-05 07:2x — every tool letter on the Mac, no modifier
+        // (Sticky Keys). Same letters as Tool.shortcutLetter, same order as the walk above.
+        let letters: [(String, String)] = [
+            ("c", "Canvas Tool"), ("k", "Color Palette"), ("m", "Move"), ("s", "Selection"),
+            ("q", "Mask"), ("b", "Paint Drop Bucket"), ("p", "Pixel Pen"), ("e", "Eraser"),
+            ("i", "Eyedropper"), ("t", "Text"), ("y", "Symbol"), ("g", "Image"),
+            ("a", "Image Playground"), ("l", "Layer"), ("r", "Remove Background"), ("w", "Magic Lasso"),
+            ("j", "Adjust"), ("z", "Zoom"), ("h", "Camera")]
+        var keyMissed: [String] = []
+        for (k, t) in letters {
+            app.typeKey(k, modifierFlags: []); sleep(1)
+            if app.sheets.firstMatch.exists || app.alerts.firstMatch.exists {
+                app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: []); sleep(1)
+            }
+            if !button(t).isSelected { keyMissed.append("\(k.uppercased())→\(t)") }
+        }
+        check("355", "Every tool letter picks its tool on the Mac (\(letters.count) keys)",
+              keyMissed.isEmpty, keyMissed.isEmpty ? "all \(letters.count)" : "missed: \(keyMissed.joined(separator: ", "))")
     }
 }
 #endif
