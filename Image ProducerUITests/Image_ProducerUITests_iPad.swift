@@ -389,6 +389,15 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             if !button(t).isSelected { missed.append(t) }
         }
         snapshot("p1-strip-end")
+        // 022 — the detachable palette: float it (the grip is a button too), look, dock it.
+        if press("Float tools", 3) {
+            sleep(1); snapshot("p2-floating")
+            check("022", "Tools float as a glass palette and stay pickable",
+                  button("Camera").exists && button("Dock tools").exists)
+            press("Dock tools", 3); sleep(1)
+        } else {
+            check("022", "Tools float as a glass palette and stay pickable", false, "no Float tools button")
+        }
         check("022", "Phone layout: every tool in the strip can be tapped and selected (\(tools.count))",
               missed.isEmpty, missed.isEmpty ? "all \(tools.count)" : "missed: \(missed.joined(separator: ", "))")
     }

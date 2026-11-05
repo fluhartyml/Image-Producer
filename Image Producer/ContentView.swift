@@ -113,6 +113,11 @@ struct ContentView: View {
     /// Production preview PiP visible? Shared with the Zoom inspector's toggle via
     /// AppStorage, so either surface can turn it on or off.
     @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
+    /// 022 — the phone layout's detachable tool palette: floating or docked, and where.
+    @AppStorage("ip.phone.toolsFloating") private var toolsFloating = false
+    @AppStorage("ip.phone.toolsX") private var toolsX: Double = 0.05
+    @AppStorage("ip.phone.toolsY") private var toolsY: Double = 0.08
+    @State private var paletteDrag: CGSize = .zero
 
     /// Zoom at the moment a pinch began, so the gesture scales from where you were
     /// rather than snapping to 1× on the first delta.
@@ -300,6 +305,67 @@ struct ContentView: View {
     /// iPhone-only layout, isolated from iPad. Canvas gets the room; the tool box is a
     /// single scrollable line; Tool/Layers/History stay in the existing swipe panel.
     /// Portrait stacks it; landscape puts the canvas on the left, tools+panel on the right.
+    // MARK: 022 — the detachable tool palette (phone layout)
+    // REM: his ask 11-04 22:5x: "can the tool box be detachable like in photoshop?" and "if its
+    // movable and liquid glass you can see through it and drag it out of your way". Docked, the
+    // tools sit in two rows under the canvas. Floating, they are a see-through Liquid Glass
+    // palette dragged anywhere, and the box under the canvas is all inspector and layers.
+    // The grip is ALSO a button (float / dock) — a switch, Voice Control or Sticky Keys user
+    // must never need a drag (his rules). Position and state persist across launches.
+
+    private var toolPaletteGrip: some View {
+        Button { withAnimation(.snappy) { toolsFloating.toggle() } } label: {
+            Image(systemName: "line.3.horizontal")
+                .rotationEffect(.degrees(90))
+                .frame(width: 18, height: 76)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .accessibilityLabel(toolsFloating ? "Dock tools" : "Float tools")
+        .help(toolsFloating ? "Dock the tools under the canvas" : "Float the tools — drag them anywhere")
+    }
+
+    @ViewBuilder
+    private func floatingToolPalette(in area: CGSize) -> some View {
+        let cols = 4
+        let side: CGFloat = 38
+        let w = CGFloat(cols) * side + 26
+        let rows = Int((Double(Tool.shipping.count) / Double(cols)).rounded(.up))
+        let h = CGFloat(rows) * (side + 2) + 12
+        let x = min(max(0, toolsX * area.width + paletteDrag.width), area.width - w)
+        let y = min(max(0, toolsY * area.height + paletteDrag.height), area.height - h)
+        HStack(spacing: 0) {
+            toolPaletteGrip
+                .gesture(DragGesture()
+                    .onChanged { paletteDrag = $0.translation }
+                    .onEnded { v in
+                        toolsX = Double(min(max(0, toolsX * area.width + v.translation.width), area.width - w) / area.width)
+                        toolsY = Double(min(max(0, toolsY * area.height + v.translation.height), area.height - h) / area.height)
+                        paletteDrag = .zero
+                    })
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(side), spacing: 0), count: cols), spacing: 2) {
+                ForEach(Tool.shipping) { tool in
+                    Button { activeTool = tool } label: {
+                        ToolGlyph(tool: tool)
+                            .frame(width: side, height: side)
+                            .background(RoundedRectangle(cornerRadius: 8)
+                                .fill(activeTool == tool ? Color.accentColor.opacity(0.25) : .clear))
+                            .foregroundStyle(activeTool == tool ? Color.accentColor : Color.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tool.accessibilityName)
+                    .accessibilityInputLabels(tool.voiceInputNames)
+                    .accessibilityAddTraits(activeTool == tool ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, 6).padding(.trailing, 6)
+        }
+        .frame(width: w, height: h)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .offset(x: x, y: y)
+    }
+
     @ViewBuilder
     private func phoneLayout(geo: GeometryProxy) -> some View {
         if geo.size.height > geo.size.width {
@@ -308,15 +374,30 @@ struct ContentView: View {
                 // ActiveToolLabel here — the tool strip highlights the active tool and
                 // the inspector names it, so a third label was redundant. Panel is
                 // `compact` (no pills, swipe + dots) and takes the freed room.
+                // 022 — a full-width square (his "the canvas is too short"), capped so the
+                // panel keeps room; every tool shows, wrapping ("out of sight out of mind").
+                // His word 22:4x: "make the canvas take up the whole frame set aside for the
+                // exclusive use of the canvas no light grey" — the frame takes the picture's
+                // own shape at full width, so nothing letterboxes. Capped so a tall picture
+                // still leaves the tools and panel on screen.
                 canvasArea
-                    .frame(height: geo.size.height * 0.42)
+                    .frame(height: min(geo.size.width * CGFloat(document.canvasHeight) / CGFloat(max(1, document.canvasWidth)),
+                                       geo.size.height * 0.66))
                 Divider()
-                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, lines: 1)
-                Divider()
+                if !toolsFloating {
+                    HStack(spacing: 0) {
+                        toolPaletteGrip
+                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, wrap: true)
+                    }
+                    Divider()
+                }
                 BottomPanel.PanelView(document: document, camera: camera, activeTool: activeTool,
                                       activeLayerID: $activeLayerID, selection: $bottomPanel,
                                       fillColor: $fillColor, fileURL: fileURL, compact: true)
                     .frame(maxHeight: .infinity)
+            }
+            .overlay(alignment: .topLeading) {
+                if toolsFloating { floatingToolPalette(in: geo.size) }
             }
         } else {
             HStack(spacing: 0) {
@@ -552,7 +633,43 @@ struct ContentView: View {
                 }
                 .help("About Image Producer — Graphic Arts")
             }
+            #if os(iOS)
+            // REM: 022 PHONE GLASS TOOLBAR — his design 11-04 21:5x: "a liquid glass tab or
+            // toolbar along the right side under the three glyphs … all that room its wasted
+            // space", and "the zoom arrows and percentage should be liquid glass probably off
+            // of the canvas". The PiP stays ON the canvas, a square you drag anywhere like on
+            // the Mac (his word 22:3x: "PiP is an important tool it can NOT be removed").
+            // Seven items at most: the Duo's bar must end above the curved corner ("the ...
+            // is going to be cut off … because that is a curve in the phone"). No Tool
+            // button: picking a tool already opens its sheet. With the 27.1 SDK the system runs these down the
+            // right edge on the Duo. Same calls as the on-canvas cluster on iPad/Mac.
+            if isPhone {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { setZoom(canvasZoom + zoomStep); activeTool = .zoom } label: {
+                        Label("Zoom in", systemImage: "plus.magnifyingglass")
+                    }
+                    .disabled(canvasZoom >= maxZoom)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { setZoom(canvasZoom - zoomStep); activeTool = .zoom } label: {
+                        Label("Zoom out", systemImage: "minus.magnifyingglass")
+                    }
+                    .disabled(canvasZoom <= minZoom)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { bottomPanel = .layers } label: { Label("Layers", systemImage: "square.3.layers.3d") }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { bottomPanel = .history } label: { Label("History", systemImage: "clock.arrow.circlepath") }
+                }
+            }
+            #endif
         }
+        #if os(iOS)
+        // 022 — the name band at the top goes to the canvas on a phone-sized window; the name
+        // and rename live in the Canvas Tool's inspector (his word 11-04 21:5x).
+        .toolbar(removing: isPhone ? .title : nil)
+        #endif
         .sheet(isPresented: $showExportSheet) {
             ExportSheet(document: document, gifFPS: camera.fps, gifLoop: camera.loop,
                         onIconSet: { exportIconSet() })
@@ -880,8 +997,11 @@ struct ContentView: View {
                 }
             }
         }
-        .padding()
-        .background(Color(white: 0.5).opacity(0.12))
+        // 022 PHONE (his review 11-04 21:5x: "youre wasting the canvas screen realestate"):
+        // on a phone-sized window the canvas runs edge to edge; zoom and the PiP live in the
+        // glass toolbar instead (see phoneToolbar).
+        .padding(isPhone ? 0 : 16)
+        .background(isPhone ? Color.clear : Color(white: 0.5).opacity(0.12))   // 022: no grey band on the phone
         .clipped()                                   // zoomed canvas stays inside its area
         // The production preview floats over the canvas AREA — deliberately OUTSIDE the
         // .scaleEffect / .offset applied above.
@@ -903,19 +1023,13 @@ struct ContentView: View {
                 }
             }
         }
-        .overlay(alignment: .bottomTrailing) { canvasControls }
+        .overlay(alignment: .bottomTrailing) { if !isPhone { canvasControls } }
         // REM: 013 — THE SAME DETAILS ON SCREEN, for anyone who can't hear VoiceOver (his
         // "a deaf person cant swipe"). Hidden from VoiceOver: the canvas element carries it.
-        .overlay(alignment: .bottomLeading) {
-            Text(canvasDetails)
-                .scaledFont(18, monospacedDigit: true)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
-                .padding(8)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
+        // 022 — the "1024 by 1024, 5 layers" tag is OFF the canvas everywhere (his word
+        // 11-04 22:3x, twice: "TAKE 1024 BY 1024, 5 LAYERS OFF OF THE CANVAS"). It repeated
+        // the status line, and its corner belongs to the PiP. VoiceOver still reads it from
+        // the canvas element's "More about canvas" action (013).
         // Safeguard: if a tool is marked incompatible with Fit Width, picking it drops
         // back to the normal fitted view so the tool can't break (Michael 2026-06-23).
         #if os(macOS)
@@ -1177,18 +1291,45 @@ struct ToolStrip: View {
     var onDoubleTap: ((Tool) -> Void)? = nil
     /// Rows of tools: 2 on iPad (the default), 1 on iPhone (a single scrollable line).
     var lines: Int = 2
+    /// 022 — every tool visible, wrapping onto as many rows as the width needs (no scrolling).
+    /// His word 11-04: "no tool is ever hidden because out of sight out of mind".
+    var wrap: Bool = false
 
     private var rows: [GridItem] {
         Array(repeating: GridItem(.fixed(44), spacing: 4), count: lines)
     }
 
     var body: some View {
+        if wrap {
+            // 022 — HIS LAYOUT, drawn with Preview's selection handles 11-04 22:2x: the tool
+            // box runs from the screen's left edge to the glass toolbar, right under the
+            // canvas, and is never more than TWO rows ("there is too much space between
+            // tools"). So the columns are half the tools, rounded up, packed edge to edge.
+            let perRow = Int((Double(Tool.shipping.count) / 2).rounded(.up))
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: perRow), spacing: 2) {
+                ForEach(Tool.shipping) { tool in toolButton(tool, side: 38) }
+            }
+            .padding(.vertical, 2)
+        } else {
+            strip
+        }
+    }
+
+    private var strip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHGrid(rows: rows, spacing: 4) {
-                ForEach(Tool.shipping) { tool in
+                ForEach(Tool.shipping) { tool in toolButton(tool) }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func toolButton(_ tool: Tool, side: CGFloat = 44) -> some View {
                     Button { activeTool = tool } label: {
                         ToolGlyph(tool: tool)
-                            .frame(width: 44, height: 44)
+                            .frame(width: side, height: side)
                             // ⚠️ THE TOOLTIP LIVES ON THE GLYPH, NOT ON THE BUTTON.
                             // On the Button it was accepted and never appeared: "only those
                             // glyps have hover ovr the tools have none." The button carries a
@@ -1215,11 +1356,6 @@ struct ToolStrip: View {
                     .accessibilityLabel(tool.accessibilityName)   // VoiceOver everywhere
                     .accessibilityInputLabels(tool.voiceInputNames)  // Voice Control — his spoken names
                     .accessibilityAddTraits(activeTool == tool ? .isSelected : [])
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-        }
     }
 }
 
