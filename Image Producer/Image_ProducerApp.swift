@@ -224,6 +224,10 @@ struct Image_ProducerApp: App {
 #endif
 
     init() {
+        #if os(macOS)
+        // Command mode (roadmap C): a --command job runs and exits before any window opens.
+        CommandMode.runIfRequested()
+        #endif
         // The shakedown's windows must never be restored, in the test or in his own copy
         // later. Argument domain = in memory for this launch only, never saved (UITestDoor.swift).
         if UITestDoor.isOpen {
