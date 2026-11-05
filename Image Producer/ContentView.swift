@@ -772,6 +772,16 @@ struct ContentView: View {
         return pngData(from: cg)
     }
 
+    /// 013 — "1024 by 1024, 5 layers": what "More about canvas" reads and the on-screen tag shows.
+    private var canvasDetails: String {
+        let n = document.layers.count
+        return "\(document.canvasWidth) by \(document.canvasHeight), \(n) \(n == 1 ? "layer" : "layers")"
+    }
+
+    private func announceCanvasDetails() {
+        AccessibilityNotification.Announcement(canvasDetails).post()
+    }
+
     private var canvasArea: some View {
         // Zoom REVIVED 2026-06-18 as a scaleEffect driven by the on-canvas +/−
         // buttons (the ZoomableCanvas/UIScrollView pinch approach stays parked —
@@ -819,6 +829,28 @@ struct ContentView: View {
                     .gesture(activeTool == .zoom ? zoomToolGestures : nil)
             }
         }
+        // REM: 013 A5 CANVAS, his design 11-04 19:4x. VoiceOver saw NOTHING on the canvas.
+        // His words: "can it say canvas and ask if they want to hear more?" — so the element
+        // says only "Canvas". The size and layer count wait behind a "More about canvas"
+        // ACTION, not a swipe, because "a blind person can't swipe": the actions list is
+        // reached by swipe, keyboard (VO-Command-Space) or switch alike. Zoom In / Zoom Out /
+        // Fit Screen run the SAME calls as the zoom bar, so the two cannot drift apart.
+        // It is an invisible overlay that takes no touches, so the Pen and Move gestures
+        // underneath are untouched; its default action (double-tap) also reads the details,
+        // so a VoiceOver press never paints a stray pixel through to the canvas.
+        .overlay {
+            Color.clear
+                .allowsHitTesting(false)
+                .accessibilityElement()
+                .accessibilityLabel("Canvas")
+                .accessibilityAddTraits(.isImage)
+                .accessibilityHint("Actions: More about canvas, zoom.")
+                .accessibilityAction(.default) { announceCanvasDetails() }
+                .accessibilityAction(named: "More about canvas") { announceCanvasDetails() }
+                .accessibilityAction(named: "Zoom In") { setZoom(canvasZoom + zoomStep); activeTool = .zoom }
+                .accessibilityAction(named: "Zoom Out") { setZoom(canvasZoom - zoomStep); activeTool = .zoom }
+                .accessibilityAction(named: "Fit Screen") { setZoom(1); activeTool = .zoom }
+        }
         // ZOOM: RIGHT-CLICK → FIT SCREEN. From the PhotoCraft test video (2026-10-11): the
         // reviewer right-clicks with the magnifier and picks Fit Screen every time he uses
         // Photoshop, and PhotoCraft had no such menu. Zoom tool only, so it never covers the
@@ -861,6 +893,18 @@ struct ContentView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) { canvasControls }
+        // REM: 013 — THE SAME DETAILS ON SCREEN, for anyone who can't hear VoiceOver (his
+        // "a deaf person cant swipe"). Hidden from VoiceOver: the canvas element carries it.
+        .overlay(alignment: .bottomLeading) {
+            Text(canvasDetails)
+                .font(.system(size: 18).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
+                .padding(8)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
         // Safeguard: if a tool is marked incompatible with Fit Width, picking it drops
         // back to the normal fitted view so the tool can't break (Michael 2026-06-23).
         #if os(macOS)
