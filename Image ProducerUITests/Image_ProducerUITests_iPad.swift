@@ -131,7 +131,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     }
 
     func commitMove() {
-        press("Canvas"); sleep(1); press("Move"); sleep(1)
+        press("Canvas Tool"); sleep(1); press("Move"); sleep(1)
     }
 
     /// Hardware-keyboard key, sent to the app (the A3 key-catcher), not to a text field.
@@ -214,8 +214,8 @@ final class Image_ProducerUITests_iPad: XCTestCase {
 
         // A3 (364) — tool letters from a hardware keyboard pick tools.
         // Tap the canvas first so the key-catcher (not a field) has the keyboard.
-        press("Canvas"); sleep(1)
-        for (letter, tool) in [("m", "Move"), ("b", "Paint Drop Bucket"), ("c", "Canvas")] {
+        press("Canvas Tool"); sleep(1)
+        for (letter, tool) in [("m", "Move"), ("b", "Paint Drop Bucket"), ("c", "Canvas Tool")] {
             key(letter); sleep(1)
             check("364", "Key \(letter.uppercased()) picks \(tool)", button(tool).isSelected)
         }
@@ -288,7 +288,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         commitMove()
 
         // 013 — A5: the canvas is one VoiceOver element named "Canvas" (an image, not a button —
-        // the Canvas TOOL tile is the button of that name).
+        // the "Canvas Tool" tile is the button).
         let canvasEl = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier == 'canvas.element' AND label == 'Canvas'")).firstMatch
         check("013", "The canvas is one element named Canvas", canvasEl.waitForExistence(timeout: 5))
@@ -312,7 +312,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         snapshot("06-pixel-cursor"); audit("Pixel Pen with cursor")
 
         // 015 — A7: walk every tool by its spoken name; each must become the selected tool.
-        let tools = ["Canvas", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
+        let tools = ["Canvas Tool", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
                      "Pixel Pen", "Eraser", "Eyedropper", "Text", "Symbol", "Image",
                      "Image Playground", "Layer", "Remove Background", "Magic Lasso", "Adjust",
                      "Zoom", "Camera"]

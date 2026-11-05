@@ -140,7 +140,7 @@ final class Image_ProducerUITests: XCTestCase {
 
     /// Commit the Move session by leaving the tool, then come back.
     func commitMove() {
-        press("Canvas"); sleep(1); press("Move"); sleep(1)
+        press("Canvas Tool"); sleep(1); press("Move"); sleep(1)
     }
 
     // MARK: The shakedown
@@ -312,7 +312,7 @@ final class Image_ProducerUITests: XCTestCase {
         commitMove()
 
         // 013 — A5: the canvas is one VoiceOver element named "Canvas" (an image, not a button —
-        // the Canvas TOOL tile is the button of that name).
+        // the "Canvas Tool" tile is the button).
         let canvasEl = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier == 'canvas.element' AND label == 'Canvas'")).firstMatch
         check("013", "The canvas is one element named Canvas", canvasEl.waitForExistence(timeout: 5))
@@ -336,7 +336,7 @@ final class Image_ProducerUITests: XCTestCase {
         snapshot("06-pixel-cursor"); audit("Pixel Pen with cursor")
 
         // 015 — A7: walk every tool by its spoken name; each must become the selected tool.
-        let tools = ["Canvas", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
+        let tools = ["Canvas Tool", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
                      "Pixel Pen", "Eraser", "Eyedropper", "Text", "Symbol", "Image",
                      "Image Playground", "Layer", "Remove Background", "Magic Lasso", "Adjust",
                      "Zoom", "Camera"]

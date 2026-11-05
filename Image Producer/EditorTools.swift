@@ -97,6 +97,9 @@ enum Tool: String, CaseIterable, Identifiable {
         case .move:  "Move"
         case .pen:   "Pixel Pen"
         case .layer: "Layer"
+        // REM: 11-04 21:0x, his yes: the canvas itself is "Canvas" (013), so its TOOL is
+        // "Canvas Tool" — Voice Control saw two things named "Canvas". Engineering call.
+        case .canvas: "Canvas Tool"
         default:     title
         }
     }
@@ -107,6 +110,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .fill: ["Paint Drop Bucket", "Paint Drop", "Bucket"]
         case .move: ["Move", "Transform"]
         case .pen:  ["Pixel Pen", "Pen", "Pen Tool"]
+        case .canvas: ["Canvas Tool", "Canvas Inspector"]
         default:    [accessibilityName]
         }
     }
