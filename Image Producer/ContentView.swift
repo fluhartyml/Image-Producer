@@ -850,6 +850,16 @@ struct ContentView: View {
                 .accessibilityAction(named: "Zoom In") { setZoom(canvasZoom + zoomStep); activeTool = .zoom }
                 .accessibilityAction(named: "Zoom Out") { setZoom(canvasZoom - zoomStep); activeTool = .zoom }
                 .accessibilityAction(named: "Fit Screen") { setZoom(1); activeTool = .zoom }
+                // 014 — the pixel cursor by switch, VoiceOver or Voice Control: same calls as the keys.
+                .accessibilityActions {
+                    if activeTool == .pen, activeLayerID != nil {
+                        Button("Paint") { _ = paintAtPenCursor() }
+                        Button("Cursor Left") { _ = movePenCursor(dx: -1, dy: 0, big: false) }
+                        Button("Cursor Right") { _ = movePenCursor(dx: 1, dy: 0, big: false) }
+                        Button("Cursor Up") { _ = movePenCursor(dx: 0, dy: -1, big: false) }
+                        Button("Cursor Down") { _ = movePenCursor(dx: 0, dy: 1, big: false) }
+                    }
+                }
         }
         // ZOOM: RIGHT-CLICK → FIT SCREEN. From the PhotoCraft test video (2026-10-11): the
         // reviewer right-clicks with the magnifier and picks Fit Screen every time he uses
@@ -910,11 +920,13 @@ struct ContentView: View {
         #if os(macOS)
         // A3 — one key picks a tool (letters locked in 005a). See ToolShortcutMonitor.
         .background(ToolShortcutMonitor(onPick: { activeTool = $0 },
-                                        onArrow: { dx, dy, big in nudgeActiveLayer(dx: dx, dy: dy, big: big) }))
+                                        onArrow: { dx, dy, big in nudgeActiveLayer(dx: dx, dy: dy, big: big) || movePenCursor(dx: dx, dy: dy, big: big) },
+                                        onPaint: { paintAtPenCursor() }))
         #elseif canImport(UIKit)
         // A3 + 012a on the iPad with a hardware keyboard — same letters, same arrows. See IPadToolKeys.
         .background(IPadToolKeys(onPick: { activeTool = $0 },
-                                 onArrow: { dx, dy, big in nudgeActiveLayer(dx: dx, dy: dy, big: big) }))
+                                 onArrow: { dx, dy, big in nudgeActiveLayer(dx: dx, dy: dy, big: big) || movePenCursor(dx: dx, dy: dy, big: big) },
+                                 onPaint: { paintAtPenCursor() }))
         #endif
         .onChange(of: activeTool) { _, newTool in
             if fitWidth && !newTool.fitWidthCompatible { fitWidth = false }
@@ -990,6 +1002,20 @@ struct ContentView: View {
     // It edits the SAME live Move session a drag does, so leaving Move commits it the same
     // way — hidden "before" copy and one History step — however many presses it took.
     /// Returns true when the key was used (Move active with a layer selected).
+    /// 014 — arrows move the pixel cursor while the Pen is active.
+    private func movePenCursor(dx: Int, dy: Int, big: Bool) -> Bool {
+        guard activeTool == .pen, activeLayerID != nil else { return false }
+        pen.moveCursor(dx: dx, dy: dy, big: big)
+        return true
+    }
+
+    /// 014 — Space (or the canvas's Paint action) paints the cell under the cursor.
+    private func paintAtPenCursor() -> Bool {
+        guard activeTool == .pen, activeLayerID != nil else { return false }
+        pen.paintAtCursor()
+        return true
+    }
+
     private func nudgeActiveLayer(dx: Int, dy: Int, big: Bool) -> Bool {
         guard activeTool == .move, let id = activeLayerID,
               let i = document.layers.firstIndex(where: { $0.id == id }) else { return false }
@@ -5500,6 +5526,16 @@ struct CanvasView: View {
     /// Yes, this makes a lot of layers. That is the cost of being reversible, and it
     /// is the same mantra as the other Applies ("original kept + hidden — there's no
     /// undo"). His call, twice.
+    /// 014 — commit the open pixel-cursor stroke as one Pen action, like a drag.
+    @MainActor private func commitCursorStroke() {
+        guard pen.cursorStrokeOpen else { return }
+        pen.cursorStrokeCommitted()
+        pen.endStroke()
+        if let data = pen.currentPNG() {
+            commitPenPixels(data, actionLabel: pen.erasing ? "Erase" : "Stroke")
+        }
+    }
+
     @MainActor private func commitPenPixels(_ data: Data, actionLabel: String) {
         guard let i = activeIndex, document.layers.indices.contains(i) else { return }
         document.captureHistoryBaselineIfNeeded()   // before the edit
@@ -5987,6 +6023,20 @@ struct CanvasView: View {
                         .frame(width: disp.width, height: disp.height)
                         .allowsHitTesting(false)
                 }
+                // 014 — the pixel cursor: a white-and-black ring so it shows on any color.
+                if activeTool == .pen, let c = pen.cursorCell {
+                    let cell = disp.width / CGFloat(max(1, pen.resolution))
+                    let side = cell * CGFloat(max(1, pen.brush))
+                    let half = CGFloat(pen.brush / 2)
+                    ZStack {
+                        Rectangle().stroke(Color.black, lineWidth: 3)
+                        Rectangle().stroke(Color.white, lineWidth: 1.5)
+                    }
+                    .frame(width: max(side, 4), height: max(side, 4))
+                    .position(x: (c.x - half) * cell + side / 2, y: (c.y - half) * cell + side / 2)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
                 canvasOverlays(disp: disp, ref: ref)
             }
             .frame(width: disp.width, height: disp.height)
@@ -6153,13 +6203,16 @@ struct CanvasView: View {
                 if activeTool == .pen { pen.load(activePixelData) }
                 refreshEraserPreview()
             }
+            .onChange(of: pen.cursorCommitTick) { commitCursorStroke() }
             .onChange(of: activeTool) {
+                commitCursorStroke()   // 014: leaving the Pen keeps the presses
                 if activeTool == .pen { pen.load(activePixelData) }
                 if activeTool != .eraser { pen.endEraseSession() }   // leaving the tool drops the copy session
                 if activeTool != .fill && activeTool != .magicLasso { bucketHover = nil; pen.clearBucketPreview() }
                 refreshEraserPreview()
             }
             .onChange(of: activeLayerID) {
+                pen.cursorStrokeCommitted()   // 014: the buffer reloads for the new layer (see PixelPen)
                 // NB: don't end the brush session here — eraseAt() sets activeLayerID itself when it
                 // makes the copy, which would wipe the session we just started. A manual layer switch
                 // is handled by eraseAt's "working != active → new copy" check on the next stroke.
@@ -7836,6 +7889,52 @@ final class PixelPen: ObservableObject {
 
     func endStroke() { lastPoint = nil }
 
+    // MARK: 014 A6 — the pixel cursor (his yes 11-04 19:4x)
+    // REM: "arrow keys or a switch move one cell; a press paints. Freehand drawing without
+    // hands." The cursor is a CELL (column, row) at the layer's resolution, so it lands on the
+    // same grid the brush and the grid overlay use. A press paints into the open buffer — the
+    // same paint() a tap runs, so the brush size and Draw/Erase mode apply unchanged. Presses
+    // made close together are ONE stroke: the commit waits a moment after the last press, so
+    // ten presses make one History step and one "(Pixel n)" layer, not ten.
+    // Known edge: switching the ACTIVE LAYER inside that moment drops the open presses (the
+    // buffer reloads for the new layer, the same as it always has). A tool change commits first.
+    @Published var cursorCell: CGPoint?
+    /// Bumped when the open cursor stroke should be committed; CanvasView commits it.
+    @Published var cursorCommitTick = 0
+    private(set) var cursorStrokeOpen = false
+    private var cursorCommitTask: Task<Void, Never>?
+
+    /// Move the cursor one cell (Shift: ten). Starts at the center the first time.
+    func moveCursor(dx: Int, dy: Int, big: Bool) {
+        let dim = max(1, resolution)
+        let step = big ? 10 : 1
+        let c = cursorCell ?? CGPoint(x: dim / 2, y: dim / 2)
+        cursorCell = CGPoint(x: min(max(Int(c.x) + dx * step, 0), dim - 1),
+                             y: min(max(Int(c.y) + dy * step, 0), dim - 1))
+    }
+
+    /// Paint (or erase, in Erase mode) the cell under the cursor.
+    func paintAtCursor() {
+        let dim = max(1, resolution)
+        if cursorCell == nil { cursorCell = CGPoint(x: dim / 2, y: dim / 2) }
+        guard let c = cursorCell else { return }
+        let n = CGPoint(x: (c.x + 0.5) / CGFloat(dim), y: (c.y + 0.5) / CGFloat(dim))
+        paint(n, erase: erasing)
+        cursorStrokeOpen = true
+        cursorCommitTask?.cancel()
+        cursorCommitTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(1.2))
+            guard !Task.isCancelled else { return }
+            self?.cursorCommitTick += 1
+        }
+    }
+
+    /// Called by CanvasView once it has committed the open cursor stroke (or dropped it).
+    func cursorStrokeCommitted() {
+        cursorCommitTask?.cancel(); cursorCommitTask = nil
+        cursorStrokeOpen = false
+    }
+
     func currentPNG() -> Data? {
         guard let cg = ctx?.makeImage() else { return nil }
         return pngData(from: cg)
@@ -8970,16 +9069,19 @@ struct ToolShortcutMonitor: NSViewRepresentable {
     var onPick: (Tool) -> Void
     /// 012a: an arrow key (dx, dy, Shift held). Returns true when it was used.
     var onArrow: (Int, Int, Bool) -> Bool = { _, _, _ in false }
+    /// 014: Space paints at the pixel cursor. Returns true when it was used.
+    var onPaint: () -> Bool = { false }
 
     func makeNSView(context: Context) -> MonitorView {
-        let v = MonitorView(); v.onPick = onPick; v.onArrow = onArrow; return v
+        let v = MonitorView(); v.onPick = onPick; v.onArrow = onArrow; v.onPaint = onPaint; return v
     }
-    func updateNSView(_ view: MonitorView, context: Context) { view.onPick = onPick; view.onArrow = onArrow }
+    func updateNSView(_ view: MonitorView, context: Context) { view.onPick = onPick; view.onArrow = onArrow; view.onPaint = onPaint }
     static func dismantleNSView(_ view: MonitorView, coordinator: ()) { view.stop() }
 
     final class MonitorView: NSView {
         var onPick: (Tool) -> Void = { _ in }
         var onArrow: (Int, Int, Bool) -> Bool = { _, _, _ in false }
+        var onPaint: () -> Bool = { false }
         private var monitor: Any?
 
         override func viewDidMoveToWindow() {
@@ -9003,6 +9105,8 @@ struct ToolShortcutMonitor: NSViewRepresentable {
                         default: nil
                     }
                     if let d { return self.onArrow(d.0, d.1, big) ? nil : event }
+                    // 014 — Space paints at the pixel cursor (Pen only; otherwise passed on).
+                    if event.keyCode == 49, !event.isARepeat { return self.onPaint() ? nil : event }
                 }
                 guard let self, let win = self.window, event.window === win,
                       win.attachedSheet == nil,

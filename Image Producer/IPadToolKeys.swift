@@ -28,13 +28,15 @@ struct IPadToolKeys: UIViewRepresentable {
     var onPick: (Tool) -> Void
     /// 012a: an arrow key (dx, dy, Shift held). Returns true when it was used.
     var onArrow: (Int, Int, Bool) -> Bool
+    /// 014: Space paints at the pixel cursor. Returns true when it was used.
+    var onPaint: () -> Bool = { false }
 
     func makeUIView(context: Context) -> CatcherView {
-        let v = CatcherView(); v.onPick = onPick; v.onArrow = onArrow; return v
+        let v = CatcherView(); v.onPick = onPick; v.onArrow = onArrow; v.onPaint = onPaint; return v
     }
 
     func updateUIView(_ view: CatcherView, context: Context) {
-        view.onPick = onPick; view.onArrow = onArrow
+        view.onPick = onPick; view.onArrow = onArrow; view.onPaint = onPaint
         // The editor changed (a tool tapped, a sheet closed…): take focus back if it's free.
         view.reclaimSoon()
     }
@@ -44,6 +46,7 @@ struct IPadToolKeys: UIViewRepresentable {
     final class CatcherView: UIView {
         var onPick: (Tool) -> Void = { _ in }
         var onArrow: (Int, Int, Bool) -> Bool = { _, _, _ in false }
+        var onPaint: () -> Bool = { false }
         /// Keys whose press began here; their end must not go to super alone.
         private var held: Set<UIKeyboardHIDUsage> = []
         private var repeatTask: Task<Void, Never>?
@@ -122,6 +125,12 @@ struct IPadToolKeys: UIViewRepresentable {
                 guard onArrow(d.0, d.1, big) else { return super.pressesBegan(presses, with: event) }
                 held.insert(key.keyCode)
                 startRepeat(d, big)
+                return
+            }
+            // 014 — Space paints at the pixel cursor (Pen only; otherwise passed on).
+            if key.keyCode == .keyboardSpacebar {
+                guard onPaint() else { return super.pressesBegan(presses, with: event) }
+                held.insert(key.keyCode)
                 return
             }
             let chars = key.charactersIgnoringModifiers
