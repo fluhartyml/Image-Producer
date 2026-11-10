@@ -15,8 +15,17 @@
 //    D-023 "Up to 4 sets per device: your original page plus up to 3 Product Page
 //          Optimization test versions"
 //
-//  REM: WHAT IS DELIBERATELY NOT HERE. Wrong-size warnings and Fill/Fit (D-040–042), Export to
-//  Project Bundle (D-050–051), the Apple TV icon and Top Shelf wells (D-021/027), the creative
+//  REM: PIECE 2 (D-040, D-041, D-042, LOCKED) — wrong-size images. His words:
+//    D-040 "A wrong-size image dropped in a well gets a warning: an exclamation popup, or a
+//          text note on the wells page."
+//    D-041 "Once a mismatch is found, the image shows a toggle: Fill ( ) Fit. Fit is the
+//          default."
+//    D-042 "At export, every wrong-size image is resized to its well, and the export says so
+//          plainly, so you can look in each folder and check nothing was skewed."
+//  Sizes are D-001 and D-030–D-034 (App Store Connect screenshot specifications, read
+//  2026-11-05). See "Sizes" below.
+//
+//  REM: WHAT IS DELIBERATELY NOT HERE. Export to Project Bundle (D-050–051), the Apple TV icon and Top Shelf wells (D-021/027), the creative
 //  asset wells (D-024/025/028) and video (D-070+) are later pieces. His rule: no placeholders,
 //  dead buttons or "coming soon" — so they are absent, not stubbed.
 //
@@ -78,6 +87,28 @@ enum XcodeWellDevice: String, CaseIterable, Identifiable {
 struct XcodeScreenshot: Identifiable, Codable, Equatable {
     var id = UUID()
     var imageData: Data
+    /// REM: D-041 — "the image shows a toggle: Fill ( ) Fit. Fit is the default." Kept per
+    /// screenshot and saved with the project; it only matters while the image is the wrong
+    /// size for its well.
+    var fitMode: XcodeFitMode = .fit
+}
+
+extension XcodeScreenshot {
+    /// Build 383 wrote screenshots with no `fitMode`; they open as Fit — D-041 "Fit is the
+    /// default." (In an extension so the memberwise init stays.)
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        imageData = try c.decode(Data.self, forKey: .imageData)
+        fitMode = try c.decodeIfPresent(XcodeFitMode.self, forKey: .fitMode) ?? .fit
+    }
+}
+
+/// REM: D-041 — "Fill ( ) Fit". Neither one stretches: D-042 wants "nothing was skewed", so
+/// both keep the picture's own proportions. Fit shows all of it inside the well's size, with
+/// bars where it doesn't reach; Fill covers the whole size and trims what spills over.
+enum XcodeFitMode: String, Codable {
+    case fill, fit
 }
 
 /// One set — a whole App Store page's worth of screenshots, one well per device.
@@ -143,6 +174,16 @@ extension ImageDocument {
         xcodeProject.sets[setIndex].wells[device.rawValue]?.removeAll { $0.id == id }
     }
 
+    /// REM: D-041 — flip one wrong-size screenshot between Fill and Fit.
+    func setFitMode(_ mode: XcodeFitMode, for id: XcodeScreenshot.ID, in device: XcodeWellDevice,
+                    inSet setIndex: Int) {
+        guard xcodeProject.sets.indices.contains(setIndex),
+              var list = xcodeProject.sets[setIndex].wells[device.rawValue],
+              let i = list.firstIndex(where: { $0.id == id }) else { return }
+        list[i].fitMode = mode
+        xcodeProject.sets[setIndex].wells[device.rawValue] = list
+    }
+
     /// One step earlier in upload order. REM: order matters — D-051 numbers the exported files
     /// "in upload order", so the well's order IS the App Store order.
     func moveScreenshotEarlier(_ id: XcodeScreenshot.ID, in device: XcodeWellDevice, inSet setIndex: Int) {
@@ -152,6 +193,125 @@ extension ImageDocument {
         list.swapAt(i, i - 1)
         xcodeProject.sets[setIndex].wells[device.rawValue] = list
     }
+}
+
+// MARK: - Sizes (D-001, D-030–D-034) and the wrong-size check (D-040)
+
+/// A picture's size in pixels, the way it shows on screen (EXIF rotation applied).
+struct WellPixelSize: Hashable, Sendable {
+    let width: Int
+    let height: Int
+    var aspect: Double { Double(width) / Double(height) }
+    var sideways: WellPixelSize { WellPixelSize(width: height, height: width) }
+    /// "1206 × 2622" — the way App Store Connect writes it.
+    var text: String { "\(width) × \(height)" }
+}
+
+extension XcodeWellDevice {
+    /// REM: The accepted screenshot sizes, exactly as the sheet lists them (App Store Connect
+    /// screenshot specifications, read 2026-11-05). "App Store Connect is our source of truth."
+    ///   D-031 iPhone "1206 × 2622 or 1179 × 2556"
+    ///   D-032 iPad "13-inch, 2064 × 2752 or 2048 × 2732"
+    ///   D-030 iPhone Duo "outer 1398 × 2034, inner 2007 × 2853 (landscape flipped)"
+    ///   D-001 Mac "16:10 at 1280 × 800, 1440 × 900, 2560 × 1600 or 2880 × 1800"
+    ///   D-034 Apple Watch "one size per model, for example 422 × 514 (Ultra 4, Ultra 3) or
+    ///         416 × 496 (Series 10–12)" — only the two the sheet names; a later sheet line
+    ///         can add the other models.
+    ///   D-033 Apple TV "1920 × 1080 or 3840 × 2160"
+    var acceptedSizes: [WellPixelSize] {
+        func s(_ w: Int, _ h: Int) -> WellPixelSize { WellPixelSize(width: w, height: h) }
+        switch self {
+        case .iPhone:     return [s(1206, 2622), s(1179, 2556)]
+        case .iPad:       return [s(2064, 2752), s(2048, 2732)]
+        case .iPhoneDuo:  return [s(1398, 2034), s(2007, 2853)]
+        case .mac:        return [s(1280, 800), s(1440, 900), s(2560, 1600), s(2880, 1800)]
+        case .appleWatch: return [s(422, 514), s(416, 496)]
+        case .appleTV:    return [s(1920, 1080), s(3840, 2160)]
+        }
+    }
+
+    /// REM: D-030 says the Duo's sizes come "landscape flipped" too. App Store Connect takes
+    /// iPhone and iPad screenshots either way up as well, so those three wells accept the
+    /// sideways size. Mac and Apple TV are landscape only, the Watch upright only.
+    var turnsSideways: Bool {
+        switch self {
+        case .iPhone, .iPad, .iPhoneDuo: true
+        case .mac, .appleWatch, .appleTV: false
+        }
+    }
+
+    /// Every size this well takes, upright first.
+    var allAcceptedSizes: [WellPixelSize] {
+        turnsSideways ? acceptedSizes + acceptedSizes.map(\.sideways) : acceptedSizes
+    }
+
+    func accepts(_ size: WellPixelSize) -> Bool { allAcceptedSizes.contains(size) }
+
+    /// "1206 × 2622 or 1179 × 2556, upright or sideways" — for the note in the well.
+    var acceptedSizesText: String {
+        let list = acceptedSizes.map(\.text)
+        let joined = list.count <= 2
+            ? list.joined(separator: " or ")
+            : list.dropLast().joined(separator: ", ") + " or " + list.last!
+        return turnsSideways ? joined + ", upright or sideways" : joined
+    }
+
+    /// REM: D-042 — "every wrong-size image is resized to its well." The well takes more than
+    /// one size, so pick the one that changes the picture least: same way up first, then the
+    /// closest shape, then (shapes alike within 2 %) the closest pixel count, so a slightly
+    /// small iPhone shot goes to 1179 × 2556 rather than being scaled up to 1206 × 2622.
+    func exportSize(for size: WellPixelSize) -> WellPixelSize {
+        let all = allAcceptedSizes
+        let sameWay = all.filter { size.width == size.height || ($0.width > $0.height) == (size.width > size.height) }
+        let pool = sameWay.isEmpty ? all : sameWay
+        func shapeGap(_ t: WellPixelSize) -> Double { abs(log(t.aspect / size.aspect)) }
+        let best = pool.map(shapeGap).min() ?? 0
+        let area = Double(size.width * size.height)
+        return pool.filter { shapeGap($0) <= best + 0.02 }
+            .min { abs(Double($0.width * $0.height) - area) < abs(Double($1.width * $1.height) - area) }
+            ?? pool[0]
+    }
+}
+
+/// The picture's pixel size, read from the file's header without decoding it. Rotation from
+/// the camera (EXIF orientations 5–8) swaps width and height, the same way the thumbnail
+/// shows it, so the check matches what you see.
+nonisolated func wellPixelSize(_ data: Data) -> WellPixelSize? {
+    guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+          let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+          let w = props[kCGImagePropertyPixelWidth] as? Int,
+          let h = props[kCGImagePropertyPixelHeight] as? Int, w > 0, h > 0 else { return nil }
+    let orientation = props[kCGImagePropertyOrientation] as? Int ?? 1
+    return (5...8).contains(orientation) ? WellPixelSize(width: h, height: w)
+                                         : WellPixelSize(width: w, height: h)
+}
+
+/// REM: D-042 — the resize itself. Fill or Fit (D-041), centered, never stretched ("check
+/// nothing was skewed"). Drawn onto an opaque canvas — D-035 "no transparency" — so Fit's
+/// bars are solid black. The thumbnails in the wells run THIS function at thumbnail size, so
+/// what you see in the well is the shape the export gets.
+nonisolated func wellResized(_ image: CGImage, to size: WellPixelSize, mode: XcodeFitMode) -> CGImage? {
+    let space = (image.colorSpace?.model == .rgb ? image.colorSpace : nil)
+        ?? CGColorSpace(name: CGColorSpace.sRGB)!
+    guard let ctx = CGContext(data: nil, width: size.width, height: size.height,
+                              bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                              bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+    ctx.interpolationQuality = .high
+    ctx.setFillColor(CGColor(gray: 0, alpha: 1))
+    ctx.fill(CGRect(x: 0, y: 0, width: size.width, height: size.height))
+    let sx = Double(size.width) / Double(image.width)
+    let sy = Double(size.height) / Double(image.height)
+    let k = mode == .fill ? max(sx, sy) : min(sx, sy)
+    let w = Double(image.width) * k, h = Double(image.height) * k
+    ctx.draw(image, in: CGRect(x: (Double(size.width) - w) / 2, y: (Double(size.height) - h) / 2,
+                               width: w, height: h))
+    return ctx.makeImage()
+}
+
+/// A screenshot whose size isn't one its well takes, and what the export does about it.
+struct WellMismatch: Equatable {
+    let size: WellPixelSize
+    let exportSize: WellPixelSize
 }
 
 // MARK: - Bringing an image in
@@ -239,12 +399,21 @@ struct XcodeWellRow: View {
 
     @State private var isTargeted = false
     @State private var importing = false
+    /// Each screenshot's pixel size, read once from its header (D-040's check needs it).
+    @State private var sizes: [XcodeScreenshot.ID: WellPixelSize] = [:]
 
     private var shots: [XcodeScreenshot] {
         document.xcodeProject.sets.indices.contains(setIndex)
             ? document.xcodeProject.sets[setIndex].screenshots(for: device) : []
     }
     private var isFull: Bool { shots.count >= XcodeProjectWells.maxPerDevice }
+
+    /// REM: D-040 — "A wrong-size image dropped in a well gets a warning". nil while the size
+    /// is still being read, or when it's a size this well takes.
+    private func mismatch(_ shot: XcodeScreenshot) -> WellMismatch? {
+        guard let size = sizes[shot.id], !device.accepts(size) else { return nil }
+        return WellMismatch(size: size, exportSize: device.exportSize(for: size))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -277,6 +446,7 @@ struct XcodeWellRow: View {
                 .accessibilityLabel("Add file")
             }
             strip
+            wrongSizeNotes
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
@@ -302,8 +472,53 @@ struct XcodeWellRow: View {
             guard case .success(let urls) = result else { return }
             add(urls.compactMap(wellImageData(fromFile:)))
         }
+        .task(id: shots.map(\.id)) {
+            // Read sizes only for screenshots not yet measured; keep the rest.
+            let missing = shots.filter { sizes[$0.id] == nil }.map { ($0.id, $0.imageData) }
+            guard !missing.isEmpty else { return }
+            let found = await Task.detached(priority: .utility) {
+                missing.compactMap { id, data in wellPixelSize(data).map { (id, $0) } }
+            }.value
+            for (id, size) in found { sizes[id] = size }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(device.title) well")
+    }
+
+    /// REM: D-040 — of "an exclamation popup, or a text note on the wells page", the text
+    /// note: it stays in the well beside the picture it's about, needs no tap to dismiss, and
+    /// a popup over the Layers list would stop you mid-drop. Each thumbnail also carries an
+    /// exclamation mark. The note says what D-042 will do at export — "says so plainly".
+    @ViewBuilder private var wrongSizeNotes: some View {
+        let wrong = shots.enumerated().compactMap { i, shot in
+            mismatch(shot).map { (position: i + 1, shot: shot, mismatch: $0) }
+        }
+        if !wrong.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(wrong, id: \.shot.id) { item in
+                    Label {
+                        Text(wrongSizeText(position: item.position, mismatch: item.mismatch,
+                                           mode: item.shot.fitMode))
+                            .scaledFont(18)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .scaledFont(18)
+                            .foregroundStyle(.yellow)
+                    }
+                }
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func wrongSizeText(position: Int, mismatch m: WellMismatch, mode: XcodeFitMode) -> String {
+        let how = mode == .fit
+            ? "fit inside it, all of it showing, with black bars where it doesn't reach"
+            : "filled to its edges, with what spills over trimmed"
+        return "Screenshot \(position) is \(m.size.text). The \(device.title) well takes "
+            + "\(device.acceptedSizesText). At export it's resized to \(m.exportSize.text), "
+            + "\(how). Nothing is stretched."
     }
 
     @ViewBuilder private var strip: some View {
@@ -317,7 +532,10 @@ struct XcodeWellRow: View {
                 HStack(spacing: 8) {
                     ForEach(Array(shots.enumerated()), id: \.element.id) { i, shot in
                         XcodeWellThumbnail(
-                            shot: shot, position: i + 1,
+                            shot: shot, position: i + 1, mismatch: mismatch(shot),
+                            onSetFitMode: { mode in
+                                document.setFitMode(mode, for: shot.id, in: device, inSet: setIndex)
+                            },
                             onRemove: { document.removeScreenshot(shot.id, from: device, inSet: setIndex) },
                             onMoveEarlier: i == 0 ? nil : {
                                 document.moveScreenshotEarlier(shot.id, in: device, inSet: setIndex)
@@ -342,9 +560,20 @@ struct XcodeWellRow: View {
         let before = shots.count
         let leftOut = document.addScreenshots(images, to: device, inSet: setIndex)
         let added = shots.count - before
+        // REM: D-040 — measure the new arrivals right away (a header read, no decode) so the
+        // warning is there the moment the drop lands, not a beat later.
+        let newShots = shots.suffix(added)
+        for shot in newShots where sizes[shot.id] == nil {
+            sizes[shot.id] = wellPixelSize(shot.imageData)
+        }
+        let wrong = newShots.filter { mismatch($0) != nil }.count
         if leftOut > 0 {
             document.say("\(device.title) holds \(XcodeProjectWells.maxPerDevice) screenshots — "
                          + "\(leftOut) not added", kind: .warning)
+        } else if wrong > 0 {
+            document.say("Added \(added) to the \(device.title) well — \(wrong) "
+                         + (wrong == 1 ? "isn't" : "aren't") + " a size it takes; see the note in the well",
+                         kind: .warning)
         } else if added > 0 {
             document.say("Added \(added) to the \(device.title) well", kind: .edit)
         }
@@ -355,6 +584,10 @@ struct XcodeWellRow: View {
 struct XcodeWellThumbnail: View {
     let shot: XcodeScreenshot
     let position: Int
+    /// REM: D-041 — "Once a mismatch is found, the image shows a toggle". nil = right size,
+    /// no toggle.
+    let mismatch: WellMismatch?
+    let onSetFitMode: (XcodeFitMode) -> Void
     let onRemove: () -> Void
     let onMoveEarlier: (() -> Void)?
 
@@ -375,7 +608,19 @@ struct XcodeWellThumbnail: View {
             }
             .frame(height: height)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .accessibilityLabel("Screenshot \(position)")
+            .overlay(alignment: .topTrailing) {
+                // REM: D-040 — the exclamation mark on the picture itself.
+                if mismatch != nil {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .scaledFont(18)
+                        .symbolRenderingMode(.multicolor)
+                        .padding(2)
+                        .accessibilityLabel("Wrong size")
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(mismatch == nil ? "Screenshot \(position)" : "Screenshot \(position), wrong size")
+            if mismatch != nil { fillFitToggle }
             HStack(spacing: 6) {
                 if let onMoveEarlier {
                     Button(action: onMoveEarlier) {
@@ -397,10 +642,54 @@ struct XcodeWellThumbnail: View {
                 .accessibilityLabel("Remove screenshot")
             }
         }
-        .task(id: shot.id) {
-            let data = shot.imageData
-            thumb = await Task.detached(priority: .utility) { wellThumbnail(data, maxPixels: 256) }.value
+        .task(id: PreviewKey(id: shot.id, mode: shot.fitMode, mismatch: mismatch)) {
+            // REM: D-042 — a wrong-size screenshot shows as the export will make it: the same
+            // `wellResized` Fill or Fit, run at thumbnail size, so you can see before export
+            // that nothing is skewed.
+            let data = shot.imageData, mode = shot.fitMode, target = mismatch?.exportSize
+            thumb = await Task.detached(priority: .utility) { () -> CGImage? in
+                guard let small = wellThumbnail(data, maxPixels: 256) else { return nil }
+                guard let target else { return small }
+                let k = 256 / Double(max(target.width, target.height))
+                let size = WellPixelSize(width: max(1, Int((Double(target.width) * k).rounded())),
+                                         height: max(1, Int((Double(target.height) * k).rounded())))
+                return wellResized(small, to: size, mode: mode) ?? small
+            }.value
         }
+    }
+
+    private struct PreviewKey: Equatable {
+        let id: XcodeScreenshot.ID
+        let mode: XcodeFitMode
+        let mismatch: WellMismatch?
+    }
+
+    /// REM: D-041 — "Fill ( ) Fit", in that order, as two visible buttons (no menu — his
+    /// rule). Built from plain buttons rather than a segmented Picker so the words keep the
+    /// 18 pt Dynamic Type font on iPhone and iPad too.
+    private var fillFitToggle: some View {
+        HStack(spacing: 0) {
+            fillFitButton("Fill", mode: .fill, help: "Fill the well's size, trimming the edges that spill over")
+            fillFitButton("Fit", mode: .fit, help: "Fit the whole picture inside the well's size, with bars where it doesn't reach")
+        }
+        .background(Capsule().strokeBorder(Color.secondary.opacity(0.5)))
+    }
+
+    private func fillFitButton(_ title: String, mode: XcodeFitMode, help: String) -> some View {
+        let on = shot.fitMode == mode
+        return Button { onSetFitMode(mode) } label: {
+            Text(title)
+                .scaledFont(18, weight: on ? .semibold : .regular)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 2)
+                .foregroundStyle(on ? Color.white : Color.primary)
+                .background(Capsule().fill(on ? Color.accentColor : Color.clear))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 
