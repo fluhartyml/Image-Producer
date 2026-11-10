@@ -573,7 +573,8 @@ extension UTType {
 /// A plain data file for SwiftUI's `.fileExporter` — any format the Export sheet writes.
 struct CanvasDataDocument: FileDocument {
     static var readableContentTypes: [UTType] {
-        [.png, .jpeg, .tiff, .gif, .bmp, .pdf, UTType("public.heic") ?? .png, .photoshopDocument, .layeredSourceImage]
+        [.png, .jpeg, .tiff, .gif, .bmp, .pdf, UTType("public.heic") ?? .png, .photoshopDocument, .layeredSourceImage,
+         .quickTimeMovie, .mpeg4Movie]   // REM: D-077 — the Video export's .mov and .mp4
     }
     static var writableContentTypes: [UTType] { readableContentTypes }
     var data: Data

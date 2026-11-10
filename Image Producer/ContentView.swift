@@ -8269,7 +8269,21 @@ struct ExportSheet: View {
 
     /// A single file in some format, or the Xcode icon set — which is a folder, not a file,
     /// so it cannot go through `fileExporter` and needs its own case.
-    private enum Choice: Hashable { case file(ExportFormat), iconSet, projectBundle }
+    private enum Choice: Hashable { case file(ExportFormat), iconSet, projectBundle, video }
+    /// REM: D-077 — "New export format: Video (ProRes 422 HQ or H.264, per 073), next to
+    /// Animated GIF, so you can also make a video on its own, outside a project bundle."
+    @State private var videoCodec: VideoExport.Codec = .proRes
+    @State private var videoPoster: Double = VideoExport.posterDefault
+    @State private var videoBusy = false
+    @State private var videoSound: URL?
+    @State private var videoFailure: String?
+    private var videoPlan: VideoExport.Plan {
+        VideoExport.plan(document, sourceFPS: gifFPS, cameraOnly: gifCameraOnly)
+    }
+    /// REM: D-072 — "The export names the second it's at, so you can set the same spot in
+    /// App Store Connect." Claude's call: the second goes in the file's name and the status line.
+    private var videoPosterAt: Double { min(videoPoster, videoPlan.seconds) }
+    private var videoFileName: String { "\(baseName) (Poster Frame \(VideoExport.seconds(videoPosterAt)))" }
     @State private var choice: Choice = .file(.png)
     private var format: ExportFormat? {
         if case .file(let f) = choice { return f }
@@ -8296,6 +8310,7 @@ struct ExportSheet: View {
                 Text("Format").scaledFont(18).foregroundStyle(.secondary)
                 Picker("Format", selection: $choice) {
                     ForEach(ExportFormat.allCases) { f in Text(f.rawValue).tag(Choice.file(f)) }
+                    Text("Video").tag(Choice.video)
                     #if os(macOS)
                     Divider()
                     Text("Icon Set").tag(Choice.iconSet)
@@ -8353,6 +8368,25 @@ struct ExportSheet: View {
                 }
                 Toggle("Loop", isOn: $gifLoop).scaledFont(18)
             }
+            if choice == .video {
+                if !document.cameraFrames.isEmpty {
+                    Toggle("Camera frames only", isOn: $gifCameraOnly).scaledFont(18)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Each card plays as \(Int(gifFPS)) flipbook frames a second").scaledFont(18)
+                    Slider(value: $gifFPS, in: 1...24, step: 1)
+                        .accessibilityLabel("Card speed")
+                        .accessibilityValue("\(Int(gifFPS))")
+                }
+                VideoExportOptions(plan: videoPlan, codec: $videoCodec, poster: $videoPoster,
+                                   sound: $videoSound)
+                if videoBusy {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Making your video").scaledFont(18).foregroundStyle(.secondary)
+                    }
+                }
+            }
             if choice == .projectBundle {
                 ProjectBundleSummary(document: document, project: bundleProject)
             }
@@ -8408,6 +8442,27 @@ struct ExportSheet: View {
                         #endif
                         return
                     }
+                    if choice == .video {
+                        let plan = videoPlan
+                        guard !plan.cards.isEmpty else {
+                            videoFailure = "No frames yet. Each layer with artwork is one card of the video."
+                            return
+                        }
+                        videoBusy = true
+                        Task { @MainActor in
+                            defer { videoBusy = false }
+                            do {
+                                let url = try await VideoExport.make(plan, document: document, codec: videoCodec,
+                                                                  sound: videoSound)
+                                defer { try? FileManager.default.removeItem(at: url) }
+                                payload = try Data(contentsOf: url)
+                                exporting = true
+                            } catch {
+                                videoFailure = "Your video could not be made: \(error.localizedDescription)"
+                            }
+                        }
+                        return
+                    }
                     guard let format else { return }
                     let m = (format == .pdfLayers && flattenMatte) ? matte.cgColorResolved : nil
                     if let d = format.data(from: document, matte: m, fps: gifFPS, loop: gifLoop,
@@ -8419,6 +8474,7 @@ struct ExportSheet: View {
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
+                .disabled(videoBusy)
             }
             .scaledFont(18)
         }
@@ -8434,10 +8490,21 @@ struct ExportSheet: View {
         #endif
         .fileExporter(isPresented: $exporting,
                       document: CanvasDataDocument(payload),
-                      contentType: (format ?? .png).utType,
-                      defaultFilename: baseName) { result in
-            document.reportExport(result, what: "\(baseName) (\(format?.rawValue ?? "file"))")
+                      contentType: choice == .video ? videoCodec.utType : (format ?? .png).utType,
+                      defaultFilename: choice == .video ? videoFileName : baseName) { result in
+            if choice == .video, case .success(let url) = result {
+                document.say("Exported \(url.lastPathComponent) — Poster Frame at "
+                             + "\(VideoExport.seconds(videoPosterAt))", kind: .save)
+            } else {
+                document.reportExport(result, what: "\(baseName) (\(choice == .video ? "Video" : format?.rawValue ?? "file"))")
+            }
             dismiss()
+        }
+        .alert("Video", isPresented: Binding(get: { videoFailure != nil },
+                                             set: { if !$0 { videoFailure = nil } })) {
+            Button("OK", role: .cancel) { videoFailure = nil }
+        } message: {
+            Text(videoFailure ?? "").scaledFont(18)
         }
         .fileExporter(isPresented: $bundleExporting,
                       document: bundleBuilt.map { ProjectBundleDocument(files: $0.allFiles) },
