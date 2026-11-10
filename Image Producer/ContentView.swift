@@ -77,6 +77,8 @@ struct ContentView: View {
     @State private var fillColor: Color = .white
     /// Export (⌘E): the unified export sheet with a format dropdown.
     @State private var showExportSheet = false
+    /// REM: D-080 — the storyboard sheet (Storyboard.swift).
+    @State private var showStoryboard = false
     /// Result of an "Export ▸ Icon Set…" run. Always says what happened — a silent
     /// export is the same failure shape as the Done button that reported nothing.
     @State private var iconSetResult: String?
@@ -632,6 +634,15 @@ struct ContentView: View {
                 .help("Export the project to a file (⌘E) — pick the format")
             }
             ToolbarItem(placement: .primaryAction) {
+                // REM: D-080 / D-092 — "a stack of cards is a storyboard". Opens the
+                // storyboard: your video's length and each card's time.
+                Button { showStoryboard = true } label: {
+                    Label("Storyboard", systemImage: "film.stack")
+                }
+                .help("Set your video's length and each card's time")
+                .accessibilityLabel("Storyboard")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 // Native ShareLink (replaces the old render→custom-sheet path that came
                 // up empty). Shares a flat PNG of the visible layers (crop-trimmed).
                 ShareLink(item: shareItem, preview: SharePreview(exportFilename)) {
@@ -701,6 +712,10 @@ struct ContentView: View {
         // and rename live in the Canvas Tool's inspector (his word 11-04 21:5x).
         .toolbar(removing: isPhone ? .title : nil)
         #endif
+        // REM: D-080 — the storyboard, its own sheet from the toolbar.
+        .sheet(isPresented: $showStoryboard) {
+            StoryboardSheet(document: document)
+        }
         .sheet(isPresented: $showExportSheet) {
             ExportSheet(document: document, gifFPS: camera.fps, gifLoop: camera.loop,
                         projectName: iconSetProjectName,
@@ -8372,11 +8387,19 @@ struct ExportSheet: View {
                 if !document.cameraFrames.isEmpty {
                     Toggle("Camera frames only", isOn: $gifCameraOnly).scaledFont(18)
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Each card plays as \(Int(gifFPS)) flipbook frames a second").scaledFont(18)
-                    Slider(value: $gifFPS, in: 1...24, step: 1)
-                        .accessibilityLabel("Card speed")
-                        .accessibilityValue("\(Int(gifFPS))")
+                if document.storyboard.isOn {
+                    // REM: D-088 — the storyboard's length sets the cards' time once it's set.
+                    Text("Your cards are timed by your storyboard: "
+                         + "\(VideoExport.seconds(document.storyboard.lengthSeconds)).")
+                        .scaledFont(18).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Each card plays as \(Int(gifFPS)) flipbook frames a second").scaledFont(18)
+                        Slider(value: $gifFPS, in: 1...24, step: 1)
+                            .accessibilityLabel("Card speed")
+                            .accessibilityValue("\(Int(gifFPS))")
+                    }
                 }
                 VideoExportOptions(plan: videoPlan, codec: $videoCodec, poster: $videoPoster,
                                    sound: $videoSound)

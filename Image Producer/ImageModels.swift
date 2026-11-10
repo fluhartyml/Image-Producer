@@ -78,6 +78,7 @@ final class ImageDocument {
         _ = registrationMarks
         _ = colorSpaceCMYK
         _ = xcodeProject
+        _ = storyboard
     }
 
     var name: String
@@ -271,6 +272,10 @@ final class ImageDocument {
     /// for Xcode Project Support. They belong to THIS image's project, so they live in the
     /// document and save with it, not in app settings. Types in XcodeProjectWells.swift.
     var xcodeProject = XcodeProjectWells()
+
+    /// REM: D-080, D-088 — the storyboard's length and each card's time. It belongs to this
+    /// image's video, so it saves with the document. Types in Storyboard.swift.
+    var storyboard = Storyboard()
 
     /// Crayon-box defaults — used for a new doc, or one saved before palettes existed.
     static let defaultPalette = ["#000000", "#FFFFFF", "#FF3B30", "#FF9500",
@@ -1442,6 +1447,9 @@ struct ImageProjectManifest: Codable {
     /// Written only when a well holds something: a project that never used them saves the
     /// same bytes it always did.
     var xcodeProject: XcodeProjectWells? = nil
+    /// REM: D-088 — the storyboard. Optional and LAST, like `xcodeProject`: older files have
+    /// no key and open with no storyboard; a document that never set a length saves no key.
+    var storyboard: Storyboard? = nil
 }
 
 extension ImageDocument {
@@ -1467,6 +1475,7 @@ extension ImageDocument {
         registrationMarks = manifest.registrationMarks ?? false
         colorSpaceCMYK = manifest.colorSpaceCMYK ?? false
         xcodeProject = manifest.xcodeProject ?? XcodeProjectWells()
+        storyboard = manifest.storyboard ?? Storyboard()
         // A document read from a file is not a brand-new one.
         openedAsNew = false
     }
@@ -1498,7 +1507,8 @@ extension ImageDocument {
                             bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                             cropMarks: cropMarks, registrationMarks: registrationMarks,
                             colorSpaceCMYK: colorSpaceCMYK, history: history,
-                            xcodeProject: xcodeProject.isEmpty ? nil : xcodeProject)
+                            xcodeProject: xcodeProject.isEmpty ? nil : xcodeProject,
+                            storyboard: storyboard.isWorthSaving ? storyboard : nil)
     }
 
     /// The package around the manifest bytes: a directory holding `manifest.json`.

@@ -435,6 +435,10 @@ struct WellVideoStrip: View {
         var text = "Make Video turns your flipbook into a silent video. This well takes "
             + "\(well.lengthText) at \(well.acceptedSizesText); under 15 seconds, each card is held longer."
         if case .creative = well { text += " The App Store loops it and plays it muted at first." }
+        // REM: D-088 — once the storyboard has a length, it times the cards here too.
+        if document.storyboard.isOn {
+            text += " Your cards are timed by your storyboard: \(VideoExport.seconds(document.storyboard.lengthSeconds))."
+        }
         return text
     }
 

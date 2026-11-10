@@ -71,15 +71,22 @@ enum VideoExport {
     /// 3333 (yes), never 123 123 123 123 (no)." Doubling every hold together keeps the
     /// cards in order and in proportion; anything under 15 s doubles to under 30 s, so the
     /// padded video always lands in the green.
-    /// REM: Claude's call, not from the sheet — until the storyboard's length-first timing
-    /// (D-084, D-088) is built, a card's time comes from the flipbook's frames a second,
-    /// the same slider the Animated GIF uses.
+    /// REM: Claude's call, not from the sheet — with no storyboard length set, a card's time
+    /// comes from the flipbook's frames a second, the same slider the Animated GIF uses.
     static func plan(_ document: ImageDocument, sourceFPS: Double, cameraOnly: Bool) -> Plan {
         let cards = flipbookFrameLayers(document, cameraOnly: cameraOnly)
         let rate = max(1, sourceFPS)
-        let base = cards.map { layer -> Int in
-            let exposures = Double(max(1, layer.cameraFrame?.exposures ?? 1))
-            return max(1, Int((exposures * Double(fps) / rate).rounded()))
+        // REM: D-088 — "Length first, then key frames." Once you've set a length on the
+        // storyboard, each card holds its storyboard time (D-084, D-089) and the flipbook
+        // speed no longer applies. With no length set, today's flipbook timing is kept.
+        let base: [Int]
+        if document.storyboard.isOn {
+            base = document.storyboard.holds(for: cards.map(\.id))
+        } else {
+            base = cards.map { layer -> Int in
+                let exposures = Double(max(1, layer.cameraFrame?.exposures ?? 1))
+                return max(1, Int((exposures * Double(fps) / rate).rounded()))
+            }
         }
         var plan = Plan(cards: cards, baseHolds: base, doublings: 0)
         let target = Int(shortest) * Int(fps)
