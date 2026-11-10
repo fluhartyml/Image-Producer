@@ -703,7 +703,9 @@ struct ContentView: View {
         #endif
         .sheet(isPresented: $showExportSheet) {
             ExportSheet(document: document, gifFPS: camera.fps, gifLoop: camera.loop,
-                        onIconSet: { exportIconSet() })
+                        projectName: iconSetProjectName,
+                        onIconSet: { exportIconSet() },
+                        onProjectBundle: { exportProjectBundle() })
         }
         .alert("Image Producer", isPresented: Binding(get: { iconSetResult != nil },
                                                 set: { if !$0 { iconSetResult = nil } })) {
@@ -800,8 +802,7 @@ struct ContentView: View {
     /// `AppIcon.appiconset`. An empty result string means the user cancelled the
     /// panel, which is not worth an alert.
     private func exportIconSet() {
-        // The FILE name, not document.name — the file is what he renamed and recognises.
-        let project = fileURL?.deletingPathExtension().lastPathComponent ?? document.name
+        let project = iconSetProjectName
         let message = IconSetExport.exportInteractively(from: document, projectName: project)
         if message.isEmpty {
             document.say("Icon set export cancelled", kind: .info)
@@ -811,6 +812,31 @@ struct ContentView: View {
             document.say(ok ? "Exported icon set — \(project)/\(IconSetExport.folderName)"
                             : "Icon set export failed — see the message", kind: ok ? .save : .warning)
         }
+    }
+
+    /// The FILE name, not document.name — the file is what he renamed and recognises. The
+    /// Icon Set and the Project Bundle use the same one, so both land in the same folder.
+    private var iconSetProjectName: String {
+        fileURL?.deletingPathExtension().lastPathComponent ?? document.name
+    }
+
+    /// REM: D-050 — ⌘E ▸ Format ▸ Project Bundle, on the Mac: "sits next to the Icon Set
+    /// export", so it runs the way Icon Set does — the sheet closes, the folder panel opens,
+    /// and the result (D-042's "resized" report) shows in the same alert. iPhone and iPad save
+    /// it through the system file picker inside the sheet instead (ExportSheet).
+    private func exportProjectBundle() {
+        #if os(macOS)
+        let project = iconSetProjectName
+        let message = ProjectBundleExport.exportInteractively(from: document, projectName: project)
+        if message.isEmpty {
+            document.say("Project bundle export cancelled", kind: .info)
+        } else {
+            iconSetResult = message
+            let ok = message.hasPrefix("Wrote")
+            document.say(ok ? "Exported project bundle — \(ProjectBundleExport.projectFolderName(project))"
+                            : "Project bundle export failed — see the message", kind: ok ? .save : .warning)
+        }
+        #endif
     }
 
     /// Write a flat PNG of the visible layers to the Desktop, no panel.
@@ -8209,7 +8235,18 @@ struct ExportSheet: View {
     @Bindable var document: ImageDocument
     /// Runs the icon-set export (it brings up its own folder panel and reports the result).
     var onIconSet: (() -> Void)? = nil
+    /// REM: D-050 — the Mac's Project Bundle export, run like Icon Set (its own folder panel).
+    var onProjectBundle: (() -> Void)? = nil
+    /// The project folder's name for the Project Bundle — the same name the Icon Set uses.
+    var projectName: String? = nil
     @Environment(\.dismiss) private var dismiss
+    /// REM: D-010 — Project Bundle is part of Xcode Project Support, "hidden unless you ask
+    /// for it", so it's in the Format list only while that's on.
+    @AppStorage(XcodeProjectSupport.storageKey) private var xcodeProjectSupport = XcodeProjectSupport.defaultValue
+    /// iPhone/iPad: the bundle waiting for the file picker, and the report once it's saved.
+    @State private var bundleBuilt: ProjectBundleExport.Built?
+    @State private var bundleExporting = false
+    @State private var bundleReport: String?
 
     /// Animated GIF timing, seeded from the Camera's playback so the file plays the way
     /// the preview did. Changing them here does not change the Camera.
@@ -8219,9 +8256,12 @@ struct ExportSheet: View {
     /// shots, not the puppet layers they were shot from.
     @State private var gifCameraOnly: Bool
     init(document: ImageDocument, gifFPS: Double = 8, gifLoop: Bool = true,
-         onIconSet: (() -> Void)? = nil) {
+         projectName: String? = nil,
+         onIconSet: (() -> Void)? = nil, onProjectBundle: (() -> Void)? = nil) {
         self.document = document
+        self.projectName = projectName
         self.onIconSet = onIconSet
+        self.onProjectBundle = onProjectBundle
         _gifFPS = State(initialValue: gifFPS)
         _gifLoop = State(initialValue: gifLoop)
         _gifCameraOnly = State(initialValue: !document.cameraFrames.isEmpty)
@@ -8229,7 +8269,7 @@ struct ExportSheet: View {
 
     /// A single file in some format, or the Xcode icon set — which is a folder, not a file,
     /// so it cannot go through `fileExporter` and needs its own case.
-    private enum Choice: Hashable { case file(ExportFormat), iconSet }
+    private enum Choice: Hashable { case file(ExportFormat), iconSet, projectBundle }
     @State private var choice: Choice = .file(.png)
     private var format: ExportFormat? {
         if case .file(let f) = choice { return f }
@@ -8245,6 +8285,10 @@ struct ExportSheet: View {
         return n.isEmpty ? "Untitled" : n
     }
 
+    private var bundleProject: String {
+        ProjectBundleExport.projectFolderName(projectName ?? baseName)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Export").scaledFont(22, weight: .semibold)
@@ -8256,6 +8300,14 @@ struct ExportSheet: View {
                     Divider()
                     Text("Icon Set").tag(Choice.iconSet)
                     #endif
+                    // REM: D-050 — "sits next to the Icon Set export". On iPhone and iPad,
+                    // where Icon Set isn't in this list, it takes the same spot.
+                    if xcodeProjectSupport {
+                        #if os(iOS)
+                        Divider()
+                        #endif
+                        Text(ProjectBundleExport.title).tag(Choice.projectBundle)
+                    }
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
@@ -8301,6 +8353,9 @@ struct ExportSheet: View {
                 }
                 Toggle("Loop", isOn: $gifLoop).scaledFont(18)
             }
+            if choice == .projectBundle {
+                ProjectBundleSummary(document: document, project: bundleProject)
+            }
             if format == .pdfLayers {
                 Toggle("Flatten transparency onto a matte", isOn: $flattenMatte)
                 if flattenMatte {
@@ -8334,6 +8389,25 @@ struct ExportSheet: View {
                         DispatchQueue.main.async { onIconSet?() }
                         return
                     }
+                    if choice == .projectBundle {
+                        #if os(macOS)
+                        // Like Icon Set: close the sheet, then its own folder panel opens.
+                        dismiss()
+                        DispatchQueue.main.async { onProjectBundle?() }
+                        #else
+                        // iPhone/iPad: the system file picker, which saves the project folder.
+                        let built = ProjectBundleExport.build(from: document,
+                                                              projectName: projectName ?? baseName)
+                        if built.groups.isEmpty {
+                            bundleReport = "Nothing to export: the icon set could not be rendered "
+                                + "and no well has a screenshot."
+                        } else {
+                            bundleBuilt = built
+                            bundleExporting = true
+                        }
+                        #endif
+                        return
+                    }
                     guard let format else { return }
                     let m = (format == .pdfLayers && flattenMatte) ? matte.cgColorResolved : nil
                     if let d = format.data(from: document, matte: m, fps: gifFPS, loop: gifLoop,
@@ -8364,6 +8438,29 @@ struct ExportSheet: View {
                       defaultFilename: baseName) { result in
             document.reportExport(result, what: "\(baseName) (\(format?.rawValue ?? "file"))")
             dismiss()
+        }
+        .fileExporter(isPresented: $bundleExporting,
+                      document: bundleBuilt.map { ProjectBundleDocument(files: $0.allFiles) },
+                      contentType: .folder,
+                      defaultFilename: bundleProject) { result in
+            // REM: D-042 — on success the report says plainly what was resized, before the
+            // sheet closes. A cancel or failure is said in the status line, as other exports do.
+            if case .success(let url) = result, let built = bundleBuilt {
+                document.say("Exported project bundle — \(url.lastPathComponent)", kind: .save)
+                bundleReport = ProjectBundleExport.report(
+                    built, header: "Saved the project bundle \(url.lastPathComponent) in "
+                        + "\(url.deletingLastPathComponent().lastPathComponent).")
+            } else {
+                document.reportExport(result, what: "\(bundleProject) (\(ProjectBundleExport.title))")
+                dismiss()
+            }
+            bundleBuilt = nil
+        }
+        .alert(ProjectBundleExport.title, isPresented: Binding(get: { bundleReport != nil },
+                                                             set: { if !$0 { bundleReport = nil } })) {
+            Button("OK", role: .cancel) { bundleReport = nil; dismiss() }
+        } message: {
+            Text(bundleReport ?? "").scaledFont(18)
         }
     }
 }

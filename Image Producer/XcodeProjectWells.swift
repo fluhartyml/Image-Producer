@@ -25,7 +25,9 @@
 //  Sizes are D-001 and D-030–D-034 (App Store Connect screenshot specifications, read
 //  2026-11-05). See "Sizes" below.
 //
-//  REM: WHAT IS DELIBERATELY NOT HERE. Export to Project Bundle (D-050–051), the Apple TV icon and Top Shelf wells (D-021/027), the creative
+//  REM: Export to Project Bundle (D-050–051) and D-042's "resized" report are in
+//  ProjectBundleExport.swift; the export calls `wellResized` below.
+//  REM: WHAT IS DELIBERATELY NOT HERE. The Apple TV icon and Top Shelf wells (D-021/027), the creative
 //  asset wells (D-024/025/028) and video (D-070+) are later pieces. His rule: no placeholders,
 //  dead buttons or "coming soon" — so they are absent, not stubbed.
 //
