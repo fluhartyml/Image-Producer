@@ -181,6 +181,9 @@ struct XcodeWellSet: Identifiable, Codable, Equatable {
     var wells: [String: [XcodeScreenshot]] = [:]
     /// Added in build 386. Builds 383–385 only ever wrote the Original set, with no `kind`.
     var kind: XcodeSetKind = .original
+    /// Added in build 390 (D-074–076): the wells' videos, keyed like `wells` — by a device's
+    /// or a creative asset well's raw value. Earlier files have none.
+    var videos: [String: [XcodeVideo]] = [:]
 
     func screenshots(for device: XcodeWellDevice) -> [XcodeScreenshot] { wells[device.rawValue] ?? [] }
 
@@ -198,6 +201,7 @@ extension XcodeWellSet {
         wells = try c.decodeIfPresent([String: [XcodeScreenshot]].self, forKey: .wells) ?? [:]
         kind = try c.decodeIfPresent(XcodeSetKind.self, forKey: .kind)
             ?? (name == XcodeProjectWells.originalName ? .original : .testVersion)
+        videos = try c.decodeIfPresent([String: [XcodeVideo]].self, forKey: .videos) ?? [:]
     }
 }
 
@@ -242,7 +246,7 @@ struct XcodeProjectWells: Codable, Equatable {
     /// A test version or custom page you added is saved even while its wells are empty, so
     /// its name is still there when you reopen the project.
     var isEmpty: Bool {
-        sets.count == 1 && sets.allSatisfy { $0.wells.values.allSatisfy(\.isEmpty) }
+        sets.count == 1 && sets.allSatisfy { $0.wells.values.allSatisfy(\.isEmpty) && $0.videoCount == 0 }
     }
 
     var originalIndex: Int { sets.firstIndex { $0.kind == .original } ?? 0 }
@@ -898,8 +902,8 @@ struct XcodeWellsSection: View {
             // REM: D-024 — the iOS 27 creative asset wells, after the device wells, on the
             // Original page only (see `XcodeCreativeWell` for why).
             if set.kind == .original {
-                Text("App Store creative assets, for iOS 27 and iPadOS 27 only. Images only, "
-                     + "no transparency. The dashed outline on a header or search results picture "
+                Text("App Store creative assets, for iOS 27 and iPadOS 27 only. Pictures take "
+                     + "no transparency; each well also takes one video. The dashed outline on a header or search results picture "
                      + "is its art safe area: keep your key artwork inside it.")
                     .scaledFont(18)
                     .foregroundStyle(.secondary)
@@ -1004,8 +1008,9 @@ struct XcodeWellsSection: View {
                 .accessibilityLabel("Keep set")
         } message: {
             if let doomed = pendingDelete {
-                let n = doomed.screenshotCount
-                Text("Its \(n) screenshot\(n == 1 ? "" : "s") will be deleted with it.")
+                let n = doomed.screenshotCount, v = doomed.videoCount
+                Text("Its \(n) screenshot\(n == 1 ? "" : "s")"
+                     + (v > 0 ? " and \(v) video\(v == 1 ? "" : "s")" : "") + " will be deleted with it.")
             }
         }
     }
@@ -1055,7 +1060,7 @@ struct XcodeWellsSection: View {
     }
 
     private func askDelete(_ s: XcodeWellSet) {
-        if s.screenshotCount > 0 { pendingDelete = s } else { delete(s) }
+        if s.screenshotCount + s.videoCount > 0 { pendingDelete = s } else { delete(s) }
     }
 
     private func delete(_ s: XcodeWellSet) {
@@ -1122,6 +1127,8 @@ struct XcodeWellRow: View {
             }
             strip
             wrongSizeNotes
+            // REM: D-074 — app previews, "up to 3 per device size", under the screenshots.
+            WellVideoStrip(document: document, well: .device(device), setIndex: setIndex)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
@@ -1493,6 +1500,9 @@ struct XcodeCreativeRow: View {
                 note("This picture is a JPEG at \(size.text). That size takes PNG only, so the export "
                      + "saves it as a PNG. Nothing is resized.", symbol: "info.circle", color: .secondary)
             }
+            // REM: D-075 — each creative asset well also takes a video.
+            WellVideoStrip(document: document, well: .creative(well),
+                           setIndex: document.xcodeProject.originalIndex)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
@@ -1639,6 +1649,9 @@ struct XcodeWellThumbnail: View {
     /// area as a fraction of the picture (top-left origin), drawn scaled to the thumbnail.
     /// nil for screenshots: "Screenshots and app previews fill the whole frame".
     var safeArea: CGRect? = nil
+    /// Set for a well's video (D-074–076): the thumbnail is its still, and the buttons say
+    /// "video" and keep the upload number.
+    var isVideo = false
 
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 84
 
@@ -1696,10 +1709,10 @@ struct XcodeWellThumbnail: View {
                         Image(systemName: "chevron.left").scaledFont(18)
                     }
                     .buttonStyle(.borderless)
-                    .help("Move this screenshot one place earlier")
+                    .help(isVideo ? "Move this video one place earlier" : "Move this screenshot one place earlier")
                     .accessibilityLabel("Move earlier")
                 }
-                if artName == nil {
+                if artName == nil || isVideo {
                     Text("\(position)")
                         .scaledFont(18, monospacedDigit: true)
                         .foregroundStyle(.secondary)
@@ -1709,8 +1722,9 @@ struct XcodeWellThumbnail: View {
                     Image(systemName: "xmark.circle.fill").scaledFont(18)
                 }
                 .buttonStyle(.borderless)
-                .help(artName == nil ? "Remove this screenshot from the well" : "Remove this picture from the well")
-                .accessibilityLabel(artName == nil ? "Remove screenshot" : "Remove picture")
+                .help(isVideo ? "Remove this video from the well"
+                      : artName == nil ? "Remove this screenshot from the well" : "Remove this picture from the well")
+                .accessibilityLabel(isVideo ? "Remove video" : artName == nil ? "Remove screenshot" : "Remove picture")
             }
         }
         .task(id: PreviewKey(id: shot.id, mode: shot.fitMode, mismatch: mismatch)) {

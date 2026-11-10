@@ -7,9 +7,9 @@
 //  (each layer with artwork, or the Camera's frames) become the cards of a video.
 //
 //  REM: D-026 — "image producer technically can make animations for app store connect"
-//  (his word). This is that animation, written as a real video file. The wells taking
-//  video (D-026, D-074–076), your own sound (D-071) and the storyboard (D-080 on) come
-//  in later pieces.
+//  (his word). This is that animation, written as a real video file. The wells take
+//  video in WellVideos.swift (D-026, D-074–076); sound effects at chosen moments (D-071)
+//  and the storyboard (D-080 on) come in later pieces.
 //
 //  REM: D-071 — "Sound: you bring your own. You can add your own sound effects; Image
 //  Producer offers none, not even the Mac's built-in system sounds, to stay clear of

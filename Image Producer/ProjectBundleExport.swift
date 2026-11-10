@@ -32,8 +32,13 @@
 //  (D-042), see-through parts made solid (D-035), and D-025's "5244 × 2950 (PNG only)" saves a
 //  JPEG at that size as a PNG, which the report names.
 //
-//  REM: WHAT IS DELIBERATELY NOT HERE. Video (D-070+, incl. 070b's "Only the green part … can
-//  go into … the Project Bundle") is a later piece — absent, not stubbed.
+//  REM: THE WELLS' VIDEOS (D-074, D-075, D-076, D-070b, LOCKED). A device well's app previews
+//  go in "<set>/<device>/App Previews/01.mp4 …" in upload order; a creative asset well's
+//  video goes beside its picture in Creative Assets, named for its well ("Search
+//  Results.mp4"). (Claude's naming: the sheet gives no folder for these.) A wrong-size video
+//  is written as the Fit or Fill version made with it (D-076) and named in the resized
+//  report. D-070b "Only the green part (15–30 s) can go into the App Store wells and the
+//  Project Bundle": a video outside its well's length is left out and named.
 //
 
 import SwiftUI
@@ -82,6 +87,8 @@ enum ProjectBundleExport {
         var enlarged: [Resize] = []
         /// Creative asset JPEGs saved as PNG because their size takes PNG only (D-025).
         var madePNG: [String] = []
+        /// REM: D-070b — videos left out because their length isn't one their well takes.
+        var outOfLength: [String] = []
 
         /// Every file, keyed by its path inside the project folder.
         var allFiles: [String: Data] {
@@ -157,6 +164,18 @@ enum ProjectBundleExport {
                 }
                 if written > 0 { counts.append((device.title, written)) }
             }
+            // REM: D-074 — each device's app previews, numbered in upload order.
+            for device in set.kind.devices {
+                let well = VideoWell.device(device)
+                let deviceFolder = IconSetExport.safeFolderName(device.title)
+                var written = 0
+                for (i, video) in set.videos(for: well.key).enumerated() {
+                    let name = "\(deviceFolder)/\(previewFolderName)/\(String(format: "%02d", i + 1)).mp4"
+                    if exportVideo(video, for: well, path: "\(folder)/\(name)", into: &built,
+                                   files: &files, name: name) { written += 1 }
+                }
+                if written > 0 { counts.append(("\(device.title) \(previewFolderName)", written)) }
+            }
             // REM: D-024 — the creative asset wells (Original page only) go in their own
             // folder inside the set's folder, each file named for its well.
             var creativeWritten = 0
@@ -177,6 +196,16 @@ enum ProjectBundleExport {
                 }
                 if out.seeThrough { built.seeThrough.append("\(folder)/\(name)") }
             }
+            // REM: D-075 — a creative asset well's video, beside its picture.
+            if set.kind == .original {
+                for well in XcodeCreativeWell.allCases {
+                    for video in set.videos(for: VideoWell.creative(well).key) {
+                        let name = "\(creativeFolderName)/\(IconSetExport.safeFolderName(well.title)).mp4"
+                        if exportVideo(video, for: .creative(well), path: "\(folder)/\(name)",
+                                       into: &built, files: &files, name: name) { creativeWritten += 1 }
+                    }
+                }
+            }
             if creativeWritten > 0 { counts.append((creativeFolderName, creativeWritten)) }
             if files.isEmpty {
                 built.emptySetFolders.append(folder)
@@ -186,6 +215,33 @@ enum ProjectBundleExport {
             }
         }
         return built
+    }
+
+    /// The folder, inside each device folder, for its app previews (D-074).
+    static let previewFolderName = "App Previews"
+
+    /// REM: D-076 / D-070b — one well video into the bundle: the version at the well's size
+    /// (Fit or Fill, made with it) when the canvas size isn't one the well takes; left out and
+    /// named when its length isn't one the well takes. Returns true when written.
+    private static func exportVideo(_ video: XcodeVideo, for well: VideoWell, path: String,
+                                    into built: inout Built, files: inout [String: Data],
+                                    name: String) -> Bool {
+        guard well.lengthFits(video.seconds) else {
+            built.outOfLength.append("\(path), \(VideoExport.seconds(video.seconds))")
+            return false
+        }
+        if well.accepts(video.size) {
+            files[name] = video.videoData
+            return true
+        }
+        guard let data = video.fitMode == .fit ? video.fitData : video.fillData else {
+            built.unreadable.append(path)
+            return false
+        }
+        files[name] = data
+        built.resized.append(Resize(path: path, from: video.size, to: well.exportSize(for: video.size),
+                                    mode: video.fitMode))
+        return true
     }
 
     /// REM: D-021/D-027 — the Apple TV wells as the brand assets' pictures. Each picture is
@@ -373,7 +429,7 @@ enum ProjectBundleExport {
         // nothing was skewed." Every resized file by its path, its old size and its new one.
         if built.resized.isEmpty {
             if !built.filled.isEmpty {
-                parts.append("Nothing was resized: every picture is already a size its well takes.")
+                parts.append("Nothing was resized: everything is already a size its well takes.")
             }
         } else {
             var lines = ["Resized to fit their wells. Open each folder and check nothing was skewed:"]
@@ -401,6 +457,14 @@ enum ProjectBundleExport {
             // REM: D-035 "no transparency".
             parts.append("App Store Connect takes no transparency, so the see-through parts of these are solid black now:\n"
                          + built.seeThrough.map { "• \($0)" }.joined(separator: "\n"))
+        }
+        if built.filled.contains(where: { $0.counts.contains { $0.device.hasSuffix(previewFolderName) } }) {
+            parts.append("App previews are in each device's \(previewFolderName) folder, numbered in upload order.")
+        }
+        if !built.outOfLength.isEmpty {
+            // REM: D-070b — "Only the green part (15–30 s) can go into … the Project Bundle."
+            parts.append("Left out because their length isn't one App Store Connect takes there:\n"
+                         + built.outOfLength.map { "• \($0)" }.joined(separator: "\n"))
         }
         if !built.unreadable.isEmpty {
             parts.append("These couldn't be read, so they were left out:\n"
@@ -511,7 +575,9 @@ struct ProjectBundleSummary: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("One folder named \(project), holding the icon set and a folder for each set of wells, "
                  + "with each device's screenshots numbered in upload order.")
-            if filled.isEmpty && XcodeCreativeWell.allCases.allSatisfy({ wells.sets[wells.originalIndex].creative($0) == nil }) {
+            let videoCount = wells.sets.reduce(0) { $0 + $1.videoCount }
+            if filled.isEmpty && videoCount == 0
+                && XcodeCreativeWell.allCases.allSatisfy({ wells.sets[wells.originalIndex].creative($0) == nil }) {
                 Text("Your wells are empty, so only the icon set goes in.")
             } else {
                 ForEach(filled, id: \.self) { Text($0) }
@@ -534,6 +600,19 @@ struct ProjectBundleSummary: View {
                     Text("\(wrongArt) of them \(wrongArt == 1 ? "isn't a size its well takes; it's" : "aren't a size their well takes; they're") "
                          + "resized, and the report after export names each one.")
                 }
+            }
+            // REM: D-074/D-075/D-076 — the wells' videos, and how many get their Fit or Fill version.
+            if videoCount > 0 {
+                let wrongVideos = wells.sets.reduce(0) { total, set in
+                    total + set.videos.reduce(0) { sub, entry in
+                        let well = set.kind.devices.first { $0.rawValue == entry.key }.map(VideoWell.device)
+                            ?? XcodeCreativeWell.allCases.first { $0.rawValue == entry.key }.map(VideoWell.creative)
+                        guard let well else { return sub }
+                        return sub + entry.value.filter { !well.accepts($0.size) }.count
+                    }
+                }
+                Text("\(videoCount) video\(videoCount == 1 ? "" : "s") from your wells, as .mp4"
+                     + (wrongVideos > 0 ? "; \(wrongVideos) of them resized to their well, named in the report." : "."))
             }
             if wrong > 0 {
                 Text("\(wrong) screenshot\(wrong == 1 ? " isn't a size its well takes; it's" : "s aren't a size their well takes; they're") "
