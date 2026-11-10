@@ -27,6 +27,7 @@
 
 import AVKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// What the document saves about its storyboard. Optional in the manifest, so files saved
 /// before it open unchanged (no storyboard: videos keep the flipbook speed).
@@ -67,8 +68,36 @@ struct Storyboard: Codable, Equatable {
         var easing: CameraEasing { CameraEasing(rawValue: easingName ?? "") ?? .easeBoth }
     }
     var transitions: [Transition]? = nil
+    /// REM: D-071 — "You can add your own sound effects; Image Producer offers none".
+    /// "Partly built in 389: you can add one sound file; sound effects at chosen moments are
+    /// not built yet." Each one is your own sound file, tied to a card: it starts the moment
+    /// that card first shows in the video. Claude's call, not from the sheet: the moment you
+    /// choose is a card's start (cards are the storyboard's key frames, D-081), and the
+    /// sound's bytes are kept inside the document, like the working video (D-087), so it
+    /// travels with the file. Optional, so files saved by build 393 (no key) open unchanged.
+    struct SoundEffect: Codable, Equatable {
+        /// The card it plays at. Removing the card drops the sound from the video.
+        var card: UUID
+        /// The file's name, shown on the card's row.
+        var name: String
+        var data: Data
+    }
+    var soundEffects: [SoundEffect]? = nil
     /// Worth saving: a length is set or a working video is kept.
-    var isWorthSaving: Bool { isOn || workingVideo != nil }
+    var isWorthSaving: Bool { isOn || workingVideo != nil || !(soundEffects ?? []).isEmpty }
+
+    /// The sound effect on this card, if you added one.
+    func soundEffect(for card: UUID) -> SoundEffect? {
+        soundEffects?.first { $0.card == card }
+    }
+
+    /// REM: Claude's call, not from the sheet — one sound effect a card; adding another to the
+    /// same card replaces it. A sound that should come later can go on a later card.
+    mutating func setSoundEffect(_ effect: SoundEffect?, for card: UUID) {
+        var list = (soundEffects ?? []).filter { $0.card != card }
+        if let effect { list.append(effect) }
+        soundEffects = list.isEmpty ? nil : list
+    }
 
     static let fps = Int(VideoExport.fps)
     /// REM: D-088 — "You set the video's length (30 s max)". Claude's call, not from the
@@ -338,6 +367,8 @@ struct StoryboardSheet: View {
     @State private var failure: String?
     @State private var player: AVPlayer?
     @State private var exporting = false
+    /// The card a sound effect is being picked for (D-071).
+    @State private var soundCard: UUID?
 
     private var cards: [ImageLayer] { document.storyboardCards }
     private var ids: [UUID] { cards.map(\.id) }
@@ -351,7 +382,8 @@ struct StoryboardSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Storyboard").scaledFont(24, weight: .semibold)
             Text("Each card is a key frame: one layer with artwork, in layer order. Set your video's "
-                 + "length first, and your cards share it evenly.")
+                 + "length first, and your cards share it evenly. A sound you add to a card plays "
+                 + "when that card starts.")
                 .scaledFont(18).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if cards.isEmpty {
@@ -403,8 +435,11 @@ struct StoryboardSheet: View {
                     Button("Use Flipbook Speed") {
                         // Your working video is kept (D-087); only the timing goes.
                         let kept = document.storyboard
+                        // REM: Claude's call — your sound effects are kept too; they play
+                        // again once you set a length (they need the storyboard's cards).
                         document.storyboard = Storyboard(workingVideo: kept.workingVideo,
-                                                         workingSeconds: kept.workingSeconds)
+                                                         workingSeconds: kept.workingSeconds,
+                                                         soundEffects: kept.soundEffects)
                         document.say("Storyboard off: videos use the flipbook speed", kind: .edit)
                     }
                     .buttonStyle(.bordered).buttonBorderShape(.capsule).scaledFont(18)
@@ -426,6 +461,23 @@ struct StoryboardSheet: View {
                       contentType: .mpeg4Movie,
                       defaultFilename: "\(document.name) Video") { result in
             document.reportExport(result, what: "\(document.name) Video")
+        }
+        .fileImporter(isPresented: Binding(get: { soundCard != nil },
+                                           set: { if !$0 { soundCard = nil } }),
+                      allowedContentTypes: [.audio]) { result in
+            guard let card = soundCard else { return }
+            soundCard = nil
+            guard case .success(let url) = result else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let data = try Data(contentsOf: url)
+                document.storyboard.setSoundEffect(
+                    Storyboard.SoundEffect(card: card, name: url.lastPathComponent, data: data), for: card)
+                document.say("Sound added: \(url.lastPathComponent)", kind: .edit)
+            } catch {
+                failure = "That sound file can't be opened: \(error.localizedDescription)"
+            }
         }
         .alert("Storyboard", isPresented: Binding(get: { failure != nil },
                                                   set: { if !$0 { failure = nil } })) {
@@ -552,6 +604,33 @@ struct StoryboardSheet: View {
             .accessibilityLabel("More time")
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .contain)
+        soundRow(card)
+    }
+
+    /// REM: D-071 — "You can add your own sound effects". The card's sound line: your own
+    /// file plays the moment this card starts.
+    @ViewBuilder private func soundRow(_ card: ImageLayer) -> some View {
+        HStack(spacing: 10) {
+            if let effect = document.storyboard.soundEffect(for: card.id) {
+                Text("Sound: \(effect.name)").scaledFont(18).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                Spacer(minLength: 8)
+                Button("Remove Sound") {
+                    document.storyboard.setSoundEffect(nil, for: card.id)
+                    document.say("Sound removed from \(card.name)", kind: .edit)
+                }
+                .buttonStyle(.bordered).buttonBorderShape(.capsule).scaledFont(18)
+                .accessibilityLabel("Remove sound")
+            } else {
+                Text("No sound on this card.").scaledFont(18).foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Button("Add Sound") { soundCard = card.id }
+                    .buttonStyle(.bordered).buttonBorderShape(.capsule).scaledFont(18)
+                    .accessibilityLabel("Add sound")
+            }
+        }
+        .padding(.leading, 24)
         .accessibilityElement(children: .contain)
     }
 

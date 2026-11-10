@@ -132,10 +132,54 @@ enum VideoExport {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("ImageProducer-\(UUID().uuidString)")
             .appendingPathExtension(codec.fileExtension)
+        // REM: D-071 — "sound effects at chosen moments": each card's sound effect starts
+        // where that card first shows (after D-070c's padding, its first held frame). They
+        // need the storyboard's cards, so they play only while a length is set.
+        var effects: [(url: URL, at: Double)] = []
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ImageProducer-effects-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        if document.storyboard.isOn, let list = document.storyboard.soundEffects, !list.isEmpty {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let starts = plan.cardStarts
+            for (n, effect) in list.enumerated() {
+                guard let i = plan.cards.firstIndex(where: { $0.id == effect.card }),
+                      starts.indices.contains(i) else { continue }
+                let file = folder.appendingPathComponent("\(n)-\(effect.name)")
+                try effect.data.write(to: file)
+                effects.append((file, starts[i]))
+            }
+        }
         try await write(images: images, holds: plan.holds, width: w, height: h,
                         canvas: CGSize(width: cw, height: ch), codec: codec, sound: sound, to: url,
-                        steps: withMotion(plan.steps, cards: plan.cards, document: document))
+                        steps: withMotion(plan.steps, cards: plan.cards, document: document),
+                        effects: effects)
         return url
+    }
+
+    /// REM: D-071 — your background sound (the one Add Sound in the Export sheet, from 0 s)
+    /// and each sound effect at its moment, laid on their own audio tracks of one composition,
+    /// every one cut off where the video ends. AVAssetReaderAudioMixOutput mixes them into the
+    /// one stereo track the video gets.
+    nonisolated static func soundMix(background: URL?, effects: [(url: URL, at: Double)],
+                                                 end: CMTime) async throws -> AVMutableComposition? {
+        var parts: [(URL, CMTime)] = []
+        if let background { parts.append((background, .zero)) }
+        for e in effects { parts.append((e.url, CMTime(seconds: e.at, preferredTimescale: 48_000))) }
+        guard !parts.isEmpty else { return nil }
+        let mix = AVMutableComposition()
+        for (url, at) in parts where at < end {
+            let asset = AVURLAsset(url: url)
+            guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+                throw Failure.writer("The sound file \(url.lastPathComponent) has no sound in it.")
+            }
+            let length = CMTimeMinimum(try await asset.load(.duration), end - at)
+            guard length > .zero,
+                  let lane = mix.addMutableTrack(withMediaType: .audio,
+                                                 preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
+            try lane.insertTimeRange(CMTimeRange(start: .zero, duration: length), of: track, at: at)
+        }
+        return mix.tracks.isEmpty ? nil : mix
     }
 
     nonisolated enum Failure: LocalizedError {
@@ -152,19 +196,17 @@ enum VideoExport {
     /// buffer, then appended for every 1/30 s frame it holds.
     @concurrent nonisolated static func write(images: [CGImage], holds: [Int], width: Int, height: Int,
                                               canvas: CGSize, codec: Codec, sound: URL?, to url: URL,
-                                              steps: [VideoTransitionStep] = []) async throws {
+                                              steps: [VideoTransitionStep] = [],
+                                              effects: [(url: URL, at: Double)] = []) async throws {
         let writer = try AVAssetWriter(outputURL: url, fileType: codec.fileType)
-        // Your sound, read as plain stereo samples and written in App Store Connect's form.
+        let videoEnd = CMTime(value: Int64(holds.reduce(0, +) + steps.reduce(0) { $0 + $1.frames }), timescale: fps)
+        // Your sounds, mixed and read as plain stereo samples, written in App Store Connect's form.
         var soundReader: AVAssetReader?
-        var soundOutput: AVAssetReaderTrackOutput?
+        var soundOutput: AVAssetReaderOutput?
         var soundInput: AVAssetWriterInput?
-        if let sound {
-            let asset = AVURLAsset(url: sound)
-            guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
-                throw Failure.writer("The sound file has no sound in it.")
-            }
-            let reader = try AVAssetReader(asset: asset)
-            let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+        if let mix = try await soundMix(background: sound, effects: effects, end: videoEnd) {
+            let reader = try AVAssetReader(asset: mix)
+            let output = AVAssetReaderAudioMixOutput(audioTracks: mix.tracks, audioSettings: [
                 AVFormatIDKey: kAudioFormatLinearPCM,
                 AVSampleRateKey: 48_000,
                 AVNumberOfChannelsKey: 2,
@@ -194,7 +236,6 @@ enum VideoExport {
         }
         var pending: CMSampleBuffer?
         var soundDone = soundInput == nil
-        let videoEnd = CMTime(value: Int64(holds.reduce(0, +) + steps.reduce(0) { $0 + $1.frames }), timescale: fps)
         /// Feed sound up to `limit` while the writer will take it. Returns true if any went in.
         /// The sound plays from the start and is cut off where the video ends.
         func pumpSound(upTo limit: CMTime) -> Bool {
@@ -425,7 +466,8 @@ struct VideoExportOptions: View {
     }
 
     /// REM: D-071 — "you bring your own". Claude's call, not from the sheet: one sound
-    /// file, playing from the start and cut off where the video ends.
+    /// file, playing from the start and cut off where the video ends. It's the background
+    /// track; the storyboard's per-card sound effects are mixed over it (Storyboard.swift).
     @ViewBuilder private var soundRow: some View {
         if let sound {
             HStack(spacing: 10) {
@@ -435,7 +477,8 @@ struct VideoExportOptions: View {
                     .buttonStyle(.bordered).buttonBorderShape(.capsule).scaledFont(18)
                     .accessibilityLabel("Remove sound")
             }
-            Text("Your sound plays from the start and stops when the video ends.")
+            Text("Your sound plays from the start, under any sounds on your storyboard's cards, "
+                 + "and stops when the video ends.")
                 .scaledFont(18).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         } else {

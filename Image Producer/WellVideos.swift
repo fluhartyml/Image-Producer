@@ -333,6 +333,9 @@ enum WellVideoMaker {
             .appendingPathComponent("ImageProducer-well-\(UUID().uuidString)")
             .appendingPathExtension(VideoExport.Codec.h264.fileExtension)
         defer { try? FileManager.default.removeItem(at: url) }
+        // REM: D-071 — the sheet doesn't say the wells' videos get sound, and "Videos with no
+        // sound stay silent." Claude's call: the wells' videos stay silent (no background
+        // sound, no storyboard sound effects); sound is for Export ▸ Video and Play / Render.
         try await VideoExport.write(images: images, holds: holds, width: size.width, height: size.height,
                                     canvas: canvas, codec: .h264, sound: nil, to: url,
                                     steps: steps)
