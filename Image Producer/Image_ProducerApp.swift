@@ -273,6 +273,8 @@ struct Image_ProducerApp: App {
             CommandGroup(replacing: .undoRedo) { }
 
             AdjustmentCommands()
+            // REM: D-011 — View ▸ Xcode Project Support (⌥⌘X), Mac and iPad menu bars.
+            XcodeProjectCommands()
 
             #if os(macOS)
             // File > Export… (⌘E) — placed after Save, but distinct from it: Save
@@ -417,6 +419,14 @@ struct Image_ProducerApp: App {
         }
         .defaultLaunchBehavior(.presented)
         .windowResizability(.contentSize)
+        #endif
+
+        #if os(macOS)
+        // REM: D-011 — the Settings half on the Mac (Image Producer ▸ Settings…, ⌘,). The
+        // iPhone and iPad have the same switch in the Settings app (Settings.bundle).
+        Settings {
+            XcodeProjectSettingsView()
+        }
         #endif
     }
 }

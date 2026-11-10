@@ -6942,6 +6942,8 @@ struct LayerPanel: View {
     /// for." Tying them together broke Move / Transform — see `toggleChecked`.
     @State private var checkedLayerIDs: Set<ImageLayer.ID> = []
     @State private var mergeMessage: String?
+    /// REM: D-012 — Xcode Project Support on: the screenshot wells show under the layers.
+    @AppStorage(XcodeProjectSupport.storageKey) private var xcodeProjectSupport = XcodeProjectSupport.defaultValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -6967,6 +6969,7 @@ struct LayerPanel: View {
             // Button, or it would swallow the drag before .onMove sees it.
             List(selection: $activeLayerID) {
                 layerRows().onMove(perform: move).onDelete(perform: deleteAt)
+                if xcodeProjectSupport { XcodeWellsSection(document: document) }
             }
             .listStyle(.plain)
             #else
@@ -6977,6 +6980,7 @@ struct LayerPanel: View {
             // back the long press"). Delete lives in the row's long-press menu instead.
             List {
                 layerRows().onMove(perform: move)
+                if xcodeProjectSupport { XcodeWellsSection(document: document) }
             }
             .listStyle(.plain)
             .environment(\.editMode, .constant(.active))

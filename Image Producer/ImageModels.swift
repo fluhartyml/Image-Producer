@@ -77,6 +77,7 @@ final class ImageDocument {
         _ = cropMarks
         _ = registrationMarks
         _ = colorSpaceCMYK
+        _ = xcodeProject
     }
 
     var name: String
@@ -265,6 +266,11 @@ final class ImageDocument {
     /// Output color space for the Print PDF: false = RGB (default), true = CMYK. Switchable
     /// anytime — editing stays RGB on screen; CMYK is an export-time conversion.
     var colorSpaceCMYK: Bool = false
+
+    /// REM: D-010–D-023 (Amber Sheet D, LOCKED 2026-11-05) — the App Store screenshot wells
+    /// for Xcode Project Support. They belong to THIS image's project, so they live in the
+    /// document and save with it, not in app settings. Types in XcodeProjectWells.swift.
+    var xcodeProject = XcodeProjectWells()
 
     /// Crayon-box defaults — used for a new doc, or one saved before palettes existed.
     static let defaultPalette = ["#000000", "#FFFFFF", "#FF3B30", "#FF9500",
@@ -1431,6 +1437,11 @@ struct ImageProjectManifest: Codable {
     /// Linear edit history; optional/absent in files saved before History existed → an
     /// empty history. (Snapshot PNGs referenced by entries live as sibling files.)
     var history: ImageHistory? = nil
+    /// REM: D-012 — the Xcode Project Support wells. Optional and LAST so every older file
+    /// (no key) opens unchanged, and the memberwise init everywhere else keeps compiling.
+    /// Written only when a well holds something: a project that never used them saves the
+    /// same bytes it always did.
+    var xcodeProject: XcodeProjectWells? = nil
 }
 
 extension ImageDocument {
@@ -1455,6 +1466,7 @@ extension ImageDocument {
         cropMarks = manifest.cropMarks ?? true
         registrationMarks = manifest.registrationMarks ?? false
         colorSpaceCMYK = manifest.colorSpaceCMYK ?? false
+        xcodeProject = manifest.xcodeProject ?? XcodeProjectWells()
         // A document read from a file is not a brand-new one.
         openedAsNew = false
     }
@@ -1485,7 +1497,8 @@ extension ImageDocument {
                             cropMask: cropMask, ppi: ppi,
                             bleedInches: bleedInches, safeMarginInches: safeMarginInches,
                             cropMarks: cropMarks, registrationMarks: registrationMarks,
-                            colorSpaceCMYK: colorSpaceCMYK, history: history)
+                            colorSpaceCMYK: colorSpaceCMYK, history: history,
+                            xcodeProject: xcodeProject.isEmpty ? nil : xcodeProject)
     }
 
     /// The package around the manifest bytes: a directory holding `manifest.json`.

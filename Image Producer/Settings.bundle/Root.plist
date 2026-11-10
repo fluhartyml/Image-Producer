@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  REM: D-011 (Amber Sheet D, LOCKED 2026-11-05) — "View and settings because the ipad has a
+  menubar but iphones dont." This is the Settings half on iPhone and iPad: Settings app ▸
+  Apps ▸ Image Producer. Same key the View menu toggle and the Mac's Settings window use
+  (XcodeProjectSupport.storageKey), so all of them are one switch. D-010: off by default.
+-->
+<plist version="1.0">
+<dict>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Xcode Project</string>
+			<key>FooterText</key>
+			<string>Shows screenshot wells for your App Store pages in the Layers list. Drop screenshots for each device into its well; they save with your project.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Xcode Project Support</string>
+			<key>Key</key>
+			<string>ip.xcodeProjectSupport</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+	</array>
+</dict>
+</plist>
