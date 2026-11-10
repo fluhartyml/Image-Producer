@@ -293,19 +293,36 @@ enum WellVideoMaker {
         let stillImage = images[min(posterCard, images.count - 1)]
         let still = pngData(stillImage) ?? Data()
 
+        // REM: D-091 — motion in-betweens are made once, then sized with the cards.
+        let steps = VideoExport.withMotion(plan.steps, cards: plan.cards, document: document)
         let original = try await encode(images, holds: holds, size: size,
-                                        canvas: CGSize(width: cw, height: ch), steps: plan.steps)
+                                        canvas: CGSize(width: cw, height: ch), steps: steps)
         var fit: Data?, fill: Data?
         if !well.accepts(size) {
             let target = well.exportSize(for: size)
             let full = CGSize(width: target.width, height: target.height)
             fit = try await encode(images.compactMap { wellResized($0, to: target, mode: .fit) },
-                                   holds: holds, size: target, canvas: full, steps: plan.steps)
+                                   holds: holds, size: target, canvas: full,
+                                   steps: resized(steps, to: target, mode: .fit))
             fill = try await encode(images.compactMap { wellResized($0, to: target, mode: .fill) },
-                                    holds: holds, size: target, canvas: full, steps: plan.steps)
+                                    holds: holds, size: target, canvas: full,
+                                    steps: resized(steps, to: target, mode: .fill))
         }
         return XcodeVideo(videoData: original, width: size.width, height: size.height,
                           seconds: plan.seconds, still: still, fitData: fit, fillData: fill)
+    }
+
+    /// A motion in-between's frames sized like the cards (Fit or Fill). If any frame can't
+    /// be sized, the step falls back to its eased cross-fade.
+    private static func resized(_ steps: [VideoTransitionStep], to target: WellPixelSize,
+                                mode: XcodeFitMode) -> [VideoTransitionStep] {
+        steps.map { step in
+            guard !step.motionFrames.isEmpty else { return step }
+            var out = step
+            let sized = step.motionFrames.compactMap { wellResized($0, to: target, mode: mode) }
+            out.motionFrames = sized.count == step.motionFrames.count ? sized : []
+            return out
+        }
     }
 
     /// One silent H.264 video through Export ▸ Video's own writer, read back as bytes.

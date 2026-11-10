@@ -59,6 +59,12 @@ struct Storyboard: Codable, Equatable {
         var effectName: String
         var frames: Int
         var effect: TransitionEffect { TransitionEffect(rawValue: effectName) ?? .cut }
+        /// REM: D-091 — "motion in-betweens with easing (from the Camera tool)": the Camera
+        /// tool's easing, saved by name for a motion in-between. Optional, so files saved by
+        /// build 392 (no key) open unchanged; nil reads as the Camera tool's own starting
+        /// choice, Slow in + out.
+        var easingName: String? = nil
+        var easing: CameraEasing { CameraEasing(rawValue: easingName ?? "") ?? .easeBoth }
     }
     var transitions: [Transition]? = nil
     /// Worth saving: a length is set or a working video is kept.
@@ -217,6 +223,14 @@ struct Storyboard: Codable, Equatable {
             list.append(Transition(from: ids[i], to: ids[i + 1], effectName: effect.rawValue, frames: frames))
         }
         transitions = list.isEmpty ? nil : list
+    }
+
+    /// REM: D-091 — the easing a motion in-between moves with.
+    mutating func setEasing(_ easing: CameraEasing, at i: Int, ids: [UUID]) {
+        guard let t = transition(after: i, ids: ids), var list = transitions,
+              let k = list.firstIndex(of: t) else { return }
+        list[k].easingName = easing.rawValue
+        transitions = list
     }
 
     /// REM: D-095 — "you can stretch it on the timeline, but never below its minimum (094)."
@@ -597,6 +611,22 @@ struct StoryboardSheet: View {
                     .buttonStyle(.bordered).buttonBorderShape(.capsule).scaledFont(18)
                     .disabled(frames >= board.framesAvailable(at: gap, ids: ids))
                     .accessibilityLabel("Longer transition")
+                }
+                if effect == .motion {
+                    // REM: D-091 — "motion in-betweens with easing (from the Camera tool)":
+                    // the Camera tool's own easing choices, nothing new.
+                    let easing = board.transition(after: gap, ids: ids)?.easing ?? .easeBoth
+                    Picker("Easing", selection: Binding(
+                        get: { easing },
+                        set: { document.storyboard.setEasing($0, at: gap, ids: ids) })) {
+                        ForEach(CameraEasing.allCases) { Text($0.title).scaledFont(18).tag($0) }
+                    }
+                    .scaledFont(18)
+                    .accessibilityLabel("Easing")
+                    Text("Your Camera frames' layers move, scale and fade from one card's pose to "
+                         + "the next. Cards without the Camera's scene cross-fade instead.")
+                        .scaledFont(18).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Text("Shortest for this effect: \(effect.minimumFrames) frames.")
                     .scaledFont(18).foregroundStyle(.secondary)

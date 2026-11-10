@@ -20,14 +20,15 @@ import Foundation
 /// REM: D-091 — "The transition list, as per HyperCard: cut · dissolve · fade to/from black
 /// or white · barn door open/close · venetian blinds · wipe (left/right/up/down) · iris
 /// open/close · zoom open/close · checkerboard · scroll (left/right/up/down) · plus motion
-/// in-betweens with easing (from the Camera tool)." Every effect in the list but the last
-/// is here; motion in-betweens with easing come with a later piece.
+/// in-betweens with easing (from the Camera tool)." Every effect in the list is here; the
+/// last, `.motion`, is drawn from frames made ahead of time (see `motionInBetweens`).
 nonisolated enum TransitionEffect: String, CaseIterable, Identifiable, Sendable {
     case cut, dissolve, fadeBlack, fadeWhite
     case barnDoorOpen, barnDoorClose, venetianBlinds
     case wipeLeft, wipeRight, wipeUp, wipeDown
     case irisOpen, irisClose, zoomOpen, zoomClose, checkerboard
     case scrollLeft, scrollRight, scrollUp, scrollDown
+    case motion
 
     var id: String { rawValue }
 
@@ -53,6 +54,7 @@ nonisolated enum TransitionEffect: String, CaseIterable, Identifiable, Sendable 
         case .scrollRight: return "Scroll Right"
         case .scrollUp: return "Scroll Up"
         case .scrollDown: return "Scroll Down"
+        case .motion: return "Motion In-Between"
         }
     }
 
@@ -66,6 +68,9 @@ nonisolated enum TransitionEffect: String, CaseIterable, Identifiable, Sendable 
         case .dissolve, .wipeLeft, .wipeRight, .wipeUp, .wipeDown,
              .scrollLeft, .scrollRight, .scrollUp, .scrollDown: return 6
         case .venetianBlinds, .irisOpen, .irisClose, .zoomOpen, .zoomClose, .checkerboard: return 8
+        // The Camera tool's own in-betweens go down to 1 frame; 4 is the fewest that reads
+        // as motion rather than a jump at 30 frames a second.
+        case .motion: return 4
         case .fadeBlack, .fadeWhite, .barnDoorOpen, .barnDoorClose: return 10
         }
     }
@@ -78,7 +83,7 @@ nonisolated enum TransitionEffect: String, CaseIterable, Identifiable, Sendable 
         case .cut: return 0
         case .dissolve, .wipeLeft, .wipeRight, .wipeUp, .wipeDown: return 15
         case .scrollLeft, .scrollRight, .scrollUp, .scrollDown: return 18
-        case .venetianBlinds, .irisOpen, .irisClose, .zoomOpen, .zoomClose, .checkerboard: return 20
+        case .venetianBlinds, .irisOpen, .irisClose, .zoomOpen, .zoomClose, .checkerboard, .motion: return 20
         case .barnDoorOpen, .barnDoorClose: return 24
         case .fadeBlack, .fadeWhite: return 30
         }
@@ -107,7 +112,9 @@ nonisolated enum TransitionEffect: String, CaseIterable, Identifiable, Sendable 
         switch self {
         case .cut:
             ctx.draw(p < 0.5 ? a : b, in: r)
-        case .dissolve:
+        case .dissolve, .motion:
+            // `.motion` lands here only when its frames couldn't be made (see
+            // `motionInBetweens`): the cards are then cross-faded, eased.
             ctx.draw(a, in: r)
             ctx.saveGState(); ctx.setAlpha(p); ctx.draw(b, in: r); ctx.restoreGState()
         case .fadeBlack, .fadeWhite:
@@ -198,4 +205,95 @@ nonisolated enum TransitionEffect: String, CaseIterable, Identifiable, Sendable 
 nonisolated struct VideoTransitionStep: Sendable {
     var effect: TransitionEffect
     var frames: Int
+    /// For a motion in-between: each filler frame, made ahead of time on the main actor
+    /// (count = frames). Empty for every other effect.
+    var motionFrames: [CGImage] = []
+    /// For a motion in-between: each filler frame's progress, already eased. Empty means
+    /// even steps.
+    var progress: [CGFloat] = []
+}
+
+// MARK: - Motion in-betweens (D-091)
+
+extension VideoTransitionStep {
+    /// The effect and length only, before a motion in-between's frames are made.
+    var bare: VideoTransitionStep { VideoTransitionStep(effect: effect, frames: frames) }
+}
+
+/// REM: D-091 — "plus motion in-betweens with easing (from the Camera tool)." The Camera
+/// tool's own rule (CameraTool.swift): "A frame carries its NEGATIVE … Two flattened
+/// pictures can only be cross-faded — the motion is not in the pixels. Two snapshots give
+/// start and end for every layer's center, scale and rotation, so an in-between is
+/// arithmetic and a re-render." So when both cards are Camera frames with negatives, each
+/// layer moves, scales and turns from its pose in one card to its pose in the next (the
+/// Camera tool's `blend`), shaped by the Camera tool's easing (`CameraEasing.shape`), and
+/// fades in or out where it is only in one of the two.
+/// REM: Claude's call, not from the sheet — with no negatives to read (flipbook layers,
+/// Camera in-betweens, a frame trimmed to its art, or two frames shot with different
+/// background or scale settings), there is no sound basis for what moved, so it returns
+/// nothing and the cards cross-fade with the same easing — what the Camera tool says a
+/// flattened pair can only do.
+@MainActor
+func motionInBetweens(from a: ImageLayer, to b: ImageLayer, in document: ImageDocument,
+                      count: Int, easing: CameraEasing) -> [CGImage] {
+    guard count > 0,
+          let fa = a.cameraFrame, let fb = b.cameraFrame,
+          !fa.isTween, !fb.isTween, !fa.trimmedToArt, !fb.trimmedToArt,
+          fa.includedBackground == fb.includedBackground, fa.scale == fb.scale,
+          let da = fa.snapshot, let db = fb.snapshot,
+          let sa = try? JSONDecoder().decode(DocumentSnapshot.self, from: da),
+          let sb = try? JSONDecoder().decode(DocumentSnapshot.self, from: db)
+    else { return [] }
+    let width = sa.canvasWidth ?? document.canvasWidth
+    let height = sa.canvasHeight ?? document.canvasHeight
+    // A hidden layer counts as fully faded, so showing or hiding one between shots fades it.
+    func shown(_ l: ImageLayer) -> Double { l.isVisible ? l.opacity : 0 }
+    var frames: [CGImage] = []
+    for k in 1...count {
+        let t = easing.shape(Double(k) / Double(count + 1))
+        var mid: [ImageLayer] = []
+        for var layer in sa.layers {
+            let start = shown(layer)
+            if let to = sb.layers.first(where: { $0.id == layer.id }) {
+                layer.transform = cameraBlend(layer.transform, to.transform, t)
+                layer.opacity = start + (shown(to) - start) * t
+            } else {
+                layer.opacity = start * (1 - t)
+            }
+            layer.isVisible = layer.opacity > 0
+            mid.append(layer)
+        }
+        // Layers only in the next card fade in at their place in its stack.
+        for (j, var layer) in sb.layers.enumerated() where !sa.layers.contains(where: { $0.id == layer.id }) {
+            layer.opacity = shown(layer) * t
+            layer.isVisible = layer.opacity > 0
+            mid.insert(layer, at: min(j, mid.count))
+        }
+        let temp = ImageDocument(name: document.name, canvasWidth: width, canvasHeight: height,
+                                 layers: mid, palette: document.palette, cropRect: nil)
+        guard let cg = renderCanvasImage(temp, scale: CGFloat(fa.scale),
+                                         includeBackgrounds: fa.includedBackground)
+        else { return [] }
+        frames.append(cg)
+    }
+    return frames
+}
+
+extension VideoExport {
+    /// REM: D-091 — fill in each motion in-between's frames (or its eased cross-fade) for
+    /// the steps as they'll be written, after D-070c's padding has set their lengths.
+    @MainActor static func withMotion(_ steps: [VideoTransitionStep], cards: [ImageLayer],
+                                      document: ImageDocument) -> [VideoTransitionStep] {
+        steps.enumerated().map { i, step in
+            guard step.effect == .motion, step.frames > 0, cards.indices.contains(i + 1) else { return step }
+            let easing = document.storyboard.transition(after: i, ids: cards.map(\.id))?.easing ?? .easeBoth
+            var out = step
+            out.motionFrames = motionInBetweens(from: cards[i], to: cards[i + 1], in: document,
+                                                count: step.frames, easing: easing)
+            out.progress = (1...step.frames).map {
+                CGFloat(easing.shape(Double($0) / Double(step.frames + 1)))
+            }
+            return out
+        }
+    }
 }

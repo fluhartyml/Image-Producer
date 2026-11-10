@@ -177,6 +177,11 @@ private func copyCapturedPNGToClipboard(_ png: Data) -> Bool {
 /// the straight-line case — the seam a motion PATH would replace when the Path tool ships
 /// (real movement follows arcs, and a straight tween is wrong the same way linear timing
 /// is). Kept as one function precisely so that swap is one function later.
+/// The storyboard's motion in-betweens (D-091) use it too, through `cameraBlend`.
+func cameraBlend(_ a: LayerTransform, _ b: LayerTransform, _ t: Double) -> LayerTransform {
+    blend(a, b, t)
+}
+
 private func blend(_ a: LayerTransform, _ b: LayerTransform, _ t: Double) -> LayerTransform {
     var out = a
     out.center = CGPoint(x: a.center.x + (b.center.x - a.center.x) * t,

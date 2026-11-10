@@ -134,7 +134,7 @@ enum VideoExport {
             .appendingPathExtension(codec.fileExtension)
         try await write(images: images, holds: plan.holds, width: w, height: h,
                         canvas: CGSize(width: cw, height: ch), codec: codec, sound: sound, to: url,
-                        steps: plan.steps)
+                        steps: withMotion(plan.steps, cards: plan.cards, document: document))
         return url
     }
 
@@ -275,7 +275,15 @@ enum VideoExport {
             if steps.indices.contains(i), images.indices.contains(i + 1), steps[i].frames > 0 {
                 let step = steps[i], next = images[i + 1]
                 for k in 1...step.frames {
-                    let p = CGFloat(k) / CGFloat(step.frames + 1)
+                    // REM: D-091 — a motion in-between's frames were made ahead of time;
+                    // its eased progress, when there is one, shapes a cross-fade fallback.
+                    if step.motionFrames.indices.contains(k - 1) {
+                        let still = step.motionFrames[k - 1]
+                        try await append(try buffer { $0.draw(still, in: place) })
+                        continue
+                    }
+                    let p = step.progress.indices.contains(k - 1) ? step.progress[k - 1]
+                        : CGFloat(k) / CGFloat(step.frames + 1)
                     try await append(try buffer { step.effect.draw($0, from: image, to: next, progress: p, in: place) })
                 }
             }
