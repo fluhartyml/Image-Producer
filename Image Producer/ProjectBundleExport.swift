@@ -18,9 +18,15 @@
 //          plainly, so you can look in each folder and check nothing was skewed."
 //    D-035 "Files: JPEG or PNG, no transparency."
 //
-//  REM: WHAT IS DELIBERATELY NOT HERE. The Apple TV icon/Top Shelf wells (D-021/027), the
-//  creative asset wells (D-024/025/028) and video (D-070+, incl. 070b's "Only the green part
-//  … can go into … the Project Bundle") are later pieces — absent, not stubbed.
+//  REM: THE APPLE TV WELLS (D-021, D-027, LOCKED). The icon and Top Shelf pictures you drop
+//  go into "App Icon & Top Shelf Image.brandassets" in the files the canvas would otherwise
+//  fill (same folders, same names, same Contents.json layout as the Icon Set export). An
+//  empty well keeps the canvas's picture. The report lists what came from the wells and
+//  names anything resized or enlarged (D-042).
+//
+//  REM: WHAT IS DELIBERATELY NOT HERE. The creative asset wells (D-024/025/028) and video
+//  (D-070+, incl. 070b's "Only the green part … can go into … the Project Bundle") are later
+//  pieces — absent, not stubbed.
 //
 
 import SwiftUI
@@ -59,6 +65,11 @@ enum ProjectBundleExport {
         var unreadable: [String] = []
         var iconSetWritten = false
         var tvSetWritten = false
+        /// The Apple TV wells that went into the brand assets (D-021, D-027), by title.
+        var tvArtUsed: [String] = []
+        /// Brand-asset files made bigger than the picture they came from (a 1920 × 720 banner
+        /// becomes the 3840 × 1440 @2x file). Same shape, so nothing is skewed, but softer.
+        var enlarged: [Resize] = []
 
         /// Every file, keyed by its path inside the project folder.
         var allFiles: [String: Data] {
@@ -88,7 +99,9 @@ enum ProjectBundleExport {
             built.groups.append((IconSetExport.folderName, icon))
             built.iconSetWritten = true
         }
-        let tv = IconSetExport.buildTV(from: document)
+        // REM: D-021/D-027 — the Apple TV wells replace the canvas's pictures in the brand
+        // assets; an empty well keeps them.
+        let tv = IconSetExport.buildTV(from: document, art: tvArt(from: document, into: &built))
         if !tv.isEmpty {
             built.groups.append((IconSetExport.tvFolderName, tv))
             built.tvSetWritten = true
@@ -140,6 +153,65 @@ enum ProjectBundleExport {
             }
         }
         return built
+    }
+
+    /// REM: D-021/D-027 — the Apple TV wells as the brand assets' pictures. Each picture is
+    /// read upright once; every size the brand assets need is made from it with the same
+    /// `wellResized` (Fill or Fit, never stretched) the well's thumbnail shows. Opaque, as
+    /// D-035 asks ("no transparency"). A picture that can't be read is left out and named in
+    /// the report, and that file keeps the canvas's picture.
+    private static func tvArt(from document: ImageDocument, into built: inout Built) -> IconSetExport.TVArt {
+        let original = document.xcodeProject.sets[document.xcodeProject.originalIndex]
+        var art: IconSetExport.TVArt = [:]
+        for well in XcodeTVArtWell.allCases {
+            guard let shot = original.tvArt(well) else { continue }
+            guard let (image, size) = uprightImage(shot.imageData) else {
+                built.unreadable.append("The \(well.title) well")
+                continue
+            }
+            let mode = shot.fitMode
+            art[well.slot, default: [:]][well.appearance] = { target in
+                wellResized(image, to: target, mode: mode).flatMap(pngData(from:))
+            }
+            built.tvArtUsed.append(well.title)
+            let wrongSize = !well.accepts(size)
+            for file in IconSetExport.tvArtFiles(well.slot, well.appearance) where file.size != size {
+                let path = "\(IconSetExport.tvFolderName)/\(file.path)"
+                if wrongSize {
+                    built.resized.append(Resize(path: path, from: size, to: file.size, mode: mode))
+                } else if file.size.width > size.width {
+                    built.enlarged.append(Resize(path: path, from: size, to: file.size, mode: mode))
+                }
+            }
+            if hasAlpha(image), hasSeeThroughPixels(image) {
+                built.seeThrough.append("The \(well.title) well")
+            }
+        }
+        return art
+    }
+
+    /// The picture upright (EXIF rotation applied, as the well shows it) and its size.
+    private static func uprightImage(_ data: Data) -> (CGImage, WellPixelSize)? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              let size = wellPixelSize(data) else { return nil }
+        let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]
+        let orientation = props?[kCGImagePropertyOrientation] as? Int ?? 1
+        if orientation == 1 {
+            return CGImageSourceCreateImageAtIndex(src, 0, nil).map { ($0, size) }
+        }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: max(size.width, size.height),
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary).map { ($0, size) }
+    }
+
+    private static func hasAlpha(_ image: CGImage) -> Bool {
+        switch image.alphaInfo {
+        case .none, .noneSkipFirst, .noneSkipLast: false
+        default: true
+        }
     }
 
     /// One screenshot as it goes into the bundle.
@@ -236,6 +308,11 @@ enum ProjectBundleExport {
         }
         if !built.tvSetWritten {
             parts.append("The Apple TV icon set could not be rendered, so it was not written.")
+        } else if !built.tvArtUsed.isEmpty {
+            // REM: D-021/D-027 — say which Apple TV pictures came from the wells.
+            parts.append("From your Apple TV wells, in \(IconSetExport.tvFolderName): "
+                         + built.tvArtUsed.joined(separator: ", ")
+                         + ". The rest of it is made from your canvas, as the Icon Set export makes it.")
         }
 
         // REM: D-042 — "the export says so plainly, so you can look in each folder and check
@@ -254,6 +331,12 @@ enum ProjectBundleExport {
             }
             lines.append("Nothing was stretched.")
             parts.append(lines.joined(separator: "\n"))
+        }
+        if !built.enlarged.isEmpty {
+            // REM: D-042 "says so plainly" — an enlarged file isn't skewed, but it is softer.
+            parts.append("Enlarged from a smaller picture in its well, same shape, so nothing is skewed, but it may look soft:\n"
+                         + built.enlarged.map { "• \($0.path) was \($0.from.text), now \($0.to.text)." }
+                             .joined(separator: "\n"))
         }
         if !built.seeThrough.isEmpty {
             // REM: D-035 "no transparency".
@@ -373,6 +456,11 @@ struct ProjectBundleSummary: View {
                 Text("Your wells are empty, so only the icon set goes in.")
             } else {
                 ForEach(filled, id: \.self) { Text($0) }
+            }
+            // REM: D-021/D-027 — the Apple TV wells that will replace the canvas's pictures.
+            let tvArt = XcodeTVArtWell.allCases.filter { wells.sets[wells.originalIndex].tvArt($0) != nil }
+            if !tvArt.isEmpty {
+                Text("Apple TV pictures from your wells: " + tvArt.map(\.title).joined(separator: ", ") + ".")
             }
             if wrong > 0 {
                 Text("\(wrong) screenshot\(wrong == 1 ? " isn't a size its well takes; it's" : "s aren't a size their well takes; they're") "

@@ -35,9 +35,22 @@
 //
 //  REM: Export to Project Bundle (D-050–051) and D-042's "resized" report are in
 //  ProjectBundleExport.swift; the export calls `wellResized` below.
-//  REM: WHAT IS DELIBERATELY NOT HERE. The Apple TV icon and Top Shelf wells (D-021/027), the creative
-//  asset wells (D-024/025/028) and video (D-070+) are later pieces. His rule: no placeholders,
-//  dead buttons or "coming soon" — so they are absent, not stubbed.
+//  REM: THE APPLE TV ICON AND TOP SHELF WELLS (D-021, D-027, D-002, LOCKED). His words:
+//    D-021 "Apple TV wells: the rounded-rectangle icon, Top Shelf and wide Top Shelf, plus the
+//          TV screenshots."
+//    D-027 "Top Shelf is a banner, made the way we made Mediaworks' on Nov 4 … its own wide
+//          picture with the app's name in big type across it … light and dark. Sizes: Top
+//          Shelf 1920 × 720 (@2x 3840 × 1440), wide 2320 × 720 (@2x 4640 × 1440)."
+//    D-002 "No icon wells for the page versions. Each version varies its screenshots only;
+//          the app keeps one icon." — so these wells are on the Original page only.
+//  They sit right under the Apple TV screenshot well. Each holds one picture, with the same
+//  wrong-size check and Fill / Fit as the screenshots. Export to Project Bundle puts them into
+//  "App Icon & Top Shelf Image.brandassets" in place of the pictures made from the canvas; an
+//  empty well leaves the canvas's picture there, as the Icon Set export makes it.
+//
+//  REM: WHAT IS DELIBERATELY NOT HERE. The creative asset wells (D-024/025/028) and video
+//  (D-070+) are later pieces. His rule: no placeholders, dead buttons or "coming soon" — so
+//  they are absent, not stubbed.
 //
 
 import SwiftUI
@@ -459,6 +472,131 @@ struct WellMismatch: Equatable {
     let exportSize: WellPixelSize
 }
 
+// MARK: - The Apple TV icon and Top Shelf wells (D-021, D-027)
+
+/// REM: D-021 "the rounded-rectangle icon, Top Shelf and wide Top Shelf"; D-027 "light and
+/// dark" for the Top Shelf banner. One picture per well. The raw values are the keys in the
+/// Original set's `wells`, beside the device keys, so the file format doesn't change and a
+/// build that doesn't know these wells still opens (and keeps) them.
+enum XcodeTVArtWell: String, CaseIterable, Identifiable {
+    case icon = "appleTVIcon"
+    case topShelf = "appleTVTopShelf"
+    case topShelfDark = "appleTVTopShelfDark"
+    case wideTopShelf = "appleTVTopShelfWide"
+    case wideTopShelfDark = "appleTVTopShelfWideDark"
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .icon:             "Apple TV Icon"
+        case .topShelf:         "Top Shelf, Light"
+        case .topShelfDark:     "Top Shelf, Dark"
+        case .wideTopShelf:     "Wide Top Shelf, Light"
+        case .wideTopShelfDark: "Wide Top Shelf, Dark"
+        }
+    }
+
+    /// Verified against the app's own SFSymbolNames.json.
+    var systemImage: String {
+        switch self {
+        case .icon:                          "appletv"
+        case .topShelf, .wideTopShelf:       "sun.max"
+        case .topShelfDark, .wideTopShelfDark: "moon"
+        }
+    }
+
+    var slot: IconSetExport.TVSlot {
+        switch self {
+        case .icon:                           .icon
+        case .topShelf, .topShelfDark:        .topShelf
+        case .wideTopShelf, .wideTopShelfDark: .topShelfWide
+        }
+    }
+
+    var appearance: IconAppearance {
+        switch self {
+        case .topShelfDark, .wideTopShelfDark: .dark
+        default:                               .light
+        }
+    }
+
+    /// REM: The sizes, biggest first. Top Shelf from D-027: "Top Shelf 1920 × 720 (@2x 3840 ×
+    /// 1440), wide 2320 × 720 (@2x 4640 × 1440)". The icon's are the ones the Icon Set export
+    /// already writes into the brand assets (IconSetExport `tvImages`): App Store 1280 × 768,
+    /// home screen 400 × 240 (@2x 800 × 480). The sheet gives no icon size of its own.
+    var acceptedSizes: [WellPixelSize] {
+        func s(_ w: Int, _ h: Int) -> WellPixelSize { WellPixelSize(width: w, height: h) }
+        switch self {
+        case .icon:                          return [s(1280, 768), s(800, 480), s(400, 240)]
+        case .topShelf, .topShelfDark:       return [s(3840, 1440), s(1920, 720)]
+        case .wideTopShelf, .wideTopShelfDark: return [s(4640, 1440), s(2320, 720)]
+        }
+    }
+
+    func accepts(_ size: WellPixelSize) -> Bool { acceptedSizes.contains(size) }
+
+    /// "3840 × 1440 or 1920 × 720" — for the note in the well.
+    var acceptedSizesText: String {
+        let list = acceptedSizes.map(\.text)
+        return list.count <= 2 ? list.joined(separator: " or ")
+            : list.dropLast().joined(separator: ", ") + " or " + list.last!
+    }
+
+    /// REM: D-042 — a wrong-size picture is resized to its well. Every size in a well is the
+    /// same shape, and the export makes all of them from the picture, so the note names the
+    /// biggest.
+    var exportSize: WellPixelSize { acceptedSizes[0] }
+
+    /// What the empty well says. REM: D-027 — the Top Shelf "is a banner … with the app's
+    /// name in big type across it".
+    var dropHint: String {
+        switch self {
+        case .icon: "Drop your Apple TV icon here"
+        case .topShelf, .wideTopShelf: "Drop your light Top Shelf banner here"
+        case .topShelfDark, .wideTopShelfDark: "Drop your dark Top Shelf banner here"
+        }
+    }
+
+    /// What the export does when this well is empty, in the well, so an empty well isn't a
+    /// surprise. REM: an empty well keeps the Icon Set export's picture from the canvas.
+    var emptyNote: String {
+        switch self {
+        case .icon, .topShelf, .wideTopShelf:
+            "While it's empty, the export makes this one from your canvas."
+        case .topShelfDark, .wideTopShelfDark:
+            "While it's empty, the export makes this one from your canvas, unless the light well "
+                + "above has a picture: then your light banner shows in dark mode too."
+        }
+    }
+}
+
+extension XcodeWellSet {
+    /// The picture in one Apple TV well, if any. REM: D-002 — only the Original set has them.
+    func tvArt(_ well: XcodeTVArtWell) -> XcodeScreenshot? {
+        kind == .original ? wells[well.rawValue]?.first : nil
+    }
+}
+
+extension ImageDocument {
+    /// Put a picture in an Apple TV well, replacing the one there — each well holds one.
+    /// Always the Original set (D-002).
+    func setTVArt(_ data: Data, for well: XcodeTVArtWell) {
+        xcodeProject.sets[xcodeProject.originalIndex].wells[well.rawValue] = [XcodeScreenshot(imageData: data)]
+    }
+
+    func removeTVArt(_ well: XcodeTVArtWell) {
+        xcodeProject.sets[xcodeProject.originalIndex].wells[well.rawValue] = nil
+    }
+
+    /// REM: D-041 — Fill or Fit for a wrong-size picture in an Apple TV well.
+    func setTVArtFitMode(_ mode: XcodeFitMode, for well: XcodeTVArtWell) {
+        let i = xcodeProject.originalIndex
+        guard var list = xcodeProject.sets[i].wells[well.rawValue], !list.isEmpty else { return }
+        list[0].fitMode = mode
+        xcodeProject.sets[i].wells[well.rawValue] = list
+    }
+}
+
 // MARK: - Bringing an image in
 
 /// What a well accepts from a drop: a picture file from the Finder or Files, a photo dragged
@@ -539,6 +677,13 @@ struct XcodeWellsSection: View {
             setControls(set: set, wells: wells)
             ForEach(set.kind.devices) { device in
                 XcodeWellRow(document: document, device: device, setIndex: index)
+                // REM: D-021 — the icon and Top Shelf wells go with "the TV screenshots";
+                // D-002 — on the Original page only, never a test version.
+                if device == .appleTV && set.kind == .original {
+                    ForEach(XcodeTVArtWell.allCases) { well in
+                        XcodeTVArtRow(document: document, well: well)
+                    }
+                }
             }
         } header: {
             // REM: D-023 — the set's name shows, so the sets read as siblings of one another.
@@ -886,6 +1031,171 @@ struct XcodeWellRow: View {
     }
 }
 
+/// REM: D-021/D-027 — one Apple TV well: the icon, or a Top Shelf banner in light or dark.
+/// Built like `XcodeWellRow` (drop, Add Canvas, Add File, the D-040 note and D-041's Fill /
+/// Fit), but it holds one picture: a new one replaces the old, and the status line says so.
+struct XcodeTVArtRow: View {
+    @Bindable var document: ImageDocument
+    let well: XcodeTVArtWell
+
+    @State private var isTargeted = false
+    @State private var importing = false
+    @State private var size: WellPixelSize?
+    @State private var measuredID: XcodeScreenshot.ID?
+
+    private var art: XcodeScreenshot? {
+        document.xcodeProject.sets[document.xcodeProject.originalIndex].tvArt(well)
+    }
+
+    /// REM: D-040 — the wrong-size check, against this well's sizes.
+    private var mismatch: WellMismatch? {
+        guard let art, measuredID == art.id, let size, !well.accepts(size) else { return nil }
+        return WellMismatch(size: size, exportSize: well.exportSize)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: well.systemImage)
+                    .scaledFont(18)
+                    .frame(width: 26)
+                    .accessibilityHidden(true)
+                // REM: D-012 "each showing what's in it" — "1 of 1" like the screenshot wells.
+                Text("\(well.title) · \(art == nil ? 0 : 1) of 1")
+                    .scaledFont(18)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                Button { addCanvas() } label: {
+                    Image(systemName: "photo.badge.plus").scaledFont(18)
+                }
+                .buttonStyle(.borderless)
+                .help(art == nil ? "Put the canvas as it looks now in the \(well.title) well"
+                                 : "Replace the \(well.title) picture with the canvas as it looks now")
+                .accessibilityLabel("Add canvas")
+                Button { importing = true } label: {
+                    Image(systemName: "doc.badge.plus").scaledFont(18)
+                }
+                .buttonStyle(.borderless)
+                .help(art == nil ? "Put a picture from a file in the \(well.title) well"
+                                 : "Replace the \(well.title) picture with one from a file")
+                .accessibilityLabel("Add file")
+            }
+            content
+            if let mismatch, let art {
+                Label {
+                    Text(wrongSizeText(mismatch, mode: art.fitMode))
+                        .scaledFont(18)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .scaledFont(18)
+                        .foregroundStyle(.yellow)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(isTargeted ? Color.accentColor : Color.secondary.opacity(0.35),
+                              style: StrokeStyle(lineWidth: isTargeted ? 2 : 1,
+                                                 dash: art == nil ? [6, 4] : []))
+        )
+        .contentShape(Rectangle())
+        .dropDestination(for: WellDropImage.self) { items, _ in
+            guard let first = items.first else { return false }
+            put(first.data)
+            return true
+        }
+        .onDropSessionUpdated { session in
+            switch session.phase {
+            case .entering, .active: isTargeted = true
+            default: isTargeted = false
+            }
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.png, .jpeg, .image],
+                      allowsMultipleSelection: false) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            guard let data = wellImageData(fromFile: url) else {
+                document.say("Could not read that picture for the \(well.title) well", kind: .warning)
+                return
+            }
+            put(data)
+        }
+        .task(id: art?.id) {
+            guard let art, measuredID != art.id else { return }
+            let data = art.imageData, id = art.id
+            size = await Task.detached(priority: .utility) { wellPixelSize(data) }.value
+            measuredID = id
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(well.title) well")
+    }
+
+    @ViewBuilder private var content: some View {
+        if let art {
+            ScrollView(.horizontal, showsIndicators: false) {
+                XcodeWellThumbnail(
+                    shot: art, position: 1, mismatch: mismatch,
+                    onSetFitMode: { document.setTVArtFitMode($0, for: well) },
+                    onRemove: {
+                        document.removeTVArt(well)
+                        document.say("Removed the \(well.title) picture", kind: .edit)
+                    },
+                    onMoveEarlier: nil,
+                    artName: well.title)
+                    .padding(.vertical, 2)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(well.dropHint)
+                    .scaledFont(18)
+                    .foregroundStyle(.secondary)
+                Text("Size: \(well.acceptedSizesText). \(well.emptyNote)")
+                    .scaledFont(18)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        }
+    }
+
+    private func wrongSizeText(_ m: WellMismatch, mode: XcodeFitMode) -> String {
+        let how = mode == .fit
+            ? "fit inside it, all of it showing, with black bars where it doesn't reach"
+            : "filled to its edges, with what spills over trimmed"
+        let made = well.acceptedSizes.map(\.text).joined(separator: " and ")
+        return "This picture is \(m.size.text). The \(well.title) well takes \(well.acceptedSizesText). "
+            + "At export it's resized to \(made), \(how). Nothing is stretched."
+    }
+
+    private func addCanvas() {
+        guard let png = ContentView.renderCanvasPNG(document: document) else {
+            document.say("Could not render the canvas for the \(well.title) well", kind: .warning)
+            return
+        }
+        put(png)
+    }
+
+    private func put(_ data: Data) {
+        let replacing = art != nil
+        document.setTVArt(data, for: well)
+        // REM: D-040 — measured right away so the warning is there the moment the drop lands.
+        let measured = wellPixelSize(data)
+        size = measured
+        measuredID = art?.id
+        let wrong = measured.map { !well.accepts($0) } ?? false
+        if wrong {
+            document.say("\(replacing ? "Replaced" : "Added") the \(well.title) picture — it isn't a "
+                         + "size the well takes; see the note in the well", kind: .warning)
+        } else {
+            document.say("\(replacing ? "Replaced" : "Added") the \(well.title) picture", kind: .edit)
+        }
+    }
+}
+
 /// One screenshot in a well: the picture, its place in upload order, Remove, and Move Earlier.
 struct XcodeWellThumbnail: View {
     let shot: XcodeScreenshot
@@ -896,8 +1206,13 @@ struct XcodeWellThumbnail: View {
     let onSetFitMode: (XcodeFitMode) -> Void
     let onRemove: () -> Void
     let onMoveEarlier: (() -> Void)?
+    /// Set for a picture in an Apple TV well: what VoiceOver calls it, and no upload number
+    /// (a well that holds one picture has no order).
+    var artName: String? = nil
 
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 84
+
+    private var spokenName: String { artName ?? "Screenshot \(position)" }
     @State private var thumb: CGImage?
 
     var body: some View {
@@ -925,7 +1240,7 @@ struct XcodeWellThumbnail: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(mismatch == nil ? "Screenshot \(position)" : "Screenshot \(position), wrong size")
+            .accessibilityLabel(mismatch == nil ? spokenName : "\(spokenName), wrong size")
             if mismatch != nil { fillFitToggle }
             HStack(spacing: 6) {
                 if let onMoveEarlier {
@@ -936,16 +1251,18 @@ struct XcodeWellThumbnail: View {
                     .help("Move this screenshot one place earlier")
                     .accessibilityLabel("Move earlier")
                 }
-                Text("\(position)")
-                    .scaledFont(18, monospacedDigit: true)
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
+                if artName == nil {
+                    Text("\(position)")
+                        .scaledFont(18, monospacedDigit: true)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
                 Button(role: .destructive, action: onRemove) {
                     Image(systemName: "xmark.circle.fill").scaledFont(18)
                 }
                 .buttonStyle(.borderless)
-                .help("Remove this screenshot from the well")
-                .accessibilityLabel("Remove screenshot")
+                .help(artName == nil ? "Remove this screenshot from the well" : "Remove this picture from the well")
+                .accessibilityLabel(artName == nil ? "Remove screenshot" : "Remove picture")
             }
         }
         .task(id: PreviewKey(id: shot.id, mode: shot.fitMode, mismatch: mismatch)) {

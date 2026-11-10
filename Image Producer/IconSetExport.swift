@@ -243,9 +243,22 @@ enum IconSetExport {
 
     private enum TVPart { case back, front, flat }
 
+    /// REM: D-021 (LOCKED) — "Apple TV wells: the rounded-rectangle icon, Top Shelf and wide
+    /// Top Shelf". The three things in the brand assets a well can supply.
+    enum TVSlot: Hashable { case icon, topShelf, topShelfWide }
+
+    /// Pictures from the Apple TV wells (Project Bundle only), by slot and appearance. Each
+    /// makes an opaque PNG at the pixel size asked for. Empty = the Icon Set export as always.
+    typealias TVArt = [TVSlot: [IconAppearance: (WellPixelSize) -> Data?]]
+
     /// One PNG in the brand assets: where it goes, its pixel size, and which part it shows.
     private struct TVImage {
         let folder: String, stem: String, width: Int, height: Int, scale: Int, part: TVPart
+        var slot: TVSlot {
+            if folder == topShelf { return .topShelf }
+            if folder == topShelfWide { return .topShelfWide }
+            return .icon
+        }
     }
 
     private static let iconStack = "App Icon.imagestack"
@@ -275,21 +288,86 @@ enum IconSetExport {
         image.stem + (image.scale == 2 ? "@2x" : "") + (appearance == .dark ? "-dark" : "") + ".png"
     }
 
+    /// Where one TV image comes from: the canvas (the Icon Set export's way) or a well.
+    private enum TVSource { case canvas, art((WellPixelSize) -> Data?) }
+
+    /// REM: D-021/D-027 — which appearances a slot writes, and from where. With no art this is
+    /// the Icon Set export exactly: light and dark, both from the canvas.
+    ///   • Icon: D-021 asks for one icon well, so a dropped icon is the icon in both
+    ///     appearances — light only, no dark file (a dark icon made from the canvas beside a
+    ///     dropped light one would be two different icons).
+    ///   • Top Shelf / wide: D-027 says "light and dark". A filled well wins; an empty Light
+    ///     well keeps the canvas render (Xcode needs a light image); an empty Dark well beside
+    ///     a filled Light one writes no dark file, so the TV shows your light banner in both.
+    private static func tvSources(_ slot: TVSlot, _ art: TVArt) -> [(IconAppearance, TVSource)] {
+        let given = art[slot] ?? [:]
+        guard !given.isEmpty else { return [(.light, .canvas), (.dark, .canvas)] }
+        if slot == .icon {
+            return given[.light].map { [(.light, .art($0))] } ?? [(.light, .canvas), (.dark, .canvas)]
+        }
+        var list: [(IconAppearance, TVSource)] = [(.light, given[.light].map(TVSource.art) ?? .canvas)]
+        if let dark = given[.dark] {
+            list.append((.dark, .art(dark)))
+        } else if given[.light] == nil {
+            list.append((.dark, .canvas))
+        }
+        return list
+    }
+
     /// The Apple TV brand assets, light and dark — PNGs plus every Contents.json, keyed by
     /// path inside the `.brandassets` folder. All or nothing: a set that names a dark file
     /// it does not contain would fail in Xcode.
-    static func buildTV(from document: ImageDocument) -> [String: Data] {
+    ///
+    /// REM: `art` is the Apple TV wells (D-021, D-027), passed only by Export to Project
+    /// Bundle: "dropped art overrides what Icon Set would generate; if a well is empty, keep
+    /// the current Icon Set behavior." The files land in the same folders under the same
+    /// names; only where the pixels come from changes. The Icon Set export passes none.
+    static func buildTV(from document: ImageDocument, art: TVArt = [:]) -> [String: Data] {
         var files: [String: Data] = [:]
-        for appearance in [IconAppearance.light, .dark] {
-            let lit = render(appearance, of: document)
-            for image in tvImages {
-                let stage = widened(lit, width: image.width, height: image.height)
-                guard let png = renderTV(stage, image) else { return [:] }
+        var written: [String: [IconAppearance]] = [:]
+        var lit: [IconAppearance: ImageDocument] = [:]
+        for image in tvImages {
+            for (appearance, source) in tvSources(image.slot, art) {
+                let png: Data?
+                switch source {
+                case .canvas:
+                    let base = lit[appearance] ?? render(appearance, of: document)
+                    lit[appearance] = base
+                    png = renderTV(widened(base, width: image.width, height: image.height), image)
+                case .art(let make):
+                    let size = WellPixelSize(width: image.width, height: image.height)
+                    // REM: a dropped icon is ONE flat picture, and the TV icon is two layers:
+                    // the picture is the Back layer (opaque), the Front layer is left clear.
+                    png = image.part == .front ? clearPNG(size) : make(size)
+                }
+                guard let png else { return [:] }
                 files["\(image.folder)/\(fileName(image, appearance))"] = png
+                if !(written[image.folder] ?? []).contains(appearance) {
+                    written[image.folder, default: []].append(appearance)
+                }
             }
         }
-        files.merge(tvContents()) { $1 }
+        files.merge(tvContents(written)) { $1 }
         return files
+    }
+
+    /// A fully see-through PNG — the Front layer when the icon comes from a well.
+    private static func clearPNG(_ size: WellPixelSize) -> Data? {
+        guard let ctx = CGContext(data: nil, width: size.width, height: size.height,
+                                  bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let cg = ctx.makeImage() else { return nil }
+        return pngData(from: cg)
+    }
+
+    /// The files a slot's picture becomes, for the Project Bundle report: path inside the
+    /// `.brandassets` and pixel size, biggest first. The icon's clear Front layer is left out.
+    static func tvArtFiles(_ slot: TVSlot, _ appearance: IconAppearance) -> [(path: String, size: WellPixelSize)] {
+        tvImages.filter { $0.slot == slot && $0.part != .front }
+            .map { (path: "\($0.folder)/\(fileName($0, appearance))",
+                    size: WellPixelSize(width: $0.width, height: $0.height)) }
+            .sorted { $0.size.width > $1.size.width }
     }
 
     /// A DETACHED copy whose CANVAS is reshaped to `width`×`height` (wider for Apple TV, square
@@ -359,7 +437,8 @@ enum IconSetExport {
     }
 
     /// Every Contents.json in the brand assets, laid out the way Xcode's own tvOS template does.
-    private static func tvContents() -> [String: Data] {
+    /// `written` = the appearances each imageset folder got (light first); nil means both.
+    private static func tvContents(_ written: [String: [IconAppearance]] = [:]) -> [String: Data] {
         let info: [String: Any] = ["author": "xcode", "version": 1]
         func json(_ root: [String: Any]) -> Data {
             (try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])) ?? Data()
@@ -383,7 +462,7 @@ enum IconSetExport {
         for folder in Set(tvImages.map(\.folder)) {
             var images: [[String: Any]] = []
             for image in tvImages where image.folder == folder {
-                for appearance in [IconAppearance.light, .dark] {
+                for appearance in written[folder] ?? [IconAppearance.light, .dark] {
                     var entry: [String: Any] = ["filename": fileName(image, appearance),
                                                 "idiom": "tv", "scale": "\(image.scale)x"]
                     if appearance == .dark {
