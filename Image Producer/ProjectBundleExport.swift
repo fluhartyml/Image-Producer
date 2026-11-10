@@ -24,9 +24,16 @@
 //  empty well keeps the canvas's picture. The report lists what came from the wells and
 //  names anything resized or enlarged (D-042).
 //
-//  REM: WHAT IS DELIBERATELY NOT HERE. The creative asset wells (D-024/025/028) and video
-//  (D-070+, incl. 070b's "Only the green part … can go into … the Project Bundle") are later
-//  pieces — absent, not stubbed.
+//  REM: THE iOS 27 CREATIVE ASSET WELLS (D-024, D-025, LOCKED). Each filled one is written into
+//  "<project>-Original/Creative Assets/", named for its well — "Product Page Header.png",
+//  "Search Results.png", "In-App Event Card.png", "In-App Event Details Page.png" — beside the
+//  device folders, the way D-051 names a folder for what's in it. (Claude's naming: the sheet
+//  gives no folder for these.) Same rules as the screenshots: resized to the well when wrong
+//  (D-042), see-through parts made solid (D-035), and D-025's "5244 × 2950 (PNG only)" saves a
+//  JPEG at that size as a PNG, which the report names.
+//
+//  REM: WHAT IS DELIBERATELY NOT HERE. Video (D-070+, incl. 070b's "Only the green part … can
+//  go into … the Project Bundle") is a later piece — absent, not stubbed.
 //
 
 import SwiftUI
@@ -40,6 +47,9 @@ enum ProjectBundleExport {
 
     /// The name in the Export sheet's Format list, beside "Icon Set" (D-050).
     static let title = "Project Bundle"
+
+    /// The folder, inside the Original set's folder, that holds the iOS 27 creative assets.
+    static let creativeFolderName = "Creative Assets"
 
     /// One screenshot the export changed to fit its well — a line in the D-042 report.
     struct Resize {
@@ -70,6 +80,8 @@ enum ProjectBundleExport {
         /// Brand-asset files made bigger than the picture they came from (a 1920 × 720 banner
         /// becomes the 3840 × 1440 @2x file). Same shape, so nothing is skewed, but softer.
         var enlarged: [Resize] = []
+        /// Creative asset JPEGs saved as PNG because their size takes PNG only (D-025).
+        var madePNG: [String] = []
 
         /// Every file, keyed by its path inside the project folder.
         var allFiles: [String: Data] {
@@ -145,6 +157,27 @@ enum ProjectBundleExport {
                 }
                 if written > 0 { counts.append((device.title, written)) }
             }
+            // REM: D-024 — the creative asset wells (Original page only) go in their own
+            // folder inside the set's folder, each file named for its well.
+            var creativeWritten = 0
+            for well in XcodeCreativeWell.allCases {
+                guard let shot = set.creative(well) else { continue }
+                guard let out = exportCreative(shot, for: well) else {
+                    built.unreadable.append("\(folder)/\(creativeFolderName), the \(well.title) well")
+                    continue
+                }
+                let name = "\(creativeFolderName)/\(IconSetExport.safeFolderName(well.title)).\(out.ext)"
+                files[name] = out.data
+                creativeWritten += 1
+                if let r = out.resized {
+                    built.resized.append(Resize(path: "\(folder)/\(name)", from: r.from, to: r.to,
+                                                mode: shot.fitMode))
+                } else if out.madePNG {
+                    built.madePNG.append("\(folder)/\(name)")
+                }
+                if out.seeThrough { built.seeThrough.append("\(folder)/\(name)") }
+            }
+            if creativeWritten > 0 { counts.append((creativeFolderName, creativeWritten)) }
             if files.isEmpty {
                 built.emptySetFolders.append(folder)
             } else {
@@ -220,6 +253,20 @@ enum ProjectBundleExport {
         let ext: String
         let resized: (from: WellPixelSize, to: WellPixelSize)?
         let seeThrough: Bool
+        /// A right-size JPEG re-saved as PNG because its size takes PNG only (D-025).
+        var madePNG = false
+    }
+
+    /// REM: D-025/D-042/D-035 — a creative asset picture, by the same rules as a screenshot,
+    /// against its well's sizes; "PNG only" for the 5244 × 2950 size.
+    private static func exportCreative(_ shot: XcodeScreenshot, for well: XcodeCreativeWell) -> Output? {
+        exportImage(shot, accepts: well.accepts, exportSize: well.exportSize(for:),
+                    needsPNG: well.needsPNG)
+    }
+
+    private static func exportImage(_ shot: XcodeScreenshot, for device: XcodeWellDevice) -> Output? {
+        exportImage(shot, accepts: device.accepts, exportSize: device.exportSize(for:),
+                    needsPNG: { _ in false })
     }
 
     /// REM: D-042 — "every wrong-size image is resized to its well", through the same
@@ -229,7 +276,10 @@ enum ProjectBundleExport {
     /// REM: D-035 "no transparency": a picture with an alpha channel is redrawn onto the same
     /// opaque black canvas the Fit bars use, and the report names it if anything was see-through.
     /// A camera-rotated file is redrawn upright, the way the well shows it and measured it.
-    private static func exportImage(_ shot: XcodeScreenshot, for device: XcodeWellDevice) -> Output? {
+    private static func exportImage(_ shot: XcodeScreenshot,
+                                    accepts: (WellPixelSize) -> Bool,
+                                    exportSize: (WellPixelSize) -> WellPixelSize,
+                                    needsPNG: (WellPixelSize) -> Bool) -> Output? {
         let data = shot.imageData
         guard let src = CGImageSourceCreateWithData(data as CFData, nil),
               let size = wellPixelSize(data) else { return nil }
@@ -238,7 +288,8 @@ enum ProjectBundleExport {
         let type = CGImageSourceGetType(src).flatMap { UTType($0 as String) }
         let isJPEG = type?.conforms(to: .jpeg) ?? false
         let isPNG = type?.conforms(to: .png) ?? false
-        let target: WellPixelSize? = device.accepts(size) ? nil : device.exportSize(for: size)
+        let target: WellPixelSize? = accepts(size) ? nil : exportSize(size)
+        let jpegMustBePNG = target == nil && isJPEG && needsPNG(size)
 
         let image: CGImage?
         if orientation == 1 {
@@ -256,14 +307,14 @@ enum ProjectBundleExport {
         case .none, .noneSkipFirst, .noneSkipLast: false
         default: true
         }
-        if target == nil, orientation == 1, !hasAlphaChannel, isPNG || isJPEG {
+        if target == nil, orientation == 1, !hasAlphaChannel, isPNG || isJPEG, !jpegMustBePNG {
             return Output(data: data, ext: isJPEG ? "jpg" : "png", resized: nil, seeThrough: false)
         }
         let seeThrough = hasAlphaChannel && hasSeeThroughPixels(image)
         guard let flat = wellResized(image, to: target ?? size, mode: shot.fitMode),
               let png = pngData(from: flat) else { return nil }
         return Output(data: png, ext: "png", resized: target.map { (from: size, to: $0) },
-                      seeThrough: seeThrough)
+                      seeThrough: seeThrough, madePNG: jpegMustBePNG)
     }
 
     /// True when any pixel is less than fully opaque. A PNG often carries an alpha channel
@@ -302,6 +353,9 @@ enum ProjectBundleExport {
             parts.append("No well has a screenshot yet, so only the icon set was written.")
         } else {
             parts.append("Screenshots are numbered in upload order.")
+            if built.filled.contains(where: { $0.counts.contains { $0.device == creativeFolderName } }) {
+                parts.append("\(creativeFolderName) holds your iOS 27 creative assets, each named for its well.")
+            }
         }
         if !built.iconSetWritten {
             parts.append("The icon set could not be rendered, so \(IconSetExport.folderName) was not written.")
@@ -319,7 +373,7 @@ enum ProjectBundleExport {
         // nothing was skewed." Every resized file by its path, its old size and its new one.
         if built.resized.isEmpty {
             if !built.filled.isEmpty {
-                parts.append("Nothing was resized: every screenshot is already a size its well takes.")
+                parts.append("Nothing was resized: every picture is already a size its well takes.")
             }
         } else {
             var lines = ["Resized to fit their wells. Open each folder and check nothing was skewed:"]
@@ -331,6 +385,11 @@ enum ProjectBundleExport {
             }
             lines.append("Nothing was stretched.")
             parts.append(lines.joined(separator: "\n"))
+        }
+        if !built.madePNG.isEmpty {
+            // REM: D-025 "16:9 at 5244 × 2950 (PNG only)".
+            parts.append("Saved as PNG, because App Store Connect takes 5244 × 2950 as PNG only. Nothing was resized:\n"
+                         + built.madePNG.map { "• \($0)" }.joined(separator: "\n"))
         }
         if !built.enlarged.isEmpty {
             // REM: D-042 "says so plainly" — an enlarged file isn't skewed, but it is softer.
@@ -452,7 +511,7 @@ struct ProjectBundleSummary: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("One folder named \(project), holding the icon set and a folder for each set of wells, "
                  + "with each device's screenshots numbered in upload order.")
-            if filled.isEmpty {
+            if filled.isEmpty && XcodeCreativeWell.allCases.allSatisfy({ wells.sets[wells.originalIndex].creative($0) == nil }) {
                 Text("Your wells are empty, so only the icon set goes in.")
             } else {
                 ForEach(filled, id: \.self) { Text($0) }
@@ -461,6 +520,20 @@ struct ProjectBundleSummary: View {
             let tvArt = XcodeTVArtWell.allCases.filter { wells.sets[wells.originalIndex].tvArt($0) != nil }
             if !tvArt.isEmpty {
                 Text("Apple TV pictures from your wells: " + tvArt.map(\.title).joined(separator: ", ") + ".")
+            }
+            // REM: D-024 — the creative asset wells, written to "\(project)-Original/Creative Assets".
+            let original = wells.sets[wells.originalIndex]
+            let creative = XcodeCreativeWell.allCases.filter { original.creative($0) != nil }
+            if !creative.isEmpty {
+                Text("Creative assets from your wells, in \(project)-\(original.name)/\(ProjectBundleExport.creativeFolderName): "
+                     + creative.map(\.title).joined(separator: ", ") + ".")
+                let wrongArt = creative.filter { well in
+                    original.creative(well).flatMap { wellPixelSize($0.imageData) }.map { !well.accepts($0) } ?? false
+                }.count
+                if wrongArt > 0 {
+                    Text("\(wrongArt) of them \(wrongArt == 1 ? "isn't a size its well takes; it's" : "aren't a size their well takes; they're") "
+                         + "resized, and the report after export names each one.")
+                }
             }
             if wrong > 0 {
                 Text("\(wrong) screenshot\(wrong == 1 ? " isn't a size its well takes; it's" : "s aren't a size their well takes; they're") "

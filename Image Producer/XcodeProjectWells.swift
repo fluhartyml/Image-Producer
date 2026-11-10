@@ -48,9 +48,20 @@
 //  "App Icon & Top Shelf Image.brandassets" in place of the pictures made from the canvas; an
 //  empty well leaves the canvas's picture there, as the Icon Set export makes it.
 //
-//  REM: WHAT IS DELIBERATELY NOT HERE. The creative asset wells (D-024/025/028) and video
-//  (D-070+) are later pieces. His rule: no placeholders, dead buttons or "coming soon" — so
-//  they are absent, not stubbed.
+//  REM: THE iOS 27 CREATIVE ASSET WELLS (D-024, D-025, D-028, LOCKED 2026-11-05). His words:
+//    D-024 "Wells for the new iOS 27 creative assets: product page header, search results
+//          picture, and In-App Event pictures (a 16:9 card and a 9:16 details page)."
+//    D-025 "images only, no transparency … A single universal asset can serve both the header
+//          and search results. These are iOS 27 / iPadOS 27 only." (Sizes at
+//          `XcodeCreativeWell.options`.)
+//    D-028 "Each of these wells shows its safe area as an outline, so key artwork stays inside
+//          it. Screenshots and app previews fill the whole frame; Apple's pages give them no
+//          safe area." — and "sizes and safe areas © Apple, credited in the app" (AboutView's
+//          Acknowledgments).
+//  Four single-picture wells, built like the Apple TV ones, under the device wells.
+//
+//  REM: WHAT IS DELIBERATELY NOT HERE. Video (D-026, D-070+) is a later piece. His rule: no
+//  placeholders, dead buttons or "coming soon" — so it is absent, not stubbed.
 //
 
 import SwiftUI
@@ -597,6 +608,205 @@ extension ImageDocument {
     }
 }
 
+// MARK: - The iOS 27 creative asset wells (D-024, D-025, D-028)
+
+/// REM: D-024 "product page header, search results picture, and In-App Event pictures (a 16:9
+/// card and a 9:16 details page)". One picture per well. Like the Apple TV wells, the raw
+/// values are keys in the Original set's `wells`, so the file format doesn't change and an
+/// older build still opens (and keeps) them.
+/// REM (Claude's call, conservative — the sheet doesn't settle it): these wells are on the
+/// ORIGINAL page only. D-002 says "Each version varies its screenshots only", and D-003 gives
+/// a custom page "iPhone and iPad screenshot wells … no icon well"; neither line gives the
+/// page versions any picture but screenshots.
+enum XcodeCreativeWell: String, CaseIterable, Identifiable {
+    case header = "creativeProductPageHeader"
+    case searchResults = "creativeSearchResults"
+    case eventCard = "creativeEventCard"
+    case eventDetails = "creativeEventDetailsPage"
+    var id: String { rawValue }
+
+    /// Also the file's name in the export (D-051 style: the well's own name).
+    var title: String {
+        switch self {
+        case .header:        "Product Page Header"
+        case .searchResults: "Search Results"
+        case .eventCard:     "In-App Event Card"
+        case .eventDetails:  "In-App Event Details Page"
+        }
+    }
+
+    /// Verified against the app's own SFSymbolNames.json.
+    var systemImage: String {
+        switch self {
+        case .header:        "rectangle.tophalf.inset.filled"
+        case .searchResults: "magnifyingglass"
+        case .eventCard:     "calendar"
+        case .eventDetails:  "rectangle.portrait"
+        }
+    }
+
+    /// One way a well's picture can be the right size.
+    enum Option {
+        /// Exactly this size. `pngOnly`: D-025 "16:9 at 5244 × 2950 (PNG only)".
+        case exact(WellPixelSize, pngOnly: Bool)
+        /// D-025's "from … up to": any size from `from` to `to` at the shape `rw`:`rh`.
+        case range(rw: Int, rh: Int, from: WellPixelSize, to: WellPixelSize)
+    }
+
+    /// REM: D-025, exactly as the sheet lists them (App Store Connect creative assets
+    /// specifications, read 2026-11-05):
+    ///   "Product page header: 21:9 at 3840 × 1646 (JPEG or PNG), or 16:9 at 5244 × 2950 (PNG only)."
+    ///   "Search results: 3:2 from 1920 × 1280 up to 3840 × 2560 (JPEG or PNG), or 16:9 at
+    ///    5244 × 2950 (PNG only)."
+    ///   "In-App Event card: 16:9 from 1920 × 1080 up to 3840 × 2160."
+    ///   "In-App Event details page: 9:16 from 1080 × 1920 up to 2160 × 3840."
+    /// REM: "A single universal asset can serve both the header and search results" — that's
+    /// the 5244 × 2950 PNG both wells take; drop the same file in each.
+    var options: [Option] {
+        func s(_ w: Int, _ h: Int) -> WellPixelSize { WellPixelSize(width: w, height: h) }
+        switch self {
+        case .header:
+            return [.exact(s(3840, 1646), pngOnly: false), .exact(Self.universal, pngOnly: true)]
+        case .searchResults:
+            return [.range(rw: 3, rh: 2, from: s(1920, 1280), to: s(3840, 2560)),
+                    .exact(Self.universal, pngOnly: true)]
+        case .eventCard:
+            return [.range(rw: 16, rh: 9, from: s(1920, 1080), to: s(3840, 2160))]
+        case .eventDetails:
+            return [.range(rw: 9, rh: 16, from: s(1080, 1920), to: s(2160, 3840))]
+        }
+    }
+
+    /// D-025's universal 16:9 asset.
+    static let universal = WellPixelSize(width: 5244, height: 2950)
+
+    /// REM: D-025's ranges — "from … up to" — take ANY size in between at the right shape,
+    /// not just the two ends. The height may be off by the rounding of one pixel (a 2000-wide
+    /// 3:2 is 1333.3 tall), the way Apple's own 21:9 header, 3840 × 1646, is rounded.
+    func accepts(_ size: WellPixelSize) -> Bool {
+        options.contains { option in
+            switch option {
+            case .exact(let s, _):
+                return s == size
+            case .range(let rw, let rh, let from, let to):
+                guard (from.width...to.width).contains(size.width) else { return false }
+                let exactHeight = Double(size.width) * Double(rh) / Double(rw)
+                return abs(Double(size.height) - exactHeight) < 1
+            }
+        }
+    }
+
+    /// REM: D-025 "(PNG only)" — true when the picture is at a size that must be a PNG.
+    func needsPNG(_ size: WellPixelSize) -> Bool {
+        options.contains { if case .exact(let s, true) = $0 { s == size } else { false } }
+    }
+
+    /// REM: D-042 — "every wrong-size image is resized to its well." The size that changes the
+    /// picture least: the closest shape first; then, within a range, the size closest to the
+    /// picture's own pixel count (held between the range's ends), so a picture is only made
+    /// bigger when it's under the smallest size the well takes.
+    func exportSize(for size: WellPixelSize) -> WellPixelSize {
+        let area = Double(size.width) * Double(size.height)
+        let candidates: [WellPixelSize] = options.map { option in
+            switch option {
+            case .exact(let s, _):
+                return s
+            case .range(let rw, let rh, let from, let to):
+                // Whole steps of rw × rh keep the shape exact: 3:2 steps 640…1280 give
+                // 1920 × 1280 … 3840 × 2560.
+                let unit = (area / Double(rw * rh)).squareRoot().rounded()
+                let k = Int(min(max(unit, Double(from.width / rw)), Double(to.width / rw)))
+                return WellPixelSize(width: rw * k, height: rh * k)
+            }
+        }
+        func shapeGap(_ t: WellPixelSize) -> Double { abs(log(t.aspect / size.aspect)) }
+        return candidates.min { shapeGap($0) < shapeGap($1) } ?? candidates[0]
+    }
+
+    /// "3:2 from 1920 × 1280 up to 3840 × 2560 (JPEG or PNG), or 16:9 at 5244 × 2950 (PNG
+    /// only)" — D-025's own words, for the note in the well.
+    var acceptedSizesText: String {
+        switch self {
+        case .header:
+            "21:9 at 3840 × 1646 (JPEG or PNG), or 16:9 at 5244 × 2950 (PNG only)"
+        case .searchResults:
+            "3:2 from 1920 × 1280 up to 3840 × 2560 (JPEG or PNG), or 16:9 at 5244 × 2950 (PNG only)"
+        case .eventCard:
+            "16:9 from 1920 × 1080 up to 3840 × 2160"
+        case .eventDetails:
+            "9:16 from 1080 × 1920 up to 2160 × 3840"
+        }
+    }
+
+    /// REM: D-028 — the art safe area, from Apple's own templates' "Art Safe Area" layer, in
+    /// pixels from the top-left, as a fraction of the picture (so the outline scales to any
+    /// thumbnail):
+    ///   "Product page header 3840 × 1646: safe area 1646 × 661, from x 1097, y 493"
+    ///   "Search results 3840 × 2560: safe area 2168 × 1030, from x 836, y 765"
+    ///   "Universal 16:9 5244 × 2950: safe area 1402 × 962, from x 1921, y 660"
+    /// REM (Claude's call): a smaller 3:2 search picture (D-025 "from 1920 × 1280") gets the
+    /// 3840 × 2560 template's area scaled to it — same shape, same proportions. The sheet gives
+    /// no safe area for the In-App Event pictures, so their wells show none (nil).
+    /// `size` is the size the export writes: the picture's own, or the one it's resized to.
+    func safeArea(for size: WellPixelSize) -> CGRect? {
+        func unit(_ x: Double, _ y: Double, _ w: Double, _ h: Double, of W: Double, _ H: Double) -> CGRect {
+            CGRect(x: x / W, y: y / H, width: w / W, height: h / H)
+        }
+        switch self {
+        case .header, .searchResults:
+            if size == Self.universal { return unit(1921, 660, 1402, 962, of: 5244, 2950) }
+            if self == .header { return unit(1097, 493, 1646, 661, of: 3840, 1646) }
+            return unit(836, 765, 2168, 1030, of: 3840, 2560)
+        case .eventCard, .eventDetails:
+            return nil
+        }
+    }
+
+    /// What the empty well says.
+    var dropHint: String {
+        switch self {
+        case .header:        "Drop your product page header here"
+        case .searchResults: "Drop your search results picture here"
+        case .eventCard:     "Drop your In-App Event card here"
+        case .eventDetails:  "Drop your In-App Event details page here"
+        }
+    }
+}
+
+extension XcodeWellSet {
+    /// The picture in one creative asset well, if any. Only the Original set has them (see
+    /// `XcodeCreativeWell`).
+    func creative(_ well: XcodeCreativeWell) -> XcodeScreenshot? {
+        kind == .original ? wells[well.rawValue]?.first : nil
+    }
+}
+
+extension ImageDocument {
+    /// Put a picture in a creative asset well, replacing the one there — each holds one.
+    func setCreative(_ data: Data, for well: XcodeCreativeWell) {
+        xcodeProject.sets[xcodeProject.originalIndex].wells[well.rawValue] = [XcodeScreenshot(imageData: data)]
+    }
+
+    func removeCreative(_ well: XcodeCreativeWell) {
+        xcodeProject.sets[xcodeProject.originalIndex].wells[well.rawValue] = nil
+    }
+
+    /// REM: D-041 — Fill or Fit for a wrong-size picture in a creative asset well.
+    func setCreativeFitMode(_ mode: XcodeFitMode, for well: XcodeCreativeWell) {
+        let i = xcodeProject.originalIndex
+        guard var list = xcodeProject.sets[i].wells[well.rawValue], !list.isEmpty else { return }
+        list[0].fitMode = mode
+        xcodeProject.sets[i].wells[well.rawValue] = list
+    }
+}
+
+/// True when the bytes are a JPEG (read from the file's header, not its name).
+nonisolated func wellIsJPEG(_ data: Data) -> Bool {
+    guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+          let type = CGImageSourceGetType(src).flatMap({ UTType($0 as String) }) else { return false }
+    return type.conforms(to: .jpeg)
+}
+
 // MARK: - Bringing an image in
 
 /// What a well accepts from a drop: a picture file from the Finder or Files, a photo dragged
@@ -683,6 +893,20 @@ struct XcodeWellsSection: View {
                     ForEach(XcodeTVArtWell.allCases) { well in
                         XcodeTVArtRow(document: document, well: well)
                     }
+                }
+            }
+            // REM: D-024 — the iOS 27 creative asset wells, after the device wells, on the
+            // Original page only (see `XcodeCreativeWell` for why).
+            if set.kind == .original {
+                Text("App Store creative assets, for iOS 27 and iPadOS 27 only. Images only, "
+                     + "no transparency. The dashed outline on a header or search results picture "
+                     + "is its art safe area: keep your key artwork inside it.")
+                    .scaledFont(18)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+                ForEach(XcodeCreativeWell.allCases) { well in
+                    XcodeCreativeRow(document: document, well: well)
                 }
             }
         } header: {
@@ -1196,6 +1420,208 @@ struct XcodeTVArtRow: View {
     }
 }
 
+/// REM: D-024/D-025/D-028 — one iOS 27 creative asset well. Built like `XcodeTVArtRow` (drop,
+/// Add Canvas, Add File, D-040's note, D-041's Fill / Fit; one picture, a new one replaces the
+/// old), plus D-028's safe-area outline on the thumbnail and D-025's "PNG only" note.
+struct XcodeCreativeRow: View {
+    @Bindable var document: ImageDocument
+    let well: XcodeCreativeWell
+
+    @State private var isTargeted = false
+    @State private var importing = false
+    @State private var size: WellPixelSize?
+    @State private var isJPEG = false
+    @State private var measuredID: XcodeScreenshot.ID?
+
+    private var art: XcodeScreenshot? {
+        document.xcodeProject.sets[document.xcodeProject.originalIndex].creative(well)
+    }
+
+    /// REM: D-040 — the wrong-size check, against D-025's sizes.
+    private var mismatch: WellMismatch? {
+        guard let art, measuredID == art.id, let size, !well.accepts(size) else { return nil }
+        return WellMismatch(size: size, exportSize: well.exportSize(for: size))
+    }
+
+    /// REM: D-028 — the safe area of the picture the export writes (the resized one when it's
+    /// the wrong size, the way the thumbnail draws it).
+    private var safeArea: CGRect? {
+        guard let art, measuredID == art.id, let size else { return nil }
+        return well.safeArea(for: mismatch?.exportSize ?? size)
+    }
+
+    /// REM: D-025 "5244 × 2950 (PNG only)" — a JPEG at that size isn't resized, only saved
+    /// as a PNG at export; the well says so.
+    private var jpegNeedsPNG: Bool {
+        guard let art, measuredID == art.id, let size, isJPEG else { return false }
+        return mismatch == nil && well.needsPNG(size)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: well.systemImage)
+                    .scaledFont(18)
+                    .frame(width: 26)
+                    .accessibilityHidden(true)
+                // REM: D-012 "each showing what's in it" — "1 of 1" like the other wells.
+                Text("\(well.title) · \(art == nil ? 0 : 1) of 1")
+                    .scaledFont(18)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                Button { addCanvas() } label: {
+                    Image(systemName: "photo.badge.plus").scaledFont(18)
+                }
+                .buttonStyle(.borderless)
+                .help(art == nil ? "Put the canvas as it looks now in the \(well.title) well"
+                                 : "Replace the \(well.title) picture with the canvas as it looks now")
+                .accessibilityLabel("Add canvas")
+                Button { importing = true } label: {
+                    Image(systemName: "doc.badge.plus").scaledFont(18)
+                }
+                .buttonStyle(.borderless)
+                .help(art == nil ? "Put a picture from a file in the \(well.title) well"
+                                 : "Replace the \(well.title) picture with one from a file")
+                .accessibilityLabel("Add file")
+            }
+            content
+            if let mismatch, let art {
+                note(wrongSizeText(mismatch, mode: art.fitMode), symbol: "exclamationmark.triangle.fill",
+                     color: .yellow)
+            } else if jpegNeedsPNG, let size {
+                note("This picture is a JPEG at \(size.text). That size takes PNG only, so the export "
+                     + "saves it as a PNG. Nothing is resized.", symbol: "info.circle", color: .secondary)
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(isTargeted ? Color.accentColor : Color.secondary.opacity(0.35),
+                              style: StrokeStyle(lineWidth: isTargeted ? 2 : 1,
+                                                 dash: art == nil ? [6, 4] : []))
+        )
+        .contentShape(Rectangle())
+        .dropDestination(for: WellDropImage.self) { items, _ in
+            guard let first = items.first else { return false }
+            put(first.data)
+            return true
+        }
+        .onDropSessionUpdated { session in
+            switch session.phase {
+            case .entering, .active: isTargeted = true
+            default: isTargeted = false
+            }
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.png, .jpeg, .image],
+                      allowsMultipleSelection: false) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            guard let data = wellImageData(fromFile: url) else {
+                document.say("Could not read that picture for the \(well.title) well", kind: .warning)
+                return
+            }
+            put(data)
+        }
+        .task(id: art?.id) {
+            guard let art, measuredID != art.id else { return }
+            let data = art.imageData, id = art.id
+            let (found, jpeg) = await Task.detached(priority: .utility) {
+                (wellPixelSize(data), wellIsJPEG(data))
+            }.value
+            size = found
+            isJPEG = jpeg
+            measuredID = id
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(well.title) well")
+    }
+
+    private func note(_ text: String, symbol: String, color: Color) -> some View {
+        Label {
+            Text(text)
+                .scaledFont(18)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: symbol)
+                .scaledFont(18)
+                .foregroundStyle(color)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var content: some View {
+        if let art {
+            ScrollView(.horizontal, showsIndicators: false) {
+                XcodeWellThumbnail(
+                    shot: art, position: 1, mismatch: mismatch,
+                    onSetFitMode: { document.setCreativeFitMode($0, for: well) },
+                    onRemove: {
+                        document.removeCreative(well)
+                        document.say("Removed the \(well.title) picture", kind: .edit)
+                    },
+                    onMoveEarlier: nil,
+                    artName: well.title,
+                    safeArea: safeArea)
+                    .padding(.vertical, 2)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(well.dropHint)
+                    .scaledFont(18)
+                    .foregroundStyle(.secondary)
+                Text("Size: \(well.acceptedSizesText).")
+                    .scaledFont(18)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if well == .header || well == .searchResults {
+                    // REM: D-025 "A single universal asset can serve both the header and
+                    // search results."
+                    Text("One 5244 × 2950 PNG can serve as both your header and your search "
+                         + "results picture: drop it in both wells.")
+                        .scaledFont(18)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        }
+    }
+
+    private func wrongSizeText(_ m: WellMismatch, mode: XcodeFitMode) -> String {
+        let how = mode == .fit
+            ? "fit inside it, all of it showing, with black bars where it doesn't reach"
+            : "filled to its edges, with what spills over trimmed"
+        return "This picture is \(m.size.text). The \(well.title) well takes \(well.acceptedSizesText). "
+            + "At export it's resized to \(m.exportSize.text), \(how). Nothing is stretched."
+    }
+
+    private func addCanvas() {
+        guard let png = ContentView.renderCanvasPNG(document: document) else {
+            document.say("Could not render the canvas for the \(well.title) well", kind: .warning)
+            return
+        }
+        put(png)
+    }
+
+    private func put(_ data: Data) {
+        let replacing = art != nil
+        document.setCreative(data, for: well)
+        // REM: D-040 — measured right away so the warning is there the moment the drop lands.
+        let measured = wellPixelSize(data)
+        size = measured
+        isJPEG = wellIsJPEG(data)
+        measuredID = art?.id
+        let wrong = measured.map { !well.accepts($0) } ?? false
+        if wrong {
+            document.say("\(replacing ? "Replaced" : "Added") the \(well.title) picture — it isn't a "
+                         + "size the well takes; see the note in the well", kind: .warning)
+        } else {
+            document.say("\(replacing ? "Replaced" : "Added") the \(well.title) picture", kind: .edit)
+        }
+    }
+}
+
 /// One screenshot in a well: the picture, its place in upload order, Remove, and Move Earlier.
 struct XcodeWellThumbnail: View {
     let shot: XcodeScreenshot
@@ -1209,10 +1635,17 @@ struct XcodeWellThumbnail: View {
     /// Set for a picture in an Apple TV well: what VoiceOver calls it, and no upload number
     /// (a well that holds one picture has no order).
     var artName: String? = nil
+    /// REM: D-028 — "Each of these wells shows its safe area as an outline". The art safe
+    /// area as a fraction of the picture (top-left origin), drawn scaled to the thumbnail.
+    /// nil for screenshots: "Screenshots and app previews fill the whole frame".
+    var safeArea: CGRect? = nil
 
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 84
 
-    private var spokenName: String { artName ?? "Screenshot \(position)" }
+    private var spokenName: String {
+        let name = artName ?? "Screenshot \(position)"
+        return safeArea == nil ? name : "\(name), safe area outlined"
+    }
     @State private var thumb: CGImage?
 
     var body: some View {
@@ -1222,6 +1655,21 @@ struct XcodeWellThumbnail: View {
                     Image(decorative: thumb, scale: 1)
                         .resizable()
                         .scaledToFit()
+                        .overlay {
+                            if let safeArea {
+                                GeometryReader { geo in
+                                    let r = CGRect(x: safeArea.minX * geo.size.width,
+                                                   y: safeArea.minY * geo.size.height,
+                                                   width: safeArea.width * geo.size.width,
+                                                   height: safeArea.height * geo.size.height)
+                                    // A dark line under a light dashed one, so the outline
+                                    // shows on any picture.
+                                    Path(r).stroke(Color.black.opacity(0.7), lineWidth: 2.5)
+                                    Path(r).stroke(Color.white, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                                }
+                                .accessibilityHidden(true)
+                            }
+                        }
                 } else {
                     Color.secondary.opacity(0.15)
                         .aspectRatio(0.5, contentMode: .fit)

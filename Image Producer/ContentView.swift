@@ -9044,6 +9044,12 @@ struct AboutView: View {
                     para("Image generation uses Apple's Image Playground. Image Playground and "
                          + "Apple Intelligence are trademarks of Apple Inc. Image Producer is not "
                          + "affiliated with or endorsed by Apple.")
+                    // REM: Amber Sheet D-028 (LOCKED): "sizes and safe areas © Apple, credited
+                    // in the app" — the creative asset wells' sizes (D-025, App Store Connect's
+                    // specifications) and safe-area outlines (Apple's App Store creative asset
+                    // templates).
+                    para("App Store creative asset sizes and safe areas © Apple Inc., from App Store "
+                         + "Connect's specifications and Apple's App Store creative asset templates.")
                 }
 
                 section("License") {
