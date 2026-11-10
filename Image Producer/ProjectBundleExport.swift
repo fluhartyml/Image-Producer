@@ -98,11 +98,17 @@ enum ProjectBundleExport {
         // in upload order." Folder "<project>-<set name>", device folder named as the well is,
         // files 01, 02 … in the well's own order. D-050 "every filled well": an empty well
         // writes no folder.
+        // REM: D-051's names, checked against build 386's sets: the original page is
+        // "<project>-Original", a test version "<project>-Version A" (its default name; you can
+        // rename it), a custom page "<project>-<custom page name>". Set names are kept unique
+        // (case doesn't count), so no two sets share a folder.
         for set in document.xcodeProject.sets {
             let folder = IconSetExport.safeFolderName("\(project)-\(set.name)")
             var files: [String: Data] = [:]
             var counts: [(device: String, count: Int)] = []
-            for device in XcodeWellDevice.allCases {
+            // REM: D-003 — a custom page has "iPhone and iPad screenshot wells" only, so only
+            // the wells its kind shows are written.
+            for device in set.kind.devices {
                 let shots = set.screenshots(for: device)
                 guard !shots.isEmpty else { continue }
                 let deviceFolder = IconSetExport.safeFolderName(device.title)
@@ -347,14 +353,14 @@ struct ProjectBundleSummary: View {
     var body: some View {
         let wells = document.xcodeProject
         let filled = wells.sets.compactMap { set -> String? in
-            let counts = XcodeWellDevice.allCases.compactMap { d -> String? in
+            let counts = set.kind.devices.compactMap { d -> String? in
                 let n = set.screenshots(for: d).count
                 return n > 0 ? "\(d.title) \(n)" : nil
             }
             return counts.isEmpty ? nil : "\(project)-\(set.name): " + counts.joined(separator: ", ")
         }
         let wrong = wells.sets.reduce(0) { total, set in
-            total + XcodeWellDevice.allCases.reduce(0) { sub, d in
+            total + set.kind.devices.reduce(0) { sub, d in
                 sub + set.screenshots(for: d).filter { shot in
                     wellPixelSize(shot.imageData).map { !d.accepts($0) } ?? false
                 }.count

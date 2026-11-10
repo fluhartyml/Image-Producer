@@ -25,6 +25,14 @@
 //  Sizes are D-001 and D-030–D-034 (App Store Connect screenshot specifications, read
 //  2026-11-05). See "Sizes" below.
 //
+//  REM: THE OTHER SETS (build 386, D-023 and D-003, LOCKED). His words:
+//    D-023 "Up to 4 sets per device: your original page plus up to 3 Product Page
+//          Optimization test versions, as per App Store Connect."
+//    D-003 "Custom product pages: yes, up to 70, as per App Store Connect. Each is its own set
+//          with iPhone and iPad screenshot wells (up to 10 each), no icon well."
+//  The wells section shows "Showing [set]" (a Picker), Add Test Version, Add Custom Page, and
+//  for any set but the Original, Rename and Delete. Deleting a set with screenshots asks first.
+//
 //  REM: Export to Project Bundle (D-050–051) and D-042's "resized" report are in
 //  ProjectBundleExport.swift; the export calls `wellResized` below.
 //  REM: WHAT IS DELIBERATELY NOT HERE. The Apple TV icon and Top Shelf wells (D-021/027), the creative
@@ -113,8 +121,33 @@ enum XcodeFitMode: String, Codable {
     case fill, fit
 }
 
+/// REM: What kind of App Store page a set is. His words, LOCKED 2026-11-05:
+///   D-023 "Up to 4 sets per device: your original page plus up to 3 Product Page
+///         Optimization test versions, as per App Store Connect."
+///   D-003 "Custom product pages: yes, up to 70, as per App Store Connect. Each is its own set
+///         with iPhone and iPad screenshot wells (up to 10 each), no icon well. Apple offers
+///         custom pages for iPhone and iPad only, not Mac, Apple TV or Apple Watch."
+///   D-002 "No icon wells for the page versions." — no set has an icon well; the app keeps
+///         one icon (the Icon Set export).
+enum XcodeSetKind: String, Codable {
+    case original, testVersion, customPage
+
+    /// The wells this kind of set shows, in the Layers list and in the export.
+    /// REM: D-023 says "per device", so the original page and its test versions get every
+    /// well. D-003 names "iPhone and iPad" only for custom pages, so they get exactly those
+    /// two. REM (Claude's call, conservative): the sheet doesn't say whether a custom page
+    /// takes iPhone Duo screenshots; D-003 names only "iPhone and iPad", so no Duo well.
+    var devices: [XcodeWellDevice] {
+        switch self {
+        case .original, .testVersion: XcodeWellDevice.allCases
+        case .customPage:             [.iPhone, .iPad]
+        }
+    }
+}
+
 /// One set — a whole App Store page's worth of screenshots, one well per device.
-/// REM: D-023 — "your original page plus up to 3 Product Page Optimization test versions".
+/// REM: D-023 — "your original page plus up to 3 Product Page Optimization test versions";
+/// D-003 — custom product pages, each "its own set".
 struct XcodeWellSet: Identifiable, Codable, Equatable {
     var id = UUID()
     var name: String
@@ -122,18 +155,40 @@ struct XcodeWellSet: Identifiable, Codable, Equatable {
     /// by a later build with a device this build doesn't know still OPENS here — the unknown
     /// well is simply not shown — instead of the whole document failing to decode.
     var wells: [String: [XcodeScreenshot]] = [:]
+    /// Added in build 386. Builds 383–385 only ever wrote the Original set, with no `kind`.
+    var kind: XcodeSetKind = .original
 
     func screenshots(for device: XcodeWellDevice) -> [XcodeScreenshot] { wells[device.rawValue] ?? [] }
+
+    /// Screenshots in the wells this set shows.
+    var screenshotCount: Int { kind.devices.reduce(0) { $0 + screenshots(for: $1).count } }
 }
 
-/// Every set for this project. REM: D-023 — modeled as an ARRAY of sets from day one so the
-/// Product Page Optimization versions can be added later without changing the file format.
-/// Only "Original" has UI in this piece.
+extension XcodeWellSet {
+    /// Builds 383–385 wrote no `kind`: their only set was "Original", so a set without one
+    /// opens as the original page if it's named that, otherwise as a test version.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        wells = try c.decodeIfPresent([String: [XcodeScreenshot]].self, forKey: .wells) ?? [:]
+        kind = try c.decodeIfPresent(XcodeSetKind.self, forKey: .kind)
+            ?? (name == XcodeProjectWells.originalName ? .original : .testVersion)
+    }
+}
+
+/// Every set for this project: the Original first, then the test versions, then the custom
+/// pages. REM: D-023 — modeled as an ARRAY of sets from day one (build 383), so adding the
+/// other sets didn't change the file format, only added each set's `kind`.
 struct XcodeProjectWells: Codable, Equatable {
     /// REM: D-022 — "Up to 10 screenshots per device, as per App Store Connect."
     static let maxPerDevice = 10
-    /// REM: D-023 — "Up to 4 sets per device". Original + 3 test versions.
+    /// REM: D-023 — "Up to 4 sets per device": the original page + "up to 3 Product Page
+    /// Optimization test versions".
     static let maxSets = 4
+    static let maxTestVersions = maxSets - 1
+    /// REM: D-003 — "Custom product pages: yes, up to 70".
+    static let maxCustomPages = 70
     static let originalName = "Original"
 
     /// REM: D-023 — the "Original" set first. Always present.
@@ -142,27 +197,115 @@ struct XcodeProjectWells: Codable, Equatable {
     init() {}
 
     /// Older builds' files have no wells, and a file could in theory carry an empty list:
-    /// either way the Original set is guaranteed to exist and to come first.
+    /// either way exactly one Original set exists and comes first, then test versions, then
+    /// custom pages (each group in its saved order).
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        sets = try c.decodeIfPresent([XcodeWellSet].self, forKey: .sets) ?? []
-        if !sets.contains(where: { $0.name == Self.originalName }) {
-            sets.insert(XcodeWellSet(name: Self.originalName), at: 0)
-        }
+        let saved = try c.decodeIfPresent([XcodeWellSet].self, forKey: .sets) ?? []
+        var original = saved.first { $0.kind == .original } ?? XcodeWellSet(name: Self.originalName)
+        original.name = Self.originalName
+        // A second "original" can only come from a hand-edited file; keep its screenshots
+        // as a test version rather than drop them.
+        let extraOriginals = saved.filter { $0.kind == .original && $0.id != original.id }
+            .map { s -> XcodeWellSet in var s = s; s.kind = .testVersion; return s }
+        sets = [original]
+            + (saved.filter { $0.kind == .testVersion } + extraOriginals)
+            + saved.filter { $0.kind == .customPage }
     }
 
-    /// Nothing in any well — the manifest leaves the key out entirely.
-    var isEmpty: Bool { sets.allSatisfy { $0.wells.values.allSatisfy(\.isEmpty) } }
+    /// Only the Original, with nothing in its wells — the manifest leaves the key out
+    /// entirely, so a project that never used the wells saves the same bytes it always did.
+    /// A test version or custom page you added is saved even while its wells are empty, so
+    /// its name is still there when you reopen the project.
+    var isEmpty: Bool {
+        sets.count == 1 && sets.allSatisfy { $0.wells.values.allSatisfy(\.isEmpty) }
+    }
 
-    var originalIndex: Int { sets.firstIndex { $0.name == Self.originalName } ?? 0 }
+    var originalIndex: Int { sets.firstIndex { $0.kind == .original } ?? 0 }
+
+    func count(of kind: XcodeSetKind) -> Int { sets.filter { $0.kind == kind }.count }
+
+    var canAddTestVersion: Bool { count(of: .testVersion) < Self.maxTestVersions }
+    var canAddCustomPage: Bool { count(of: .customPage) < Self.maxCustomPages }
+
+    /// The folder this name would get in the export, compared the way the Mac's disk compares
+    /// names (case doesn't count), so two sets can never write into one folder.
+    private static func folderKey(_ name: String) -> String {
+        IconSetExport.safeFolderName(name).lowercased()
+    }
+
+    /// nil when the name can be used for the set `id`; otherwise the sentence saying why not.
+    /// REM: D-051 names each set's folder "<project>-<set name>", so names must be unique and
+    /// not empty, and none but the Original may be called "Original".
+    func problem(withName name: String, for id: XcodeWellSet.ID?) -> String? {
+        let key = Self.folderKey(name)
+        if key.isEmpty { return "A set needs a name." }
+        if key == Self.folderKey(Self.originalName) {
+            return "“\(Self.originalName)” is your original page's name. Choose another."
+        }
+        if sets.contains(where: { $0.id != id && Self.folderKey($0.name) == key }) {
+            return "Another set is already named “\(name.trimmingCharacters(in: .whitespacesAndNewlines))”. Choose another."
+        }
+        return nil
+    }
+
+    /// The first free default name: "Version A", "Version B", "Version C" for test versions —
+    /// REM: D-051's own example folder is "HomeLAB Playground-Version A" — and "Custom Page 1",
+    /// "Custom Page 2"… for custom pages (Claude's wording; the sheet writes these folders
+    /// "<custom page name>" and leaves the default open).
+    func defaultName(for kind: XcodeSetKind) -> String {
+        let candidates: [String]
+        switch kind {
+        case .original:    return Self.originalName
+        case .testVersion: candidates = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".map { "Version \($0)" }
+        case .customPage:  candidates = (1...(Self.maxCustomPages + sets.count)).map { "Custom Page \($0)" }
+        }
+        return candidates.first { problem(withName: $0, for: nil) == nil } ?? candidates[0]
+    }
 }
 
 extension ImageDocument {
+    /// Add an empty test version or custom page under its default name, after the others of
+    /// its kind (test versions stay ahead of custom pages). Returns its id, or nil at the cap
+    /// — REM: D-023 "up to 3 Product Page Optimization test versions", D-003 "up to 70".
+    @discardableResult
+    func addWellSet(_ kind: XcodeSetKind) -> XcodeWellSet.ID? {
+        switch kind {
+        case .original:    return nil   // there's only ever one, and it's always there
+        case .testVersion: guard xcodeProject.canAddTestVersion else { return nil }
+        case .customPage:  guard xcodeProject.canAddCustomPage else { return nil }
+        }
+        let set = XcodeWellSet(name: xcodeProject.defaultName(for: kind), kind: kind)
+        let order: [XcodeSetKind] = [.original, .testVersion, .customPage]
+        let rank = order.firstIndex(of: kind) ?? order.count
+        let at = xcodeProject.sets.lastIndex { (order.firstIndex(of: $0.kind) ?? 0) <= rank }
+            .map { $0 + 1 } ?? xcodeProject.sets.count
+        xcodeProject.sets.insert(set, at: at)
+        return set.id
+    }
+
+    /// Rename a test version or custom page. Returns nil when done, or the sentence saying why
+    /// not. REM: the Original keeps its name — D-051's folder is "<project>-Original".
+    func renameWellSet(_ id: XcodeWellSet.ID, to name: String) -> String? {
+        guard let i = xcodeProject.sets.firstIndex(where: { $0.id == id }),
+              xcodeProject.sets[i].kind != .original else { return nil }
+        if let problem = xcodeProject.problem(withName: name, for: id) { return problem }
+        xcodeProject.sets[i].name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return nil
+    }
+
+    /// Delete a test version or custom page and everything in its wells. The Original can't
+    /// be deleted. (The view asks first when the set holds screenshots.)
+    func removeWellSet(_ id: XcodeWellSet.ID) {
+        xcodeProject.sets.removeAll { $0.id == id && $0.kind != .original }
+    }
+
     /// Add screenshots to one well of one set, in the order given, up to the ten-per-device
     /// limit. Returns how many were left out because the well was full.
     @discardableResult
     func addScreenshots(_ images: [Data], to device: XcodeWellDevice, inSet setIndex: Int) -> Int {
-        guard xcodeProject.sets.indices.contains(setIndex) else { return images.count }
+        guard xcodeProject.sets.indices.contains(setIndex),
+              xcodeProject.sets[setIndex].kind.devices.contains(device) else { return images.count }
         var list = xcodeProject.sets[setIndex].screenshots(for: device)
         let room = max(0, XcodeProjectWells.maxPerDevice - list.count)
         let taken = images.prefix(room)
@@ -377,18 +520,179 @@ nonisolated private func wellThumbnail(_ data: Data, maxPixels: Int) -> CGImage?
 struct XcodeWellsSection: View {
     @Bindable var document: ImageDocument
 
+    /// Which set's wells you're looking at. nil (or a set that's gone) means the Original.
+    @State private var selectedSetID: XcodeWellSet.ID?
+    @State private var renamingID: XcodeWellSet.ID?
+    @State private var draftName = ""
+    @State private var pendingDelete: XcodeWellSet?
+
+    private var setIndex: Int {
+        selectedSetID.flatMap { id in document.xcodeProject.sets.firstIndex { $0.id == id } }
+            ?? document.xcodeProject.originalIndex
+    }
+
     var body: some View {
-        let setIndex = document.xcodeProject.originalIndex
+        let wells = document.xcodeProject
+        let index = setIndex
+        let set = wells.sets[index]
         Section {
-            ForEach(XcodeWellDevice.allCases) { device in
-                XcodeWellRow(document: document, device: device, setIndex: setIndex)
+            setControls(set: set, wells: wells)
+            ForEach(set.kind.devices) { device in
+                XcodeWellRow(document: document, device: device, setIndex: index)
             }
         } header: {
-            // REM: D-023 — the set's name shows, so later sets read as siblings of this one.
-            Text("Xcode Project · \(document.xcodeProject.sets[setIndex].name)")
+            // REM: D-023 — the set's name shows, so the sets read as siblings of one another.
+            Text("Xcode Project · \(set.name)")
                 .scaledFont(18, weight: .semibold)
                 .accessibilityLabel("Xcode wells")
         }
+    }
+
+    /// REM: D-023 and D-003 — choosing, adding, renaming and deleting sets. A Picker to choose
+    /// which set's wells you see (his rule allows a Picker for choosing); every action is a
+    /// visible button with words on it — no "…" menu.
+    @ViewBuilder
+    private func setControls(set: XcodeWellSet, wells: XcodeProjectWells) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Text("Showing").scaledFont(18).foregroundStyle(.secondary)
+                Picker("Set", selection: Binding(get: { set.id }, set: { selectedSetID = $0 })) {
+                    ForEach(wells.sets) { s in
+                        Text(pickerTitle(s)).tag(s.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .scaledFont(18)
+                .accessibilityLabel("Choose set")
+                .help("Choose which page's wells you see")
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 12) {
+                Button { add(.testVersion) } label: {
+                    Label("Add Test Version", systemImage: "plus.square.on.square").scaledFont(18)
+                }
+                .disabled(!wells.canAddTestVersion)
+                .help(wells.canAddTestVersion
+                      ? "Add a Product Page Optimization test version with its own wells"
+                      : "You have \(XcodeProjectWells.maxTestVersions) test versions, the most App Store Connect allows")
+                .accessibilityLabel("Add test version")
+                Button { add(.customPage) } label: {
+                    Label("Add Custom Page", systemImage: "doc.badge.plus").scaledFont(18)
+                }
+                .disabled(!wells.canAddCustomPage)
+                .help(wells.canAddCustomPage
+                      ? "Add a custom product page with its own iPhone and iPad wells"
+                      : "You have \(XcodeProjectWells.maxCustomPages) custom pages, the most App Store Connect allows")
+                .accessibilityLabel("Add custom page")
+            }
+            .buttonStyle(.borderless)
+            // REM: the Original "can't be removed" (and keeps its name — D-051's folder is
+            // "<project>-Original"), so it shows no Rename or Delete at all rather than dead ones.
+            if set.kind != .original {
+                HStack(spacing: 12) {
+                    Button { startRename(set) } label: {
+                        Label("Rename", systemImage: "pencil").scaledFont(18)
+                    }
+                    .help("Rename “\(set.name)”; its export folder takes the new name")
+                    .accessibilityLabel("Rename set")
+                    Button(role: .destructive) { askDelete(set) } label: {
+                        Label("Delete", systemImage: "trash").scaledFont(18)
+                    }
+                    .help("Delete “\(set.name)” and its wells")
+                    .accessibilityLabel("Delete set")
+                }
+                .buttonStyle(.borderless)
+            }
+            Text(kindNote(set, wells: wells))
+                .scaledFont(18)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Sets")
+        .alert("Rename Set", isPresented: Binding(get: { renamingID != nil },
+                                                  set: { if !$0 { renamingID = nil } })) {
+            TextField("Name", text: $draftName)
+                .accessibilityLabel("Set name")
+            Button("Cancel", role: .cancel) { renamingID = nil }
+            Button("Rename") { commitRename() }
+        } message: {
+            Text("This name is also the set's folder name when you export the project bundle.")
+        }
+        // REM: his rule — deleting a set that has screenshots asks first; it destroys work.
+        .confirmationDialog(pendingDelete.map { "Delete “\($0.name)”?" } ?? "",
+                            isPresented: Binding(get: { pendingDelete != nil },
+                                                 set: { if !$0 { pendingDelete = nil } }),
+                            titleVisibility: .visible) {
+            Button("Delete Set and Screenshots", role: .destructive) {
+                if let doomed = pendingDelete { delete(doomed) }
+                pendingDelete = nil
+            }
+            .accessibilityLabel("Delete set")
+            Button("Keep Set", role: .cancel) { pendingDelete = nil }
+                .accessibilityLabel("Keep set")
+        } message: {
+            if let doomed = pendingDelete {
+                let n = doomed.screenshotCount
+                Text("Its \(n) screenshot\(n == 1 ? "" : "s") will be deleted with it.")
+            }
+        }
+    }
+
+    private func pickerTitle(_ s: XcodeWellSet) -> String {
+        switch s.kind {
+        case .original:    "Original page"
+        case .testVersion: "Test version: \(s.name)"
+        case .customPage:  "Custom page: \(s.name)"
+        }
+    }
+
+    /// One line under the buttons saying what this set is, in App Store Connect's terms.
+    private func kindNote(_ s: XcodeWellSet, wells: XcodeProjectWells) -> String {
+        switch s.kind {
+        case .original:
+            return "Your original App Store page. You can add up to \(XcodeProjectWells.maxTestVersions) "
+                + "test versions and up to \(XcodeProjectWells.maxCustomPages) custom pages."
+        case .testVersion:
+            return "A Product Page Optimization test version, \(wells.count(of: .testVersion)) of "
+                + "\(XcodeProjectWells.maxTestVersions). It varies the screenshots; your app keeps one icon."
+        case .customPage:
+            return "A custom product page, \(wells.count(of: .customPage)) of \(XcodeProjectWells.maxCustomPages). "
+                + "App Store Connect offers custom pages for iPhone and iPad only."
+        }
+    }
+
+    private func add(_ kind: XcodeSetKind) {
+        guard let id = document.addWellSet(kind),
+              let added = document.xcodeProject.sets.first(where: { $0.id == id }) else { return }
+        selectedSetID = id
+        document.say("Added \(added.name). Its wells are showing; Rename changes its name.", kind: .edit)
+    }
+
+    private func startRename(_ s: XcodeWellSet) {
+        draftName = s.name
+        renamingID = s.id
+    }
+
+    private func commitRename() {
+        guard let id = renamingID else { return }
+        renamingID = nil
+        // A name that can't be used leaves the old one and says why in the status line.
+        if let problem = document.renameWellSet(id, to: draftName) {
+            document.say(problem, kind: .warning)
+        }
+    }
+
+    private func askDelete(_ s: XcodeWellSet) {
+        if s.screenshotCount > 0 { pendingDelete = s } else { delete(s) }
+    }
+
+    private func delete(_ s: XcodeWellSet) {
+        document.removeWellSet(s.id)
+        if selectedSetID == s.id { selectedSetID = nil }
+        document.say("Deleted \(s.name). Showing your original page.", kind: .edit)
     }
 }
 
