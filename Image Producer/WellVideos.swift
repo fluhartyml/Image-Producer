@@ -294,15 +294,15 @@ enum WellVideoMaker {
         let still = pngData(stillImage) ?? Data()
 
         let original = try await encode(images, holds: holds, size: size,
-                                        canvas: CGSize(width: cw, height: ch))
+                                        canvas: CGSize(width: cw, height: ch), steps: plan.steps)
         var fit: Data?, fill: Data?
         if !well.accepts(size) {
             let target = well.exportSize(for: size)
             let full = CGSize(width: target.width, height: target.height)
             fit = try await encode(images.compactMap { wellResized($0, to: target, mode: .fit) },
-                                   holds: holds, size: target, canvas: full)
+                                   holds: holds, size: target, canvas: full, steps: plan.steps)
             fill = try await encode(images.compactMap { wellResized($0, to: target, mode: .fill) },
-                                    holds: holds, size: target, canvas: full)
+                                    holds: holds, size: target, canvas: full, steps: plan.steps)
         }
         return XcodeVideo(videoData: original, width: size.width, height: size.height,
                           seconds: plan.seconds, still: still, fitData: fit, fillData: fill)
@@ -310,14 +310,15 @@ enum WellVideoMaker {
 
     /// One silent H.264 video through Export ▸ Video's own writer, read back as bytes.
     @MainActor private static func encode(_ images: [CGImage], holds: [Int], size: WellPixelSize,
-                                          canvas: CGSize) async throws -> Data {
+                                          canvas: CGSize, steps: [VideoTransitionStep] = []) async throws -> Data {
         guard images.count == holds.count else { throw Problem.render }
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("ImageProducer-well-\(UUID().uuidString)")
             .appendingPathExtension(VideoExport.Codec.h264.fileExtension)
         defer { try? FileManager.default.removeItem(at: url) }
         try await VideoExport.write(images: images, holds: holds, width: size.width, height: size.height,
-                                    canvas: canvas, codec: .h264, sound: nil, to: url)
+                                    canvas: canvas, codec: .h264, sound: nil, to: url,
+                                    steps: steps)
         return try Data(contentsOf: url)
     }
 

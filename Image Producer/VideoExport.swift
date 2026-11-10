@@ -51,15 +51,27 @@ enum VideoExport {
         var baseHolds: [Int]
         /// How many times each card's hold was doubled to reach 15 seconds (D-070c).
         var doublings: Int
+        /// REM: D-082 — the filler frames between each card and the next (count = cards − 1),
+        /// a cut (no frames) where there's no transition. Empty with no storyboard.
+        var baseSteps: [VideoTransitionStep] = []
         var holds: [Int] { baseHolds.map { $0 << doublings } }
-        var baseFrames: Int { baseHolds.reduce(0, +) }
-        var frames: Int { holds.reduce(0, +) }
+        /// REM: Claude's call, not from the sheet — D-070c's padding doubles the transitions
+        /// with the cards, so they keep their share of the video.
+        var steps: [VideoTransitionStep] {
+            baseSteps.map { VideoTransitionStep(effect: $0.effect, frames: $0.frames << doublings) }
+        }
+        var baseFrames: Int { baseHolds.reduce(0, +) + baseSteps.reduce(0) { $0 + $1.frames } }
+        var frames: Int { baseFrames << doublings }
         var baseSeconds: Double { Double(baseFrames) / Double(VideoExport.fps) }
         var seconds: Double { Double(frames) / Double(VideoExport.fps) }
         /// Start of each card, in seconds, for the dividers on the bar.
         var cardStarts: [Double] {
             var t = 0, out: [Double] = []
-            for h in holds { out.append(Double(t) / Double(VideoExport.fps)); t += h }
+            let filler = steps
+            for (i, h) in holds.enumerated() {
+                out.append(Double(t) / Double(VideoExport.fps))
+                t += h + (filler.indices.contains(i) ? filler[i].frames : 0)
+            }
             return out
         }
     }
@@ -80,15 +92,18 @@ enum VideoExport {
         // storyboard, each card holds its storyboard time (D-084, D-089) and the flipbook
         // speed no longer applies. With no length set, today's flipbook timing is kept.
         let base: [Int]
+        var steps: [VideoTransitionStep] = []
         if document.storyboard.isOn {
-            base = document.storyboard.holds(for: cards.map(\.id))
+            // REM: D-093 — transitions spend frames out of the length; the cards share the rest.
+            base = document.storyboard.cardHolds(for: cards.map(\.id))
+            steps = document.storyboard.steps(for: cards.map(\.id))
         } else {
             base = cards.map { layer -> Int in
                 let exposures = Double(max(1, layer.cameraFrame?.exposures ?? 1))
                 return max(1, Int((exposures * Double(fps) / rate).rounded()))
             }
         }
-        var plan = Plan(cards: cards, baseHolds: base, doublings: 0)
+        var plan = Plan(cards: cards, baseHolds: base, doublings: 0, baseSteps: steps)
         let target = Int(shortest) * Int(fps)
         while !cards.isEmpty && plan.frames < target { plan.doublings += 1 }
         return plan
@@ -118,7 +133,8 @@ enum VideoExport {
             .appendingPathComponent("ImageProducer-\(UUID().uuidString)")
             .appendingPathExtension(codec.fileExtension)
         try await write(images: images, holds: plan.holds, width: w, height: h,
-                        canvas: CGSize(width: cw, height: ch), codec: codec, sound: sound, to: url)
+                        canvas: CGSize(width: cw, height: ch), codec: codec, sound: sound, to: url,
+                        steps: plan.steps)
         return url
     }
 
@@ -135,7 +151,8 @@ enum VideoExport {
     /// The AVAssetWriter loop, off the main thread. Each card is drawn once into a pixel
     /// buffer, then appended for every 1/30 s frame it holds.
     @concurrent nonisolated static func write(images: [CGImage], holds: [Int], width: Int, height: Int,
-                                              canvas: CGSize, codec: Codec, sound: URL?, to url: URL) async throws {
+                                              canvas: CGSize, codec: Codec, sound: URL?, to url: URL,
+                                              steps: [VideoTransitionStep] = []) async throws {
         let writer = try AVAssetWriter(outputURL: url, fileType: codec.fileType)
         // Your sound, read as plain stereo samples and written in App Store Connect's form.
         var soundReader: AVAssetReader?
@@ -177,7 +194,7 @@ enum VideoExport {
         }
         var pending: CMSampleBuffer?
         var soundDone = soundInput == nil
-        let videoEnd = CMTime(value: Int64(holds.reduce(0, +)), timescale: fps)
+        let videoEnd = CMTime(value: Int64(holds.reduce(0, +) + steps.reduce(0) { $0 + $1.frames }), timescale: fps)
         /// Feed sound up to `limit` while the writer will take it. Returns true if any went in.
         /// The sound plays from the start and is cut off where the video ends.
         func pumpSound(upTo limit: CMTime) -> Bool {
@@ -216,7 +233,10 @@ enum VideoExport {
         }
         writer.startSession(atSourceTime: .zero)
         var frame: Int64 = 0
-        for (image, hold) in zip(images, holds) {
+        let place = CGRect(x: 0, y: CGFloat(height) - canvas.height, width: canvas.width, height: canvas.height)
+        /// One frame's pixel buffer, filled black (video has no transparency: clear parts of a
+        /// card show black), then drawn by `paint`.
+        func buffer(_ paint: (CGContext) -> Void) throws -> CVPixelBuffer {
             var made: CVPixelBuffer?
             CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA,
                                 attributes as CFDictionary, &made)
@@ -227,25 +247,37 @@ enum VideoExport {
                                    space: CGColorSpaceCreateDeviceRGB(),
                                    bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
                                        | CGBitmapInfo.byteOrder32Little.rawValue) {
-                // Video has no transparency: clear parts of a card show black.
                 ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
                 ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
-                ctx.draw(image, in: CGRect(x: 0, y: CGFloat(height) - canvas.height,
-                                           width: canvas.width, height: canvas.height))
+                paint(ctx)
             }
             CVPixelBufferUnlockBaseAddress(buffer, [])
-            for _ in 0..<hold {
-                while !input.isReadyForMoreMediaData {
-                    // The writer interleaves picture and sound; give it sound while it waits.
-                    if !pumpSound(upTo: CMTime(value: frame + Int64(fps), timescale: fps)) {
-                        try await Task.sleep(for: .milliseconds(2))
-                    }
+            return buffer
+        }
+        func append(_ buffer: CVPixelBuffer) async throws {
+            while !input.isReadyForMoreMediaData {
+                // The writer interleaves picture and sound; give it sound while it waits.
+                if !pumpSound(upTo: CMTime(value: frame + Int64(fps), timescale: fps)) {
+                    try await Task.sleep(for: .milliseconds(2))
                 }
-                guard adaptor.append(buffer, withPresentationTime: CMTime(value: frame, timescale: fps)) else {
-                    throw Failure.writer(writer.error?.localizedDescription ?? "A video frame could not be written.")
+            }
+            guard adaptor.append(buffer, withPresentationTime: CMTime(value: frame, timescale: fps)) else {
+                throw Failure.writer(writer.error?.localizedDescription ?? "A video frame could not be written.")
+            }
+            frame += 1
+            _ = pumpSound(upTo: CMTime(value: frame + Int64(fps), timescale: fps))
+        }
+        for (i, (image, hold)) in zip(images, holds).enumerated() {
+            // Each card is drawn once, then appended for every frame it holds.
+            let card = try buffer { $0.draw(image, in: place) }
+            for _ in 0..<hold { try await append(card) }
+            // REM: D-083 — the filler frames are drawn here, only while a video is made.
+            if steps.indices.contains(i), images.indices.contains(i + 1), steps[i].frames > 0 {
+                let step = steps[i], next = images[i + 1]
+                for k in 1...step.frames {
+                    let p = CGFloat(k) / CGFloat(step.frames + 1)
+                    try await append(try buffer { step.effect.draw($0, from: image, to: next, progress: p, in: place) })
                 }
-                frame += 1
-                _ = pumpSound(upTo: CMTime(value: frame + Int64(fps), timescale: fps))
             }
         }
         input.markAsFinished()
