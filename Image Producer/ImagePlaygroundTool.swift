@@ -50,6 +50,28 @@ struct ImagePlaygroundInspector: View {
     @State private var filterSource: Image?   // the active layer rendered, seeds Filter
     @State private var failed = false
 
+    /// The style the sheet opens in, picked BEFORE the sheet (kept across launches).
+    @AppStorage("imagePlaygroundStyleID") private var styleID = ImagePlaygroundStyle.any.id
+
+    /// REM: his report 2026-11-14: Apple's sheet greys out its styles until you type a
+    /// description. His "add a style picker before" (11:1x): we pick the style here and
+    /// hand it to the sheet with .imagePlaygroundGenerationStyle(_:in:), so it opens in
+    /// that style. Every style stays allowed, so he can still switch inside the sheet.
+    /// SDK-verified names (Xcode 27): any, animation, illustration, sketch, emoji (Genmoji),
+    /// externalProvider (ChatGPT). Buttons, not a menu (no overflow menus, his rule).
+    static let styleChoices: [(style: ImagePlaygroundStyle, title: String, symbol: String)] = [
+        (.any, "Any", "sparkles"),
+        (.animation, "Animation", "film"),
+        (.illustration, "Illustration", "paintbrush"),
+        (.sketch, "Sketch", "pencil.and.scribble"),
+        (.emoji, "Genmoji", "face.smiling"),
+        (.externalProvider, "ChatGPT", "bubble.left.and.text.bubble.right"),
+    ]
+
+    private var selectedStyle: ImagePlaygroundStyle {
+        Self.styleChoices.first { $0.style.id == styleID }?.style ?? .any
+    }
+
     private var activeIndex: Int? {
         guard let id = activeLayerID else { return nil }
         return document.layers.firstIndex(where: { $0.id == id })
@@ -133,10 +155,35 @@ struct ImagePlaygroundInspector: View {
             replaceActiveLayer(from: url)
         }
         .imagePlaygroundOptions(personalizationDisabled)
+        .imagePlaygroundGenerationStyle(selectedStyle, in: ImagePlaygroundStyle.all)
+    }
+
+    /// Two columns of style buttons; the chosen one is filled.
+    private var stylePicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Style:").scaledFont(18)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(Self.styleChoices, id: \.style.id) { choice in
+                    let chosen = choice.style.id == selectedStyle.id
+                    let button = Button { styleID = choice.style.id } label: {
+                        Label(choice.title, systemImage: choice.symbol)
+                            .scaledFont(18)
+                            .frame(maxWidth: .infinity)
+                    }
+                    Group {
+                        if chosen { button.buttonStyle(.borderedProminent) } else { button.buttonStyle(.bordered) }
+                    }
+                    .accessibilityLabel(choice.title)
+                    .accessibilityAddTraits(chosen ? .isSelected : [])
+                }
+            }
+        }
     }
 
     @ViewBuilder private var supported: some View {
             VStack(alignment: .leading, spacing: 14) {
+                stylePicker
+
                 Text("Describe what Image Playground should make:")
                     .scaledFont(18)
 
