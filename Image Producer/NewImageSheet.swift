@@ -108,7 +108,12 @@ struct NewImageSheet: View {
     /// sheet asks for a name.
     private var fileIsAutoNamed: Bool {
         guard let stem = fileName else { return true }
-        return stem.range(of: #"^ImageProducer\d{4}$"#, options: .regularExpression) != nil
+        // REM 2026-11-18 — "Untitled" is automatic too. iPad/iPhone "New Image" names the file
+        // "Untitled", and this check only knew ImageProducerNNNN, so on his iPhone Duo the Name
+        // field never showed. His TestFlight note, 7:45 AM: "This opup should let you give it a
+        // new name". Same pattern as the rename's isStillAutoNamed (ContentView), so the two agree.
+        return stem.range(of: #"^(ImageProducer\d{4}|Untitled( \d+)?)$"#,
+                          options: .regularExpression) != nil
     }
 
     /// The project file's name on disk, without its extension — what the Canvas tool's
