@@ -306,6 +306,16 @@ struct ContentView: View {
     private var isPhone: Bool { false }
     #endif
 
+    /// REM 2026-11-18 — every tool button goes through here. onChange(of: activeTool) only fires
+    /// when the tool CHANGES, so tapping the tool already picked (Canvas, on a new image) left the
+    /// iPhone panel on Layers and the Project name field out of sight. His TestFlight note, iPhone
+    /// Duo, 7:47 AM: "The tool inspector doesn't obviously let you know how to rename the new
+    /// project". A tap now always brings that tool's page up on a phone.
+    private func pickTool(_ tool: Tool) {
+        activeTool = tool
+        if isPhone { bottomPanel = .tool }
+    }
+
     /// iPhone-only layout, isolated from iPad. Canvas gets the room; the tool box is a
     /// single scrollable line; Tool/Layers/History stay in the existing swipe panel.
     /// Portrait stacks it; landscape puts the canvas on the left, tools+panel on the right.
@@ -355,7 +365,7 @@ struct ContentView: View {
                     })
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(side), spacing: 0), count: cols), spacing: 2) {
                 ForEach(Tool.shipping) { tool in
-                    Button { activeTool = tool } label: {
+                    Button { pickTool(tool) } label: {
                         ToolGlyph(tool: tool)
                             .frame(width: side, height: side)
                             .background(RoundedRectangle(cornerRadius: 8)
@@ -396,7 +406,7 @@ struct ContentView: View {
                 if !toolsFloating {
                     HStack(spacing: 0) {
                         toolPaletteGrip
-                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, wrap: true)
+                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if isPhone { bottomPanel = .tool } }, wrap: true)
                     }
                     Divider()
                 }
@@ -417,7 +427,7 @@ struct ContentView: View {
                     if !toolsFloating {
                         HStack(spacing: 0) {
                             toolPaletteGrip
-                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, lines: 1)
+                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if isPhone { bottomPanel = .tool } }, lines: 1)
                         }
                         Divider()
                     }
@@ -480,7 +490,7 @@ struct ContentView: View {
                     if !toolsFloating {
                         HStack(spacing: 0) {
                             toolPaletteGrip
-                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
+                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if isPhone { bottomPanel = .tool } })
                         }
                     }
                     ActiveToolLabel(tool: activeTool)
@@ -517,7 +527,7 @@ struct ContentView: View {
                             Divider()
                             HStack(spacing: 0) {
                                 toolPaletteGrip
-                                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } })
+                                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if isPhone { bottomPanel = .tool } })
                             }
                             .frame(height: 104)
                         }
@@ -603,7 +613,10 @@ struct ContentView: View {
                 || document.openedAsNew
                 || (document.isUntouchedBlank && fileIsAppNamed)
                 || fileURL?.lastPathComponent == ImageDocument.pendingNewProjectURL?.lastPathComponent {
-                activeTool = .canvas
+                // REM 2026-11-18 — pickTool, not a bare assignment: Canvas is already the
+                // default tool, so the assignment changed nothing and the iPhone panel stayed
+                // on Layers, hiding the Project name field (his Duo note, 7:47 AM).
+                pickTool(.canvas)
                 ImageDocument.pendingNewProjectURL = nil
                 document.openedAsNew = false
                 if !document.newImageAsked,
@@ -1379,6 +1392,9 @@ struct ToolStrip: View {
     /// Double-tap on a tool's own button. Zoom uses it to toggle all-the-way-out and
     /// back — Michael 2026-08-24. Optional so callers that do not care can omit it.
     var onDoubleTap: ((Tool) -> Void)? = nil
+    /// REM 2026-11-18 — every tap, even on the tool already picked (onChange can't see that).
+    /// ContentView uses it to bring the Tool page up on iPhone (his Duo note, 7:47 AM).
+    var onPick: ((Tool) -> Void)? = nil
     /// Rows of tools: 2 on iPad (the default), 1 on iPhone (a single scrollable line).
     var lines: Int = 2
     /// 022 — every tool visible, wrapping onto as many rows as the width needs (no scrolling).
@@ -1417,7 +1433,7 @@ struct ToolStrip: View {
 
     @ViewBuilder
     private func toolButton(_ tool: Tool, side: CGFloat = 44) -> some View {
-                    Button { activeTool = tool } label: {
+                    Button { activeTool = tool; onPick?(tool) } label: {
                         ToolGlyph(tool: tool)
                             .frame(width: side, height: side)
                             // ⚠️ THE TOOLTIP LIVES ON THE GLYPH, NOT ON THE BUTTON.
