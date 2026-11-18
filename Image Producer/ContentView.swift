@@ -130,6 +130,10 @@ struct ContentView: View {
     /// True while the on-screen keyboard is up. His Duo note, 7:49 AM: "Everything is so cramped
     /// up no place for the keyboard when i tapped the name" — the canvas steps aside while typing.
     @State private var keyboardUp = false
+    /// The orientation the editor was in when the keyboard rose; nil when it is down.
+    @State private var keyboardPortraitLock: Bool?
+    /// Same idea one level up: phone vs full layout is held while the keyboard is up.
+    @State private var keyboardPhoneLock: Bool?
 
     /// Zoom at the moment a pinch began, so the gesture scales from where you were
     /// rather than snapping to 1× on the first delta.
@@ -434,7 +438,13 @@ struct ContentView: View {
 
     @ViewBuilder
     private func phoneLayout(geo: GeometryProxy) -> some View {
-        if geo.size.height > geo.size.width {
+        // REM 2026-11-18 — while the keyboard is up, keep the orientation it rose in. The keyboard
+        // takes height, so a portrait window can measure wider than tall; the layout flipped to
+        // landscape, the Project name field was rebuilt, focus dropped, the keyboard fell and it
+        // flipped back. His Duo note, 2:57 PM: "I tap untitled to rename but it bounces like a
+        // keyboard is going to show but it never does". (Cause is Claude's reading; not yet
+        // confirmed on the Duo.)
+        if keyboardPortraitLock ?? (geo.size.height > geo.size.width) {
             VStack(spacing: 0) {
                 // Canvas ~42% (was half): the inspector was starved for height. No
                 // ActiveToolLabel here — the tool strip highlights the active tool and
@@ -466,10 +476,6 @@ struct ContentView: View {
             .overlay(alignment: .topLeading) {
                 if toolsFloating { floatingToolPalette(in: geo.size) }
             }
-            #if canImport(UIKit)
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
-            #endif
         } else {
             HStack(spacing: 0) {
                 canvasArea
@@ -531,7 +537,7 @@ struct ContentView: View {
                 // Full-screen focus: canvas only, tools/panel hidden. The on-canvas
                 // control cluster carries the toggle back out + the zoom buttons.
                 canvasArea
-            } else if isPhone || ContentView.isSmallWindow(geo.size) {
+            } else if keyboardPhoneLock ?? (isPhone || ContentView.isSmallWindow(geo.size)) {
                 // REM 2026-11-18 — go by the WINDOW, not the size class. The iPhone Duo in
                 // landscape reports regular sizes, so it got the iPad's three columns in a
                 // phone-sized screen (Style buttons broke mid-word). His Duo note, 7:54 AM:
@@ -655,6 +661,18 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.25), value: usesPhoneLayout)
         // REM 2026-11-18 — measure the editor so tool taps and the hand-off know which layout shows.
         .onGeometryChange(for: CGSize.self) { $0.size } action: { editorSize = $0 }
+        #if canImport(UIKit)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            if keyboardPortraitLock == nil { keyboardPortraitLock = editorSize.height > editorSize.width }
+            if keyboardPhoneLock == nil { keyboardPhoneLock = usesPhoneLayout }
+            keyboardUp = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardUp = false
+            keyboardPortraitLock = nil
+            keyboardPhoneLock = nil
+        }
+        #endif
         // Every project opens on the Canvas hub (see `activeTool`). A NEW one also gets the
         // New Image sheet, so the user names it and sets the canvas size up front.
         // New projects are real files now, so match the just-created URL (by name) too.
