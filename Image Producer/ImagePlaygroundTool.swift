@@ -58,7 +58,7 @@ struct ImagePlaygroundInspector: View {
     /// hand it to the sheet with .imagePlaygroundGenerationStyle(_:in:), so it opens in
     /// that style. Every style stays allowed, so he can still switch inside the sheet.
     /// SDK-verified names (Xcode 27): any, animation, illustration, sketch, emoji (Genmoji),
-    /// externalProvider (ChatGPT). Buttons, not a menu (no overflow menus, his rule).
+    /// externalProvider (ChatGPT). Shown as ONE pull-down line since 2026-11-18 (see stylePicker).
     static let styleChoices: [(style: ImagePlaygroundStyle, title: String, symbol: String)] = [
         (.any, "Any", "sparkles"),
         (.animation, "Animation", "film"),
@@ -158,25 +158,23 @@ struct ImagePlaygroundInspector: View {
         .imagePlaygroundGenerationStyle(selectedStyle, in: ImagePlaygroundStyle.all)
     }
 
-    /// Two columns of style buttons; the chosen one is filled.
+    /// REM 2026-11-18 — ONE LINE that drops down, like Apple's own Image Playground. His Duo
+    /// TestFlight note, 7:56 AM: "In the real image playground all those buttons are behind one
+    /// line reveal drop down". This replaces the 2×3 button grid (which took half the iPhone
+    /// panel); it is a labeled pull-down showing the chosen style, not a "…" overflow menu.
     private var stylePicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Style:").scaledFont(18)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+        HStack(spacing: 8) {
+            Text("Style").scaledFont(18)
+            Spacer(minLength: 0)
+            Picker("Style", selection: $styleID) {
                 ForEach(Self.styleChoices, id: \.style.id) { choice in
-                    let chosen = choice.style.id == selectedStyle.id
-                    let button = Button { styleID = choice.style.id } label: {
-                        Label(choice.title, systemImage: choice.symbol)
-                            .scaledFont(18)
-                            .frame(maxWidth: .infinity)
-                    }
-                    Group {
-                        if chosen { button.buttonStyle(.borderedProminent) } else { button.buttonStyle(.bordered) }
-                    }
-                    .accessibilityLabel(choice.title)
-                    .accessibilityAddTraits(chosen ? .isSelected : [])
+                    Label(choice.title, systemImage: choice.symbol).tag(choice.style.id)
                 }
             }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .scaledFont(18)
+            .accessibilityLabel("Style")
         }
     }
 
