@@ -122,6 +122,14 @@ struct ContentView: View {
     @AppStorage("ip.phone.toolsX", store: UITestDoor.defaults) private var toolsX: Double = 0.05
     @AppStorage("ip.phone.toolsY", store: UITestDoor.defaults) private var toolsY: Double = 0.08
     @State private var paletteDrag: CGSize = .zero
+    /// REM 2026-11-18 — the phone's canvas/panel split is a handle he drags (his word: "the
+    /// elements should be moveable and resizable like you normally do"). Stored as the most of
+    /// the screen's height the canvas may take; the picture's own shape can still make it less.
+    @AppStorage("ip.phone.canvasShare", store: UITestDoor.defaults) private var phoneCanvasShare: Double = 0.66
+    @State private var splitDragStart: Double?
+    /// True while the on-screen keyboard is up. His Duo note, 7:49 AM: "Everything is so cramped
+    /// up no place for the keyboard when i tapped the name" — the canvas steps aside while typing.
+    @State private var keyboardUp = false
 
     /// Zoom at the moment a pinch began, so the gesture scales from where you were
     /// rather than snapping to 1× on the first delta.
@@ -332,6 +340,37 @@ struct ContentView: View {
     // editorBody (phone portrait/landscape, regular portrait, wide = iPad landscape + Mac).
     // The "ip.phone.*" storage keys keep their old names so a saved position survives.
 
+    /// REM 2026-11-18 — drag up or down to give the canvas or the panel more room; where he
+    /// leaves it is remembered. Also an adjustable control (swipe up/down in VoiceOver) and a
+    /// double-tap back to the default, so a switch or Voice Control user never needs the drag.
+    private func splitHandle(height: CGFloat) -> some View {
+        ZStack {
+            Divider()
+            Capsule().fill(.secondary).frame(width: 44, height: 5)
+        }
+        .frame(maxWidth: .infinity, minHeight: 22)
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 2)
+            .onChanged { v in
+                let start = splitDragStart ?? phoneCanvasShare
+                splitDragStart = start
+                phoneCanvasShare = min(0.85, max(0.15, start + Double(v.translation.height / max(1, height))))
+            }
+            .onEnded { _ in splitDragStart = nil })
+        .onTapGesture(count: 2) { withAnimation(.snappy) { phoneCanvasShare = 0.66 } }
+        .accessibilityElement()
+        .accessibilityLabel("Canvas size")
+        .accessibilityValue("\(Int((phoneCanvasShare * 100).rounded())) percent")
+        .accessibilityAdjustableAction { dir in
+            switch dir {
+            case .increment: phoneCanvasShare = min(0.85, phoneCanvasShare + 0.05)
+            case .decrement: phoneCanvasShare = max(0.15, phoneCanvasShare - 0.05)
+            @unknown default: break
+            }
+        }
+        .help("Drag to resize the canvas; double-tap to reset")
+    }
+
     private var toolPaletteGrip: some View {
         Button { withAnimation(.snappy) { toolsFloating.toggle() } } label: {
             Image(systemName: "line.3.horizontal")
@@ -401,8 +440,9 @@ struct ContentView: View {
                 // still leaves the tools and panel on screen.
                 canvasArea
                     .frame(height: min(geo.size.width * CGFloat(document.canvasHeight) / CGFloat(max(1, document.canvasWidth)),
-                                       geo.size.height * 0.66))
-                Divider()
+                                       geo.size.height * (keyboardUp ? 0.18 : phoneCanvasShare)))
+                    .animation(.snappy, value: keyboardUp)
+                splitHandle(height: geo.size.height)
                 if !toolsFloating {
                     HStack(spacing: 0) {
                         toolPaletteGrip
@@ -418,6 +458,10 @@ struct ContentView: View {
             .overlay(alignment: .topLeading) {
                 if toolsFloating { floatingToolPalette(in: geo.size) }
             }
+            #if canImport(UIKit)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
+            #endif
         } else {
             HStack(spacing: 0) {
                 canvasArea
