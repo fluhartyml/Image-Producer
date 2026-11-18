@@ -444,6 +444,14 @@ struct ContentView: View {
             // the same place, so it is never the thing that moved.
             StatusBar(window: window)
         }
+        #if os(macOS)
+        // REM 2026-11-18 — A FLOOR FOR THE MAC WINDOW (Grok Bot layout review, applied by Claude
+        // at Michael's word). The wide layout gives the canvas half the window and splits the
+        // other half between the inspector (needs 280 pt) and Layers (200 pt). Below about 980
+        // wide those floors cannot both be met, so the inspector's text clipped and layer names
+        // truncated. Dragging the window smaller now stops here.
+        .frame(minWidth: 980, minHeight: 600)
+        #endif
         // LINKED LAYERS follow each other — one rule for every control that places a
         // layer. See LayerLink.swift.
         .onChange(of: LinkSnapshot(document), initial: true) {
@@ -573,6 +581,11 @@ struct ContentView: View {
                 }
             }
         }
+        // REM 2026-11-18 — SMOOTH HAND-OFF between layouts (Grok Bot layout review). When the
+        // size class flips — iPad Split View or Slide Over, a Stage Manager window dragged
+        // narrow, the iPhone Duo opened or closed — the editor swaps between the phone and the
+        // full layout. Without this it snapped; now the old layout cross-fades into the new one.
+        .animation(.easeInOut(duration: 0.25), value: isPhone)
         // Every project opens on the Canvas hub (see `activeTool`). A NEW one also gets the
         // New Image sheet, so the user names it and sets the canvas size up front.
         // New projects are real files now, so match the just-created URL (by name) too.
@@ -764,6 +777,13 @@ struct ContentView: View {
                 document.say("New project", kind: .info)
             }
         }
+        // REM 2026-11-18 — The Canvas inspector's "Single image…" button asks for the same
+        // sheet, on EVERY platform (Grok Bot layout review). This used to sit inside the macOS
+        // block below, so on the iPad and iPhone — the very devices that button was added for
+        // ("an iPad has no ⌘ key") — the tap set the flag and nothing ever answered it.
+        .onChange(of: document.exportSheetRequested) {
+            if document.exportSheetRequested { document.exportSheetRequested = false; showExportSheet = true }
+        }
         #if os(macOS)
         // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
         // targeting the focused document.
@@ -784,10 +804,6 @@ struct ContentView: View {
             }))
         #endif
         .focusedSceneValue(\.saveAsAction, { saveAsWithFormat() })
-        // The Canvas inspector's "Single image…" button asks for the same sheet.
-        .onChange(of: document.exportSheetRequested) {
-            if document.exportSheetRequested { document.exportSheetRequested = false; showExportSheet = true }
-        }
         // File ▸ Revert to Open / Revert to Last Save — nil (disabled) until frozen.
         .focusedSceneValue(\.revertToOpenAction,
                            window.hasFrozenOpen ? { pendingRevert = .open } : nil)
@@ -1302,7 +1318,9 @@ struct ContentView: View {
             // EVERY CONTROL HERE PUTS YOU IN THE ZOOM TOOL. Michael, 2026-10-19: using the
             // full-screen arrows, Fit Width or + / − "you should be automatically put in
             // the zoom tool" — its inspector shows, and its drag pans the zoomed canvas.
-            Button { canvasFocused.toggle(); activeTool = .zoom } label: {
+            // REM 2026-11-18 — the full-screen toggle cross-fades instead of snapping (Grok Bot
+            // layout review).
+            Button { withAnimation(.easeInOut(duration: 0.25)) { canvasFocused.toggle() }; activeTool = .zoom } label: {
                 Image(systemName: canvasFocused
                       ? "arrow.down.right.and.arrow.up.left"
                       : "arrow.up.left.and.arrow.down.right")
@@ -8505,7 +8523,11 @@ struct ExportSheet: View {
         #if os(iOS)
         // iPad: a real width (fitted alone made it a tiny generic box, 2026-10-05 — "TOO
         // small"), height still sized to the content so it doesn't float in an empty box.
-        .frame(width: 520)
+        // REM 2026-11-18 — IDEAL 520, not a hard 520 (Grok Bot layout review): `.fitted` asks for
+        // the ideal size, so the iPad sheet is still 520 wide — but an iPhone screen (375–440 pt)
+        // is narrower than 520, and a hard width pushed the buttons and labels off both edges.
+        // On iPhone the sheet now takes the screen's width instead.
+        .frame(idealWidth: 520, maxWidth: 520)
         .presentationSizing(.fitted)
         .presentationDragIndicator(.visible)
         #else

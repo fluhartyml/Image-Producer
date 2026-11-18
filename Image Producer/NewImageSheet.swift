@@ -89,7 +89,14 @@ struct NewImageSheet: View {
             .scaledFont(18)
         }
         .padding(24)
+        // REM 2026-11-18 — 420 wide on the Mac and iPad (Grok Bot layout review). On iPhone a hard
+        // minimum of 420 is wider than the screen (375–440 pt), which pushed Create and Cancel off
+        // the edges; there it just takes the screen's width.
+        #if os(macOS)
         .frame(minWidth: 420)
+        #else
+        .frame(idealWidth: 420, maxWidth: .infinity)
+        #endif
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             width = document.canvasWidth; height = document.canvasHeight
