@@ -321,8 +321,16 @@ struct ContentView: View {
     /// project". A tap now always brings that tool's page up on a phone.
     private func pickTool(_ tool: Tool) {
         activeTool = tool
-        if isPhone { bottomPanel = .tool }
+        if usesPhoneLayout { bottomPanel = .tool }
     }
+
+    /// REM 2026-11-18 — short side under 600 pt = phone layout (see editorBody).
+    static func isSmallWindow(_ size: CGSize) -> Bool {
+        size.width > 0 && min(size.width, size.height) < 600
+    }
+    /// The editor's last measured size, so tool taps know which layout is showing.
+    @State private var editorSize: CGSize = .zero
+    private var usesPhoneLayout: Bool { isPhone || ContentView.isSmallWindow(editorSize) }
 
     /// iPhone-only layout, isolated from iPad. Canvas gets the room; the tool box is a
     /// single scrollable line; Tool/Layers/History stay in the existing swipe panel.
@@ -446,7 +454,7 @@ struct ContentView: View {
                 if !toolsFloating {
                     HStack(spacing: 0) {
                         toolPaletteGrip
-                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if isPhone { bottomPanel = .tool } }, wrap: true)
+                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } }, wrap: true)
                     }
                     Divider()
                 }
@@ -471,7 +479,7 @@ struct ContentView: View {
                     if !toolsFloating {
                         HStack(spacing: 0) {
                             toolPaletteGrip
-                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if isPhone { bottomPanel = .tool } }, lines: 1)
+                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } }, lines: 1)
                         }
                         Divider()
                     }
@@ -523,7 +531,12 @@ struct ContentView: View {
                 // Full-screen focus: canvas only, tools/panel hidden. The on-canvas
                 // control cluster carries the toggle back out + the zoom buttons.
                 canvasArea
-            } else if isPhone {
+            } else if isPhone || ContentView.isSmallWindow(geo.size) {
+                // REM 2026-11-18 — go by the WINDOW, not the size class. The iPhone Duo in
+                // landscape reports regular sizes, so it got the iPad's three columns in a
+                // phone-sized screen (Style buttons broke mid-word). His Duo note, 7:54 AM:
+                // "What the fuck?????". Any window under 600 pt on its short side gets the
+                // phone layout. iPads are 744+ on the short side, so they are unchanged.
                 phoneLayout(geo: geo)
             } else if geo.size.height > geo.size.width {
                 // Portrait: canvas top half, then tool strip + swipe panel.
@@ -534,7 +547,7 @@ struct ContentView: View {
                     if !toolsFloating {
                         HStack(spacing: 0) {
                             toolPaletteGrip
-                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if isPhone { bottomPanel = .tool } })
+                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } })
                         }
                     }
                     ActiveToolLabel(tool: activeTool)
@@ -571,7 +584,7 @@ struct ContentView: View {
                             Divider()
                             HStack(spacing: 0) {
                                 toolPaletteGrip
-                                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if isPhone { bottomPanel = .tool } })
+                                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } })
                             }
                             .frame(height: 104)
                         }
@@ -639,7 +652,9 @@ struct ContentView: View {
         // size class flips — iPad Split View or Slide Over, a Stage Manager window dragged
         // narrow, the iPhone Duo opened or closed — the editor swaps between the phone and the
         // full layout. Without this it snapped; now the old layout cross-fades into the new one.
-        .animation(.easeInOut(duration: 0.25), value: isPhone)
+        .animation(.easeInOut(duration: 0.25), value: usesPhoneLayout)
+        // REM 2026-11-18 — measure the editor so tool taps and the hand-off know which layout shows.
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { editorSize = $0 }
         // Every project opens on the Canvas hub (see `activeTool`). A NEW one also gets the
         // New Image sheet, so the user names it and sets the canvas size up front.
         // New projects are real files now, so match the just-created URL (by name) too.
