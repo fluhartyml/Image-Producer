@@ -219,13 +219,15 @@ struct ImagePlaygroundInspector: View {
                 }
                 .buttonStyle(.borderedProminent)
 
-                if activeIndex != nil {
+                // REM 2026-11-19 16:0x — his latest word: "what ever it should not be present instead of
+                // greyed out". Filter shows ONLY when the selected layer has art to change; otherwise
+                // it is not there at all (an empty layer is filled with New Layer — his 08-22 rule).
+                if activeFilterable != nil {
                     Button { startFilter() } label: {
                         Label("Filter Current Layer", systemImage: "wand.and.stars")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .disabled(activeFilterable == nil)
                     .accessibilityHint(filterAvailabilityMessage)
                 }
 
