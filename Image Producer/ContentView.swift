@@ -503,9 +503,12 @@ struct ContentView: View {
                     }
                     Divider()
                 }
+                // REM 2026-11-19 — the full-width Tool | Layers | History switch shows here (his word:
+                // "on the iphone duo the tool layer and history is the full width" — the iPhone follows
+                // the Mockup), one sheet at a time, and the Tool sheet carries the spine.
                 BottomPanel.PanelView(document: document, camera: camera, activeTool: activeTool,
                                       activeLayerID: $activeLayerID, selection: $bottomPanel,
-                                      fillColor: $fillColor, fileURL: fileURL, compact: true)
+                                      fillColor: $fillColor, fileURL: fileURL, compact: false, spine: true)
                     .frame(maxHeight: .infinity)
             }
             .overlay(alignment: .topLeading) {
@@ -1728,8 +1731,58 @@ struct ToolInspector: View {
     @Binding var fillColor: Color
     /// Open document's file on disk — for the Canvas hub's Project/File section.
     var fileURL: URL? = nil
+    /// REM 2026-11-19 — THE SPINE (tall iPhone only). His idea: "can you make its top of the word
+    /// anchored to the left side of the tool inspector and have it zoomed to fit from bottom to top
+    /// of the tool insector sheet" — and on seeing it: "Canvas looks great!" · "it could use a little
+    /// padding". The tool's name runs sideways up the left edge, reading bottom to top, sized to the
+    /// sheet's height; the settings sit to its right. The header row is not shown in this mode.
+    var spine: Bool = false
 
     var body: some View {
+        if spine { spineBody } else { headerBody }
+    }
+
+    private var spineBody: some View {
+        HStack(alignment: .top, spacing: 0) {
+            GeometryReader { g in
+                let pad: CGFloat = 14
+                let length = max(40, g.size.height - pad * 2)
+                Text(activeTool.title)
+                    .font(.system(size: 400, weight: .heavy))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.01)
+                    .frame(width: length, height: g.size.width)
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: g.size.width, height: g.size.height)
+            }
+            .frame(width: spineWidth)
+            .accessibilityElement()
+            .accessibilityLabel(activeTool.title)
+            .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 0) {
+                if let name = activeLayerName {
+                    Text("Layer: \(name)")
+                        .scaledFont(18)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top, 10)
+                }
+                ScrollView { content }
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height - 28 } action: { spineHeight = max(40, $0) }
+    }
+
+    /// The spine is as wide as its letters are tall. A short name ("Canvas") gets big letters and a
+    /// wide spine; a long one ("Paint Drop / Bucket") gets smaller letters and a narrower one. An
+    /// estimate from the name's length (about 0.6 of the type size per letter), kept between 30 and 96.
+    @State private var spineHeight: CGFloat = 300
+    private var spineWidth: CGFloat {
+        let size = spineHeight / (CGFloat(max(4, activeTool.title.count)) * 0.6)
+        return min(96, max(30, size * 1.05))
+    }
+
+    private var headerBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Tool-name header: the inspector names the active tool, so you never
             // need hover to know which tool you're on (Michael 2026-06-11).
@@ -4360,6 +4413,8 @@ enum BottomPanel: String, CaseIterable, Identifiable {
         /// reclaiming vertical room for the cramped inspector. iPad/Mac keep the pills
         /// (default false), so their layout is unchanged.
         var compact: Bool = false
+        /// REM 2026-11-19 — tall iPhone: the Tool page names its tool with the spine (see ToolInspector).
+        var spine: Bool = false
 
         var body: some View {
             VStack(spacing: 0) {
@@ -4401,7 +4456,8 @@ enum BottomPanel: String, CaseIterable, Identifiable {
                           activeTool: activeTool,
                           activeLayerID: $activeLayerID,
                           fillColor: $fillColor,
-                          fileURL: fileURL)
+                          fileURL: fileURL,
+                          spine: spine)
         }
 
         private var layersPage: some View {
