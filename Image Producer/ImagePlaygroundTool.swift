@@ -179,7 +179,11 @@ struct ImagePlaygroundInspector: View {
     }
 
     @ViewBuilder private var supported: some View {
-            VStack(alignment: .leading, spacing: 14) {
+            // REM 2026-11-19 15:3x — TIGHTER PADDING (his word on the 16e: "the text padding is
+            // probably the only place to squeeze out extra pixles"). Was 14 between pieces and the
+            // default 16 around the edge; 8 and 8 frees about 45 pt — roughly one more line at his
+            // text size. Text sizes untouched: they follow the phone's Text Size (his 11-04 rule).
+            VStack(alignment: .leading, spacing: 8) {
                 stylePicker
 
                 Text("Describe what Image Playground should make:")
@@ -220,7 +224,7 @@ struct ImagePlaygroundInspector: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding()
+            .padding(8)
             .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
