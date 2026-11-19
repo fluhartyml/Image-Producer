@@ -51,7 +51,9 @@ struct ImagePlaygroundInspector: View {
     @State private var failed = false
 
     /// The style the sheet opens in, picked BEFORE the sheet (kept across launches).
-    @AppStorage("imagePlaygroundStyleID") private var styleID = ImagePlaygroundStyle.any.id
+    /// REM 2026-11-19 16:1x — DEFAULT IS ILLUSTRATION (his word: "can it default to illustratioon?").
+    /// Was .any. A style the user already picked is still remembered and wins over this default.
+    @AppStorage("imagePlaygroundStyleID") private var styleID = ImagePlaygroundStyle.illustration.id
 
     /// REM: his report 2026-11-14: Apple's sheet greys out its styles until you type a
     /// description. His "add a style picker before" (11:1x): we pick the style here and
@@ -69,7 +71,7 @@ struct ImagePlaygroundInspector: View {
     ]
 
     private var selectedStyle: ImagePlaygroundStyle {
-        Self.styleChoices.first { $0.style.id == styleID }?.style ?? .any
+        Self.styleChoices.first { $0.style.id == styleID }?.style ?? .illustration
     }
 
     private var activeIndex: Int? {
@@ -184,8 +186,9 @@ struct ImagePlaygroundInspector: View {
             // default 16 around the edge; 8 and 8 frees about 45 pt — roughly one more line at his
             // text size. Text sizes untouched: they follow the phone's Text Size (his 11-04 rule).
             VStack(alignment: .leading, spacing: 8) {
-                stylePicker
-
+                // REM 2026-11-19 16:1x — STYLE MOVED TO THE LAST LINE (his word, on 411's "It's too
+                // cramped up" feedback: "style should be last line"). The prompt box now sits right
+                // under the sheet's title, so it is on screen on the 16e; Style is reached by scrolling.
                 Text("Describe what Image Playground should make:")
                     .scaledFont(18)
 
@@ -230,6 +233,8 @@ struct ImagePlaygroundInspector: View {
                     .buttonStyle(.bordered)
                     .accessibilityHint(filterAvailabilityMessage)
                 }
+
+                stylePicker
 
                 if failed {
                     Text("Couldn't place the generated image.")
