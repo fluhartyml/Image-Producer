@@ -1745,17 +1745,17 @@ struct ToolInspector: View {
     private var spineBody: some View {
         HStack(alignment: .top, spacing: 0) {
             GeometryReader { g in
-                let pad: CGFloat = 14
-                let length = max(40, g.size.height - pad * 2)
+                let length = max(40, g.size.height - Self.spinePad * 2)
                 Text(activeTool.title)
-                    .font(.system(size: 400, weight: .heavy))
+                    .font(.system(size: spineMetrics.fontSize, weight: .heavy))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.01)
+                    .minimumScaleFactor(0.5)
+                    .fixedSize()
                     .frame(width: length, height: g.size.width)
                     .rotationEffect(.degrees(-90))
                     .frame(width: g.size.width, height: g.size.height)
             }
-            .frame(width: spineWidth)
+            .frame(width: spineMetrics.thickness)
             .accessibilityElement()
             .accessibilityLabel(activeTool.title)
             .accessibilityAddTraits(.isHeader)
@@ -1770,16 +1770,34 @@ struct ToolInspector: View {
                 ScrollView { content }
             }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.height - 28 } action: { spineHeight = max(40, $0) }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height - Self.spinePad * 2 } action: { spineHeight = max(40, $0) }
     }
 
     /// The spine is as wide as its letters are tall. A short name ("Canvas") gets big letters and a
-    /// wide spine; a long one ("Paint Drop / Bucket") gets smaller letters and a narrower one. An
-    /// estimate from the name's length (about 0.6 of the type size per letter), kept between 30 and 96.
+    /// wide spine; a long one ("Paint Drop / Bucket") gets smaller letters and a narrower one.
+    /// REM 2026-11-19 — his 16e report: "the word canvas has its top half cut off on the 16e but not
+    /// the 14 pro max simulator". The old width was a GUESS from the letter count (0.6 × size per
+    /// letter); when the guess ran narrower than the letters were tall, the tops spilled off the left
+    /// edge. Now the word is MEASURED (CoreText, the same heavy system face) — font size fits the
+    /// sheet's height, the spine is the measured ascent + descent, kept between 30 and 96. If the cap
+    /// bites, the font shrinks to match, so the letters can never be taller than the spine.
+    static let spinePad: CGFloat = 14
     @State private var spineHeight: CGFloat = 300
-    private var spineWidth: CGFloat {
-        let size = spineHeight / (CGFloat(max(4, activeTool.title.count)) * 0.6)
-        return min(96, max(30, size * 1.05))
+    private var spineMetrics: (fontSize: CGFloat, thickness: CGFloat) {
+        let ref: CGFloat = 100
+        #if canImport(UIKit)
+        let base = UIFont.systemFont(ofSize: ref, weight: .heavy) as CTFont
+        #else
+        let base = NSFont.systemFont(ofSize: ref, weight: .heavy) as CTFont
+        #endif
+        let line = CTLineCreateWithAttributedString(
+            NSAttributedString(string: activeTool.title, attributes: [.font: base]))
+        let wordLength = max(1, CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)))
+        let wordHeight = max(1, CTFontGetAscent(base) + CTFontGetDescent(base))
+        let byLength = spineHeight * ref / wordLength          // font size that fills the length
+        let thickness = min(96, max(30, byLength * wordHeight / ref))
+        let fontSize = min(byLength, thickness * ref / wordHeight) // never taller than the spine
+        return (fontSize, thickness)
     }
 
     private var headerBody: some View {
