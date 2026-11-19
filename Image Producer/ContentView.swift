@@ -176,6 +176,22 @@ struct ContentView: View {
         panAtDragStart = canvasPan                  // the Zoom tool's drag carries on from here
     }
 
+    /// REM 2026-11-19 — THE TALL IPHONE'S CANVAS, his idea (Mockup line 006): "is lab a zoomed to fit
+    /// top and bottom anchored left edge and navigatable by the PiP?" The picture fills the canvas
+    /// from top to bottom, its LEFT edge against the left of the screen; whatever runs past the right
+    /// is reached with the PiP (its orange box) or two fingers (line 007). A picture taller than the
+    /// area simply fits and sits on the left. Runs when the canvas area is measured or changes size,
+    /// only on the tall iPhone — every Duo shape keeps its centered fit (his screenshots, 11-19).
+    private func fitHeightLeft() {
+        let d = canvasDisplaySize, f = canvasFrame
+        guard d.width > 0, d.height > 0, f.width > 0, f.height > 0 else { return }
+        let z = min(max(f.height / d.height, minZoom), maxZoom)
+        fitWidth = false
+        canvasZoom = z
+        canvasPan = CGSize(width: (d.width * z - f.width) / 2, height: 0)   // left edge to the left
+        panAtDragStart = canvasPan
+    }
+
     /// What one double-click is worth. Michael, 2026-08-24: "you double click the canvas
     /// to zoom in +1.5x per double click".
     private let doubleClickZoomFactor: CGFloat = 1.5
@@ -1188,8 +1204,23 @@ struct ContentView: View {
                     .offset(canvasPan)
                     .gesture(pinchZoom)
                     .gesture(activeTool == .zoom ? zoomToolGestures : nil)
+                    #if canImport(UIKit)
+                    // REM 2026-11-19 — TWO FINGERS PAN, his word: "yes add two finger pan to the plan
+                    // that actually sounds intuitive and second nature". One finger stays with the
+                    // active tool; two fingers move the picture. Tall iPhone only for now (the Duo is
+                    // locked, his word 11-19). Runs alongside the pinch, so pinch-and-slide works.
+                    .gesture(TwoFingerPan(onChange: { t in
+                        guard tallPhone else { return }
+                        canvasPan = CGSize(width: panAtDragStart.width + t.width,
+                                           height: panAtDragStart.height + t.height)
+                    }, onEnd: { if tallPhone { panAtDragStart = canvasPan } }))
+                    #endif
             }
         }
+        .onChange(of: canvasFrame) { if tallPhone { fitHeightLeft() } }
+        .onChange(of: tallPhone) { _, now in if now { fitHeightLeft() } }
+        .onChange(of: document.canvasWidth) { if tallPhone { fitHeightLeft() } }
+        .onChange(of: document.canvasHeight) { if tallPhone { fitHeightLeft() } }
         // REM: 013 A5 CANVAS, his design 11-04 19:4x. VoiceOver saw NOTHING on the canvas.
         // His words: "can it say canvas and ask if they want to hear more?" — so the element
         // says only "Canvas". The size and layer count wait behind a "More about canvas"
@@ -9717,3 +9748,42 @@ enum MoveAxisLock: String {
     case none, vertical, horizontal
     static let storageKey = "moveAxisLock"
 }
+
+#if canImport(UIKit)
+/// REM 2026-11-19 — a two-finger drag, for panning the canvas on the iPhone (his Mockup line 007).
+/// SwiftUI has no two-finger drag of its own, so this is UIKit's pan recognizer limited to exactly two
+/// touches. It recognizes alongside everything else (the pinch above all), and never cancels the
+/// touches the one-finger tools are using.
+struct TwoFingerPan: UIGestureRecognizerRepresentable {
+    var onChange: (CGSize) -> Void
+    var onEnd: () -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let r = UIPanGestureRecognizer()
+        r.minimumNumberOfTouches = 2
+        r.maximumNumberOfTouches = 2
+        r.cancelsTouchesInView = false
+        r.delegate = context.coordinator
+        return r
+    }
+
+    func handleUIGestureRecognizerAction(_ r: UIPanGestureRecognizer, context: Context) {
+        switch r.state {
+        case .changed:
+            let p = r.translation(in: r.view)
+            onChange(CGSize(width: p.x, height: p.y))
+        case .ended, .cancelled, .failed:
+            onEnd()
+        default:
+            break
+        }
+    }
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizer(_ g: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+    }
+}
+#endif
