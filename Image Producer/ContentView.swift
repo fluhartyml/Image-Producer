@@ -364,6 +364,14 @@ struct ContentView: View {
     /// Measured on the WHOLE window, edge to edge (safe areas added back): toolbars down the side of
     /// a closed Duo narrow the editor, and must not make it look tall. iPhone 17 Pro Max ≈ 2.17,
     /// Duo closed ≈ 1.45, Duo opened upright ≈ 1.42 (sizes from the Mockup, Claude's reading).
+    /// True on any iPhone (the iPhone Duo is one); false on iPad and Mac.
+    static var deviceIsPhone: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
     static func isTallPhone(_ window: CGSize) -> Bool {
         window.width > 0 && window.height >= window.width * 1.8
     }
@@ -582,7 +590,12 @@ struct ContentView: View {
             // REM 2026-11-19 — EXCEPT THE TALL PHONE. His word: "the user feedback bar probably
             // should go" · "i havnt seen the ipad yet so just the phones for now". Only the plain
             // iPhone for now; the Duo keeps it (its screenshots are locked in, his word 11-19).
-            if !tallPhone {
+            // REM 2026-11-19 15:1x — NOW THE DUO TOO. His TestFlight note on 405, from the Duo:
+            // "The autosave user feedback bar needs to go please". So every iPhone (any shape,
+            // Duo included) drops the bar; iPad and Mac keep it ("just the phones for now").
+            // Decided by the device being a phone, not by size class, so an iPad in a narrow
+            // window keeps its bar.
+            if !(tallPhone || ContentView.deviceIsPhone) {
                 Divider()
                 StatusBar(window: window)
             }
