@@ -100,10 +100,10 @@ struct ImagePlaygroundInspector: View {
     /// selected layer and its actual role can.
     private var filterAvailabilityMessage: String {
         if activeFilterable != nil {
-            return "New Layer = fresh layer · Restyle = redo the selected layer's art with your prompt."
+            return "New Layer = fresh layer · Filter = redo the selected layer's art with your prompt."
         }
         guard let i = activeIndex else {
-            return "New Layer drops the result on a fresh layer. Select a layer to use Restyle."
+            return "New Layer drops the result on a fresh layer. Select a layer to use Filter."
         }
         let layer = document.layers[i]
         switch layer.role {
@@ -112,14 +112,14 @@ struct ImagePlaygroundInspector: View {
             return """
             New Layer drops the result on a fresh layer. \
             “\(layer.name)” is the \(which) floor — a solid fill, not artwork — so there is \
-            nothing for Restyle to redo. Select a content layer instead: Foreground, \
+            nothing for Filter to redo. Select a content layer instead: Foreground, \
             Midground or Background.
             """
         case .content:
             return """
             New Layer drops the result on a fresh layer. \
             “\(layer.name)” is a content layer but has nothing on it yet. Filling the Light \
-            or Dark floor does not count — Restyle needs art on THIS layer. Import an image \
+            or Dark floor does not count — Filter needs art on THIS layer. Import an image \
             or draw something first, or use New Layer.
             """
         }
@@ -202,21 +202,32 @@ struct ImagePlaygroundInspector: View {
                             .fill(.white.opacity(0.18))
                     )
 
+                // REM 2026-11-19 15:4x — SHORT NAMES, AND FILTER ONLY WHEN IT CAN WORK. His words:
+                // "make the image playground :new layer and image playground:filter current layer
+                // not have image playground because that is the title of the tool inspector" ·
+                // "if a layer is selected the filter button is used and if no layer is selected the
+                // filter is greyed out or not showing" · then "if a layer IS selected both buttons
+                // should still show". So: no layer selected → Filter is not shown (frees a row on
+                // the 16e); a layer selected → both show, and Filter is grayed out when that layer
+                // has no art to filter. Then "no explination because there is NO ROOM": the help
+                // text under the buttons is gone from the screen; its words live on as the Filter
+                // button's VoiceOver hint, which takes no room. "Filter" replaces the old word
+                // "Restyle" in those words so they match the button.
                 Button { startMaker() } label: {
-                    Label("Image Playground: New Layer", systemImage: "plus.rectangle.on.rectangle")
+                    Label("New Layer", systemImage: "plus.rectangle.on.rectangle")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
 
-                Button { startFilter() } label: {
-                    Label("Filter → Edit Current Layer", systemImage: "wand.and.stars")
-                        .frame(maxWidth: .infinity)
+                if activeIndex != nil {
+                    Button { startFilter() } label: {
+                        Label("Filter Current Layer", systemImage: "wand.and.stars")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(activeFilterable == nil)
+                    .accessibilityHint(filterAvailabilityMessage)
                 }
-                .buttonStyle(.bordered)
-                .disabled(activeFilterable == nil)
-
-                Text(filterAvailabilityMessage)
-                    .scaledFont(18).foregroundStyle(.secondary)
 
                 if failed {
                     Text("Couldn't place the generated image.")
