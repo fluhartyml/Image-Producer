@@ -134,6 +134,9 @@ struct ContentView: View {
     @State private var keyboardPortraitLock: Bool?
     /// Same idea one level up: phone vs full layout is held while the keyboard is up.
     @State private var keyboardPhoneLock: Bool?
+    /// REM 2026-11-19 — the tall-phone shape, frozen while the keyboard is up (the keyboard takes
+    /// height, the window stops looking tall, and the layout would flip under the name field).
+    @State private var keyboardTallLock: Bool?
 
     /// Zoom at the moment a pinch began, so the gesture scales from where you were
     /// rather than snapping to 1× on the first delta.
@@ -336,6 +339,25 @@ struct ContentView: View {
     @State private var editorSize: CGSize = .zero
     private var usesPhoneLayout: Bool { isPhone || ContentView.isSmallWindow(editorSize) }
 
+    /// REM 2026-11-19 — THE TALL PHONE (his Mockup, lines 015–018): a phone-layout window at least
+    /// 1.8 times as tall as it is wide — a plain iPhone held upright. The iPhone Duo never qualifies
+    /// (closed is about 1.45, opened upright about 1.42), and that is ON PURPOSE: his word 11-19,
+    /// "i have the iphone duo screenshots locked in and i dont want to take them again" — so the
+    /// iPhone changes below must leave every Duo shape exactly as it was. Decided by the window's
+    /// SHAPE, not the device name, so it follows Apple's rule of laying out by available space.
+    /// Measured on the WHOLE window, edge to edge (safe areas added back): toolbars down the side of
+    /// a closed Duo narrow the editor, and must not make it look tall. iPhone 17 Pro Max ≈ 2.17,
+    /// Duo closed ≈ 1.45, Duo opened upright ≈ 1.42 (sizes from the Mockup, Claude's reading).
+    static func isTallPhone(_ window: CGSize) -> Bool {
+        window.width > 0 && window.height >= window.width * 1.8
+    }
+    static func wholeWindow(_ geo: GeometryProxy) -> CGSize {
+        CGSize(width: geo.size.width + geo.safeAreaInsets.leading + geo.safeAreaInsets.trailing,
+               height: geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom)
+    }
+    @State private var windowSize: CGSize = .zero
+    private var tallPhone: Bool { usesPhoneLayout && (keyboardTallLock ?? ContentView.isTallPhone(windowSize)) }
+
     /// iPhone-only layout, isolated from iPad. Canvas gets the room; the tool box is a
     /// single scrollable line; Tool/Layers/History stay in the existing swipe panel.
     /// Portrait stacks it; landscape puts the canvas on the left, tools+panel on the right.
@@ -444,7 +466,36 @@ struct ContentView: View {
         // flipped back. His Duo note, 2:57 PM: "I tap untitled to rename but it bounces like a
         // keyboard is going to show but it never does". (Cause is Claude's reading; not yet
         // confirmed on the Duo.)
-        if keyboardPortraitLock ?? (geo.size.height > geo.size.width) {
+        if keyboardPortraitLock ?? (geo.size.height > geo.size.width), keyboardTallLock ?? ContentView.isTallPhone(ContentView.wholeWindow(geo)) {
+            // REM 2026-11-19 — THE TALL PHONE, his Mockup (Image-Producer-One-Layout-Mockup, line 017):
+            // "can you make the canvas be the full top half of the iphone scren just like the iphone
+            // duo where the navigation buttons at the top are liquid glass with the PiP and two Finger
+            // panning". The canvas runs from the very top of the screen (under Apple's toolbar, whose
+            // bar is clear so its buttons float as Liquid Glass) down to the middle. Below: the tool
+            // box, then the Tool | Layers | History sheet. No split handle here: the halves are the
+            // design. Keyboard up: the canvas shrinks (as in the branch below) but the branch never flips.
+            let topInset = geo.safeAreaInsets.top
+            VStack(spacing: 0) {
+                canvasArea
+                    .frame(height: keyboardUp ? geo.size.height * 0.18 : max(120, (geo.size.height + topInset) / 2))
+                    .padding(.top, keyboardUp ? 0 : -topInset)
+                    .animation(.snappy, value: keyboardUp)
+                if !toolsFloating {
+                    HStack(spacing: 0) {
+                        toolPaletteGrip
+                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } }, wrap: true)
+                    }
+                    Divider()
+                }
+                BottomPanel.PanelView(document: document, camera: camera, activeTool: activeTool,
+                                      activeLayerID: $activeLayerID, selection: $bottomPanel,
+                                      fillColor: $fillColor, fileURL: fileURL, compact: true)
+                    .frame(maxHeight: .infinity)
+            }
+            .overlay(alignment: .topLeading) {
+                if toolsFloating { floatingToolPalette(in: geo.size) }
+            }
+        } else if keyboardPortraitLock ?? (geo.size.height > geo.size.width) {
             VStack(spacing: 0) {
                 // Canvas ~42% (was half): the inspector was starved for height. No
                 // ActiveToolLabel here — the tool strip highlights the active tool and
@@ -506,11 +557,16 @@ struct ContentView: View {
         VStack(spacing: 0) {
             editorBody
                 .overlay { CopiedPopup(trigger: camera.copiedFlash) }
-            Divider()
             // THE STATUS LINE — his ask, 2026-09-06. Outside every layout branch on
             // purpose: focus mode, phone, portrait and wide all get the same bar in
             // the same place, so it is never the thing that moved.
-            StatusBar(window: window)
+            // REM 2026-11-19 — EXCEPT THE TALL PHONE. His word: "the user feedback bar probably
+            // should go" · "i havnt seen the ipad yet so just the phones for now". Only the plain
+            // iPhone for now; the Duo keeps it (its screenshots are locked in, his word 11-19).
+            if !tallPhone {
+                Divider()
+                StatusBar(window: window)
+            }
         }
         #if os(macOS)
         // REM 2026-11-18 — A FLOOR FOR THE MAC WINDOW (Grok Bot layout review, applied by Claude
@@ -661,16 +717,19 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.25), value: usesPhoneLayout)
         // REM 2026-11-18 — measure the editor so tool taps and the hand-off know which layout shows.
         .onGeometryChange(for: CGSize.self) { $0.size } action: { editorSize = $0 }
+        .onGeometryChange(for: CGSize.self) { ContentView.wholeWindow($0) } action: { windowSize = $0 }
         #if canImport(UIKit)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             if keyboardPortraitLock == nil { keyboardPortraitLock = editorSize.height > editorSize.width }
             if keyboardPhoneLock == nil { keyboardPhoneLock = usesPhoneLayout }
+            if keyboardTallLock == nil { keyboardTallLock = ContentView.isTallPhone(windowSize) }
             keyboardUp = true
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             keyboardUp = false
             keyboardPortraitLock = nil
             keyboardPhoneLock = nil
+            keyboardTallLock = nil
         }
         #endif
         // Every project opens on the Canvas hub (see `activeTool`). A NEW one also gets the
@@ -788,7 +847,11 @@ struct ContentView: View {
             // is going to be cut off … because that is a curve in the phone"). No Tool
             // button: picking a tool already opens its sheet. With the 27.1 SDK the system runs these down the
             // right edge on the Duo. Same calls as the on-canvas cluster on iPad/Mac.
-            if isPhone {
+            // REM 2026-11-19 — NOT on the tall iPhone. There these four overflowed into a "…" menu
+            // (his rule: no "…" unless 100% unavoidable — seen in the simulator 13:27). Layers and
+            // History live on the Tool | Layers | History switch under the tool box; zoom is pinch
+            // and the Zoom tool. The bar keeps Export · Storyboard · Share · About, as in his Mockup.
+            if isPhone && !tallPhone {
                 ToolbarItem(placement: .primaryAction) {
                     Button { setZoom(canvasZoom + zoomStep); activeTool = .zoom } label: {
                         Label("Zoom in", systemImage: "plus.magnifyingglass")
@@ -814,6 +877,9 @@ struct ContentView: View {
         // 022 — the name band at the top goes to the canvas on a phone-sized window; the name
         // and rename live in the Canvas Tool's inspector (his word 11-04 21:5x).
         .toolbar(removing: isPhone ? .title : nil)
+        // REM 2026-11-19 — the tall iPhone's bar is CLEAR: the canvas runs under it and the buttons
+        // float over the picture as Liquid Glass (his Mockup line 017). Every other shape keeps its bar.
+        .toolbarBackgroundVisibility(tallPhone ? .hidden : .automatic, for: .navigationBar)
         #endif
         // REM: D-080 — the storyboard, its own sheet from the toolbar.
         .sheet(isPresented: $showStoryboard) {
