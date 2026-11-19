@@ -4460,12 +4460,31 @@ enum BottomPanel: String, CaseIterable, Identifiable {
                 }
 
                 #if os(iOS)
+                if spine {
+                    // REM 2026-11-19 16:1x — TALL PHONE: ONE SHEET, NO PAGE VIEW. His 16e report (407 and
+                    // again on 411): "the keyboard doesnt show if i tap where the text goes it just bounces
+                    // like a keyboard will appear and nothing happens". Claude's reading (not yet confirmed
+                    // on his 16e): the paged TabView re-lays out its pages when the keyboard takes height,
+                    // the text box is rebuilt mid-tap, it loses focus and the keyboard falls back. The tall
+                    // phone already has the full-width Tool | Layers | History switch above, so the sheet
+                    // is simply switched, the same way the Mac does it. Swiping between sheets is not
+                    // available here; the switch is.
+                    Group {
+                        switch selection {
+                        case .tool:    toolPage
+                        case .layers:  layersPage
+                        case .history: historyPage
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
                 TabView(selection: $selection) {
                     toolPage.tag(BottomPanel.tool)
                     layersPage.tag(BottomPanel.layers)
                     historyPage.tag(BottomPanel.history)
                 }
                 .tabViewStyle(.page(indexDisplayMode: compact ? .always : .never))
+                }
                 #else
                 // macOS has no page style; portrait branch is unused on Mac, but
                 // it still must compile — switch on the selection.
