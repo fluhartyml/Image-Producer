@@ -533,6 +533,17 @@ enum IconSetExport {
                 : "Beside it, \(tvFolderName) — the Apple TV icon (front and back layers) and Top Shelf "
                   + "images, light and dark. In the app's build settings, set the tvOS App Icon to "
                   + "\"App Icon & Top Shelf Image\"."
+            // REM 2026-11-20, his: "yes build it beside the icon set" — the App Store universal
+            // image rides along, in its own folder so it never ships inside the app.
+            let universal = AppStoreUniversalImage.build(from: document)
+            if !universal.isEmpty {
+                _ = try write(universal, into: dir, projectName: projectName,
+                              setName: AppStoreUniversalImage.folderName)
+            }
+            let universalLine = universal.isEmpty
+                ? "The App Store universal image could not be rendered."
+                : "Also beside it, \(AppStoreUniversalImage.folderName) — the 5244 × 2950 App Store "
+                  + "image, light and dark. It is for App Store Connect, not Assets.xcassets."
             return """
                 Wrote \(lightFile) and \(darkFile) to \(set.path).
 
@@ -540,6 +551,8 @@ enum IconSetExport {
                 light icon. The Mac well uses the light icon too.
 
                 \(tvLine)
+
+                \(universalLine)
 
                 Drag \(folderName) into Assets.xcassets.
                 """
