@@ -992,6 +992,7 @@ struct ContentView: View {
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
         // ⌘C — copy the pixels inside the ants to the clipboard (see copySelectionToClipboard).
         .focusedSceneValue(\.copySelectionAction, { copySelectionToClipboard() })
+        .environment(\.copyLayerAction, { copySelectionToClipboard(layerOnly: $0) })
         // ⌘V — paste a layer (or a picture) above the selected layer (see pasteFromClipboard).
         .focusedSceneValue(\.pasteLayerAction, { pasteFromClipboard() })
         #if os(macOS)
@@ -7327,6 +7328,8 @@ struct LayerPanel: View {
     @Bindable var document: ImageDocument
     var showsHeader: Bool = true
     @Binding var activeLayerID: ImageLayer.ID?
+    /// Copy from a row's right-click menu (his "it needs copy added (bug)", 2026-11-20).
+    @Environment(\.copyLayerAction) private var onCopyLayer
     @State private var renamingID: ImageLayer.ID?
     /// Which groups are folded shut, keyed by base name. VIEW STATE ONLY — never
     /// saved, never sent to the document; closing a group changes nothing about the art.
@@ -7492,6 +7495,7 @@ struct LayerPanel: View {
                 onActivate: { activeLayerID = layer.id },
                 onToggleVisibility: { toggleVisibility(layer.id) },
                 onRename: { beginRename(layer) },
+                onCopy: { onCopyLayer(layer.id) },
                 onDuplicate: { duplicate(layer.id) },
                 onDelete: { delete(layer.id) }
             )
@@ -7769,6 +7773,7 @@ struct LayerRow: View {
     let onActivate: () -> Void
     let onToggleVisibility: () -> Void
     let onRename: () -> Void
+    var onCopy: () -> Void = {}
     let onDuplicate: () -> Void
     let onDelete: () -> Void
 
@@ -7908,6 +7913,10 @@ struct LayerRow: View {
         .padding(.vertical, 2)
         .contextMenu {
             Button(action: onRename) { Label("Rename", systemImage: "pencil") }
+            // REM: his "it needs copy added (bug)", 2026-11-20 — same as ⌘C on this layer.
+            #if os(macOS)   // the clipboard copy is Mac-only; no dead item on iPad
+            Button(action: onCopy) { Label("Copy", systemImage: "doc.on.doc") }
+            #endif
             Button(action: onDuplicate) { Label("Duplicate", systemImage: "plus.square.on.square") }
             Divider()
             Button(role: .destructive, action: onDelete) { Label("Delete", systemImage: "trash") }
@@ -9825,14 +9834,21 @@ extension ContentView {
     /// REM: WHAT "INSIDE THE ANTS" MEANS. With a crop square up, it is everything you SEE
     /// inside the square (all visible layers). Otherwise the ants are around the active
     /// layer, so it is that layer alone, trimmed to its visible pixels.
-    func copySelectionToClipboard() {
+    ///
+    /// REM: COPY FROM THE LAYER'S RIGHT-CLICK MENU. Michael, 2026-11-20, finding no Copy in
+    /// that menu while moving Clouds (Move) into another tab: "it needs copy added (bug)".
+    /// `layerOnly` is the row he right-clicked: it becomes the active layer and is copied
+    /// ALONE, whatever the selection ants or a crop square say, because he pointed at a layer.
+    func copySelectionToClipboard(layerOnly: UUID? = nil) {
+        if let layerOnly { activeLayerID = layerOnly }
         // Selection tool: the ants ARE the selection — copy what you see inside them.
-        if activeTool == .select, document.selection != nil {
+        if layerOnly == nil, activeTool == .select, document.selection != nil {
             document.copySelectionPixels(); return
         }
         let w = CGFloat(document.canvasWidth), h = CGFloat(document.canvasHeight)
+        let cropRect = layerOnly == nil ? document.cropRect : nil
         let layers: [ImageLayer]
-        if document.cropRect != nil {
+        if cropRect != nil {
             layers = document.layers
         } else if let id = activeLayerID, let layer = document.layers.first(where: { $0.id == id }) {
             layers = [layer]
@@ -9846,7 +9862,7 @@ extension ContentView {
         renderer.scale = 1
         guard let full = renderer.cgImage else { document.say("Copy failed", kind: .info); return }
         let cut: CGImage?
-        if let crop = document.cropRect {
+        if let crop = cropRect {
             let px = CGRect(x: crop.minX * w, y: crop.minY * h,
                             width: crop.width * w, height: crop.height * h).integral
             cut = full.cropping(to: px)
@@ -9863,7 +9879,7 @@ extension ContentView {
         // Image Producer tab gets the real layer — text stays text, symbols stay symbols
         // ("no rasterization please unless specifically asked"). Other apps still get pixels.
         var layerClip: Data? = nil
-        if document.cropRect == nil, layers.count == 1, case .content = layers[0].role {
+        if cropRect == nil, layers.count == 1, case .content = layers[0].role {
             layerClip = LayerClipboard.encode(layers[0], canvasWidth: document.canvasWidth,
                                               canvasHeight: document.canvasHeight)
         }
@@ -10064,3 +10080,16 @@ struct TwoFingerPan: UIGestureRecognizerRepresentable {
     }
 }
 #endif
+
+// REM: COPY FROM A LAYER ROW'S RIGHT-CLICK MENU. Michael, 2026-11-20: "it needs copy added
+// (bug)". The layer list sits several views below ContentView, so the copy action comes down
+// through the environment rather than through every view in between.
+private struct CopyLayerActionKey: EnvironmentKey {
+    static let defaultValue: (ImageLayer.ID) -> Void = { _ in }
+}
+extension EnvironmentValues {
+    var copyLayerAction: (ImageLayer.ID) -> Void {
+        get { self[CopyLayerActionKey.self] }
+        set { self[CopyLayerActionKey.self] = newValue }
+    }
+}
