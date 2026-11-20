@@ -9850,7 +9850,12 @@ extension ContentView {
         let layers: [ImageLayer]
         if cropRect != nil {
             layers = document.layers
-        } else if let id = activeLayerID, let layer = document.layers.first(where: { $0.id == id }) {
+        } else if let id = activeLayerID, var layer = document.layers.first(where: { $0.id == id }) {
+            // REM: A HIDDEN LAYER COPIES TOO. Michael, 2026-11-20, after ⌘C on a red-eyed layer
+            // left the clipboard holding the layer copied before: "yes copy hidden layers too".
+            // The copy is made visible (the original keeps its eye off), so it renders, and the
+            // pasted layer arrives showing, where he can see it landed.
+            layer.isVisible = true
             layers = [layer]
         } else {
             document.say("Nothing selected to copy", kind: .info); return
