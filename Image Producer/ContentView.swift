@@ -1087,7 +1087,7 @@ struct ContentView: View {
     ///                         not mine, and nothing is destroyed by declining.
     /// → Skills Lab, "Compare on collision; never suffix" · [[feedback_fail_safe_principle]]
     private func saveToDesktop() {
-        guard let png = ContentView.renderCanvasPNG(document: document) else {
+        guard let png = ContentView.renderFlatPNG(document: document) else {
             iconSetResult = "The canvas could not be rendered."
             return
         }
@@ -1145,7 +1145,7 @@ struct ContentView: View {
 
     /// On-demand flat PNG of the visible layers (crop-trimmed) for the native ShareLink.
     private var shareItem: ImageShare {
-        ImageShare(pngData: ContentView.renderCanvasPNG(document: document) ?? Data(),
+        ImageShare(pngData: ContentView.renderFlatPNG(document: document) ?? Data(),
                   filename: exportFilename)
     }
 
@@ -1162,6 +1162,17 @@ struct ContentView: View {
             return pngData(from: cut)
         }
         return pngData(from: cg)
+    }
+
+    /// What Save to Desktop and Share write: no alpha channel when every pixel is filled.
+    /// REM 2026-11-20, his: "flat means flat, no alpha" / "flat with all pixels filled is
+    /// different than clear pixels" — real clear pixels stay clear. The Xcode wells keep
+    /// `renderCanvasPNG` — an Apple TV front layer needs its transparency.
+    @MainActor static func renderFlatPNG(document: ImageDocument) -> Data? {
+        guard let cg = renderCanvasImage(document) else { return nil }
+        let picture = document.cropMask.flatMap { $0.clip(cg) } ?? cg
+        guard let flat = flattenedOpaque(picture) else { return nil }
+        return pngData(from: flat)
     }
 
     /// Flatten the visible layers to a px×px PNG (1024 master; PNG per 2.5.1).

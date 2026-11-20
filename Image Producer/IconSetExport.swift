@@ -75,10 +75,10 @@ enum IconSetExport {
     /// the user, which is exactly what he ruled out: "we ar[e]nt on the app store connect
     /// tea[m] so its not in our lane to have an opinion."
     ///
-    /// ⚠️ ICON SET ONLY. Share, Export and PDF keep real transparency — they are not bound
-    /// by App Store Connect's rules, and clearing a floor there is a legitimate way to get
-    /// a transparent PNG. His split: clear is "alpha clear" on those paths, a real colour
-    /// here.
+    /// ⚠️ ICON SET ONLY. Share, Save to Desktop and Export keep REAL transparency ("alpha
+    /// clear") — but since 2026-11-20 a picture with every pixel filled leaves those paths with
+    /// no alpha channel at all (his: "flat means flat, no alpha" / "flat with all pixels filled
+    /// is different than clear pixels"). → `flattenedOpaque`
     ///
     /// ⚠️ AND IT IS THE EXPORT COPY ONLY. `render(_:of:)` works on a detached document, so
     /// nothing here reaches his file. His words: "if it replaced a[nd] wrote it to the image

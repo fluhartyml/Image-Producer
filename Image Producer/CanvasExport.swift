@@ -411,6 +411,32 @@ func pngPixelAspect(_ png: Data) -> Double? {
 
 // MARK: - Unified export (format dropdown)
 
+/// Flat means flat: when EVERY pixel is filled, the picture leaves with NO alpha channel.
+///
+/// REM 2026-11-20, his two words together: "flat means flat, no alpha" and "flat with all pixels
+/// filled is different than clear pixels". App Store Connect rejects art that merely CONTAINS an
+/// alpha channel even when every pixel is solid (his CryoTunes universal image came out
+/// `hasAlpha: yes`). But a picture with real clear pixels (a star mask, a cleared floor) is a
+/// transparent PNG on purpose and keeps them. Never invents a matte color.
+func flattenedOpaque(_ cg: CGImage) -> CGImage? {
+    let w = cg.width, h = cg.height
+    let space = CGColorSpace(name: CGColorSpace.sRGB)!
+    // Read alpha in a known layout: RGBA, premultiplied.
+    guard let probe = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return cg }
+    let rect = CGRect(x: 0, y: 0, width: w, height: h)
+    probe.draw(cg, in: rect)
+    guard let base = probe.data?.assumingMemoryBound(to: UInt8.self) else { return cg }
+    for i in stride(from: 3, to: w * h * 4, by: 4) where base[i] != 255 { return cg }  // real clear pixels
+    // All filled: same pixels, no alpha channel.
+    guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                              space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return cg }
+    ctx.draw(cg, in: rect)
+    return ctx.makeImage()
+}
+
+
 /// Encode a CGImage to any ImageIO-writable format (PNG/JPEG/TIFF/HEIC/GIF/BMP).
 func encodedImageData(_ cg: CGImage, as type: UTType) -> Data? {
     let out = NSMutableData()
@@ -556,8 +582,11 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .gifAnimated: return makeAnimatedGIF(document, fps: fps, loop: loop, cameraOnly: cameraOnly)
         case .gif3DText: return makeText3DLoopGIF(document, fps: fps, loop: loop)
         default:
-            guard let cg = renderCanvasImage(document) else { return nil }
-            return encodedImageData(cg, as: utType)
+            // REM 2026-11-20, HIS RULING: "flat means flat, no alpha" + "flat with all pixels filled
+            // is different than clear pixels" — a fully filled picture leaves with no alpha
+            // channel; real clear pixels stay clear.
+            guard let cg = renderCanvasImage(document), let flat = flattenedOpaque(cg) else { return nil }
+            return encodedImageData(flat, as: utType)
         }
     }
 }
