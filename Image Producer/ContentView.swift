@@ -349,7 +349,18 @@ struct ContentView: View {
 
     /// REM 2026-11-18 — short side under 600 pt = phone layout (see editorBody).
     static func isSmallWindow(_ size: CGSize) -> Bool {
-        size.width > 0 && min(size.width, size.height) < 600
+        #if os(macOS)
+        // REM 2026-11-20 — NEVER ON THE MAC. His word: "why does the window morph and the layer
+        // section move down ... after i either delete or rename layer?" · "even if i show or hide a
+        // layer the whole window contorts momentarily". His recording caught it: the Mac window's
+        // floor is 600 pt tall (minHeight below), but the EDITOR inside it — the window less the
+        // status line — flipped to the phone layout under 600. His window sat right on that line,
+        // so a status-line change tipped it into the phone layout and back. The Mac floor
+        // (980 × 600) already keeps every Mac window out of phone sizes.
+        return false
+        #else
+        return size.width > 0 && min(size.width, size.height) < 600
+        #endif
     }
     /// The editor's last measured size, so tool taps know which layout is showing.
     @State private var editorSize: CGSize = .zero
@@ -9562,7 +9573,9 @@ struct StatusBar: View {
             Image(systemName: window.status?.systemImage ?? "circle.dashed")
                 .foregroundStyle(tint)
                 .scaledFont(12, weight: .semibold)
-                .frame(width: 16)
+                // REM 2026-11-20 — fixed height: each status symbol is a different height, and the
+                // bar grew and shrank with it, nudging the whole editor (his "window contorts").
+                .frame(width: 16, height: 16)
 
             Text(window.status?.text ?? "Ready")
                 .scaledFont(12)
