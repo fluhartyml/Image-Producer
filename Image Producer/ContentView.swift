@@ -972,6 +972,9 @@ struct ContentView: View {
         .onChange(of: document.exportSheetRequested) {
             if document.exportSheetRequested { document.exportSheetRequested = false; showExportSheet = true }
         }
+        // Drop a picture anywhere on the project → a new layer above the selected one
+        // (see dropImages). The App Store wells keep their own drops; the innermost wins.
+        .onDrop(of: [.fileURL, .image], isTargeted: nil) { providers in dropImages(providers) }
         #if os(macOS)
         // File > Export… (⌘E) opens the SAME unified export sheet as the toolbar button,
         // targeting the focused document.
@@ -9690,6 +9693,80 @@ extension ContentView {
 }
 #endif
 
+
+// REM 2026-11-20 — DROP A PICTURE ON A PROJECT = A NEW LAYER ABOVE THE SELECTED ONE.
+// His word, building the CryoTunes universal asset: "i want to drag and drop appicon-dark into
+// it and drop it, after dropping it i want it to make a new layer above the selected layer".
+// Same rule as ⌘V (pasteFromClipboard): above the selected layer (top if none), at the
+// picture's own pixel size, centered, and it becomes the selected layer. Every client
+// (Mac, iPad, iPhone) — his rule: a feature goes to all clients.
+extension ContentView {
+    /// Load each dropped picture (a file from Finder/Files, or image data from another app)
+    /// and add it as a layer. Several pictures stack in the order dropped.
+    func dropImages(_ providers: [NSItemProvider]) -> Bool {
+        let usable = providers.filter {
+            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+                || $0.hasItemConformingToTypeIdentifier(UTType.image.identifier)
+        }
+        guard !usable.isEmpty else { return false }
+        Task { @MainActor in
+            for p in usable {
+                if let (data, name) = await Self.loadDroppedImage(p) {
+                    _ = addImageLayer(data, name: name)
+                }
+            }
+        }
+        return true
+    }
+
+    /// The picture's bytes and a layer name (the file's name without its extension).
+    private static func loadDroppedImage(_ p: NSItemProvider) async -> (Data, String)? {
+        if p.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            let url: URL? = await withCheckedContinuation { cont in
+                _ = p.loadObject(ofClass: URL.self) { url, _ in cont.resume(returning: url) }
+            }
+            if let url {
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                if let data = try? Data(contentsOf: url) {
+                    return (data, url.deletingPathExtension().lastPathComponent)
+                }
+            }
+        }
+        if p.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            let data: Data? = await withCheckedContinuation { cont in
+                _ = p.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { d, _ in
+                    cont.resume(returning: d)
+                }
+            }
+            if let data { return (data, p.suggestedName ?? "Dropped Image") }
+        }
+        return nil
+    }
+
+    /// A picture becomes a layer above the selected one, at its own pixel size, centered.
+    @discardableResult
+    func addImageLayer(_ raw: Data, name: String) -> Bool {
+        guard let source = CGImageSourceCreateWithData(raw as CFData, nil),
+              let cg = CGImageSourceCreateImageAtIndex(source, 0, nil),
+              let png = pngData(from: cg) else {
+            document.say("That file isn't a picture Image Producer can read.", kind: .info)
+            return false
+        }
+        var layer = ImageLayer(name: name, role: .content)
+        layer.setImage(png)
+        let longSide = Double(max(cg.width, cg.height))
+        layer.transform.contentAspect = Double(cg.width) / Double(max(1, cg.height))
+        layer.transform.scale = longSide / Double(max(1, min(document.canvasWidth, document.canvasHeight)))
+        document.captureHistoryBaselineIfNeeded()
+        document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
+        activeLayerID = layer.id
+        document.recordHistory(toolID: "layers", groupTitle: "Layers",
+                               actionLabel: "Drop \(layer.name)", layerID: layer.id)
+        document.say("Added \(layer.name), W \(cg.width) × H \(cg.height)", kind: .info)
+        return true
+    }
+}
 
 /// Keep a normalized rect inside the canvas (0...1), same size where it fits.
 func clampedUnitRect(_ r: CGRect) -> CGRect {
