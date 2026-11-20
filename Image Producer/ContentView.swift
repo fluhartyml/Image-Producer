@@ -6253,6 +6253,8 @@ struct CanvasView: View {
     @State private var brushHover: CGPoint?
     /// Selection tool: where a Rectangle/Oval drag began, and the Freehand stroke so far.
     @State private var selectDragStart: CGPoint?
+    /// When the last plain click landed — a second within 0.4 s is a double-click.
+    @State private var lastSelectClick: Date?
     @State private var freehandPoints: [CGPoint] = []
     /// Live cursor position (canvas space) for the paint-bucket fill-region preview.
     @State private var bucketHover: CGPoint?
@@ -6484,7 +6486,17 @@ struct CanvasView: View {
         case .rectangle, .oval, .appIcon:
             if let s = selectDragStart,
                hypot((n.x - s.x) * canvas.width, (n.y - s.y) * canvas.height) <= 3 {
-                document.selection = nil
+                // REM 2026-11-20 — DOUBLE-CLICK SELECTS THE LAYER'S PICTURE. His ask, rounding the
+                // CryoTunes icon tile: "can i double click the image in the 'sharp cleff icon' layer
+                // and auto select it?" The ants snap to the active layer's art in the current
+                // shape (App Icon here), so nobody has to land a drag on four exact corners.
+                if let last = lastSelectClick, Date().timeIntervalSince(last) < 0.4 {
+                    document.selectLayerArt(activeLayerID)
+                    lastSelectClick = nil
+                } else {
+                    document.selection = nil
+                    lastSelectClick = Date()
+                }
             }
             selectDragStart = nil
         case .freehand:

@@ -339,6 +339,39 @@ extension ImageDocument {
         selectionPathPoints = []
     }
 
+    /// Double-click with the Selection tool: the ants hug the active layer's art (its opaque
+    /// pixels, as placed on the canvas), in the shape picked in the Shape menu. Freehand and
+    /// Path have no box to draw, so they get the rectangle.
+    @MainActor func selectLayerArt(_ id: ImageLayer.ID?) {
+        guard let id, let idx = layers.firstIndex(where: { $0.id == id }) else {
+            say("Pick a layer to select", kind: .info); return
+        }
+        let layer = layers[idx]
+        let t = layer.transform
+        let W = CGFloat(max(1, canvasWidth)), H = CGFloat(max(1, canvasHeight))
+        let side = min(W, H) * t.scale
+        let art = layer.artUnitRect ?? CGRect(x: 0, y: 0, width: 1, height: 1)
+        // The art's four corners on the canvas, turned with the layer, then boxed.
+        let rad = t.rotationDegrees * .pi / 180
+        let cx = t.center.x * W, cy = t.center.y * H
+        let pts = [CGPoint(x: art.minX, y: art.minY), CGPoint(x: art.maxX, y: art.minY),
+                   CGPoint(x: art.maxX, y: art.maxY), CGPoint(x: art.minX, y: art.maxY)].map { u -> CGPoint in
+            let dx = (u.x - 0.5) * side, dy = (u.y - 0.5) * side
+            return CGPoint(x: (cx + dx * cos(rad) - dy * sin(rad)) / W,
+                           y: (cy + dx * sin(rad) + dy * cos(rad)) / H)
+        }
+        let xs = pts.map(\.x), ys = pts.map(\.y)
+        guard let x0 = xs.min(), let x1 = xs.max(), let y0 = ys.min(), let y1 = ys.max() else { return }
+        let form: MaskForm = switch selectionShape {
+        case .oval:    .oval
+        case .appIcon: .appIcon
+        default:       .rectangle
+        }
+        selectionPathPoints = []
+        selection = CropMask(rect: CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0), form: form)
+        say("Selected \(layer.name)", kind: .info)
+    }
+
     /// DELETE — clear the pixels inside the ants on the selected layer. Returns the layer
     /// that now holds the result (select it), or nil when nothing was cleared.
     @MainActor @discardableResult
