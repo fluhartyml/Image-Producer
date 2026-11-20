@@ -68,9 +68,25 @@ struct NewImageSheet: View {
                         .help("Height")
                     TextField("H", value: $height, format: .number)
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 90)
+                    // REM 2026-11-20 — the WHOLE preset catalog, App Store Connect first, same groups
+                    // as the Canvas tool. His word, at this sheet with the CryoTunes universal asset:
+                    // "add the app store sizes to that menu it was actually supposed to be there
+                    // already". The four common sizes stay on top.
                     Menu("Sizes") {
                         ForEach(sizes, id: \.label) { s in
                             Button(s.label) { width = s.w; height = s.h }
+                        }
+                        Divider()
+                        ForEach(CanvasPreset.catalog) { group in
+                            Menu(group.title) {
+                                ForEach(group.subsets) { subset in
+                                    Section(subset.title) {
+                                        ForEach(subset.presets) { p in
+                                            Button("\(p.label) — \(p.detail)") { apply(p) }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     .scaledFont(18)
@@ -122,6 +138,25 @@ struct NewImageSheet: View {
         let url = document.movedFileURL ?? document.configuration?.fileURL
         let stem = url?.deletingPathExtension().lastPathComponent ?? ""
         return stem.isEmpty ? nil : stem
+    }
+
+    /// Sets the W and H fields from a catalog preset, the way the Canvas tool does:
+    /// inches × the document's PPI; a ratio keeps the long edge (at least its minimum).
+    private func apply(_ p: CanvasPreset) {
+        switch p.size {
+        case .pixels(let w, let h):
+            width = w; height = h
+        case .inches(let w, let h):
+            width = max(1, Int((w * document.ppi).rounded()))
+            height = max(1, Int((h * document.ppi).rounded()))
+        case .ratio(let rw, let rh, let minLong):
+            let long = max(max(width, height), minLong, 1)
+            if rw >= rh {
+                width = long; height = max(1, Int((Double(long) * Double(rh) / Double(rw)).rounded()))
+            } else {
+                height = long; width = max(1, Int((Double(long) * Double(rw) / Double(rh)).rounded()))
+            }
+        }
     }
 
     private func create() {
