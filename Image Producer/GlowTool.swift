@@ -471,7 +471,9 @@ struct LayerInspector: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
             .disabled(!hasSomethingToApply)
-            .help("Bake the effects into pixels. The original layer is kept directly below, switched off.")
+            // REM: ⌘Return applies — his 2026-11-20 ask: "you should have a keybosrd shortcut for apply".
+            .keyboardShortcut(.return, modifiers: .command)
+            .help("Bake the effects into pixels (⌘Return). The original layer is kept directly below, switched off.")
         }
     }
 

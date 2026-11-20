@@ -5100,6 +5100,9 @@ struct MoveTransformInspector: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                // REM: ⇧⌘Return — it can share the screen with Apply (⌘Return) below; his 2026-11-20 ask.
+                .keyboardShortcut(.return, modifiers: [.command, .shift])
+                .help("Apply the crop (⇧⌘Return)")
                 .padding(.top, 4)
 
                 cropSizeControls
@@ -5515,6 +5518,12 @@ struct MoveTransformInspector: View {
                     Label("Apply", systemImage: "checkmark").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                // REM: ⌘RETURN APPLIES. Michael, 2026-11-20: "you should have a keybosrd shortcut for
+                // apply, what if a quadroplegic was using this eyes or a puffer?" Every finishing
+                // button needs a path that is not a pointer. ⌘Return, not Return: Return already
+                // commits the number fields above it.
+                .keyboardShortcut(.return, modifiers: .command)
+                .help("Apply the move, scale and rotation (⌘Return)")
                 // FLIP — Michael, 2026-10-23: "build flip". Apple's own names (Preview,
                 // Photos). Each press leaves the original hidden underneath (Flip.swift).
                 HStack {
@@ -7803,6 +7812,10 @@ struct LayerRow: View {
                     .foregroundStyle(isChecked ? Color.accentColor : .secondary)
                     .help(isChecked ? "Uncheck this layer" : "Check this layer")
                     .accessibilityLabel("Select layer")
+                    // REM: WHICH LAYER. Michael, 2026-11-20: "what if a quadroplegic was using this eyes
+                    // or a puffer?" Eleven rows all said "Select layer"; the name rides as the VALUE so
+                    // the label stays three words for Voice Control (his 11-04 rule).
+                    .accessibilityValue(layer.name)
                     .accessibilityAddTraits(isChecked ? .isSelected : [])
                 } else {
                     // Light and Dark keep the row aligned without offering the control.
@@ -7821,6 +7834,7 @@ struct LayerRow: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .accessibilityLabel(isCollapsed ? "Expand group" : "Collapse group")
+                    .accessibilityValue(layer.name)
                 } else {
                     // Keep ungrouped rows aligned with grouped ones.
                     Color.clear.frame(width: 16, height: 1)
@@ -7909,8 +7923,20 @@ struct LayerRow: View {
             .buttonStyle(.plain)
             .help(layer.isVisible ? "Visible — click to hide" : "Hidden — click to show")
             .accessibilityLabel(layer.isVisible ? "Hide layer" : "Show layer")
+            .accessibilityValue(layer.name)
         }
         .padding(.vertical, 2)
+        // REM: EVERY MENU ITEM IS ALSO AN ACCESSIBILITY ACTION. Michael, 2026-11-20: "you need to
+        // make it so I dont have to ... use my mouse ... what if a quadroplegic was using this eyes
+        // or a puffer?" A right-click menu is a pointer path; these actions reach VoiceOver's
+        // Actions rotor and Switch Control's menu with no pointer at all.
+        .accessibilityAction(named: layer.isVisible ? "Hide" : "Show", onToggleVisibility)
+        #if os(macOS)
+        .accessibilityAction(named: "Copy", onCopy)
+        #endif
+        .accessibilityAction(named: "Rename", onRename)
+        .accessibilityAction(named: "Duplicate", onDuplicate)
+        .accessibilityAction(named: "Delete", onDelete)
         .contextMenu {
             Button(action: onRename) { Label("Rename", systemImage: "pencil") }
             // REM: his "it needs copy added (bug)", 2026-11-20 — same as ⌘C on this layer.
