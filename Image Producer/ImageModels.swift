@@ -1709,12 +1709,31 @@ extension ImageDocument: Document {
                     .appendingPathComponent("\(url.deletingPathExtension().lastPathComponent) (original)")
                     .appendingPathExtension(url.pathExtension)
                 if !FileManager.default.fileExists(atPath: keep.path) {
-                    do { try FileManager.default.copyItem(at: url, to: keep) }
-                    catch {
-                        say("Could not keep the original .psd file — not saved", kind: .warning)
-                        throw error
+                    // REM: The sandbox grants only the file he opened, not its folder, so the copy
+                    // beside it can be refused (his ⌘S on Apple's template in Downloads, 11-20:
+                    // "could not be saved"). Then keep the original in our own container instead —
+                    // never lose the original, never block his save.
+                    do {
+                        try FileManager.default.copyItem(at: url, to: keep)
+                        say("Kept the original as \(keep.lastPathComponent)", kind: .info)
+                    } catch {
+                        do {
+                            let shelf = try FileManager.default.url(for: .applicationSupportDirectory,
+                                                                    in: .userDomainMask,
+                                                                    appropriateFor: nil, create: true)
+                                .appendingPathComponent("Kept Originals", isDirectory: true)
+                            try FileManager.default.createDirectory(at: shelf, withIntermediateDirectories: true)
+                            let stamp = ISO8601DateFormatter().string(from: Date())
+                                .replacingOccurrences(of: ":", with: "-")
+                            let kept = shelf.appendingPathComponent("\(keep.deletingPathExtension().lastPathComponent) \(stamp)")
+                                .appendingPathExtension(url.pathExtension)
+                            try FileManager.default.copyItem(at: url, to: kept)
+                            say("Kept the original in Image Producer's Kept Originals folder", kind: .info)
+                        } catch {
+                            say("Could not keep the original .psd file — not saved", kind: .warning)
+                            throw error
+                        }
                     }
-                    say("Kept the original as \(keep.lastPathComponent)", kind: .info)
                 }
                 psdFromElsewhere = false
             }
