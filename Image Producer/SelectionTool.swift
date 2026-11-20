@@ -241,13 +241,19 @@ struct SelectionInspector: View {
 
             Divider()
 
+            // REM: His word, 2026-11-20: "should (selct In... be on the next line in small fine
+            // print?" → yes: the action on line one at 18, the hint under it in small print, so
+            // neither Clear button truncates. Small print here is his OK to go under 18 pt.
             Button { onClear() } label: {
-                Label("Clear Inside  (Delete)", systemImage: "eraser").scaledFont(18).frame(maxWidth: .infinity)
+                Label { twoLineTitle("Clear Inside", hint: "(Delete)") } icon: { Image(systemName: "eraser").scaledFont(18) }
+                    .frame(maxWidth: .infinity)
             }
             .controlSize(.large)
             .disabled(document.selection == nil)
+            .accessibilityLabel("Clear inside")
             Button { onClearOutside() } label: {
-                Label("Clear Outside  (Select Inverse)", systemImage: "eraser.fill").scaledFont(18).frame(maxWidth: .infinity)
+                Label { twoLineTitle("Clear Outside", hint: "(Select Inverse)") } icon: { Image(systemName: "eraser.fill").scaledFont(18) }
+                    .frame(maxWidth: .infinity)
             }
             .controlSize(.large)
             .disabled(document.selection == nil)
@@ -270,6 +276,16 @@ struct SelectionInspector: View {
         .scaledFont(18)
         .padding()
         .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    /// Action name on top at 18, its shortcut hint under it in small print (his OK, 11-20).
+    private func twoLineTitle(_ title: String, hint: String) -> some View {
+        VStack(spacing: 0) {
+            Text(title).scaledFont(18)
+            Text(hint).scaledFont(12).foregroundStyle(.secondary)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
     }
 }
 
