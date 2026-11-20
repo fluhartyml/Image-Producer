@@ -603,6 +603,7 @@ struct MaskInspector: View {
                         guard let c = new.first else { return }
                         document.cropMask?.form = .glyph(String(c), fontName: nil)
                     }
+                    .accessibilityLabel("Mask character")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
             }
             // A row of ready-made glyphs, because typing ❄ is harder than tapping it.
             HStack(spacing: 6) {
@@ -629,6 +630,7 @@ struct MaskInspector: View {
         HStack {
             TextField("symbol name", text: $symbolName)
                 .scaledFont(18)
+                .accessibilityLabel("Symbol name")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
             Button("Use") { useSymbol(symbolName) }
                 .disabled(symbolName.isEmpty)
         }

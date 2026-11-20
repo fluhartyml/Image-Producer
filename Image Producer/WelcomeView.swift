@@ -384,6 +384,7 @@ struct WelcomeView: View {
                         if let staged = stagedURL,
                            staged.deletingPathExtension().lastPathComponent != newName { stagedURL = nil }
                     }
+                    .accessibilityLabel("Project name")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                 if let taken = nameTaken {
                     HStack {
                         Text("“\(taken.deletingPathExtension().lastPathComponent)” already exists.")

@@ -204,6 +204,7 @@ struct ImagePlaygroundInspector: View {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(.white.opacity(0.18))
                     )
+                    .accessibilityLabel("Picture description")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
 
                 // REM 2026-11-19 15:4x — SHORT NAMES, AND FILTER ONLY WHEN IT CAN WORK. His words:
                 // "make the image playground :new layer and image playground:filter current layer

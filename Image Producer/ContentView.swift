@@ -2172,11 +2172,13 @@ struct CanvasInspector: View {
                     TextField("Project name", text: $draftName)
                         .textFieldStyle(.roundedBorder).scaledFont(18, weight: .semibold)
                         .onSubmit { commitName() }
+                        .accessibilityLabel("Project name")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                 } else {
                     // Saved: editing here renames the FILE on disk (one-stop — no trip to Finder).
                     TextField("Project name", text: $draftName)
                         .textFieldStyle(.roundedBorder).scaledFont(18, weight: .semibold)
                         .onSubmit { renameFile() }
+                        .accessibilityLabel("Project name")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                     if renameError {
                         Text(renameErrorText ?? "Couldn't rename — a file with that name may already exist.")
                             .scaledFont(18).foregroundStyle(.red)
@@ -2206,12 +2208,14 @@ struct CanvasInspector: View {
                     CommitIntField(placeholder: "W", value: widthBinding)
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
                         .disabled(sizeRule == .fluidHeight)
+                        .accessibilityLabel("Width")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                     Text("×").scaledFont(18).fixedSize()
                     Text("H").scaledFont(18).foregroundStyle(.secondary).help("Height")
                         .fixedSize()
                     CommitIntField(placeholder: "H", value: heightBinding)
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
                         .disabled(sizeRule == .fluidWidth)
+                        .accessibilityLabel("Height")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                 }
 
                 HStack(spacing: 8) {
@@ -2236,6 +2240,7 @@ struct CanvasInspector: View {
                     TextField("PPI", value: $document.ppi, format: .number.precision(.fractionLength(0...2)))
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 76)
                         .onSubmit { if document.ppi < 1 { document.ppi = 1 } }
+                        .accessibilityLabel("Resolution")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                     Text("PPI").scaledFont(18).foregroundStyle(.secondary)
                 }
                 Menu {
@@ -2291,6 +2296,7 @@ struct CanvasInspector: View {
                     Text("Bleed").scaledFont(18).frame(width: 92, alignment: .leading)
                     TextField("in", value: $document.bleedInches, format: .number.precision(.fractionLength(0...3)))
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
+                        .accessibilityLabel("Bleed")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                     Text("in").scaledFont(18).foregroundStyle(.secondary)
                     Menu {
                         Button("None") { document.bleedInches = 0 }
@@ -2306,6 +2312,7 @@ struct CanvasInspector: View {
                     Text("Safe margin").scaledFont(18).frame(width: 92, alignment: .leading)
                     TextField("in", value: $document.safeMarginInches, format: .number.precision(.fractionLength(0...3)))
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
+                        .accessibilityLabel("Safe margin")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                     Text("in").scaledFont(18).foregroundStyle(.secondary)
                     InfoTip("What is the safe margin?", label: "Safe margin info",
                             "Keep text and faces inside this line. The cut can drift a little, and anything too close to the edge may get trimmed off.")
@@ -3503,6 +3510,7 @@ struct SymbolPickerInspector: View {
 
                 TextField("Search SF & Unicode", text: $search)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Search symbols")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                 if combinedResults.isEmpty {
                     Text("Can't find an SF or Unicode symbol matching “\(search.trimmingCharacters(in: .whitespaces))”.")
                         .scaledFont(18).foregroundStyle(.secondary).padding(.vertical, 8)
@@ -3746,6 +3754,7 @@ struct FontPickerInspector: View {
                 .scaledFont(18)
                 .lineLimit(1...4)
                 .autocorrectionDisabled()
+                .accessibilityLabel("Layer text")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
             Button { newText() } label: {
                 Label("New Text Layer", systemImage: "plus.rectangle").frame(maxWidth: .infinity)
             }
@@ -3856,6 +3865,7 @@ struct FontPickerInspector: View {
                             findText = s
                             return .handled
                         }
+                        .accessibilityLabel("Find font")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                 }
                 // A match in the MIDDLE of a name ("nerd" → "3270 Nerd Font") cannot be
                 // completed in place, so the whole suggested name shows beside the field.
@@ -7405,6 +7415,7 @@ struct LayerPanel: View {
         }
         .alert("Rename Layer", isPresented: isRenaming) {
             TextField("Name", text: $draftName)
+                .accessibilityLabel("Layer name")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
             Button("Cancel", role: .cancel) { renamingID = nil }
             Button("Rename") { commitRename() }
         }

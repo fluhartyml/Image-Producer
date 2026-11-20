@@ -52,6 +52,7 @@ struct NewImageSheet: View {
                 // instead of … 'Font test'". Empty field + Create keeps this name.
                 TextField(document.pendingNewName ?? fileName ?? document.name, text: $name)
                     .textFieldStyle(.roundedBorder).scaledFont(18)
+                    .accessibilityLabel("File name")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
             }
             }
 
@@ -63,11 +64,13 @@ struct NewImageSheet: View {
                         .help("Width")
                     TextField("W", value: $width, format: .number)
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 90)
+                        .accessibilityLabel("Width")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                     Text("×").scaledFont(18)
                     Text("H").scaledFont(18).foregroundStyle(.secondary)
                         .help("Height")
                     TextField("H", value: $height, format: .number)
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 90)
+                        .accessibilityLabel("Height")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                     // REM 2026-11-20 — the WHOLE preset catalog, App Store Connect first, same groups
                     // as the Canvas tool. His word, at this sheet with the CryoTunes universal asset:
                     // "add the app store sizes to that menu it was actually supposed to be there

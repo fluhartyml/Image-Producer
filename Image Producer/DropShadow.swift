@@ -121,6 +121,7 @@ struct AngleDial: View {
                     .textFieldStyle(.roundedBorder)
                     .scaledFont(18, monospacedDigit: true)
                     .frame(width: 70)
+                    .accessibilityLabel("Shadow angle")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
                 Text("°").scaledFont(18)
             }
         }
