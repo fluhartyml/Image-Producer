@@ -153,8 +153,12 @@ extension Color {
 @MainActor func makeIconFolder(_ document: ImageDocument) -> [String: Data] {
     var files: [String: Data] = [:]
     for px in ContentView.exportPixelSizes {
+        // REM 2026-11-20, his: "you found a bug with the alpha channels again" — this folder
+        // wrote every PNG hasAlpha: yes (Layers Demo icon set), while the Xcode set path already
+        // flattened. App Store Connect rejects an icon that merely CONTAINS an alpha channel,
+        // so every size goes through the same stripAlpha as IconSetExport.build.
         if let data = ContentView.renderIconPNG(document: document, px: px) {
-            files["icon_\(px).png"] = data
+            files["icon_\(px).png"] = IconSetExport.stripAlpha(data)
         }
     }
     return files
