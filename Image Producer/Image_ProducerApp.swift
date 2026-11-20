@@ -31,7 +31,17 @@ struct CopySelectionActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
 
+/// ⌘V on the canvas — paste a layer or picture above the selected layer (2026-11-20).
+/// Returns false when the clipboard has nothing the canvas can take.
+struct PasteLayerActionKey: FocusedValueKey {
+    typealias Value = () -> Bool
+}
+
 extension FocusedValues {
+    var pasteLayerAction: (() -> Bool)? {
+        get { self[PasteLayerActionKey.self] }
+        set { self[PasteLayerActionKey.self] = newValue }
+    }
     var copySelectionAction: (() -> Void)? {
         get { self[CopySelectionActionKey.self] }
         set { self[CopySelectionActionKey.self] = newValue }
@@ -452,6 +462,7 @@ extension View {
 /// anywhere pixels can be pasted like imessages or a pages document".
 struct ClipboardCommands: Commands {
     @FocusedValue(\.copySelectionAction) private var copySelection
+    @FocusedValue(\.pasteLayerAction) private var pasteLayer
 
     private var isEditingText: Bool {
         NSApp.keyWindow?.firstResponder is NSText
@@ -469,8 +480,11 @@ struct ClipboardCommands: Commands {
                 }
             }
             .keyboardShortcut("c", modifiers: .command)
-            Button("Paste") { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }
-                .keyboardShortcut("v", modifiers: .command)
+            Button("Paste") {
+                if !isEditingText, let pasteLayer, pasteLayer() { return }
+                NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil)
+            }
+            .keyboardShortcut("v", modifiers: .command)
             Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }
                 .keyboardShortcut("a", modifiers: .command)
         }

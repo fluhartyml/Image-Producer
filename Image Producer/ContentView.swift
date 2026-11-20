@@ -978,6 +978,8 @@ struct ContentView: View {
         .focusedSceneValue(\.exportAction, { showExportSheet = true })
         // ⌘C — copy the pixels inside the ants to the clipboard (see copySelectionToClipboard).
         .focusedSceneValue(\.copySelectionAction, { copySelectionToClipboard() })
+        // ⌘V — paste a layer (or a picture) above the selected layer (see pasteFromClipboard).
+        .focusedSceneValue(\.pasteLayerAction, { pasteFromClipboard() })
         #if os(macOS)
         // Selection tool: Delete clears inside the ants, Escape cancels a path / deselects.
         .background(SelectionKeyMonitor(
@@ -9737,15 +9739,67 @@ extension ContentView {
         guard let image = cut, let png = pngData(from: image) else {
             document.say("Nothing visible to copy", kind: .info); return
         }
+        // REM: THE LIVE LAYER RIDES ALONG. Michael, 2026-11-20: "take this layer select and make
+        // it active, press command c and switch to the other tab select 'the coast' and press
+        // command V to paste it above 'the coast' layer". When ⌘C copies ONE whole content layer
+        // (no crop square), the layer itself goes on the clipboard too, so ⌘V in another
+        // Image Producer tab gets the real layer — text stays text, symbols stay symbols
+        // ("no rasterization please unless specifically asked"). Other apps still get pixels.
+        var layerClip: Data? = nil
+        if document.cropRect == nil, layers.count == 1, case .content = layers[0].role {
+            layerClip = LayerClipboard.encode(layers[0], canvasWidth: document.canvasWidth,
+                                              canvasHeight: document.canvasHeight)
+        }
         let pb = NSPasteboard.general
         pb.clearContents()
         // PNG keeps transparency; TIFF is what older apps read. Both, so ⌘V works anywhere.
-        pb.declareTypes([.png, .tiff], owner: nil)
+        pb.declareTypes([.png, .tiff] + (layerClip == nil ? [] : [LayerClipboard.type]), owner: nil)
         pb.setData(png, forType: .png)
         if let tiff = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height)).tiffRepresentation {
             pb.setData(tiff, forType: .tiff)
         }
-        document.say("Copied \(image.width) × \(image.height)", kind: .info)
+        if let layerClip { pb.setData(layerClip, forType: LayerClipboard.type) }
+        document.say(layerClip == nil ? "Copied \(image.width) × \(image.height)"
+                                      : "Copied layer \(layers[0].name)", kind: .info)
+    }
+
+    /// ⌘V on the canvas — paste ABOVE the selected layer (top if none) and select it.
+    /// An Image Producer layer (from ⌘C in any tab) comes in live, at the same pixel size and
+    /// the same spot on the canvas. A picture from another app comes in as a picture layer
+    /// at its own pixel size, centered. Returns false when the clipboard holds neither, so
+    /// the menu can fall back to ordinary text paste.
+    @discardableResult
+    func pasteFromClipboard() -> Bool {
+        let pb = NSPasteboard.general
+        var layer: ImageLayer
+        if let data = pb.data(forType: LayerClipboard.type),
+           let clip = LayerClipboard.decode(data) {
+            layer = clip.layer
+            layer.id = UUID()
+            layer.linkGroup = nil          // its link partners live in the other document
+            // Same PIXEL size on the new canvas: scale is a fraction of the canvas's short edge.
+            let fromEdge = Double(max(1, min(clip.canvasWidth, clip.canvasHeight)))
+            let toEdge = Double(max(1, min(document.canvasWidth, document.canvasHeight)))
+            layer.transform.scale *= fromEdge / toEdge
+        } else if let raw = pb.data(forType: .png) ?? pb.data(forType: .tiff),
+                  let source = CGImageSourceCreateWithData(raw as CFData, nil),
+                  let cg = CGImageSourceCreateImageAtIndex(source, 0, nil),
+                  let png = pngData(from: cg) {
+            layer = ImageLayer(name: "Pasted Image", role: .content)
+            layer.setImage(png)
+            let longSide = Double(max(cg.width, cg.height))
+            layer.transform.contentAspect = Double(cg.width) / Double(max(1, cg.height))
+            layer.transform.scale = longSide / Double(max(1, min(document.canvasWidth, document.canvasHeight)))
+        } else {
+            return false
+        }
+        document.captureHistoryBaselineIfNeeded()
+        document.layers.insert(layer, at: document.newLayerIndex(above: activeLayerID))
+        activeLayerID = layer.id
+        document.recordHistory(toolID: "layers", groupTitle: "Layers",
+                               actionLabel: "Paste \(layer.name)", layerID: layer.id)
+        document.say("Pasted \(layer.name)", kind: .info)
+        return true
     }
 
     /// Bounding box of pixels with any opacity, in image pixel coordinates.
