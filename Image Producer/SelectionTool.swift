@@ -33,7 +33,10 @@ import UIKit
 
 /// The four ways to draw a selection.
 enum SelectionShape: String, CaseIterable, Identifiable {
-    case rectangle, oval, freehand, path
+    // REM: appIcon — his ask 2026-11-20: "how about in the mask tool to add an 'app icon'
+    // mask?" then "i mistookm selection tool as the mask tool". Apple's icon shape, to round
+    // the CryoTunes icon tile on the universal App Store image.
+    case rectangle, oval, appIcon, freehand, path
 
     var id: String { rawValue }
 
@@ -41,6 +44,7 @@ enum SelectionShape: String, CaseIterable, Identifiable {
         switch self {
         case .rectangle: "Rectangle"
         case .oval:      "Oval"
+        case .appIcon:   "App Icon"
         case .freehand:  "Freehand"
         case .path:      "Path"
         }
@@ -50,6 +54,7 @@ enum SelectionShape: String, CaseIterable, Identifiable {
         switch self {
         case .rectangle: "rectangle.dashed"
         case .oval:      "circle.dashed"
+        case .appIcon:   "app"
         case .freehand:  "scribble"
         case .path:      "point.topleft.down.to.point.bottomright.curvepath"
         }
@@ -60,6 +65,7 @@ enum SelectionShape: String, CaseIterable, Identifiable {
         switch self {
         case .rectangle: "Drag on the canvas to draw a rectangle."
         case .oval:      "Drag on the canvas to draw an oval."
+        case .appIcon:   "Drag over the picture to draw an app-icon shape, then Clear Outside to round its corners."
         case .freehand:  "Drag on the canvas to draw any shape. Letting go closes it."
         case .path:      "Click to place points. Click the first point (or Close Path) to finish."
         }
@@ -80,7 +86,12 @@ enum SelectionGeometry {
         let r = CGRect(x: min(p.x, q.x), y: min(p.y, q.y),
                        width: max(abs(q.x - p.x), CropMask.minSide),
                        height: max(abs(q.y - p.y), CropMask.minSide))
-        return CropMask(rect: r, form: shape == .oval ? .oval : .rectangle)
+        let form: MaskForm = switch shape {
+        case .oval:    .oval
+        case .appIcon: .appIcon
+        default:       .rectangle
+        }
+        return CropMask(rect: r, form: form)
     }
 
     /// A closed outline (freehand stroke or clicked path) as a selection: the frame is the
@@ -120,8 +131,9 @@ enum SelectionGeometry {
     /// `image` with every pixel inside `selection` made fully transparent. The selection is
     /// in normalized canvas space; `canvas` is the canvas in pixels; `transform` places the
     /// image on the canvas. Pixels outside the selection are untouched, byte for byte.
+    /// `outside: true` clears everything EXCEPT the selection instead (Clear Outside).
     static func clearing(_ image: CGImage, inside selection: CropMask, canvas: CGSize,
-                         transform: LayerTransform) -> CGImage? {
+                         transform: LayerTransform, outside: Bool = false) -> CGImage? {
         let w = image.width, h = image.height
         guard let toImage = canvasToImage(canvas: canvas, transform: transform, imageW: w, imageH: h) else { return nil }
         let silhouette = selection.silhouette(in: canvas).cgPath
@@ -134,9 +146,10 @@ enum SelectionGeometry {
                                   space: space,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        if outside { ctx.addRect(CGRect(x: 0, y: 0, width: w, height: h)) }
         ctx.addPath(path)
         ctx.setBlendMode(.clear)
-        ctx.fillPath()
+        if outside { ctx.fillPath(using: .evenOdd) } else { ctx.fillPath() }
         return ctx.makeImage()
     }
 }
@@ -192,6 +205,7 @@ struct SelectionOverlay: View {
 struct SelectionInspector: View {
     @Bindable var document: ImageDocument
     let onClear: () -> Void
+    let onClearOutside: () -> Void
     let onCopy: () -> Void
     let onClosePath: () -> Void
 
@@ -232,6 +246,14 @@ struct SelectionInspector: View {
             }
             .controlSize(.large)
             .disabled(document.selection == nil)
+            Button { onClearOutside() } label: {
+                Label("Clear Outside  (Select Inverse)", systemImage: "eraser.fill").scaledFont(18).frame(maxWidth: .infinity)
+            }
+            .controlSize(.large)
+            .disabled(document.selection == nil)
+            // REM: His label, 2026-11-20: "put Clear outside (select inverse)" — Photoshop's
+            // Select ▸ Inverse then Delete, in one button.
+            .accessibilityLabel("Clear outside")
             Button { onCopy() } label: {
                 Label("Copy  (⌘C)", systemImage: "doc.on.doc").scaledFont(18).frame(maxWidth: .infinity)
             }
@@ -243,7 +265,7 @@ struct SelectionInspector: View {
             .controlSize(.large)
             .disabled(document.selection == nil && document.selectionPathPoints.isEmpty)
 
-            InfoTip("More about this", label: "Clear Inside info", "Clear Inside works on the selected layer: the first clear makes a new layer and hides the original (kept). Copy takes everything you see inside the ants. Drag inside the ants to move them; drag a corner to resize.")
+            InfoTip("More about this", label: "Clear Inside info", "Clear Inside and Clear Outside work on the selected layer: the first clear makes a new layer and hides the original (kept). Copy takes everything you see inside the ants. Drag inside the ants to move them; drag a corner to resize.")
         }
         .scaledFont(18)
         .padding()
@@ -320,7 +342,7 @@ extension ImageDocument {
     /// DELETE — clear the pixels inside the ants on the selected layer. Returns the layer
     /// that now holds the result (select it), or nil when nothing was cleared.
     @MainActor @discardableResult
-    func clearInsideSelection(activeLayerID: ImageLayer.ID?) -> ImageLayer.ID? {
+    func clearInsideSelection(activeLayerID: ImageLayer.ID?, outside: Bool = false) -> ImageLayer.ID? {
         guard let sel = selection else { say("Nothing selected", kind: .info); return nil }
         guard let id = activeLayerID, let idx = layers.firstIndex(where: { $0.id == id }) else {
             say("Pick a layer to clear", kind: .info); return nil
@@ -336,7 +358,8 @@ extension ImageDocument {
         let t = layers[idx].transform
         guard let src = CGImageSourceCreateWithData(png as CFData, nil),
               let cg = CGImageSourceCreateImageAtIndex(src, 0, nil),
-              let cleared = SelectionGeometry.clearing(cg, inside: sel, canvas: canvasPixelSize, transform: t),
+              let cleared = SelectionGeometry.clearing(cg, inside: sel, canvas: canvasPixelSize, transform: t,
+                                                       outside: outside),
               let out = pngData(from: cleared) else {
             say("Clear failed", kind: .info); return nil
         }
@@ -347,7 +370,7 @@ extension ImageDocument {
         if selectionClearLayerID == id {
             layers[idx].setImage(out)
             recordHistory(toolID: Tool.select.rawValue, groupTitle: Tool.select.title,
-                          actionLabel: "Clear Selection", layerID: id)
+                          actionLabel: outside ? "Clear Outside" : "Clear Selection", layerID: id)
             return id
         }
         guard let newID = addResultLayer(out, above: idx, nameSuffix: "cleared"),
@@ -355,7 +378,7 @@ extension ImageDocument {
         layers[ni].transform = t            // the result sits exactly where the art was
         selectionClearLayerID = newID
         recordHistory(toolID: Tool.select.rawValue, groupTitle: Tool.select.title,
-                      actionLabel: "Clear Selection", layerID: newID)
+                      actionLabel: outside ? "Clear Outside" : "Clear Selection", layerID: newID)
         return newID
     }
 

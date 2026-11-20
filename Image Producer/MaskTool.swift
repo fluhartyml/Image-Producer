@@ -76,6 +76,10 @@ enum MaskForm: Equatable, Hashable, Codable {
     case oval
     case polygon
     case star
+    /// Apple's app-icon shape: a rounded square with continuous ("squircle") corners.
+    // REM: His ask 2026-11-20, rounding the CryoTunes icon tile on the universal App Store
+    // image: "how about in the mask tool to add an 'app icon' mask?"
+    case appIcon
     /// Any Unicode character, drawn from `fontName` (nil = system font).
     case glyph(String, fontName: String?)
     /// A RESOLVED outline: closed loops of points, normalized 0…1 inside the frame.
@@ -97,6 +101,7 @@ enum MaskForm: Equatable, Hashable, Codable {
         case .oval:      "Circle / Oval"
         case .polygon:   "Polygon"
         case .star:      "Star"
+        case .appIcon:   "App Icon"
         case .glyph(let c, _): "Character \(c)"
         case .path(_, let label): label
         }
@@ -104,7 +109,7 @@ enum MaskForm: Equatable, Hashable, Codable {
 
     /// The forms offered as plain picker rows. `.glyph` is reached through its own
     /// character field, so it isn't listed here.
-    static let pickable: [MaskForm] = [.rectangle, .oval, .polygon, .star]
+    static let pickable: [MaskForm] = [.rectangle, .oval, .appIcon, .polygon, .star]
 }
 
 // MARK: - The mask itself
@@ -207,6 +212,12 @@ struct CropMask: Equatable, Codable {
             // Five points unless he says otherwise; 0.42 is the inner radius that reads as
             // "a star" rather than a spiky asterisk or a fat pinwheel.
             return Self.radialPath(in: boundsRect(in: size), points: max(3, min(polygonSides, 12)), innerRatio: 0.42)
+        case .appIcon:
+            // 22.37% of the side is Apple's app-icon corner (229 px on 1024), drawn with
+            // the continuous curve — the same shape the system masks every icon with.
+            let r = boundsRect(in: size)
+            return RoundedRectangle(cornerRadius: min(r.width, r.height) * 0.2237, style: .continuous)
+                .path(in: r)
         case .glyph(let text, let fontName):
             return Self.glyphPath(text, fontName: fontName, fitting: boundsRect(in: size))
                 ?? Path(ellipseIn: boundsRect(in: size))

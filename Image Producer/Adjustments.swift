@@ -27,6 +27,9 @@ enum Adjustment: String, Identifiable, CaseIterable {
     case levels
     case gaussianBlur
     case liquify
+    // REM: His ask 2026-11-20, on the CryoTunes universal App Store image: "can we round or
+    // fillet the corners?" — the icon sat on the blurred glow as a hard-edged square tile.
+    case roundCorners
 
     var id: String { rawValue }
 
@@ -35,6 +38,7 @@ enum Adjustment: String, Identifiable, CaseIterable {
         case .levels:       "Levels"
         case .gaussianBlur: "Gaussian Blur"
         case .liquify:      "Liquify"
+        case .roundCorners: "Round Corners"
         }
     }
 
@@ -43,6 +47,7 @@ enum Adjustment: String, Identifiable, CaseIterable {
         case .levels:       "chart.bar.xaxis"
         case .gaussianBlur: "drop.circle"
         case .liquify:      "hand.point.up.left"
+        case .roundCorners: "app"
         }
     }
 
@@ -213,6 +218,20 @@ nonisolated enum AdjustmentEngine {
         }
         return context.createCGImage(out, from: extent)
     }
+
+    /// The picture clipped to `clip` (a rounded rectangle in the picture's own pixels);
+    /// everything outside turns clear. Anti-aliased, so the curve has no stair steps.
+    static func clipped(_ cg: CGImage, to clip: CGPath) -> CGImage? {
+        let w = cg.width, h = cg.height
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.setShouldAntialias(true)
+        ctx.addPath(clip)          // symmetric shape, so the bottom-left origin doesn't matter
+        ctx.clip()
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()
+    }
 }
 
 // MARK: - The Adjust tool's inspector
@@ -312,6 +331,8 @@ struct AdjustmentSheetHost: View {
                 LevelsWindow(document: document, source: source, dismiss: dismiss)
             case .liquify:
                 LiquifyWindow(document: document, source: source, dismiss: dismiss)
+            case .roundCorners:
+                RoundCornersWindow(document: document, source: source, dismiss: dismiss)
             }
         } else {
             VStack(spacing: 14) {
@@ -393,6 +414,95 @@ struct GaussianBlurWindow: View {
             working = false
             guard let out, document.applyAdjustment(.gaussianBlur, source: source, result: out) != nil else {
                 problem = "The blur could not be applied to this layer."
+                return
+            }
+            dismiss()
+        }
+    }
+}
+
+// MARK: - Round Corners
+
+/// Rounds (fillets) a picture's four corners. Radius is a percent of the picture's short
+/// side, so the same number looks the same on a 304 px or a 1024 px picture. "Smooth" is
+/// Apple's continuous curve — the app-icon shape — and "Circular" is a plain quarter-circle.
+struct RoundCornersWindow: View {
+    @Bindable var document: ImageDocument
+    let source: AdjustmentSource
+    let dismiss: () -> Void
+
+    // REM: 22.4% is the corner of an Apple app icon (about 230 px on 1024), the shape he
+    // asked for on the CryoTunes icon tile, 2026-11-20.
+    @State private var percent: Double = 22.4
+    @State private var smooth = true
+    @State private var preview: CGImage?
+    @State private var working = false
+    @State private var problem: String?
+
+    private var small: CGImage { previewCopy(of: source.cgImage) }
+
+    var body: some View {
+        AdjustmentWindow(title: "Round Corners", working: working, problem: problem,
+                         onCancel: dismiss, onApply: apply) {
+            if let preview {
+                Image(decorative: preview, scale: 1).resizable().scaledToFit()
+            } else {
+                ProgressView()
+            }
+        } controls: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Corner radius").scaledFont(18)
+                    Spacer()
+                    Text(String(format: "%.1f%%", percent)).scaledFont(18, monospacedDigit: true)
+                    Stepper("", value: $percent, in: 0...50, step: 0.5).labelsHidden()
+                        .accessibilityLabel("Corner radius")
+                        .accessibilityValue(String(format: "%.1f percent", percent))
+                }
+                Slider(value: $percent, in: 0...50)
+                    .accessibilityLabel("Corner radius")
+                    .accessibilityValue(String(format: "%.1f percent", percent))
+                Picker("Curve", selection: $smooth) {
+                    Text("Smooth (app icon)").tag(true)
+                    Text("Circular").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .scaledFont(18)
+                .accessibilityLabel("Curve")
+            }
+        }
+        .task(id: "\(percent)-\(smooth)") { await render() }
+    }
+
+    /// The rounded rectangle for a picture of this size — built here, on the main actor,
+    /// because SwiftUI's continuous-corner shape is where Apple's icon curve lives.
+    private func clipPath(width: Int, height: Int) -> CGPath {
+        let rect = CGRect(x: 0, y: 0, width: width, height: height)
+        let r = min(rect.width, rect.height) * percent / 100
+        return RoundedRectangle(cornerRadius: r, style: smooth ? .continuous : .circular)
+            .path(in: rect).cgPath
+    }
+
+    private func render() async {
+        let small = self.small
+        let clip = clipPath(width: small.width, height: small.height)
+        let out = await Task.detached(priority: .userInitiated) {
+            AdjustmentEngine.clipped(small, to: clip)
+        }.value
+        if !Task.isCancelled { preview = out }
+    }
+
+    private func apply() {
+        working = true
+        let cg = source.cgImage
+        let clip = clipPath(width: cg.width, height: cg.height)
+        Task {
+            let out = await Task.detached(priority: .userInitiated) {
+                AdjustmentEngine.clipped(cg, to: clip)
+            }.value
+            working = false
+            guard let out, document.applyAdjustment(.roundCorners, source: source, result: out) != nil else {
+                problem = "The corners could not be rounded on this layer."
                 return
             }
             dismiss()

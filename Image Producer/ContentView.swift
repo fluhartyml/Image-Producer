@@ -1869,6 +1869,10 @@ struct ToolInspector: View {
                                onClear: {
                                    if let id = document.clearInsideSelection(activeLayerID: activeLayerID) { activeLayerID = id }
                                },
+                               onClearOutside: {
+                                   if let id = document.clearInsideSelection(activeLayerID: activeLayerID,
+                                                                             outside: true) { activeLayerID = id }
+                               },
                                onCopy: { document.copySelectionPixels() },
                                onClosePath: { document.closeSelectionPath() })
         case .fill:
@@ -6466,7 +6470,7 @@ struct CanvasView: View {
     /// point again closes the shape.
     @MainActor private func endSelectionGesture(at n: CGPoint, canvas: CGSize) {
         switch document.selectionShape {
-        case .rectangle, .oval:
+        case .rectangle, .oval, .appIcon:
             if let s = selectDragStart,
                hypot((n.x - s.x) * canvas.width, (n.y - s.y) * canvas.height) <= 3 {
                 document.selection = nil
@@ -6624,7 +6628,7 @@ struct CanvasView: View {
                         let n = CGPoint(x: value.location.x / disp.width, y: value.location.y / disp.height)
                         if activeTool == .select {
                             switch document.selectionShape {
-                            case .rectangle, .oval:
+                            case .rectangle, .oval, .appIcon:
                                 let start = selectDragStart ?? n
                                 if selectDragStart == nil { selectDragStart = n }
                                 if hypot((n.x - start.x) * disp.width, (n.y - start.y) * disp.height) > 3 {

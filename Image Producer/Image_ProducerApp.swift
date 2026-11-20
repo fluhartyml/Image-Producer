@@ -86,6 +86,8 @@ struct AdjustmentCommands: Commands {
             Button("Liquify…") { adjust?(.liquify) }
                 .keyboardShortcut("x", modifiers: [.command, .shift])
                 .disabled(adjust == nil)
+            Button("Round Corners…") { adjust?(.roundCorners) }
+                .disabled(adjust == nil)
         }
     }
 }
