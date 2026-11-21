@@ -506,16 +506,44 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         // His word 11-21: "ios devices dont need a zoom toolbox tool if the pinch zoom pan is native".
         check("11-21", "No Zoom tool in the iOS toolbox", !button("Zoom").exists)
 
-        // 433 #2 — the floating preview moves by its handle.
+        // 433 #2 — the floating preview moves. His word 11-21: "yes long press to move the pip".
+        // Hold anywhere on it, then drag: at 1× and again zoomed in (his note: zoomed in, a touch on
+        // it only panned the canvas). Then the handle tap still sends it to the next corner.
+        let pip = app.descendants(matching: .any)["pip.panel"].firstMatch
+        let window = app.windows.firstMatch
+        func longPressMove(_ label: String) {
+            guard pip.waitForExistence(timeout: 3) else { check("433#2", "\(label): preview found", false); return }
+            let f0 = pip.frame
+            // Drag toward the corner diagonally opposite where it sits.
+            let to = window.coordinate(withNormalizedOffset: CGVector(dx: f0.midX < window.frame.midX ? 0.85 : 0.15,
+                                                                       dy: f0.midY < window.frame.midY ? 0.45 : 0.1))
+            pip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).press(forDuration: 0.8, thenDragTo: to)
+            sleep(1)
+            let f1 = pip.frame
+            check("433#2", "\(label): long press + drag moves the preview",
+                  hypot(f1.midX - f0.midX, f1.midY - f0.midY) > 80,
+                  String(format: "moved %.0f across, %.0f down", f1.midX - f0.midX, f1.midY - f0.midY))
+            check("433#2", "\(label): the preview stays fully on screen",
+                  f1.minX >= 0 && f1.maxX <= window.frame.maxX && f1.minY >= 0,
+                  String(format: "x %.0f–%.0f, y %.0f", f1.minX, f1.maxX, f1.minY))
+        }
+        press("Canvas Tool"); sleep(1)
+        snapshot("i98-preview-before")
+        longPressMove("At 1×")
+        snapshot("i98-preview-moved-1x")
+        let canvasEl = app.descendants(matching: .any)["uitest.canvas"].firstMatch
+        if canvasEl.waitForExistence(timeout: 3) { canvasEl.pinch(withScale: 3, velocity: 2); sleep(1) }
+        snapshot("i98-zoomed")
+        longPressMove("Zoomed in")
+        snapshot("i99-preview-moved-zoomed")
         let grip = app.buttons["Move preview"].firstMatch
         if grip.waitForExistence(timeout: 3) {
             let f0 = grip.frame
             grip.tap(); sleep(1)
             let f1 = grip.frame
-            check("433#2", "The floating preview's handle moves it",
+            check("433#2", "Tapping the handle sends it to the next corner",
                   hypot(f1.midX - f0.midX, f1.midY - f0.midY) > 40,
                   String(format: "moved %.0f across, %.0f down", f1.midX - f0.midX, f1.midY - f0.midY))
-            snapshot("i99-preview-moved")
         } else {
             check("433#2", "The floating preview's Move preview handle is there", false)
         }

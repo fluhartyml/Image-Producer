@@ -177,18 +177,37 @@ struct ProductionPiP: View {
                 dragging = true
                 drag = v.translation
             }
-            .onEnded { v in
-                let dropped = CGPoint(x: home.x + v.translation.width,
-                                      y: home.y + v.translation.height)
-                let target = PiPCorner.nearest(to: dropped, in: bounds, panel: panel)
-                // Snap: zero the offset and change corner in one animation, so it
-                // flies to the corner rather than jumping.
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
-                    cornerRaw = target.rawValue
-                    drag = .zero
-                    dragging = false
-                }
+            .onEnded { v in drop(v.translation) }
+    }
+
+    /// REM 2026-11-21 — LONG PRESS TO MOVE IT. His word: "yes long press to move the pip" (his 433 note:
+    /// "You cant move the PiP if you touch it it zooms and pans"). Hold anywhere on the preview, it
+    /// lifts, then drag it to a corner — at any zoom. A quick touch still navigates, as his 10-19
+    /// rule says ("click drag pans"). While it is lifted the navigator stands down.
+    private var holdDrag: some Gesture {
+        LongPressGesture(minimumDuration: 0.35)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                guard case .second(true, let d) = value else { return }
+                if !dragging { withAnimation(.easeOut(duration: 0.15)) { dragging = true } }
+                drag = d?.translation ?? .zero
             }
+            .onEnded { value in
+                guard case .second(true, let d) = value else { return }
+                drop(d?.translation ?? .zero)
+            }
+    }
+
+    /// Snap to the corner nearest where it was let go: zero the offset and change corner in one
+    /// animation, so it flies to the corner rather than jumping.
+    private func drop(_ translation: CGSize) {
+        let dropped = CGPoint(x: home.x + translation.width, y: home.y + translation.height)
+        let target = PiPCorner.nearest(to: dropped, in: bounds, panel: panel)
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+            cornerRaw = target.rawValue
+            drag = .zero
+            dragging = false
+        }
     }
 
     private var grip: some View {
@@ -223,7 +242,10 @@ struct ProductionPiP: View {
         // It reads as a control that is failing.
         let thumb = ProductionThumbnail.fitted(document.canvasPixelSize, side: side)
         VStack(spacing: 0) {
-            grip
+            // REM 2026-11-21 — the handle is exactly as wide as the thumbnail. Left to stretch, it widened
+            // the whole panel past the size `panel` assumes, and the 16e sim showed it hanging off the
+            // left edge of the canvas.
+            grip.frame(width: thumb.width)
             ProductionThumbnail(document: document, side: side)
                 .frame(width: thumb.width, height: thumb.height)
                 .overlay {
@@ -238,6 +260,7 @@ struct ProductionPiP: View {
                 .contentShape(Rectangle())
                 // Click = centre there; drag = keep centring under the pointer, i.e. pan.
                 .gesture(viewport == nil ? nil : DragGesture(minimumDistance: 0).onChanged { v in
+                    guard !dragging else { return }   // lifted by a long press: moving, not navigating
                     onNavigate?(CGPoint(x: min(max(v.location.x / thumb.width, 0), 1),
                                         y: min(max(v.location.y / thumb.height, 0), 1)))
                 })
@@ -251,7 +274,10 @@ struct ProductionPiP: View {
         // At 1× a drag anywhere on it moves the panel; zoomed in, the thumbnail navigates and the
         // handle on top moves it.
         .gesture(viewport != nil ? nil : moveDrag)
+        .simultaneousGesture(holdDrag)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("pip.panel")
         .help(viewport == nil ? "Production preview — drag it to any corner. Never follows the canvas zoom."
-                              : "Navigator — click to centre the view there, drag to pan; drag the handle to move it")
+                              : "Navigator — click to center the view there, drag to pan; hold it, or drag the handle, to move it")
     }
 }
