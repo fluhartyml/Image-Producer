@@ -158,6 +158,15 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         let candidates = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).allElementsBoundByIndex
             .filter { $0.isHittable }.sorted { $0.frame.minY < $1.frame.minY }
         if let launchButton = candidates.first { launchButton.tap() }
+        else {
+            // REM 2026-11-21 13:3x run (16e, after his Mac restart): the browser's On My iPhone page
+            // covered the launch scene, so no "New Image" was hittable and nothing was tapped. Use the
+            // browser's own Create Document cell, the same thing a person would tap there.
+            let create = app.cells["Create Document"].firstMatch
+            if create.waitForExistence(timeout: 3), create.isHittable {
+                record("| — | ↻ FALLBACK | New Image covered; tapped Create Document |"); create.tap()
+            }
+        }
         sleep(3)
         // REM: the 19:14 run's tap left the launch screen up (a file from the 18:44 run sat in
         // On My iPad; the tap may have landed mid-refresh). One retry, then go on and report.
@@ -563,6 +572,78 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         } else {
             check("433#2", "The floating preview's Move preview handle is there", false)
         }
+    }
+
+    // REM 2026-11-21 — 438: the Floating Preview switch left the Canvas page for Settings. His word:
+    // "move the PiP toggle to settings", then "test 438 in the 16e simulator". Checks the Canvas page
+    // has no switch, the Settings app has it, and turning it off there hides the preview.
+    func testPhoneFloatingPreviewSetting() throws {
+        XCUIDevice.shared.orientation = .portrait
+        sleep(1)
+        openNewImage()
+        press("Canvas Tool"); sleep(2)
+        snapshot("s01-canvas-page")
+        let pip = app.descendants(matching: .any)["pip.panel"].firstMatch
+        check("438", "The preview shows by default", pip.waitForExistence(timeout: 3))
+        check("438", "No Floating preview switch on the Canvas page",
+              !app.switches["Floating preview"].exists && !app.staticTexts["Floating preview"].exists)
+
+        // The Settings app ▸ Apps ▸ Image Producer.
+        let prefs = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        prefs.launch(); sleep(2)
+        func scrollFind(_ e: XCUIElement) -> Bool {
+            var n = 0
+            // REM 13:3x run: the row "existed" off screen, the tap missed, and the search ran on.
+            // Scroll until it can really be tapped.
+            while !(e.exists && e.isHittable) && n < 15 { prefs.swipeUp(); sleep(1); n += 1 }
+            return e.exists && e.isHittable
+        }
+        let apps = prefs.staticTexts["Apps"].firstMatch
+        if scrollFind(apps) { apps.tap(); sleep(2) }
+        // REM 13:4x run: staticTexts["Image Producer"].firstMatch was the "◀ Image Producer" back-to-app link in
+        // the status bar, not the list row. Search the list, then take a match below the nav bar.
+        // REM 14:3x runs: the result row sat at y≈110, so the old "minY > 150" filter threw it away. And on a freshly
+        // erased simulator, Settings search says "No Results" (its index isn't built yet) even though the app is listed.
+        // So scroll the Apps list itself; the status-bar link is never a cell — take the cell that holds the label.
+        let row = prefs.cells.containing(NSPredicate(format: "label == 'Image Producer'")).firstMatch
+        guard scrollFind(row) else {
+            snapshot("s02-settings-no-row")
+            check("438", "Image Producer appears in the Settings app", false); return
+        }
+        row.tap(); sleep(2)
+        let sw = prefs.switches["Floating Preview"].firstMatch
+        let found = scrollFind(sw)
+        prefs.screenshot().attach(self, "s03-settings-page")
+        check("438", "Settings app shows the Floating Preview switch", found)
+        guard found else { return }
+        check("438", "It reads on by default", (sw.value as? String) == "1", "value \(sw.value ?? "nil")")
+        sw.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap(); sleep(1)
+        prefs.screenshot().attach(self, "s04-settings-off")
+        check("438", "Switch turns off", (sw.value as? String) == "0", "value \(sw.value ?? "nil")")
+
+        // REM 15:0x run: the video never showed the app between "off" and "on" — the check may have read a
+        // background app. Wait until it is really in front, then give the preview time to go.
+        app.activate()
+        check("438", "Image Producer comes back to the front", app.wait(for: .runningForeground, timeout: 10))
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: pip)
+        let goneOK = XCTWaiter().wait(for: [gone], timeout: 5) == .completed
+        snapshot("s05-canvas-preview-off")
+        check("438", "Back in the app, the preview is gone", goneOK)
+
+        // Put it back on so the simulator is left as found.
+        prefs.activate(); sleep(2)
+        sw.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap(); sleep(1)
+        check("438", "Switch turns back on", (sw.value as? String) == "1", "value \(sw.value ?? "nil")")
+        app.activate()
+        _ = app.wait(for: .runningForeground, timeout: 10)
+        snapshot("s06-canvas-preview-on")
+        check("438", "Back in the app, the preview returns", pip.waitForExistence(timeout: 3))
+    }
+}
+
+private extension XCUIScreenshot {
+    func attach(_ test: XCTestCase, _ name: String) {
+        let a = XCTAttachment(screenshot: self); a.name = name; a.lifetime = .keepAlways; test.add(a)
     }
 }
 #endif

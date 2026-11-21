@@ -789,6 +789,14 @@ struct ContentView: View {
             keyboardPhoneLock = nil
             keyboardTallLock = nil
         }
+        // REM 2026-11-21 — 438 moved the Floating Preview switch into the iOS Settings app (his directive), but
+        // @AppStorage is not told when the Settings app changes the value: the 16e UI test turned it off there,
+        // came back, and the preview was still up. Re-read it each time the app comes back to the front.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            UserDefaults.standard.synchronize()
+            let v = UserDefaults.standard.object(forKey: "ip.pip.visible") as? Bool ?? true
+            if v != showProductionPiP { showProductionPiP = v }
+        }
         #endif
         // Every project opens on the Canvas hub (see `activeTool`). A NEW one also gets the
         // New Image sheet, so the user names it and sets the canvas size up front.
