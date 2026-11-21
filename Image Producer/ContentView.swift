@@ -2169,8 +2169,6 @@ struct CanvasPixelPreset: Identifiable {
 struct CanvasInspector: View {
     @Bindable var document: ImageDocument
     var fileURL: URL?
-    /// Shared with the canvas overlay — either surface can turn the floating preview on or off.
-    @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
 
     @State private var draftName = ""
     @State private var renameError = false
@@ -2239,16 +2237,9 @@ struct CanvasInspector: View {
                 }
             }
 
-            // REM 2026-11-21 — FLOATING PREVIEW, moved here from the Zoom panel (his "go with option 2"
-            // after "this tool inspector is useless as is"). Same stored setting as the canvas overlay.
-            Toggle(isOn: $showProductionPiP) {
-                Text("Floating preview").scaledFont(18)
-            }
-            .toggleStyle(.switch)
-            InfoTip("More about the floating preview", label: "Preview info",
-                    "Keeps a live preview of the whole picture over the canvas with any tool. It never follows the canvas zoom. Drag its handle to move it to another corner.")
-
-            Divider()
+            // REM 2026-11-21 — FLOATING PREVIEW switch left this page for Settings (Settings app on
+            // iPhone/iPad via Settings.bundle; Image Producer ▸ Settings… on the Mac). His word: "move
+            // the PiP toggle to settings". It had come here from the Zoom panel earlier the same day.
 
             // --- B · Dimensions & Resolution ---
             // REM 2026-11-21 — SECTION HEADINGS ARE APPLE'S HEADLINE (17 semibold), not Title 3. His word on

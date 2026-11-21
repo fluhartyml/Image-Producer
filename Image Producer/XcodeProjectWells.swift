@@ -1801,6 +1801,7 @@ struct XcodeProjectCommands: Commands {
 /// macOS-only, checked in the iOS SDK).
 struct XcodeProjectSettingsView: View {
     @AppStorage(XcodeProjectSupport.storageKey) private var isOn = XcodeProjectSupport.defaultValue
+    @AppStorage("ip.pip.visible") private var showFloatingPreview: Bool = true
 
     var body: some View {
         Form {
@@ -1809,6 +1810,17 @@ struct XcodeProjectSettingsView: View {
                 .accessibilityLabel("Xcode Project Support")
             Text("Shows screenshot wells for your App Store pages in the Layers list. "
                  + "Drop screenshots for each device into its well; they save with your project.")
+                .scaledFont(18)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // REM 2026-11-21 — FLOATING PREVIEW moved here from the Canvas tool's page. His word:
+            // "move the PiP toggle to settings". Same key as the canvas and the iOS Settings app.
+            Toggle("Floating Preview", isOn: $showFloatingPreview)
+                .scaledFont(18)
+                .accessibilityLabel("Floating preview")
+            Text("Keeps a live preview of the whole picture over the canvas with any tool. "
+                 + "It never follows the canvas zoom. Long-press it to move it to another corner.")
                 .scaledFont(18)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

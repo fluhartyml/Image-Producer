@@ -28,6 +28,26 @@
 			<key>DefaultValue</key>
 			<false/>
 		</dict>
+		<!-- REM 2026-11-21 — FLOATING PREVIEW moved here from the Canvas tool's page. His word:
+		     "move the PiP toggle to settings". Same key as the canvas (ip.pip.visible), on by default. -->
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Floating Preview</string>
+			<key>FooterText</key>
+			<string>Keeps a live preview of the whole picture over the canvas with any tool. It never follows the canvas zoom. Long-press it to move it to another corner.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Floating Preview</string>
+			<key>Key</key>
+			<string>ip.pip.visible</string>
+			<key>DefaultValue</key>
+			<true/>
+		</dict>
 	</array>
 </dict>
 </plist>
