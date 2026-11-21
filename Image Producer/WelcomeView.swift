@@ -353,6 +353,9 @@ struct WelcomeView: View {
     var body: some View {
         VStack(spacing: 28) {
             // Wordmark — mirrors the in-app About sheet (serif, "GRAPHIC ARTS" subtitle).
+            // REM: the Mac draws the LIVE app icon here; iOS draws its own copy,
+            // LaunchHeroIcon.imageset. Change the app icon → update LaunchHeroIcon too
+            // (2026-11-20: build 430 left the July art on his Duo; fixed in 431).
             VStack(spacing: 8) {
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable()
