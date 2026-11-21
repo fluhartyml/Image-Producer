@@ -385,7 +385,7 @@ struct GradientVeil<Content: View>: View {
 /// >Glow >gradient and whatever we determine is needed."*
 ///
 /// Layout, in his order:
-///   • header row — "Layer…" on the left, **Apply** hard right
+///   • header row — **Apply** hard right (the tool name lives in the inspector label, once)
 ///   • the layer picker — which layer am I dressing?
 ///   • one reveal per child, each independently switchable
 ///
@@ -462,8 +462,8 @@ struct LayerInspector: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("Layer…")
-                .scaledFont(18, weight: .semibold)
+            // REM 2026-11-21 — NAME ONCE. His word: "the lable of eacj tool inspector should be
+            // listed only once". The inspector's own label (spine or header) already says Layer.
             Spacer()
             Button("Apply") {
                 if let i = targetIndex { apply(at: i) }

@@ -267,9 +267,7 @@ struct AdjustInspector: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
-            PanelPlaceholder(systemImage: "slider.horizontal.3",
-                             title: "Adjust",
-                             subtitle: "Select a layer that has a picture or painted pixels on it")
+            PanelPlaceholder(systemImage: "slider.horizontal.3", subtitle: "Select a layer that has a picture or painted pixels on it")
         }
     }
 }

@@ -85,47 +85,11 @@ struct ProductionThumbnail: View {
     }
 }
 
-// MARK: - The Zoom inspector
+// MARK: - The Zoom inspector — REMOVED 2026-11-21
 
-/// Zoom's inspector: the live production thumbnail, plus the sizes that decide
-/// whether an icon works.
-///
-/// R2 specifies ONE thumbnail at true final size. The extra sizes below it are
-/// offered because an icon that reads at 128 can still be mud at 16, and 16 is a
-/// Finder list row. They are a row of previews, not a mode — nothing here
-/// changes what the canvas is doing.
-struct ZoomInspector: View {
-    @Bindable var document: ImageDocument
-
-    /// Shared with the canvas overlay — either surface can turn the PiP on or off.
-    @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
-
-    // ⛔ "Rendered Icon Size" and "Small sizes" (16/32/64) are GONE — his call, 2026-10-04:
-    // "rendered icon size and small sizes are obsolete and left overs from icon producer,
-    // they may be removed for image producer." An app that makes posters and banners has
-    // no single "rendered icon" to judge. The floating preview stays.
-    // All text is 18 pt — his minimum (it had been caption-sized).
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-
-            Toggle(isOn: $showProductionPiP) {
-                Text("Floating preview").scaledFont(18)
-            }
-            .toggleStyle(.switch)
-            InfoTip("More about this", label: "Preview info", "Keeps the production preview on the canvas with ANY tool active — "
-                 + "drag it to any corner.")
-
-            InfoTip("More about this", label: "Preview zoom info", "The preview never follows the canvas zoom — that is the point. "
-                 + "Work up close, judge at size.")
-
-            Spacer(minLength: 0)
-        }
-        // Inspector convention (see PaintBucketInspector): pad here, and never
-        // add a ScrollView — ToolInspector already wraps content in one.
-        .padding()
-    }
-}
+// REM: His word on the 16e, 2026-11-21: "this tool inspector is useless as is tell me why it is
+// there" → "go with option 2". It had held only the Floating preview switch and two tips since the
+// 10-04 removal of the Icon Producer leftovers. The switch now lives in the Canvas inspector.
 
 // MARK: - The floating PiP
 
@@ -196,7 +160,55 @@ struct ProductionPiP: View {
     /// The panel as drawn: the canvas-shaped thumbnail plus its 8-pt padding.
     private var panel: CGSize {
         let t = ProductionThumbnail.fitted(document.canvasPixelSize, side: side)
-        return CGSize(width: t.width + 16, height: t.height + 16)
+        return CGSize(width: t.width + 16, height: t.height + 16 + Self.gripHeight)
+    }
+
+    /// REM 2026-11-21 — A HANDLE TO MOVE IT BY. His 16e note on 433: "You cant move the PiP if you
+    /// touch it it zooms and pans". Zoomed in, the thumbnail is a navigator (his 10-19 rule: "click
+    /// drag pans"), so a drag on it can never also move the panel. The strip across the top is the
+    /// panel's own: drag it to another corner at any zoom (his 11-05 "movable like the PiP
+    /// everywhere"). It is a button too — a tap sends it to the next corner — so a switch, Voice
+    /// Control or Sticky Keys user never needs the drag (his rules).
+    static let gripHeight: CGFloat = 18
+
+    private var moveDrag: some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { v in
+                dragging = true
+                drag = v.translation
+            }
+            .onEnded { v in
+                let dropped = CGPoint(x: home.x + v.translation.width,
+                                      y: home.y + v.translation.height)
+                let target = PiPCorner.nearest(to: dropped, in: bounds, panel: panel)
+                // Snap: zero the offset and change corner in one animation, so it
+                // flies to the corner rather than jumping.
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                    cornerRaw = target.rawValue
+                    drag = .zero
+                    dragging = false
+                }
+            }
+    }
+
+    private var grip: some View {
+        Button {
+            let all = PiPCorner.allCases
+            let next = all[(all.firstIndex(of: corner)! + 1) % all.count]
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) { cornerRaw = next.rawValue }
+        } label: {
+            Capsule()
+                .fill(.secondary)
+                .frame(width: 32, height: 5)
+                .frame(maxWidth: .infinity, minHeight: Self.gripHeight + 8)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(moveDrag)
+        .padding(.top, -8)
+        .accessibilityLabel("Move preview")
+        .accessibilityHint("Moves the floating preview to the next corner")
+        .help("Drag to move the preview to another corner, or click to send it to the next one")
     }
     private var home: CGPoint { corner.point(in: bounds, panel: panel) }
 
@@ -210,50 +222,36 @@ struct ProductionPiP: View {
         // RULE: do not display a value the user cannot change and does not need.
         // It reads as a control that is failing.
         let thumb = ProductionThumbnail.fitted(document.canvasPixelSize, side: side)
-        ProductionThumbnail(document: document, side: side)
-            .frame(width: thumb.width, height: thumb.height)
-            .overlay {
-                if let v = viewport?.intersection(CGRect(x: 0, y: 0, width: 1, height: 1)), !v.isNull {
-                    Rectangle()
-                        .stroke(Color.accentColor, lineWidth: 2)
-                        .frame(width: max(4, v.width * thumb.width), height: max(4, v.height * thumb.height))
-                        .position(x: v.midX * thumb.width, y: v.midY * thumb.height)
-                        .allowsHitTesting(false)
+        VStack(spacing: 0) {
+            grip
+            ProductionThumbnail(document: document, side: side)
+                .frame(width: thumb.width, height: thumb.height)
+                .overlay {
+                    if let v = viewport?.intersection(CGRect(x: 0, y: 0, width: 1, height: 1)), !v.isNull {
+                        Rectangle()
+                            .stroke(Color.accentColor, lineWidth: 2)
+                            .frame(width: max(4, v.width * thumb.width), height: max(4, v.height * thumb.height))
+                            .position(x: v.midX * thumb.width, y: v.midY * thumb.height)
+                            .allowsHitTesting(false)
+                    }
                 }
-            }
-            .contentShape(Rectangle())
-            // Click = centre there; drag = keep centring under the pointer, i.e. pan.
-            .gesture(viewport == nil ? nil : DragGesture(minimumDistance: 0).onChanged { v in
-                onNavigate?(CGPoint(x: min(max(v.location.x / thumb.width, 0), 1),
-                                    y: min(max(v.location.y / thumb.height, 0), 1)))
-            })
-            .padding(8)
+                .contentShape(Rectangle())
+                // Click = centre there; drag = keep centring under the pointer, i.e. pan.
+                .gesture(viewport == nil ? nil : DragGesture(minimumDistance: 0).onChanged { v in
+                    onNavigate?(CGPoint(x: min(max(v.location.x / thumb.width, 0), 1),
+                                        y: min(max(v.location.y / thumb.height, 0), 1)))
+                })
+        }
+        .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.25)))
         .shadow(radius: dragging ? 12 : 6, y: 2)
         .scaleEffect(dragging ? 1.04 : 1)          // it lifts while held
         .position(x: home.x + drag.width, y: home.y + drag.height)
-        // At 1× the drag moves the panel to a corner; zoomed in, the thumbnail navigates.
-        .gesture(viewport != nil ? nil :
-            DragGesture()
-                .onChanged { v in
-                    dragging = true
-                    drag = v.translation
-                }
-                .onEnded { v in
-                    let dropped = CGPoint(x: home.x + v.translation.width,
-                                          y: home.y + v.translation.height)
-                    let target = PiPCorner.nearest(to: dropped, in: bounds, panel: panel)
-                    // Snap: zero the offset and change corner in one animation, so it
-                    // flies to the corner rather than jumping.
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
-                        cornerRaw = target.rawValue
-                        drag = .zero
-                        dragging = false
-                    }
-                }
-        )
+        // At 1× a drag anywhere on it moves the panel; zoomed in, the thumbnail navigates and the
+        // handle on top moves it.
+        .gesture(viewport != nil ? nil : moveDrag)
         .help(viewport == nil ? "Production preview — drag it to any corner. Never follows the canvas zoom."
-                              : "Navigator — click to centre the view there, drag to pan")
+                              : "Navigator — click to centre the view there, drag to pan; drag the handle to move it")
     }
 }

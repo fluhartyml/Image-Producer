@@ -344,7 +344,7 @@ struct ContentView: View {
     /// project". A tap now always brings that tool's page up on a phone.
     private func pickTool(_ tool: Tool) {
         activeTool = tool
-        if usesPhoneLayout { bottomPanel = .tool }
+        if usesPhoneLayout && tool.hasInspector { bottomPanel = .tool }
     }
 
     /// REM 2026-11-18 — short side under 600 pt = phone layout (see editorBody).
@@ -518,7 +518,7 @@ struct ContentView: View {
                 if !toolsFloating {
                     HStack(spacing: 0) {
                         toolPaletteGrip
-                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } }, wrap: true)
+                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { if usesPhoneLayout && $0.hasInspector { bottomPanel = .tool } }, wrap: true)
                     }
                     Divider()
                 }
@@ -553,7 +553,7 @@ struct ContentView: View {
                 if !toolsFloating {
                     HStack(spacing: 0) {
                         toolPaletteGrip
-                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } }, wrap: true)
+                        ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { if usesPhoneLayout && $0.hasInspector { bottomPanel = .tool } }, wrap: true)
                     }
                     Divider()
                 }
@@ -574,7 +574,7 @@ struct ContentView: View {
                     if !toolsFloating {
                         HStack(spacing: 0) {
                             toolPaletteGrip
-                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } }, lines: 1)
+                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { if usesPhoneLayout && $0.hasInspector { bottomPanel = .tool } }, lines: 1)
                         }
                         Divider()
                     }
@@ -652,7 +652,7 @@ struct ContentView: View {
                     if !toolsFloating {
                         HStack(spacing: 0) {
                             toolPaletteGrip
-                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } })
+                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { if usesPhoneLayout && $0.hasInspector { bottomPanel = .tool } })
                         }
                     }
                     ActiveToolLabel(tool: activeTool)
@@ -689,7 +689,7 @@ struct ContentView: View {
                             Divider()
                             HStack(spacing: 0) {
                                 toolPaletteGrip
-                                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { _ in if usesPhoneLayout { bottomPanel = .tool } })
+                                ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { if usesPhoneLayout && $0.hasInspector { bottomPanel = .tool } })
                             }
                             .frame(height: 104)
                         }
@@ -1368,7 +1368,7 @@ struct ContentView: View {
             // nothing of it until a SWIPE, which a switch, Voice Control or keyboard user
             // can't do (his rule: "a blind person can't swipe"). Picking a tool there now
             // brings its panel up, the same thing the iPad's pills do with a tap.
-            if isPhone { bottomPanel = .tool }
+            if isPhone && newTool.hasInspector { bottomPanel = .tool }
             if fitWidth && !newTool.fitWidthCompatible { fitWidth = false }
             // Leaving the Move tool commits whatever was being placed.
             commitMoveSession()
@@ -1810,6 +1810,10 @@ struct ToolInspector: View {
                 }
                 ScrollView { content }
             }
+            // REM 2026-11-21 — the settings column claims the rest of the width, so the spine stays on
+            // the left edge even when a tool has nothing to show (Zoom, his "go with option 2"). The
+            // 16e simulator pass showed "Zoom" drifting to the middle of an empty page without this.
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height - Self.spinePad * 2 } action: { spineHeight = max(40, $0) }
     }
@@ -1824,21 +1828,47 @@ struct ToolInspector: View {
     /// bites, the font shrinks to match, so the letters can never be taller than the spine.
     static let spinePad: CGFloat = 14
     @State private var spineHeight: CGFloat = 300
+    /// REM 2026-11-21 — THE SPINE'S SIZE IS CAPPED AT COLOR PALETTE'S. His word on the 16e: "the lable
+    /// of eacj tool inspector should be listed only once and should be vertical on the left size to fit
+    /// with no truncating alllowed fitting from bottom to the top of the inspectors frame and it should
+    /// be no larger than color pallet inspectors font size and weight." Before this, every name was
+    /// stretched to fill the sheet's height, so short names ("Zoom", "Text", "Camera") came out huge
+    /// and ate a third of the sheet's width ("Too cramped" ×9 in his 433 feedback). Now each name is
+    /// sized to fit the height, and never bigger than "Color Palette" is at that same height. Weight
+    /// stays heavy — the same as Color Palette's.
     private var spineMetrics: (fontSize: CGFloat, thickness: CGFloat) {
-        let ref: CGFloat = 100
+        let own = Self.spineFit(activeTool.title, height: spineHeight)
+        let cap = Self.spineFit(Tool.colorPalette.title, height: spineHeight)
+        let fontSize = min(own.fontSize, cap.fontSize)
+        return (fontSize, Self.spineThickness(fontSize))
+    }
+
+    private static func spineFont(_ size: CGFloat) -> CTFont {
         #if canImport(UIKit)
-        let base = UIFont.systemFont(ofSize: ref, weight: .heavy) as CTFont
+        UIFont.systemFont(ofSize: size, weight: .heavy) as CTFont
         #else
-        let base = NSFont.systemFont(ofSize: ref, weight: .heavy) as CTFont
+        NSFont.systemFont(ofSize: size, weight: .heavy) as CTFont
         #endif
+    }
+
+    /// The spine is as wide as its letters are tall (ascent + descent), measured, plus a hair.
+    private static func spineThickness(_ fontSize: CGFloat) -> CGFloat {
+        let f = spineFont(fontSize)
+        return ceil(CTFontGetAscent(f) + CTFontGetDescent(f)) + 2
+    }
+
+    /// The font size at which `word`, set in the heavy system face, runs exactly `height` long —
+    /// measured with CoreText, so it never truncates — kept to a 96-pt-thick spine at most.
+    private static func spineFit(_ word: String, height: CGFloat) -> (fontSize: CGFloat, thickness: CGFloat) {
+        let ref: CGFloat = 100
+        let base = spineFont(ref)
         let line = CTLineCreateWithAttributedString(
-            NSAttributedString(string: activeTool.title, attributes: [.font: base]))
+            NSAttributedString(string: word, attributes: [.font: base]))
         let wordLength = max(1, CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)))
         let wordHeight = max(1, CTFontGetAscent(base) + CTFontGetDescent(base))
-        let byLength = spineHeight * ref / wordLength          // font size that fills the length
-        let thickness = min(96, max(30, byLength * wordHeight / ref))
-        let fontSize = min(byLength, thickness * ref / wordHeight) // never taller than the spine
-        return (fontSize, thickness)
+        var fontSize = height * ref / wordLength
+        fontSize = min(fontSize, 96 * ref / wordHeight)
+        return (fontSize, fontSize * wordHeight / ref)
     }
 
     private var headerBody: some View {
@@ -1925,9 +1955,10 @@ struct ToolInspector: View {
         case .pen:
             PenInspector(document: document, activeLayerID: activeLayerID)
         case .zoom:
-            // R2 (resolved 2026-06-10): the live production thumbnail that does
-            // NOT follow the canvas zoom. See FatBits.swift.
-            ZoomInspector(document: document)
+            // REM 2026-11-21 — NO ZOOM PANEL, every device. His word on the 16e: "this tool inspector
+            // is useless as is" → "go with option 2". Zoom works on the canvas (double-tap, drag,
+            // long-press for Fit Screen); the Floating preview switch moved to the Canvas tool.
+            EmptyView()
         case .camera:
             // The inspector is the LANDING after the shutter fires — Michael 2026-09-03:
             // "i want the tool inspector to be a standard landing for after any tool has
@@ -2118,6 +2149,8 @@ struct CanvasPixelPreset: Identifiable {
 struct CanvasInspector: View {
     @Bindable var document: ImageDocument
     var fileURL: URL?
+    /// Shared with the canvas overlay — either surface can turn the floating preview on or off.
+    @AppStorage("ip.pip.visible") private var showProductionPiP: Bool = true
 
     @State private var draftName = ""
     @State private var renameError = false
@@ -2186,36 +2219,43 @@ struct CanvasInspector: View {
                 }
             }
 
+            // REM 2026-11-21 — FLOATING PREVIEW, moved here from the Zoom panel (his "go with option 2"
+            // after "this tool inspector is useless as is"). Same stored setting as the canvas overlay.
+            Toggle(isOn: $showProductionPiP) {
+                Text("Floating preview").scaledFont(18)
+            }
+            .toggleStyle(.switch)
+            InfoTip("More about the floating preview", label: "Preview info",
+                    "Keeps a live preview of the whole picture over the canvas with any tool. It never follows the canvas zoom. Drag its handle to move it to another corner.")
+
             Divider()
 
             // --- B · Dimensions & Resolution ---
+            // REM 2026-11-21 — SECTION HEADINGS ARE APPLE'S HEADLINE (17 semibold), not Title 3. His word on
+            // the 16e: "dimensions &resolutions is extremely too large and wasteful". Same for Print
+            // setup, Export, Layer PDF, File and the Palette count.
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Dimensions & Resolution").scaledFont(20, weight: .semibold)
+                    Text("Dimensions & Resolution").scaledFont(17, weight: .semibold)
                     InfoTip("More about size and resolution", label: "Size info",
                             "Resolution (PPI) changes the print size losslessly — pixels stay. Editing Pixels or applying a size preset changes the pixel count; existing art scales to fit, letterboxed on the background. Set Resolution first (300 for print), then pick a size.")
                 }
 
                 // Pixels — editable W × H. This is the explicit pixel-count change; existing
                 // art scales-to-fit the new shape, letterboxed on the background.
-                HStack(spacing: 4) {
-                    Text("Pixels").scaledFont(18).frame(width: 92, alignment: .leading)
-                    // W and H labels — his ask, 2026-10-11 ("H and W are not shown"). The
-                    // trailing "px" went to make room (his screen: the row clipped W, H and
-                    // px); the px/in/mm/pt switch right below already names the unit.
-                    Text("W").scaledFont(18).foregroundStyle(.secondary).help("Width")
-                        .fixedSize()
-                    CommitIntField(placeholder: "W", value: widthBinding)
-                        .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
-                        .disabled(sizeRule == .fluidHeight)
-                        .accessibilityLabel("Width")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
-                    Text("×").scaledFont(18).fixedSize()
-                    Text("H").scaledFont(18).foregroundStyle(.secondary).help("Height")
-                        .fixedSize()
-                    CommitIntField(placeholder: "H", value: heightBinding)
-                        .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 64)
-                        .disabled(sizeRule == .fluidWidth)
-                        .accessibilityLabel("Height")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
+                // REM 2026-11-21 — NO TRUNCATED NUMBERS. His 433 feedback #1 on the 16e showed the width
+                // as "1,0…": the fields were a fixed 64 pt. Now each field hugs its number (at least
+                // 64 pt), and when the row can't fit beside the "Pixels" label, the label moves above
+                // the fields (contingent sizing — his 11-14 "so everything fits naturally").
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 4) {
+                        Text("Pixels").scaledFont(18).frame(width: 92, alignment: .leading)
+                        pixelFields
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Pixels").scaledFont(18)
+                        pixelFields
+                    }
                 }
 
                 HStack(spacing: 8) {
@@ -2291,7 +2331,7 @@ struct CanvasInspector: View {
             // Every term is explained behind (i), in words for someone new to printing —
             // his call, 2026-10-04. The screen keeps only the controls.
             VStack(alignment: .leading, spacing: 10) {
-                Text("Print setup").scaledFont(20, weight: .semibold)
+                Text("Print setup").scaledFont(17, weight: .semibold)
                 HStack(spacing: 8) {
                     Text("Bleed").scaledFont(18).frame(width: 92, alignment: .leading)
                     TextField("in", value: $document.bleedInches, format: .number.precision(.fractionLength(0...3)))
@@ -2343,7 +2383,7 @@ struct CanvasInspector: View {
             // --- D · Export ---
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Export").scaledFont(20, weight: .semibold)
+                    Text("Export").scaledFont(17, weight: .semibold)
                     InfoTip("More about exporting", label: "Export info", Self.exportInfo)
                 }
                 Button {
@@ -2390,7 +2430,7 @@ struct CanvasInspector: View {
             // --- E · Layer PDF (round-trips with the importer below) ---
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("Layer PDF").scaledFont(20, weight: .semibold)
+                    Text("Layer PDF").scaledFont(17, weight: .semibold)
                     InfoTip("More about layer PDFs", label: "Layer PDF info",
                             "Export writes page 1 as the finished picture, then one page per layer, with see-through areas kept. Import brings each page of a PDF in as its own editable layer.\n\nFlatten puts a matte behind the see-through parts: a solid color, because most printers can't print \"nothing\". Flatten only for print.")
                 }
@@ -2426,7 +2466,7 @@ struct CanvasInspector: View {
             // the bottom". It is reference, not something you work in.
             // --- File attributes ---
             VStack(alignment: .leading, spacing: 8) {
-                Text("File").scaledFont(20, weight: .semibold)
+                Text("File").scaledFont(17, weight: .semibold)
                 attrRow("Location", locationText)
                 #if os(macOS)
                 if let url = fileURL {
@@ -2873,6 +2913,29 @@ struct CanvasInspector: View {
         sizeRule = p.rule
     }
 
+    /// W × H, shared by both arrangements of the Pixels row. Each field hugs its number, 64 pt at least.
+    /// W and H labels — his ask, 2026-10-11 ("H and W are not shown"). The trailing "px" went to make
+    /// room; the px/in/mm/pt switch right below already names the unit.
+    private var pixelFields: some View {
+        HStack(spacing: 4) {
+            Text("W").scaledFont(18).foregroundStyle(.secondary).help("Width")
+                .fixedSize()
+            CommitIntField(placeholder: "W", value: widthBinding)
+                .textFieldStyle(.roundedBorder).scaledFont(18)
+                .frame(minWidth: 64).fixedSize()
+                .disabled(sizeRule == .fluidHeight)
+                .accessibilityLabel("Width")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
+            Text("×").scaledFont(18).fixedSize()
+            Text("H").scaledFont(18).foregroundStyle(.secondary).help("Height")
+                .fixedSize()
+            CommitIntField(placeholder: "H", value: heightBinding)
+                .textFieldStyle(.roundedBorder).scaledFont(18)
+                .frame(minWidth: 64).fixedSize()
+                .disabled(sizeRule == .fluidWidth)
+                .accessibilityLabel("Height")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
+        }
+    }
+
     /// The Pixels fields, routed through the size rule.
     private var widthBinding: Binding<Int> {
         Binding(get: { document.canvasWidth }, set: { w in
@@ -3246,7 +3309,7 @@ struct ColorPaletteInspector: View {
 
             Divider()
 
-            Text("Palette — \(document.palette.count) colors").scaledFont(20, weight: .semibold)
+            Text("Palette — \(document.palette.count) colors").scaledFont(17, weight: .semibold)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
                 ForEach(document.palette.indices, id: \.self) { i in
                     RoundedRectangle(cornerRadius: 6)
@@ -3748,7 +3811,9 @@ struct FontPickerInspector: View {
             // explicit alternative and always creates a fresh layer.
             // TYPE FIRST, THEN PRESS (Michael, 2026-10-03). Once the layer exists, typing
             // edits it live, and its name follows the text both ways.
-            Text("Text").scaledFont(18).foregroundStyle(.secondary)
+            // REM 2026-11-21 — NAME ONCE: the "Text" label that sat over this box repeated the tool's
+            // name (his word: "the lable of eacj tool inspector should be listed only once"). The
+            // box's own prompt says what goes in it.
             TextField("Type your text…", text: textBinding, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .scaledFont(18)
@@ -4428,8 +4493,7 @@ struct PenInspector: View {
                 loadPalette(url)
             }
         } else {
-            PanelPlaceholder(systemImage: "pencil.tip", title: "Pen (Pixels)",
-                             subtitle: "Select a layer to draw.")
+            PanelPlaceholder(systemImage: "pencil.tip", subtitle: "Select a layer to draw.")
         }
     }
 
@@ -4585,7 +4649,10 @@ struct ToolInspectorPlaceholder: View {
 /// Generic empty-state placeholder for a panel page.
 struct PanelPlaceholder: View {
     let systemImage: String
-    let title: String
+    /// REM 2026-11-21 — NAME ONCE. His word: "the lable of eacj tool inspector should be listed
+    /// only once". Inside a tool inspector the tool's name is already the inspector's label, so
+    /// tool placeholders pass no title; only panels with no label of their own (History) do.
+    var title: String? = nil
     let subtitle: String
 
     var body: some View {
@@ -4593,8 +4660,12 @@ struct PanelPlaceholder: View {
             Image(systemName: systemImage)
                 .scaledFont(34)
                 .foregroundStyle(.secondary)
-            Text(title).scaledFont(20, weight: .semibold)
+                .accessibilityHidden(true)
+            if let title {
+                Text(title).scaledFont(20, weight: .semibold)
+            }
             Text(subtitle).scaledFont(18).foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
@@ -5075,9 +5146,7 @@ struct MoveTransformInspector: View {
                 if let idx = index {
                     layerControls(idx)
                 } else {
-                    PanelPlaceholder(systemImage: "hand.tap",
-                                     title: "Move / Transform",
-                                     subtitle: "Tap a layer to select it, then drag it on the canvas")
+                    PanelPlaceholder(systemImage: "hand.tap", subtitle: "Tap a layer to select it, then drag it on the canvas")
                         .frame(maxWidth: .infinity, minHeight: 150)
                 }
             }

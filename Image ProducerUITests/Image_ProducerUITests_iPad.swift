@@ -450,5 +450,72 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         check("022", "Phone layout: every tool in the strip can be tapped and selected (\(tools.count))",
               missed.isEmpty, missed.isEmpty ? "all \(tools.count)" : "missed: \(missed.joined(separator: ", "))")
     }
+
+    // REM 2026-11-21 — 433 FEEDBACK INSPECTION on the iPhone 16e simulator, portrait (his 13
+    // TestFlight notes were all on his 16e). His word: "go ahead code please and inspect the
+    // product". A picture of every tool's inspector, plus the two bugs: the keyboard that never
+    // rose in the Image Playground / Text boxes, and the floating preview that couldn't be moved.
+    func testPhoneInspectors() throws {
+        XCUIDevice.shared.orientation = .portrait
+        sleep(1)
+        openNewImage()
+        let tools = ["Canvas Tool", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
+                     "Pixel Pen", "Eraser", "Eyedropper", "Text", "Symbol", "Image",
+                     "Image Playground", "Layer", "Remove Background", "Magic Lasso", "Adjust",
+                     "Zoom", "Camera"]
+        let strip = app.scrollViews.element(boundBy: 0)
+        let limit = app.windows.firstMatch.frame.maxX
+        for (i, t) in tools.enumerated() {
+            let b = button(t)
+            guard b.waitForExistence(timeout: 3) else { record("| — | ❌ FAIL | \(t): tool not found |"); continue }
+            var tries = 0
+            func clear() -> Bool { let f = b.frame; return f.width > 0 && f.minX >= 0 && f.maxX <= limit }
+            while !clear() && tries < 12 {
+                let f = b.frame
+                let from = strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: f.width > 0 && f.minX < 0 ? 120 : -120, dy: 0)))
+                sleep(1); tries += 1
+            }
+            b.tap(); sleep(2)
+            if app.sheets.firstMatch.exists || app.alerts.firstMatch.exists {
+                snapshot(String(format: "i%02d-%@-alert", i, t.replacingOccurrences(of: " ", with: "-")))
+                app.alerts.firstMatch.buttons.firstMatch.tap(); sleep(1)
+            }
+            snapshot(String(format: "i%02d-%@", i, t.replacingOccurrences(of: " ", with: "-")))
+            // Name once: the tool's name should not also appear as a title inside its inspector.
+            let named = app.staticTexts.matching(NSPredicate(format: "label == %@", t)).count
+            record("| — | ℹ️ INFO | \(t): \(named) text label(s) reading \"\(t)\" on screen |")
+
+            if t == "Text" || t == "Image Playground" {
+                let field = app.textFields.firstMatch.exists ? app.textFields.firstMatch : app.textViews.firstMatch
+                if field.waitForExistence(timeout: 3) {
+                    field.tap(); sleep(2)
+                    snapshot(String(format: "i%02d-%@-typing", i, t.replacingOccurrences(of: " ", with: "-")))
+                    check("433#2", "\(t): tapping the text box brings up the keyboard",
+                          app.keyboards.firstMatch.exists, "keyboards on screen: \(app.keyboards.count)")
+                    app.typeText("x"); sleep(1)
+                    let v = (field.value as? String) ?? ""
+                    check("433#2", "\(t): typing reaches the box", v.contains("x"), "box reads \"\(v)\"")
+                    if app.keyboards.firstMatch.exists { app.keyboards.buttons["Return"].firstMatch.tap(); sleep(1) }
+                } else {
+                    record("| — | ℹ️ INFO | \(t): no text box on screen (needs a layer or Apple Intelligence) |")
+                }
+            }
+        }
+
+        // 433 #2 — the floating preview moves by its handle.
+        let grip = app.buttons["Move preview"].firstMatch
+        if grip.waitForExistence(timeout: 3) {
+            let f0 = grip.frame
+            grip.tap(); sleep(1)
+            let f1 = grip.frame
+            check("433#2", "The floating preview's handle moves it",
+                  hypot(f1.midX - f0.midX, f1.midY - f0.midY) > 40,
+                  String(format: "moved %.0f across, %.0f down", f1.midX - f0.midX, f1.midY - f0.midY))
+            snapshot("i99-preview-moved")
+        } else {
+            check("433#2", "The floating preview's Move preview handle is there", false)
+        }
+    }
 }
 #endif

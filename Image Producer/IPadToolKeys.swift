@@ -23,6 +23,7 @@
 #if canImport(UIKit)
 import SwiftUI
 import UIKit
+import GameController
 
 struct IPadToolKeys: UIViewRepresentable {
     var onPick: (Tool) -> Void
@@ -58,7 +59,8 @@ struct IPadToolKeys: UIViewRepresentable {
             let nc = NotificationCenter.default
             for name in [UITextField.textDidEndEditingNotification,
                          UITextView.textDidEndEditingNotification,
-                         UIWindow.didBecomeKeyNotification] {
+                         UIWindow.didBecomeKeyNotification,
+                         .GCKeyboardDidConnect, .GCKeyboardDidDisconnect] {
                 nc.addObserver(self, selector: #selector(somethingLetGo), name: name, object: nil)
             }
         }
@@ -89,8 +91,20 @@ struct IPadToolKeys: UIViewRepresentable {
 
         private var sheetIsUp: Bool { window?.rootViewController?.presentedViewController != nil }
 
+        /// REM 2026-11-21 — ONLY WITH A HARDWARE KEYBOARD. His 16e note on 433: "i tap where you need
+        /// to add text and no keyboard appears" (and the Duo, 11-18: "it bounces like a keyboard is
+        /// going to show but it never does"). This catcher re-took focus on every redraw of the
+        /// editor, and the keyboard rising IS a redraw — so on a phone in the hand it could win the
+        /// focus back from the text box it had just given it to. It exists only for keys typed on a
+        /// hardware keyboard, so without one it now stays out of the responder chain entirely.
+        private var hardwareKeyboardAttached: Bool { GCKeyboard.coalesced != nil }
+
         private func reclaim() {
             guard let window, window.isKeyWindow else { return }
+            guard hardwareKeyboardAttached else {
+                if isFirstResponder { resignFirstResponder() }
+                return
+            }
             if sheetIsUp || ToolShortcuts.typeToJumpActive {
                 if isFirstResponder { resignFirstResponder() }
                 return

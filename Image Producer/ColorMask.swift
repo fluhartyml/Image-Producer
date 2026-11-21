@@ -418,9 +418,7 @@ struct EraserInspector: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
-            PanelPlaceholder(systemImage: "eraser",
-                             title: "Eraser",
-                             subtitle: "Select a layer that holds an image, then erase it — Brush wipes pixels by hand, Magic knocks a background color out to transparent.")
+            PanelPlaceholder(systemImage: "eraser", subtitle: "Select a layer that holds an image, then erase it — Brush wipes pixels by hand, Magic knocks a background color out to transparent.")
         }
     }
 

@@ -200,9 +200,7 @@ struct RemoveBackgroundInspector: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
-            PanelPlaceholder(systemImage: "person.and.background.dotted",
-                             title: "Remove Background",
-                             subtitle: "Select a content layer that has a picture on it")
+            PanelPlaceholder(systemImage: "person.and.background.dotted", subtitle: "Select a content layer that has a picture on it")
         }
     }
 
@@ -340,9 +338,7 @@ struct MagicLassoInspector: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
-            PanelPlaceholder(systemImage: "lasso.badge.sparkles",
-                             title: "Magic Lasso",
-                             subtitle: "Select a content layer that has a picture on it")
+            PanelPlaceholder(systemImage: "lasso.badge.sparkles", subtitle: "Select a content layer that has a picture on it")
         }
     }
 }

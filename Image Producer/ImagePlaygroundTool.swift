@@ -143,9 +143,7 @@ struct ImagePlaygroundInspector: View {
                 supported
             } else {
                 PanelPlaceholder(
-                    systemImage: "apple.image.playground",
-                    title: "Image Playground",
-                    subtitle: "Needs Apple Intelligence. Turn it on in Settings on a supported device (iPhone 15 Pro / 16 or later, or an Apple-silicon Mac), then this tool generates art on device.")
+                    systemImage: "apple.image.playground", subtitle: "Needs Apple Intelligence. Turn it on in Settings on a supported device (iPhone 15 Pro / 16 or later, or an Apple-silicon Mac), then this tool generates art on device.")
             }
         }
         // concept = sheetConcept (set on button press), NOT the live `prompt`, so typing
@@ -189,12 +187,14 @@ struct ImagePlaygroundInspector: View {
                 // REM 2026-11-19 16:1x — STYLE MOVED TO THE LAST LINE (his word, on 411's "It's too
                 // cramped up" feedback: "style should be last line"). The prompt box now sits right
                 // under the sheet's title, so it is on screen on the 16e; Style is reached by scrolling.
-                Text("Describe what Image Playground should make:")
-                    .scaledFont(18)
-
+                // REM 2026-11-21 — THE ASK LIVES IN THE BOX. His word on the 16e: "the describe could
+                // be in the text input box so the user taps it and it dissabears so they can type the
+                // description and it could be shortined removing the redundant image playground and
+                // just saying "Describe what should be made"". The heading above the box is gone; its
+                // words are the box's prompt, which clears as soon as typing starts.
                 // Plain text box on a LIGHTER fill so it stands out against the dark
                 // inspector (Michael 2026-06-21). Autocomplete off.
-                TextField("e.g. a vase of sunflowers, no background…",
+                TextField("Describe what should be made",
                           text: $prompt, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(2...6)

@@ -57,6 +57,10 @@ enum Tool: String, CaseIterable, Identifiable {
     /// still withheld.
     static let shipping: [Tool] = allCases.filter { ![.shape, .path].contains($0) }
 
+    /// REM 2026-11-21 — Zoom has no panel (his "go with option 2"): picking it on a phone keeps the
+    /// sheet that was showing instead of switching to an empty Tool page.
+    var hasInspector: Bool { self != .zoom }
+
     /// Label shown in the tool's (placeholder) inspector.
     var title: String {
         switch self {
@@ -75,7 +79,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .symbol:     "Symbol"
         case .image:      "Image"
         case .imagePlayground: "Image Playground"
-        case .layer:      "Layer…"
+        case .layer:      "Layer"   // REM 2026-11-21 — his word: "remove \"...\"" (it read as a cut-off name on the 16e)
         case .cutout:     "Remove Background"
         case .magicLasso: "Magic Lasso"
         case .adjust:     "Adjust"
