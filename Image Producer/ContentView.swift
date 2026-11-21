@@ -130,6 +130,10 @@ struct ContentView: View {
     /// True while the on-screen keyboard is up. His Duo note, 7:49 AM: "Everything is so cramped
     /// up no place for the keyboard when i tapped the name" — the canvas steps aside while typing.
     @State private var keyboardUp = false
+    /// REM 2026-11-21 — how much of the canvas's top sits under Apple's toolbar (tall iPhone only; the
+    /// canvas runs up under it). The floating preview keeps out of this strip. His word: "fix the
+    /// preview covering the back button".
+    @State private var canvasUnderToolbar: CGFloat = 0
     /// The orientation the editor was in when the keyboard rose; nil when it is down.
     @State private var keyboardPortraitLock: Bool?
     /// Same idea one level up: phone vs full layout is held while the keyboard is up.
@@ -524,6 +528,8 @@ struct ContentView: View {
                     .frame(height: keyboardUp ? geo.size.height * 0.18 : max(120, (geo.size.height + topInset) / 2))
                     .padding(.top, keyboardUp ? 0 : -topInset)
                     .animation(.snappy, value: keyboardUp)
+                    .onChange(of: topInset, initial: true) { _, t in canvasUnderToolbar = t }
+                    .onDisappear { canvasUnderToolbar = 0 }
                 if !toolsFloating {
                     HStack(spacing: 0) {
                         toolPaletteGrip
@@ -1343,11 +1349,16 @@ struct ContentView: View {
         // It belongs to the WINDOW, not to the picture. Same reason it snaps to the
         // corners of the canvas area rather than to the artwork.
         .overlay {
-            if showProductionPiP {
+            // REM 2026-11-21 — on the tall iPhone, while the keyboard is up the canvas is a strip too
+            // short for the preview, which then rode up over the Back button (16e sim). It steps aside
+            // while you type and comes back when the keyboard goes. His word: "fix the preview
+            // covering the back button".
+            if showProductionPiP && !(tallPhone && keyboardUp) {
                 GeometryReader { g in
                     ProductionPiP(document: document, bounds: g.size,
                                   viewport: pipViewport,
-                                  onNavigate: { centerCanvas(onNormalized: $0) })
+                                  onNavigate: { centerCanvas(onNormalized: $0) },
+                                  topReserve: tallPhone && !keyboardUp ? canvasUnderToolbar : 0)
                 }
             }
         }

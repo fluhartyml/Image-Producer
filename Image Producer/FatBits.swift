@@ -202,7 +202,7 @@ struct ProductionPiP: View {
     /// animation, so it flies to the corner rather than jumping.
     private func drop(_ translation: CGSize) {
         let dropped = CGPoint(x: home.x + translation.width, y: home.y + translation.height)
-        let target = PiPCorner.nearest(to: dropped, in: bounds, panel: panel)
+        let target = PiPCorner.nearest(to: CGPoint(x: dropped.x, y: dropped.y - topReserve), in: usable, panel: panel)
         withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
             cornerRaw = target.rawValue
             drag = .zero
@@ -229,7 +229,15 @@ struct ProductionPiP: View {
         .accessibilityHint("Moves the floating preview to the next corner")
         .help("Drag to move the preview to another corner, or click to send it to the next one")
     }
-    private var home: CGPoint { corner.point(in: bounds, panel: panel) }
+    /// REM 2026-11-21 — KEEP CLEAR OF THE TOP BAR. His word: "fix the preview covering the back button".
+    /// On the tall iPhone the canvas runs up under Apple's toolbar, so its top corners sat behind
+    /// Back. `topReserve` is the strip the toolbar covers; the corners live in the canvas below it.
+    var topReserve: CGFloat = 0
+    private var usable: CGSize { CGSize(width: bounds.width, height: max(panel.height, bounds.height - topReserve)) }
+    private var home: CGPoint {
+        let p = corner.point(in: usable, panel: panel)
+        return CGPoint(x: p.x, y: p.y + topReserve)
+    }
 
     var body: some View {
         // NO CAPTION, and his reasoning is the point — Michael, 2026-08-24:

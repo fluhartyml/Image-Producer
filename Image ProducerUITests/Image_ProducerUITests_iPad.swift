@@ -491,6 +491,9 @@ final class Image_ProducerUITests_iPad: XCTestCase {
                 if field.waitForExistence(timeout: 3) {
                     field.tap(); sleep(2)
                     snapshot(String(format: "i%02d-%@-typing", i, t.replacingOccurrences(of: " ", with: "-")))
+                    // His word 11-21: "fix the preview covering the back button" — it steps aside while typing.
+                    check("11-21", "\(t): the preview is out of the way while the keyboard is up",
+                          !app.descendants(matching: .any)["pip.panel"].firstMatch.exists)
                     check("433#2", "\(t): tapping the text box brings up the keyboard",
                           app.keyboards.firstMatch.exists, "keyboards on screen: \(app.keyboards.count)")
                     app.typeText("x"); sleep(1)
@@ -536,6 +539,19 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         snapshot("i98-zoomed")
         longPressMove("Zoomed in")
         snapshot("i99-preview-moved-zoomed")
+        // His word 11-21: "fix the preview covering the back button" — park it top-left, check it
+        // sits below the toolbar.
+        if pip.waitForExistence(timeout: 3) {
+            pip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+                .press(forDuration: 0.8, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.02)))
+            sleep(1)
+            snapshot("i99-preview-top-left")
+            let back = app.buttons["BackButton"].firstMatch
+            let backBottom = back.exists ? back.frame.maxY : 0
+            check("11-21", "Top-left, the preview sits below the Back button",
+                  back.exists && pip.frame.minY >= backBottom,
+                  String(format: "preview top %.0f, Back bottom %.0f%@", pip.frame.minY, backBottom, back.exists ? "" : " (Back not found)"))
+        }
         let grip = app.buttons["Move preview"].firstMatch
         if grip.waitForExistence(timeout: 3) {
             let f0 = grip.frame
