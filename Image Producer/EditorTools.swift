@@ -55,7 +55,15 @@ enum Tool: String, CaseIterable, Identifiable {
     /// ZOOM shipped 2026-08-24: its inspector is no longer a placeholder — it is
     /// R2, the live production thumbnail (see FatBits.swift). Shape and Path are
     /// still withheld.
+    /// REM 2026-11-21 — NO ZOOM TOOL ON iOS. His word: "ios devices dont need a zoom toolbox tool if
+    /// the pinch zoom pan is native". On iPhone, Duo and iPad, pinch zooms and two fingers pan with
+    /// any tool (ZoomableCanvas: one finger stays with the tool). The Mac keeps it: there the Zoom
+    /// tool is what turns on double-click zoom and drag-to-pan for a mouse.
+    #if os(iOS)
+    static let shipping: [Tool] = allCases.filter { ![.shape, .path, .zoom].contains($0) }
+    #else
     static let shipping: [Tool] = allCases.filter { ![.shape, .path].contains($0) }
+    #endif
 
     /// REM 2026-11-21 — Zoom has no panel (his "go with option 2"): picking it on a phone keeps the
     /// sheet that was showing instead of switching to an empty Tool page.

@@ -315,7 +315,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         let tools = ["Canvas Tool", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
                      "Pixel Pen", "Eraser", "Eyedropper", "Text", "Symbol", "Image",
                      "Image Playground", "Layer", "Remove Background", "Magic Lasso", "Adjust",
-                     "Zoom", "Camera"]
+                     "Camera"]  // no Zoom tool on iOS (his word 11-21)
         var missed: [String] = []
         for t in tools {
             let b = button(t)
@@ -406,7 +406,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         let tools = ["Canvas Tool", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
                      "Pixel Pen", "Eraser", "Eyedropper", "Text", "Symbol", "Image",
                      "Image Playground", "Layer", "Remove Background", "Magic Lasso", "Adjust",
-                     "Zoom", "Camera"]
+                     "Camera"]  // no Zoom tool on iOS (his word 11-21)
         var missed: [String] = []
         // The system toolbar's left edge (its Back button); without one, the window's right edge.
         let back = app.buttons["BackButton"].firstMatch
@@ -462,7 +462,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         let tools = ["Canvas Tool", "Color Palette", "Move", "Selection", "Mask", "Paint Drop Bucket",
                      "Pixel Pen", "Eraser", "Eyedropper", "Text", "Symbol", "Image",
                      "Image Playground", "Layer", "Remove Background", "Magic Lasso", "Adjust",
-                     "Zoom", "Camera"]
+                     "Camera"]  // no Zoom tool on iOS (his word 11-21)
         let strip = app.scrollViews.element(boundBy: 0)
         let limit = app.windows.firstMatch.frame.maxX
         for (i, t) in tools.enumerated() {
@@ -502,6 +502,9 @@ final class Image_ProducerUITests_iPad: XCTestCase {
                 }
             }
         }
+
+        // His word 11-21: "ios devices dont need a zoom toolbox tool if the pinch zoom pan is native".
+        check("11-21", "No Zoom tool in the iOS toolbox", !button("Zoom").exists)
 
         // 433 #2 — the floating preview moves by its handle.
         let grip = app.buttons["Move preview"].firstMatch

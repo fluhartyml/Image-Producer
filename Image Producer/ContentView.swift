@@ -309,6 +309,15 @@ struct ContentView: View {
             .onEnded { _ in zoomAtPinchStart = nil }
     }
 
+    /// REM 2026-11-21 — the zoom controls pick the Zoom tool on the Mac only (his 10-19 "you should be
+    /// automatically put in the zoom tool"). iOS has no Zoom tool — his word: "ios devices dont need a
+    /// zoom toolbox tool if the pinch zoom pan is native" — so there the current tool stays picked.
+    private func enterZoomTool() {
+        #if os(macOS)
+        activeTool = .zoom
+        #endif
+    }
+
     private func setZoom(_ z: CGFloat) {
         fitWidth = false                       // manual zoom leaves Fit Width
         withAnimation(.easeOut(duration: 0.15)) {
@@ -896,13 +905,13 @@ struct ContentView: View {
             // and the Zoom tool. The bar keeps Export · Storyboard · Share · About, as in his Mockup.
             if isPhone && !tallPhone {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { setZoom(canvasZoom + zoomStep); activeTool = .zoom } label: {
+                    Button { setZoom(canvasZoom + zoomStep); enterZoomTool() } label: {
                         Label("Zoom in", systemImage: "plus.magnifyingglass")
                     }
                     .disabled(canvasZoom >= maxZoom)
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button { setZoom(canvasZoom - zoomStep); activeTool = .zoom } label: {
+                    Button { setZoom(canvasZoom - zoomStep); enterZoomTool() } label: {
                         Label("Zoom out", systemImage: "minus.magnifyingglass")
                     }
                     .disabled(canvasZoom <= minZoom)
@@ -1284,9 +1293,9 @@ struct ContentView: View {
                 .accessibilityHint("Actions: More about canvas, zoom.")
                 .accessibilityAction(.default) { announceCanvasDetails() }
                 .accessibilityAction(named: "More about canvas") { announceCanvasDetails() }
-                .accessibilityAction(named: "Zoom In") { setZoom(canvasZoom + zoomStep); activeTool = .zoom }
-                .accessibilityAction(named: "Zoom Out") { setZoom(canvasZoom - zoomStep); activeTool = .zoom }
-                .accessibilityAction(named: "Fit Screen") { setZoom(1); activeTool = .zoom }
+                .accessibilityAction(named: "Zoom In") { setZoom(canvasZoom + zoomStep); enterZoomTool() }
+                .accessibilityAction(named: "Zoom Out") { setZoom(canvasZoom - zoomStep); enterZoomTool() }
+                .accessibilityAction(named: "Fit Screen") { setZoom(1); enterZoomTool() }
                 // 014 — the pixel cursor by switch, VoiceOver or Voice Control: same calls as the keys.
                 .accessibilityActions {
                     if activeTool == .pen, activeLayerID != nil {
@@ -1551,7 +1560,7 @@ struct ContentView: View {
             // the zoom tool" — its inspector shows, and its drag pans the zoomed canvas.
             // REM 2026-11-18 — the full-screen toggle cross-fades instead of snapping (Grok Bot
             // layout review).
-            Button { withAnimation(.easeInOut(duration: 0.25)) { canvasFocused.toggle() }; activeTool = .zoom } label: {
+            Button { withAnimation(.easeInOut(duration: 0.25)) { canvasFocused.toggle() }; enterZoomTool() } label: {
                 Image(systemName: canvasFocused
                       ? "arrow.down.right.and.arrow.up.left"
                       : "arrow.up.left.and.arrow.down.right")
@@ -1563,7 +1572,7 @@ struct ContentView: View {
 
             // Fit Width: fill the area width + scroll vertically, within the resizable
             // window (NOT full-screen). Sticky toggle; tinted when on.
-            Button { fitWidth.toggle(); activeTool = .zoom } label: { Image(systemName: "arrow.left.and.right") }
+            Button { fitWidth.toggle(); enterZoomTool() } label: { Image(systemName: "arrow.left.and.right") }
                 .help(fitWidth ? "Fit width: on (tap to turn off)"
                                : "Fit width — fill the width, scroll vertically")
                 .accessibilityLabel("Fit width")
@@ -1571,17 +1580,17 @@ struct ContentView: View {
 
             Divider().frame(width: 26)
 
-            Button { setZoom(canvasZoom + zoomStep); activeTool = .zoom } label: { Image(systemName: "plus") }
+            Button { setZoom(canvasZoom + zoomStep); enterZoomTool() } label: { Image(systemName: "plus") }
                 .help("Zoom in")
                 .accessibilityLabel("Zoom in")
                 .disabled(canvasZoom >= maxZoom)
-            Button { setZoom(1); activeTool = .zoom } label: {
+            Button { setZoom(1); enterZoomTool() } label: {
                 Text("\(Int(canvasZoom * 100))%")
                     .scaledFont(11, weight: .semibold, monospacedDigit: true)
             }
             .help("Fit Screen — the whole canvas in view (100%)")
             .accessibilityLabel("Fit screen")
-            Button { setZoom(canvasZoom - zoomStep); activeTool = .zoom } label: { Image(systemName: "minus") }
+            Button { setZoom(canvasZoom - zoomStep); enterZoomTool() } label: { Image(systemName: "minus") }
                 .help("Zoom out")
                 .accessibilityLabel("Zoom out")
                 .disabled(canvasZoom <= minZoom)
