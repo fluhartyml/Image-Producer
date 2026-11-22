@@ -1428,18 +1428,22 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         // A-114 — Project name: rename it; a name that is already taken.
         if runs("114") {
             let field = app.textFields["Project name"].firstMatch
+            // REM 13:3x — a unique name each run: earlier runs and the A-114 probe left "A7 canvas renamed" on disk.
+            let newName = "A7 renamed \(Int(Date().timeIntervalSince1970) % 100000)"
             if reveal(field) {
-                setField(field, "A7 canvas renamed"); field.typeText("\n"); sleep(4)
+                setField(field, newName); field.typeText("\n"); sleep(4)
                 snapshot("A114-renamed")
-                let title = app.navigationBars.firstMatch.identifier
-                check("A-114", "Renaming the project changes its name", (field.value as? String) == "A7 canvas renamed" || title.contains("A7 canvas renamed"),
+                // REM 13:3x — the closed Duo shows no navigation bar; reading a missing one failed the whole run.
+                let nav = app.navigationBars.firstMatch
+                let title = nav.exists ? nav.identifier : ""
+                check("A-114", "Renaming the project changes its name", (field.value as? String) == newName || title.contains(newName),
                       "field \"\(field.value ?? "")\" · title \"\(title)\"")
                 setField(field, "A1 Duo closed upright"); field.typeText("\n"); sleep(4)
                 snapshot("A114-taken")
                 let err = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH \"Couldn't rename\"")).firstMatch
                 check("A-114", "A name already taken is refused, and says so", err.exists || (field.value as? String) != "A1 Duo closed upright",
                       err.exists ? err.label : "field now \"\(field.value ?? "")\"")
-                if (field.value as? String) != "A7 canvas renamed" { setField(field, "A7 canvas renamed"); field.typeText("\n"); sleep(3) }
+                if (field.value as? String) != newName { setField(field, newName); field.typeText("\n"); sleep(3) }
             } else { check("A-114", "Project name field found", false) }
         }
         // A-115 — Pixels W × H, Size rule (Exact, Fixed ratio, Fluid width, Fluid height), Landscape switch.
@@ -1447,14 +1451,15 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             toTop()
             let w = app.textFields["Width"].firstMatch, h = app.textFields["Height"].firstMatch
             if reveal(w) {
-                setField(w, "800"); h.tap(); sleep(1); setField(h, "600"); w.tap(); sleep(2)
+                // REM 13:5x — Return commits each field and drops the keyboard; without it the keyboard covered every later control.
+                setField(w, "800"); w.typeText("\n"); sleep(1); setField(h, "600"); h.typeText("\n"); sleep(2)
                 let s1 = canvasSize()
                 check("A-115", "Pixels W × H set the canvas (800 × 600)", s1.w == 800 && s1.h == 600, "\(s1.w)×\(s1.h)")
                 for rule in ["Fixed ratio", "Fluid width", "Fluid height", "Exact"] {
                     let ok = pickMenu("Size rule", rule)
                     check("A-115", "Size rule: \(rule) can be picked", ok)
                     if rule == "Fixed ratio", ok {
-                        setField(w, "1600"); h.tap(); sleep(2)
+                        setField(w, "1600"); w.typeText("\n"); sleep(2)
                         let s2 = canvasSize()
                         check("A-115", "Fixed ratio: W 1600 keeps 4:3 (H 1200)", s2.w == 1600 && s2.h == 1200, "\(s2.w)×\(s2.h)")
                     }

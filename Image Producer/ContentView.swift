@@ -1952,7 +1952,21 @@ struct ToolInspector: View {
             // slid 16 pt onto the canvas. minWidth 0: the settings take only the width they're given.
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.height - Self.spinePad * 2 } action: { spineHeight = max(40, $0) }
+        // REM 2026-11-22 shakedown A-115 — THE SPINE HOLDS ITS SIZE WHILE THE KEYBOARD IS UP. The keyboard shrinks the
+        // canvas, this sheet grows, the spine grew with it and narrowed the settings column; the Pixels row's
+        // ViewThatFits then switched layouts and rebuilt the Width field under the tap — focus dropped, the keyboard
+        // fell, and the field could never be typed in (same family as A-114). Re-measured once the keyboard is down.
+        .onGeometryChange(for: CGFloat.self) { $0.size.height - Self.spinePad * 2 } action: { h in
+            spineMeasured = max(40, h)
+            #if canImport(UIKit)
+            if spineKeyboardUp { return }
+            #endif
+            spineHeight = spineMeasured
+        }
+        #if canImport(UIKit)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in spineKeyboardUp = true }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in spineKeyboardUp = false; spineHeight = spineMeasured }
+        #endif
     }
 
     /// The spine is as wide as its letters are tall. A short name ("Canvas") gets big letters and a
@@ -1965,6 +1979,9 @@ struct ToolInspector: View {
     /// bites, the font shrinks to match, so the letters can never be taller than the spine.
     static let spinePad: CGFloat = 14
     @State private var spineHeight: CGFloat = 300
+    /// True while the on-screen keyboard is up; the spine keeps its size meanwhile (A-115, 11-22).
+    @State private var spineKeyboardUp = false
+    @State private var spineMeasured: CGFloat = 300
     /// REM 2026-11-21 — THE SPINE'S SIZE IS CAPPED AT COLOR PALETTE'S. His word on the 16e: "the lable
     /// of eacj tool inspector should be listed only once and should be vertical on the left size to fit
     /// with no truncating alllowed fitting from bottom to the top of the inspectors frame and it should
