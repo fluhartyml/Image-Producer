@@ -693,6 +693,12 @@ final class Image_ProducerUITests_iPad: XCTestCase {
                 if folder.waitForExistence(timeout: 3) { folder.tap(); sleep(1) }
             }
             snapshot("\(code)-L2-picker-folder")
+            // REM 13:0x idle probe: the folder filled up with shakedown project files, so the photo sat
+            // below the screen and was never found. Scroll the picker until it shows.
+            var swipes = 0
+            while !(photo.exists && photo.isHittable) && swipes < 6 {
+                app.descendants(matching: .any)["Browse View (Picker)"].firstMatch.swipeUp(); sleep(1); swipes += 1
+            }
             if photo.waitForExistence(timeout: 5) { photo.tap(); sleep(4); placed = true }
             // REM 20:3x A1 run: the picker never found the photo and stayed open over the editor, so every
             // later check read nothing. If the photo wasn't picked, close the picker before going on.
@@ -1567,13 +1573,29 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     /// A-114 stall (11-22): tap Project name on the Canvas page and hold 40 s, so the Mac can measure the app's CPU.
     func testNameFieldIdle() throws {
         XCUIDevice.shared.orientation = .portrait; sleep(2)
-        openNewImage(named: "A7 name idle")
+        openNewImage(named: "A7 idle \(Int(Date().timeIntervalSince1970) % 100000)")
+        // REM 13:0x — the blank-image probe did not stall; the stalled A-114 run had a photo placed first.
+        if ProcessInfo.processInfo.environment["IDLE_PHOTO"] == "1" {
+            record("| IDLE | — | photo placed: \(placeShakedownPhoto("IDLE")) |")
+        }
         press("Canvas Tool"); sleep(2)
         let f = app.textFields["Project name"].firstMatch
         record("| IDLE | — | READY tapping Project name |")
         if f.waitForExistence(timeout: 5) { f.tap() }
         record("| IDLE | — | TAPPED |")
-        sleep(40)
+        sleep(5)
+        // The A-114 stall came while typing, so type it the same way A-114 does and time each step.
+        let t0 = Date()
+        record("| IDLE | — | field hittable: \(f.isHittable) in \(Int(Date().timeIntervalSince(t0))) s |")
+        let t1 = Date()
+        snapshot("IDLE-before-type")
+        setField(f, "A7 canvas renamed")
+        snapshot("IDLE-after-type")
+        record("| IDLE | — | setField in \(Int(Date().timeIntervalSince(t1))) s |")
+        let t2 = Date()
+        f.typeText("\n")
+        record("| IDLE | — | Return in \(Int(Date().timeIntervalSince(t2))) s |")
+        sleep(10)
         snapshot("IDLE-after")
     }
 

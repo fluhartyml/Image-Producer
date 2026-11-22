@@ -556,7 +556,14 @@ struct ContentView: View {
         // flipped back. His Duo note, 2:57 PM: "I tap untitled to rename but it bounces like a
         // keyboard is going to show but it never does". (Cause is Claude's reading; not yet
         // confirmed on the Duo.)
-        if keyboardPortraitLock ?? (geo.size.height > geo.size.width), keyboardTallLock ?? ContentView.isTallPhone(ContentView.wholeWindow(geo)) {
+        // REM 2026-11-22 shakedown A-114 — PORTRAIT GOES BY THE WHOLE WINDOW, which the keyboard never changes.
+        // The probe caught the Canvas page being rebuilt again and again around a tap on Project name (fresh
+        // copies, each with an empty draft): the editor's own height shrank under the keyboard, the locks below
+        // cleared at keyboard-hide while the keyboard still took room, and the layout flipped portrait ↔
+        // landscape. Each flip rebuilt the field, dropped focus and lost the typing. The window's shape
+        // (editor + safe areas, the keyboard's included) only changes when the phone really turns.
+        let portraitWindow = ContentView.wholeWindow(geo).height > ContentView.wholeWindow(geo).width
+        if keyboardPortraitLock ?? portraitWindow, keyboardTallLock ?? ContentView.isTallPhone(ContentView.wholeWindow(geo)) {
             // REM 2026-11-19 — THE TALL PHONE, his Mockup (Image-Producer-One-Layout-Mockup, line 017):
             // "can you make the canvas be the full top half of the iphone scren just like the iphone
             // duo where the navigation buttons at the top are liquid glass with the PiP and two Finger
@@ -590,7 +597,7 @@ struct ContentView: View {
             .overlay(alignment: .topLeading) {
                 if toolsFloating { floatingToolPalette(in: geo.size) }
             }
-        } else if keyboardPortraitLock ?? (geo.size.height > geo.size.width) {
+        } else if keyboardPortraitLock ?? portraitWindow {
             VStack(spacing: 0) {
                 // Canvas ~42% (was half): the inspector was starved for height. No
                 // ActiveToolLabel here — the tool strip highlights the active tool and
@@ -853,7 +860,7 @@ struct ContentView: View {
         .onGeometryChange(for: CGSize.self) { ContentView.wholeWindow($0) } action: { windowSize = $0 }
         #if canImport(UIKit)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            if keyboardPortraitLock == nil { keyboardPortraitLock = editorSize.height > editorSize.width }
+            if keyboardPortraitLock == nil { keyboardPortraitLock = windowSize.height > windowSize.width }   // REM 11-22 A-114: the window, not the editor
             if keyboardPhoneLock == nil { keyboardPhoneLock = usesPhoneLayout }
             if keyboardTallLock == nil { keyboardTallLock = ContentView.isTallPhone(windowSize) }
             keyboardUp = true
