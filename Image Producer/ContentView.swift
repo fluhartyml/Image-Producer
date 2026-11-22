@@ -1684,6 +1684,9 @@ struct ContentView: View {
             }
             .help("Fit Screen — the whole canvas in view (100%)")
             .accessibilityLabel("Fit screen")
+            // REM 2026-11-22 shakedown A-109/A-110 — the zoom level was on screen but not spoken: VoiceOver said only
+            // "Fit screen". The percent is now its value ("Fit screen, 200 percent"). All clients (his 11-08 rule).
+            .accessibilityValue("\(Int((canvasZoom * 100).rounded())) percent")
             Button { setZoom(canvasZoom - zoomStep); enterZoomTool() } label: { Image(systemName: "minus") }
                 .help("Zoom out")
                 .accessibilityLabel("Zoom out")

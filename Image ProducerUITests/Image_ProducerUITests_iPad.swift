@@ -29,7 +29,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         continueAfterFailure = true
         // testDuoLook runs in whatever shape Claude set in Device Hub — don't turn the device for it.
         // So does the shakedown (testShakedownLayout): every shape is set by hand in Device Hub first.
-        if !name.contains("testDuoLook") && !name.contains("testShakedownLayout") && !name.contains("testShapeChange") { XCUIDevice.shared.orientation = .landscapeLeft }
+        if !name.contains("testDuoLook") && !name.contains("testShakedownLayout") && !name.contains("testShapeChange") && !name.contains("testElementsA") && !name.contains("testKeyProbe") { XCUIDevice.shared.orientation = .landscapeLeft }
         app = XCUIApplication()
         app.launchArguments += ["-ImageProducerUITest"]
         app.launch()
@@ -974,6 +974,409 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             check(code, "\(what): Pixel Pen is still the active tool", t.waitForExistence(timeout: 3) && t.isSelected)
         }
         record("| \(code) | — | DONE |")
+    }
+
+    // MARK: A7 — every element, in section A's element shape (Duo closed, upright). Sheet rule 000.14 (his yes 11-21):
+    // each section's element list runs once per device, in that section's element shape. ELEMENTS picks the lines
+    // to run ("101,102,103"); empty runs all that are written. Claude presses Device Hub's Closed button first.
+
+    /// Clear a text field and type a value; Tab moves on so a number field commits (a person would do the same).
+    func setField(_ f: XCUIElement, _ value: String) {
+        // A tap right after a menu closes can be swallowed: tap until the field has the keyboard (A-102, 11-22).
+        for _ in 0..<3 {
+            f.tap(); sleep(1)
+            if (f.value(forKey: "hasKeyboardFocus") as? Bool) == true { break }
+        }
+        let old = (f.value as? String) ?? ""
+        f.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: max(old.count, 8)) + value)
+        sleep(1)
+    }
+
+    /// The canvas size in pixels from the probe, blank images included (probe() skips a canvas with no layer).
+    func canvasSize() -> (w: Int, h: Int) {
+        let e = app.descendants(matching: .any)["uitest.canvas"].firstMatch
+        guard e.waitForExistence(timeout: 5) else { return (-1, -1) }
+        func num(_ k: String) -> Int {
+            guard let r = e.label.range(of: "\(k)=") else { return -1 }
+            return Int(Double(e.label[r.upperBound...].prefix { "0123456789.".contains($0) }) ?? -1)
+        }
+        return (num("w"), num("h"))
+    }
+
+    func testElementsA() throws {
+        let env = ProcessInfo.processInfo.environment
+        let want = Set((env["ELEMENTS"] ?? "").split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) })
+        func runs(_ n: String) -> Bool { want.isEmpty || want.contains(n) }
+        // His 11:07 screen: A6's turns left the Duo upside down. Section A's element shape is closed UPRIGHT.
+        XCUIDevice.shared.orientation = .portrait; sleep(2)
+        let win = app.windows.firstMatch
+        record("| A7 | — | Element shape (Duo closed upright): window \(Int(win.frame.width)) × \(Int(win.frame.height)) |")
+        sleep(5)
+
+        // A-101 — launch screen: New Image, New from Import… (Files picker; Cancel makes nothing), icon, version line.
+        if runs("101") {
+            let new = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).allElementsBoundByIndex.filter(\.isHittable)
+            check("A-101", "New Image is on the launch screen", !new.isEmpty)
+            // The launch scene and a hidden copy lower in the tree both carry it: take the one a finger can reach.
+            let imp = app.buttons.matching(NSPredicate(format: "label == 'New from Import…'")).allElementsBoundByIndex
+                .filter(\.isHittable).sorted { $0.frame.minY < $1.frame.minY }.first ?? button("New from Import…")
+            check("A-101", "New from Import… is on the launch screen", imp.exists && imp.isHittable)
+            let version = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Build' OR label CONTAINS 'build' OR label CONTAINS '(4'")).firstMatch
+            check("A-101", "The version line shows", version.exists, version.exists ? version.label : "not found")
+            // The hero icon is drawn only in regular width (LaunchHeroOverlay); the closed Duo is compact.
+            let icon = app.images["LaunchHeroIcon"].firstMatch
+            record("| A-101 | ℹ️ INFO | Hero icon \(icon.exists ? "shown" : "not shown") — by design it shows only in regular width |")
+            snapshot("A101-launch")
+            if imp.exists {
+                imp.tap(); sleep(3)
+                snapshot("A101-import-picker")
+                let cancel = app.buttons["Cancel"].firstMatch
+                check("A-101", "New from Import… opens the Files picker", cancel.waitForExistence(timeout: 8))
+                if cancel.exists { cancel.tap(); sleep(3) }
+                snapshot("A101-after-cancel")
+                let editor = app.descendants(matching: .any)["uitest.canvas"].firstMatch
+                check("A-101", "Cancel makes nothing (no editor opens)", !editor.exists && button("New from Import…").exists)
+            }
+        }
+
+        // A-102 — New Image sheet: Name, W and H, Sizes menu, Cancel (Esc), Create (Return); 0, 1 and a huge size.
+        if runs("102") {
+            func openSheet() -> Bool {
+                let new = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).allElementsBoundByIndex
+                    .filter(\.isHittable).sorted { $0.frame.minY < $1.frame.minY }
+                new.first?.tap()
+                return app.buttons["Create"].waitForExistence(timeout: 10)
+            }
+            func backToLaunch() {
+                let back = app.buttons["BackButton"].firstMatch
+                if back.waitForExistence(timeout: 5) { back.tap(); sleep(3) }
+            }
+            // Sheet 1 — every field, then Esc.
+            check("A-102", "New Image opens the sheet", openSheet())
+            let name = app.textFields["File name"].firstMatch, w = app.textFields["Width"].firstMatch, h = app.textFields["Height"].firstMatch
+            check("A-102", "Name field shows for an automatic name", name.exists)
+            check("A-102", "W and H fields show", w.exists && h.exists, "W \(w.value ?? "?") H \(h.value ?? "?")")
+            snapshot("A102-sheet")
+            // Sizes menu: a quick size sets W and H.
+            let sizes = button("Sizes")
+            if sizes.exists {
+                let before = app.buttons.allElementsBoundByIndex.map(\.label)
+                sizes.tap(); sleep(2)
+                snapshot("A102-sizes-menu")
+                // The menu is taller than the closed Duo: read it, scroll it, read it again.
+                var items = app.buttons.allElementsBoundByIndex.map(\.label).filter { !before.contains($0) && !$0.isEmpty }
+                if let last = app.buttons.matching(NSPredicate(format: "label == 'Paper'")).allElementsBoundByIndex.first(where: \.isHittable) {
+                    last.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                        .press(forDuration: 0.05, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)))
+                    sleep(1)
+                    items += app.buttons.allElementsBoundByIndex.map(\.label).filter { !before.contains($0) && !$0.isEmpty && !items.contains($0) }
+                }
+                let groups = ["App Store Connect", "Wallpapers", "Social", "Apple TV", "Web ads", "Paper", "Posters",
+                              "Signs & flyers", "Event & stationery", "Cards & envelopes", "Photo"]
+                let quick = items.filter { !groups.contains($0) }
+                check("A-102", "Sizes menu: 4 quick sizes", quick.count >= 4, quick.joined(separator: " · "))
+                check("A-102", "Sizes menu: the full catalog groups", groups.allSatisfy(items.contains),
+                      "missing: \(groups.filter { !items.contains($0) }.joined(separator: ", "))")
+                // Scrolling moved the quick sizes away: close the menu and open it fresh to pick one.
+                app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap(); sleep(1)
+                sizes.tap(); sleep(2)
+                if let pick = quick.first(where: { $0.hasPrefix("Web banner") }) ?? quick.first, let b = app.buttons.matching(NSPredicate(format: "label == %@", pick)).allElementsBoundByIndex.first(where: \.isHittable) {
+                    b.tap(); sleep(1)
+                    check("A-102", "A quick size sets W and H (\(pick))", (w.value as? String) == "1,500" && (h.value as? String) == "500",
+                          "W \(w.value ?? "?") H \(h.value ?? "?")")
+                } else { app.tap(); sleep(1) }
+            } else { check("A-102", "Sizes menu shows", false) }
+            // 0 → Create is off; 1 → Create is on.
+            setField(w, "0"); h.tap(); sleep(1)
+            check("A-102", "W = 0: Create is off", !app.buttons["Create"].firstMatch.isEnabled)
+            setField(w, "1"); setField(h, "1"); name.tap(); sleep(1)
+            check("A-102", "1 × 1: Create is on", app.buttons["Create"].firstMatch.isEnabled)
+            // A huge size: over 16,384 a side Create is off and the sheet says why; 16,384 itself is allowed.
+            setField(w, "30000"); setField(h, "30000"); name.tap(); sleep(1)
+            snapshot("A102-huge-typed")
+            check("A-102", "30000 × 30000: Create is off", !app.buttons["Create"].firstMatch.isEnabled)
+            check("A-102", "30000 × 30000: the sheet says the limit", app.staticTexts["Up to 16,384 pixels a side."].exists)
+            setField(w, "16384"); setField(h, "16384"); name.tap(); sleep(1)
+            check("A-102", "16384 × 16384: Create is on", app.buttons["Create"].firstMatch.isEnabled)
+            // Esc with the cursor in the Name field (hardware keyboard).
+            app.typeKey(XCUIKeyboardKey.escape, modifierFlags: []); sleep(2)
+            // REM 2026-11-22 testKeyProbe: this iPhone simulator delivers no simulated hardware keys (a tool letter
+            // didn't land either), so Esc is recorded, not judged here; judged on the iPad pass / a real keyboard.
+            record("| A-102 | ℹ️ INFO | Esc (hardware key): sheet \(app.buttons["Create"].exists ? "stayed — keys don't reach the app on this iPhone simulator" : "closed") |")
+            if app.buttons["Create"].exists { app.buttons["Cancel"].firstMatch.tap(); sleep(2) }
+            let afterEsc = canvasSize()
+            check("A-102", "Cancel keeps the size it opened with, not 16384", afterEsc.w > 0 && afterEsc.w < 16384,
+                  "\(afterEsc.w)×\(afterEsc.h)")
+            backToLaunch()
+            // Sheet 2 — the subsection's project file (000.7): name, 1024 × 1024, Return on the keyboard creates.
+            if openSheet() {
+                setField(app.textFields["File name"].firstMatch, "A7 Duo closed upright")
+                setField(app.textFields["Width"].firstMatch, "1024"); setField(app.textFields["Height"].firstMatch, "1024")
+                app.textFields["File name"].firstMatch.tap(); sleep(1)
+                app.textFields["File name"].firstMatch.typeText("\n"); sleep(3)
+                check("A-102", "Return in the Name field creates", !app.buttons["Create"].exists)
+                if app.buttons["Create"].exists { app.buttons["Create"].firstMatch.tap(); sleep(3) }
+                let made = canvasSize()
+                check("A-102", "Create makes the image at 1024 × 1024", made.w == 1024 && made.h == 1024, "\(made.w)×\(made.h)")
+                snapshot("A102-created")
+                backToLaunch()
+            }
+        }
+
+        // A-103 — Canvas presets: apply one from every group, on the subsection's file with a real photo (000.8).
+        if runs("103") {
+            openNewImage(named: "A7 presets")
+            _ = placeShakedownPhoto("A103")
+            press("Canvas Tool"); sleep(2)
+            let groups = ["App Store Connect", "Wallpapers", "Social", "Apple TV", "Web ads", "Paper", "Posters",
+                          "Signs & flyers", "Event & stationery", "Cards & envelopes", "Photo"]
+            var last = canvasSize()
+            for g in groups {
+                let menu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Canvas size presets'")).firstMatch
+                guard menu.waitForExistence(timeout: 5) else { check("A-103", "\(g): presets menu found", false); continue }
+                if !menu.isHittable { app.swipeUp(); sleep(1) }
+                menu.tap(); sleep(2)
+                let gb = app.buttons.matching(NSPredicate(format: "label == %@", g)).firstMatch
+                guard gb.waitForExistence(timeout: 4) else {
+                    snapshot("A103-\(g)-missing"); check("A-103", "\(g): group in the menu", false)
+                    app.tap(); sleep(1); continue
+                }
+                let before = Set(app.buttons.allElementsBoundByIndex.map(\.label))
+                gb.tap(); sleep(2)
+                let item = app.buttons.allElementsBoundByIndex.first { !before.contains($0.label) && !$0.label.isEmpty && $0.isHittable }
+                guard let item else { snapshot("A103-\(g)-empty"); check("A-103", "\(g): a preset to pick", false); app.tap(); sleep(1); continue }
+                let label = item.label
+                item.tap(); sleep(2)
+                let now = canvasSize()
+                check("A-103", "\(g): \"\(label.prefix(40))\" applies", now.w > 0 && app.state == .runningForeground,
+                      "\(last.w)×\(last.h) → \(now.w)×\(now.h)")
+                last = now
+            }
+            snapshot("A103-done")
+        }
+
+        // A-104 to A-110 — layout & navigation, in one project file for the group (000.7), with a real photo (000.8).
+        let layoutLines = ["104", "105", "106", "107", "109", "110"]
+        if layoutLines.contains(where: runs) {
+            openNewImage(named: "A7 layout")
+            _ = placeShakedownPhoto("A104")
+        }
+        let tools: [(String, String)] = [("Canvas Tool", "c"), ("Color Palette", "k"), ("Move", "m"), ("Selection", "s"),
+            ("Mask", "q"), ("Paint Drop Bucket", "b"), ("Pixel Pen", "p"), ("Eraser", "e"), ("Eyedropper", "i"), ("Text", "t"),
+            ("Symbol", "y"), ("Image", "g"), ("Image Playground", "a"), ("Layer", "l"), ("Remove Background", "r"),
+            ("Magic Lasso", "w"), ("Adjust", "j"), ("Camera", "h")]
+        // A-104 — every tool button selects its tool; selected state shows; its letter key picks it (hardware keyboard).
+        if runs("104") {
+            var notSel: [String] = [], keyMiss: [String] = []
+            for (t, _) in tools {
+                guard press(t, 3) else { notSel.append("\(t) (not found)"); continue }
+                sleep(1)
+                if app.alerts.firstMatch.exists { app.alerts.firstMatch.buttons.firstMatch.tap(); sleep(1) }
+                if !button(t).isSelected { notSel.append(t) }
+            }
+            check("A-104", "Every tool button selects its tool (18)", notSel.isEmpty, notSel.joined(separator: ", "))
+            press("Canvas Tool"); sleep(1)
+            for (t, k) in tools where t != "Canvas Tool" {
+                app.typeKey(k, modifierFlags: []); sleep(1)
+                if app.alerts.firstMatch.exists { app.alerts.firstMatch.buttons.firstMatch.tap(); sleep(1) }
+                if !button(t).isSelected { keyMiss.append("\(k.uppercased()) → \(t)") }
+                press("Canvas Tool"); sleep(1)
+            }
+            if keyMiss.count == tools.count - 1 {
+                record("| A-104 | ℹ️ INFO | Letter keys: none landed — this iPhone simulator delivers no hardware keys (testKeyProbe); judged on the iPad pass |")
+            } else {
+                check("A-104", "Each tool's letter key picks it (hardware keyboard)", keyMiss.isEmpty, keyMiss.joined(separator: ", "))
+            }
+            record("| A-104 | ℹ️ INFO | The letter in each tool's help text is pointer hover (iPad/Mac); checked on the Mac pass |")
+        }
+        // A-105 — tool palette grip: float and dock; drag the floating palette; its spot is remembered.
+        if runs("105") {
+            let float = button("Float tools")
+            check("A-105", "Float tools grip shows", float.waitForExistence(timeout: 3))
+            float.tap(); sleep(2)
+            let dock = button("Dock tools")
+            check("A-105", "Float tools floats the palette (grip now says Dock tools)", dock.waitForExistence(timeout: 3))
+            snapshot("A105-floating")
+            let f0 = dock.frame
+            dock.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.4, thenDragTo: dock.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: 60, dy: -120)))
+            sleep(2)
+            let f1 = button("Dock tools").frame
+            check("A-105", "Dragging the grip moves the palette", abs(f1.minX - f0.minX) > 20 || abs(f1.minY - f0.minY) > 20,
+                  "\(Int(f0.minX)),\(Int(f0.minY)) → \(Int(f1.minX)),\(Int(f1.minY))")
+            // Remembered: quit, relaunch, reopen the same file.
+            app.terminate(); app.launch(); sleep(5)
+            let file = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'A7 layout'")).firstMatch
+            if file.waitForExistence(timeout: 8) { file.tap(); sleep(4) }
+            let f2 = button("Dock tools").frame
+            check("A-105", "The palette's spot is remembered after a relaunch", button("Dock tools").exists && abs(f2.minX - f1.minX) < 6 && abs(f2.minY - f1.minY) < 6,
+                  button("Dock tools").exists ? "\(Int(f2.minX)),\(Int(f2.minY))" : "palette not floating after relaunch")
+            snapshot("A105-relaunched")
+            if button("Dock tools").exists { button("Dock tools").tap(); sleep(2) }
+            check("A-105", "Dock tools puts the palette back under the canvas", button("Float tools").waitForExistence(timeout: 3))
+        }
+        // A-106 — split handle (upright): drag 15%–85%, double-tap resets; it is an adjustable control for VoiceOver.
+        if runs("106") {
+            let handle = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Canvas size'")).firstMatch
+            check("A-106", "The split handle is on screen (Canvas size)", handle.waitForExistence(timeout: 3))
+            if handle.exists {
+                let pct = { () -> Int in Int(((handle.value as? String) ?? "").prefix { $0.isNumber }) ?? -1 }
+                let start = pct()
+                handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.3, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
+                sleep(1); let hi = pct()
+                handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.3, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.02)))
+                sleep(1); let lo = pct()
+                check("A-106", "Dragging down stops at 85%", hi == 85, "\(start)% → \(hi)%")
+                check("A-106", "Dragging up stops at 15%", lo == 15, "\(lo)%")
+                handle.doubleTap(); sleep(2)
+                let reset = pct()
+                check("A-106", "Double-tap resets the split", reset != lo && reset > 15 && reset < 85, "\(lo)% → \(reset)%")
+                let adjustable = handle.debugDescription.contains("Adjustable") || handle.elementType == .slider || handle.elementType == .other
+                record("| A-106 | ℹ️ INFO | VoiceOver: an adjustable control, value \"\(handle.value ?? "")\", steps of 5% in code; swipe check is VoiceOver-only (\(adjustable ? "element present" : "?")) |")
+            }
+        }
+        // A-107 — Tool | Layers | History: each page opens; swipe between pages where offered.
+        if runs("107") {
+            let row = app.buttons["Tool"].firstMatch.frame.midY
+            for tab in ["Layers", "History", "Tool"] {
+                let b = app.buttons.matching(identifier: tab).allElementsBoundByIndex.first { abs($0.frame.midY - row) < 8 }
+                b?.tap(); sleep(1)
+                check("A-107", "\(tab) page opens", b?.isSelected ?? false)
+            }
+            // Swipe left on the panel below the switch.
+            let panelPoint = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: row + 120))
+            panelPoint.press(forDuration: 0.05, thenDragTo: panelPoint.withOffset(CGVector(dx: -200, dy: 0)))
+            sleep(1)
+            let swiped = app.buttons.matching(identifier: "Layers").allElementsBoundByIndex.first { abs($0.frame.midY - row) < 8 }?.isSelected ?? false
+            record("| A-107 | ℹ️ INFO | Swipe left on the Tool page \(swiped ? "goes to Layers" : "is not offered (no change)") |")
+        }
+        // A-109 — Zoom in, Zoom out, Fit screen (shows the zoom level); A-110 — pinch zoom 1× to 8×.
+        if runs("109") || runs("110") {
+            let fit = button("Fit screen")
+            let zoom = { () -> Int in Int(((fit.value as? String) ?? "").prefix { $0.isNumber }) ?? -1 }
+            if runs("109") {
+                check("A-109", "Zoom in, Fit screen and Zoom out show", button("Zoom in").exists && fit.exists && button("Zoom out").exists)
+                fit.tap(); sleep(1); let z0 = zoom()
+                press("Zoom in"); sleep(1); let z1 = zoom()
+                press("Zoom out"); sleep(1); let z2 = zoom()
+                check("A-109", "Zoom in raises the zoom; Zoom out lowers it", z1 > z0 && z2 < z1, "\(z0)% → \(z1)% → \(z2)%")
+                fit.tap(); sleep(1)
+                check("A-109", "Fit screen goes back to 100%", zoom() == 100, "\(zoom())%")
+                let lh = app.buttons.matching(NSPredicate(format: "(label == 'Layers' OR label == 'History') AND identifier != 'Layers' AND identifier != 'History'")).count
+                record("| A-109 | ℹ️ INFO | Toolbar Layers/History buttons on this shape: \(lh) (the Tool | Layers | History switch holds them here) |")
+            }
+            if runs("110") {
+                fit.tap(); sleep(1)
+                probeElement.pinch(withScale: 12, velocity: 6); sleep(2)
+                let zMax = zoom()
+                check("A-110", "Pinch out zooms to 800% and stops", zMax == 800, "\(zMax)%")
+                probeElement.pinch(withScale: 0.05, velocity: -6); sleep(2)
+                let zMin = zoom()
+                check("A-110", "Pinch in comes back to 100% and stops", zMin == 100, "\(zMin)%")
+                record("| A-111 | ℹ️ INFO | Two-finger pan: XCUITest has no two-finger drag on iPhone — needs your Duo |")
+            }
+        }
+        /// Close whatever sheet or screen a toolbar button opened: its own Done / Cancel / Close, else swipe it down.
+        func dismissTop() {
+            for n in ["Done", "Cancel", "Close", "OK"] {
+                let b = app.buttons.matching(NSPredicate(format: "label == %@", n)).allElementsBoundByIndex.first(where: \.isHittable)
+                if let b { b.tap(); sleep(2); return }
+            }
+            app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
+                .press(forDuration: 0.05, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+            sleep(2)
+        }
+        // A-108 — toolbar: Export, Storyboard, Share (flat PNG), About. Each opens, then closes back to the editor.
+        if runs("108") {
+            if !app.descendants(matching: .any)["uitest.canvas"].firstMatch.exists {
+                openNewImage(named: "A7 layout"); _ = placeShakedownPhoto("A108")
+            }
+            for (label, opened) in [("Export", "Export"), ("Storyboard", "Storyboard"), ("Share", "share sheet"), ("About Image Producer", "About")] {
+                let b = app.buttons.matching(NSPredicate(format: "label == %@", label)).allElementsBoundByIndex.first(where: \.isHittable)
+                guard let b else { check("A-108", "\(label) is on the toolbar", false); continue }
+                let before = app.buttons.count
+                b.tap(); sleep(3)
+                snapshot("A108-\(label.replacingOccurrences(of: " ", with: "-"))")
+                let shareUp = XCUIApplication(bundleIdentifier: "com.apple.springboard").otherElements["ActivityListView"].exists
+                    || app.otherElements["ActivityListView"].exists || app.navigationBars["UIActivityContentView"].exists
+                let changed = app.sheets.count > 0 || app.buttons.count != before || shareUp
+                    || app.buttons["Done"].exists || app.buttons["Close"].exists
+                check("A-108", "\(label) opens the \(opened)", changed, "buttons \(before) → \(app.buttons.count)")
+                dismissTop()
+                check("A-108", "\(label): back to the editor afterward", app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 5)
+                      && button("Canvas Tool").isHittable)
+            }
+        }
+        // A-112 — floating preview: tap the handle → next corner; drag snaps to a corner; long-press lifts it;
+        // zoomed in it is a navigator; it stays clear of Back and the zoom controls.
+        if runs("112") {
+            if !app.descendants(matching: .any)["uitest.canvas"].firstMatch.exists {
+                openNewImage(named: "A7 layout"); _ = placeShakedownPhoto("A112")
+            }
+            let pip = app.descendants(matching: .any)["pip.panel"].firstMatch
+            let grip = button("Move preview")
+            check("A-112", "The floating preview shows", pip.waitForExistence(timeout: 5))
+            if pip.exists, grip.exists {
+                let c0 = pip.frame
+                grip.tap(); sleep(2)
+                let c1 = pip.frame
+                check("A-112", "Tapping the handle sends it to the next corner", c1.midX != c0.midX || c1.midY != c0.midY,
+                      "\(Int(c0.midX)),\(Int(c0.midY)) → \(Int(c1.midX)),\(Int(c1.midY))")
+                // Drag toward the middle of the canvas and let go: it must land in a corner, not mid-canvas.
+                let canvas = app.descendants(matching: .any)["uitest.canvas"].firstMatch.frame
+                grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                    .press(forDuration: 0.6, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+                        .withOffset(CGVector(dx: canvas.midX - 20, dy: canvas.midY - 20)))
+                sleep(2)
+                let c2 = pip.frame
+                let inCorner = (abs(c2.minX - canvas.minX) < 40 || abs(c2.maxX - canvas.maxX) < 40)
+                    && (abs(c2.minY - canvas.minY) < 80 || abs(c2.maxY - canvas.maxY) < 40)
+                check("A-112", "A long-press drag lifts it and it snaps to a corner", inCorner,
+                      "panel \(Int(c2.minX)),\(Int(c2.minY)) \(Int(c2.width))×\(Int(c2.height)) · canvas \(Int(canvas.minX)),\(Int(canvas.minY)) \(Int(canvas.width))×\(Int(canvas.height))")
+                // Clear of Back and the zoom controls, in every corner.
+                var hits: [String] = []
+                for _ in 0..<4 {
+                    let f = pip.frame
+                    for n in ["BackButton", "Zoom in", "Zoom out", "Fit screen", "Fit width"] {
+                        let e = n == "BackButton" ? app.buttons["BackButton"].firstMatch : button(n)
+                        if e.exists, e.isHittable, f.intersects(e.frame) { hits.append("\(n) at \(Int(f.midX)),\(Int(f.midY))") }
+                    }
+                    grip.tap(); sleep(2)
+                }
+                check("A-112", "In every corner it stays clear of Back and the zoom controls", hits.isEmpty, hits.joined(separator: ", "))
+                // Navigator: zoomed in, a tap on the thumbnail's corner moves the view.
+                button("Zoom in").tap(); sleep(1); button("Zoom in").tap(); sleep(1)
+                let before = probe()
+                pip.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap(); sleep(2)
+                let after = probe()
+                check("A-112", "Zoomed in, tapping the preview moves the view (navigator)",
+                      before != nil && after != nil && (abs((after?.x ?? 0) - (before?.x ?? 0)) > 0.02 || abs((after?.y ?? 0) - (before?.y ?? 0)) > 0.02),
+                      String(format: "layer centre %.2f,%.2f → %.2f,%.2f", before?.x ?? -1, before?.y ?? -1, after?.x ?? -1, after?.y ?? -1))
+                button("Fit screen").tap(); sleep(1)
+            }
+            record("| A-113 | ℹ️ INFO | Drag a picture in from another app: not possible on the iPhone simulator — needs your Duo |")
+        }
+        record("| A7 | — | DONE |")
+    }
+
+    /// Do simulated hardware keys reach the app on this simulator? (A-102 Esc, 11-22.) A letter key in the editor,
+    /// then Esc in the New Image sheet with no field focused, then Esc with the Name field focused.
+    func testKeyProbe() throws {
+        XCUIDevice.shared.orientation = .portrait; sleep(2)
+        openNewImage(named: "A7 key probe")
+        press("Canvas Tool"); sleep(1)
+        app.typeKey("k", modifierFlags: []); sleep(2)
+        record("| KEY | — | Letter K in the editor → Color Palette selected: \(button("Color Palette").isSelected) |")
+        app.buttons["BackButton"].firstMatch.tap(); sleep(3)
+        let new = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).allElementsBoundByIndex.filter(\.isHittable).sorted { $0.frame.minY < $1.frame.minY }
+        new.first?.tap(); _ = app.buttons["Create"].waitForExistence(timeout: 10); sleep(2)
+        record("| KEY | — | Sheet up; keyboard focus anywhere: \(app.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == 1")).count) |")
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: []); sleep(2)
+        record("| KEY | — | Esc, nothing focused → sheet closed: \(!app.buttons["Create"].exists) |")
+        if app.buttons["Create"].exists {
+            app.textFields["File name"].firstMatch.tap(); sleep(1)
+            app.typeKey(XCUIKeyboardKey.escape, modifierFlags: []); sleep(2)
+            record("| KEY | — | Esc, Name focused → sheet closed: \(!app.buttons["Create"].exists) |")
+        }
     }
 
     func testPhoneFloatingPreviewSetting() throws {

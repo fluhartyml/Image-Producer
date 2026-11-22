@@ -53,6 +53,8 @@ struct NewImageSheet: View {
                 TextField(document.pendingNewName ?? fileName ?? document.name, text: $name)
                     .textFieldStyle(.roundedBorder).scaledFont(18)
                     .accessibilityLabel("File name")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
+                    .onSubmit(submit)   // REM 2026-11-22 shakedown A-102: Return in a field creates, as Create (Return) promises
+                    .onKeyPress(.escape) { finish(); return .handled }
             }
             }
 
@@ -65,12 +67,16 @@ struct NewImageSheet: View {
                     TextField("W", value: $width, format: .number)
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 90)
                         .accessibilityLabel("Width")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
+                        .onSubmit(submit)
+                        .onKeyPress(.escape) { finish(); return .handled }
                     Text("×").scaledFont(18)
                     Text("H").scaledFont(18).foregroundStyle(.secondary)
                         .help("Height")
                     TextField("H", value: $height, format: .number)
                         .textFieldStyle(.roundedBorder).scaledFont(18).frame(width: 90)
                         .accessibilityLabel("Height")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
+                        .onSubmit(submit)
+                        .onKeyPress(.escape) { finish(); return .handled }
                     // REM 2026-11-20 — the WHOLE preset catalog, App Store Connect first, same groups
                     // as the Canvas tool. His word, at this sheet with the CryoTunes universal asset:
                     // "add the app store sizes to that menu it was actually supposed to be there
@@ -96,6 +102,10 @@ struct NewImageSheet: View {
                 }
             }
 
+            if width > Self.maxSide || height > Self.maxSide {
+                Text("Up to 16,384 pixels a side.")
+                    .scaledFont(18).foregroundStyle(.orange)
+            }
             HStack {
                 Button("Cancel") { finish() }
                     .keyboardShortcut(.cancelAction)
@@ -103,11 +113,15 @@ struct NewImageSheet: View {
                 Button("Create") { create() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(width < 1 || height < 1)
+                    .disabled(!sizeOK)
             }
             .scaledFont(18)
         }
         .padding(24)
+        // REM 2026-11-22 shakedown A-102 — with the cursor in a field, the field took Esc and Return, so the
+        // sheet's Cancel (Esc) and Create (Return) shortcuts never fired from a hardware keyboard. Esc anywhere
+        // in the sheet now cancels; Return in a field creates (onSubmit). All clients (his 11-08 rule).
+        .onKeyPress(.escape) { finish(); return .handled }
         // REM 2026-11-18 — 420 wide on the Mac and iPad (Grok Bot layout review). On iPhone a hard
         // minimum of 420 is wider than the screen (375–440 pt), which pushed Create and Cancel off
         // the edges; there it just takes the screen's width.
@@ -161,6 +175,16 @@ struct NewImageSheet: View {
             }
         }
     }
+
+    /// REM 2026-11-22 shakedown A-102 — "try a huge size": 30000 × 30000 (3.6 GB of pixels) made the app crawl on
+    /// the Duo simulator. A new image now stops at 16,384 pixels a side — the largest picture an iPhone's or
+    /// iPad's graphics chip can draw in one piece (Metal's texture limit). Claude's engineering call, told to him.
+    /// Opened and imported pictures are not touched; this is only the New Image sheet.
+    static let maxSide = 16_384
+    private var sizeOK: Bool { (1...Self.maxSide).contains(width) && (1...Self.maxSide).contains(height) }
+
+    /// Return in a field: create, when Create is on (a size of 0 or over the limit keeps the sheet open).
+    private func submit() { if sizeOK { create() } }
 
     private func create() {
         document.canvasWidth = max(1, width)
