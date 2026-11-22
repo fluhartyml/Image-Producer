@@ -191,6 +191,15 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             else { record("| — | ℹ️ INFO | New Image sheet has no Name field; file keeps its automatic name |") }
         }
         if press("Create", 10) { sleep(2) }
+        // REM 2026-11-22 A3 (open Duo) — the sheet stayed up with the name typed and the keyboard showing; the tap on
+        // Create didn't take. Close the keyboard, then tap Create again, and say so in the results.
+        if app.buttons["Create"].exists {
+            if app.keyboards.firstMatch.exists { app.typeText("\n"); sleep(1) }
+            if app.buttons["Create"].exists {
+                record("| — | ↻ RETRY | Create tapped again after closing the keyboard |")
+                app.buttons["Create"].firstMatch.tap(); sleep(2)
+            }
+        }
     }
 
     // MARK: The shakedown
@@ -679,7 +688,9 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             // own check (L3), so they're not repeated on every page.
             // REM 2026-11-22 — Apple's Stepper (its − / + halves) joins the exempt Apple components.
             let system = (app.toolbars.buttons.allElementsBoundByIndex + app.segmentedControls.buttons.allElementsBoundByIndex
-                          + app.steppers.buttons.allElementsBoundByIndex)
+                          + app.steppers.buttons.allElementsBoundByIndex
+                          // Apple's document title menu in the navigation bar ("Untitled 15 ⌄").
+                          + app.navigationBars.buttons.allElementsBoundByIndex.filter { $0.frame.minY < 90 })
                 .map(\.frame)
             let toolLabels = Set(tools.map(\.0))
             return app.buttons.allElementsBoundByIndex.filter { $0.exists && $0.isHittable }.compactMap { b in
@@ -702,6 +713,31 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             }
         }
 
+        // A3–A5 "nothing important sits across the fold" (sheet). SHAPE_FOLD = "x" (a vertical hinge at the window's
+        // middle) or "y" (horizontal). A button, field or line of text straddling the fold by more than 6 pt on each
+        // side fails; the canvas and whole-width containers are not "important" single things.
+        let fold = env["SHAPE_FOLD"] ?? ""
+        func acrossFold() -> [String] {
+            guard fold == "x" || fold == "y" else { return [] }
+            let w = win.frame, line = fold == "x" ? w.midX : w.midY
+            let els = app.buttons.allElementsBoundByIndex + app.textFields.allElementsBoundByIndex
+                + app.staticTexts.allElementsBoundByIndex + app.sliders.allElementsBoundByIndex
+            // Only what a person can see and touch: the launch scene's buttons stay in the tree behind the editor.
+            return els.filter { $0.exists && $0.isHittable && $0.frame.width > 0 && $0.identifier != "canvas.element" }.compactMap { e in
+                let f = e.frame
+                let (lo, hi, span) = fold == "x" ? (f.minX, f.maxX, w.width) : (f.minY, f.maxY, w.height)
+                guard lo < line - 6, hi > line + 6, hi - lo < span * 0.9 else { return nil }
+                // His ruling 11-22: "how about the spine lables fall inside the fold" — the spine belongs there.
+                if e.elementType == .staticText, f.height > f.width * 1.5 { return nil }
+                return "\(e.label.isEmpty ? e.identifier : String(e.label.prefix(30)))"
+            }
+        }
+        func checkFold(_ where_: String) {
+            guard !fold.isEmpty else { return }
+            let x = acrossFold()
+            check(code, "Fold \(where_): nothing sits across the fold", x.isEmpty, x.joined(separator: ", "))
+        }
+
         // L1 — the launch screen.
         sleep(5)
         // REM 2026-11-22 A2 — held sideways, Apple's own document browser covers the launch title page and its
@@ -717,12 +753,18 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         check(code, "L1 Launch: every button is at least 44 × 44", l1small.isEmpty, l1small.joined(separator: ", "))
         let l1cut = offEdge()
         check(code, "L1 Launch: no text cut off at the edge", l1cut.isEmpty, l1cut.joined(separator: ", "))
+        checkFold("launch")
 
         // L2 — a new image in its own named project, with a real photo on a layer.
         openNewImage(named: "\(code) \(shapeName)")
         snapshot("\(code)-L2-new")
         check(code, "L2 The editor opened", app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 10))
         press("Image"); sleep(2)
+        // REM 2026-11-22 A3 — the open Duo's new image came up on the Layers tab, so Import was never on screen.
+        // Open the Tool tab first, the way a person would.
+        if !app.buttons["Import Image to New Layer…"].firstMatch.exists {
+            app.buttons.matching(identifier: "Tool").allElementsBoundByIndex.first { $0.isHittable }?.tap(); sleep(1)
+        }
         var placed = false
         if press("Import Image to New Layer…", 5) {
             sleep(3)
@@ -783,6 +825,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             let s = small(tab), cut = offEdge()
             check(code, "L4 \(tab) tab: every button at least 44 × 44", s.isEmpty, s.joined(separator: ", "))
             check(code, "L4 \(tab) tab: no text cut off", cut.isEmpty, cut.joined(separator: ", "))
+            checkFold("\(tab) tab")
         }
 
         // L5 + L6 — every tool's page: opens, nothing cut off, name once, controls a finger can use.
@@ -803,6 +846,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             let cut = offEdge(), s = small(title)
             check(code, "L5 \(title): no text cut off", cut.isEmpty, cut.joined(separator: ", "))
             check(code, "L5 \(title): every button at least 44 × 44", s.isEmpty, s.joined(separator: ", "))
+            checkFold(title)
             // L6 — "The tool inspector is too narrow to work in" (his 439 feedback): sliders and fields need room.
             let narrow = (app.sliders.allElementsBoundByIndex + app.textFields.allElementsBoundByIndex)
                 // REM 2026-11-22 — a number field (Canvas W/H) hugs its number by his 10-11 design; the 120 bar

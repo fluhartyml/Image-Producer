@@ -411,11 +411,21 @@ struct ContentView: View {
     static func isTallPhone(_ window: CGSize) -> Bool {
         window.width > 0 && window.height >= window.width * 1.8
     }
+    /// REM 2026-11-22 — the whole window's width (global coordinates start at its left edge), for the fold.
+    static var keyWindowWidth: CGFloat? {
+        #if os(iOS)
+        UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first?.bounds.width
+        #else
+        nil
+        #endif
+    }
     static func wholeWindow(_ geo: GeometryProxy) -> CGSize {
         CGSize(width: geo.size.width + geo.safeAreaInsets.leading + geo.safeAreaInsets.trailing,
                height: geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom)
     }
     @State private var windowSize: CGSize = .zero
+    /// REM 2026-11-22 — the Tool page's spine thickness, reported up so the sideways phone layout can center it on the fold.
+    @State private var spineThickness: CGFloat = 0
     private var tallPhone: Bool { usesPhoneLayout && (keyboardTallLock ?? ContentView.isTallPhone(windowSize)) }
 
     /// iPhone-only layout, isolated from iPad. Canvas gets the room; the tool box is a
@@ -612,29 +622,41 @@ struct ContentView: View {
             // 249; Nov 19: two rows of tools, then Tool | Layers | History). This branch had a one-line scrolling
             // strip in a fixed 300 pt column and the compact panel (no switch). Now: half and half (his 10-04
             // rule), every tool in two rows, and the full Tool | Layers | History switch.
+            // REM 2026-11-22 — SPINE ON THE FOLD (his idea, "yes build it"). The split is no longer half of this
+            // area (which ends at the Back/Files rail and put the split 34 pt left of the open Duo's fold); the
+            // canvas runs to half a spine before the screen's middle, the spine sits across the middle, and the
+            // toolbox, switch and settings start at the middle. No Duo test exists in code, so a regular iPhone held
+            // sideways gets the same centered split.
+            let foldX = (ContentView.keyWindowWidth ?? 0) > 0
+                ? ContentView.keyWindowWidth! / 2 - geo.frame(in: .global).minX : geo.size.width / 2
+            let half = spineThickness / 2
+            let canvasWidth = min(max(120, foldX - half), geo.size.width - 200)
             HStack(spacing: 0) {
                 canvasArea
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                Divider()
+                    .frame(width: canvasWidth)
+                    .frame(maxHeight: .infinity)
                 VStack(spacing: 0) {
                     if !toolsFloating {
                         HStack(spacing: 0) {
                             toolPaletteGrip
                             ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { if usesPhoneLayout && $0.hasInspector { bottomPanel = .tool } }, wrap: true)
                         }
+                        .padding(.leading, half)
                         Divider()
                     }
                     BottomPanel.PanelView(document: document,
                                           camera: camera, activeTool: activeTool,
                                           activeLayerID: $activeLayerID, selection: $bottomPanel,
-                                          fillColor: $fillColor, fileURL: fileURL, compact: false, spine: true)
+                                          fillColor: $fillColor, fileURL: fileURL, compact: false, spine: true,
+                                          foldInset: half)
                         // REM 2026-11-22 shakedown A2 (closed Duo on its side) — every tool page here still had the
                         // horizontal title. His word 11-21: "the word 'image' is supposed to be vertical not horizontal
                         // it should be to the left of the tool tab" · "i hope you are testing every other tool inspector
                         // because that horizontal lable takes up too much realestate". Spine here too (phone layout only).
                         .frame(maxHeight: .infinity)
                 }
-                .frame(width: geo.size.width / 2)
+                .frame(maxWidth: .infinity)
+                .onPreferenceChange(SpineThicknessKey.self) { spineThickness = $0 }
             }
             .overlay(alignment: .topLeading) {
                 if toolsFloating { floatingToolPalette(in: geo.size) }
@@ -1651,8 +1673,15 @@ struct ContentView: View {
                 .disabled(canvasZoom <= minZoom)
         }
         .scaledFont(15, weight: .semibold)
+        // REM 2026-11-22 shakedown A3 (Duo open): the zoom pill's buttons were 12–22 pt on iOS. Apple's 44 × 44
+        // (000.11, HIG) — each button gets a 44-pt tap area and the pill widens to hold it. The Mac keeps 30.
+        #if os(iOS)
+        .buttonStyle(TouchTargetButtonStyle())
+        .frame(width: 44)
+        #else
         .buttonStyle(.plain)
         .frame(width: 30)
+        #endif
         .padding(8)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.secondary.opacity(0.25)))
@@ -1873,6 +1902,7 @@ struct ToolInspector: View {
                     .accessibilityAddTraits(.isHeader)
             }
             .frame(width: spineMetrics.thickness)
+            .preference(key: SpineThicknessKey.self, value: spineMetrics.thickness)
             VStack(alignment: .leading, spacing: 0) {
                 if let name = activeLayerName {
                     Text("Layer: \(name)")
@@ -3846,6 +3876,7 @@ struct FontPickerInspector: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 4).padding(.horizontal, 6)
+            .touchTarget()   // REM 2026-11-22 shakedown A3: font rows were 29–32 pt tall on iOS (000.11, HIG 44)
             .background(RoundedRectangle(cornerRadius: 6)
                 .fill(info.name == family ? Color.accentColor.opacity(0.2) : Color.clear))
             .overlay(RoundedRectangle(cornerRadius: 6)
@@ -4631,6 +4662,11 @@ enum BottomPanel: String, CaseIterable, Identifiable {
         var compact: Bool = false
         /// REM 2026-11-19 — tall iPhone: the Tool page names its tool with the spine (see ToolInspector).
         var spine: Bool = false
+        /// REM 2026-11-22 — phone held sideways (the open Duo): the panel starts half a spine BEFORE the fold so the
+        /// Tool page's spine sits on the fold (his idea: "how about the spine lables fall inside the fold" → "yes build
+        /// it"). Everything else in the panel — the switch, Layers, History — is pushed in by this much so it starts
+        /// at the fold and nothing but the spine crosses it.
+        var foldInset: CGFloat = 0
 
         var body: some View {
             VStack(spacing: 0) {
@@ -4642,6 +4678,7 @@ enum BottomPanel: String, CaseIterable, Identifiable {
                     .labelsHidden()
                     .accessibilityLabel("Panel")
                     .padding(8)
+                    .padding(.leading, foldInset)
                 }
 
                 #if os(iOS)
@@ -4657,8 +4694,8 @@ enum BottomPanel: String, CaseIterable, Identifiable {
                     Group {
                         switch selection {
                         case .tool:    toolPage
-                        case .layers:  layersPage
-                        case .history: historyPage
+                        case .layers:  layersPage.padding(.leading, foldInset)
+                        case .history: historyPage.padding(.leading, foldInset)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -10289,6 +10326,21 @@ extension EnvironmentValues {
     var copyLayerAction: (ImageLayer.ID) -> Void {
         get { self[CopyLayerActionKey.self] }
         set { self[CopyLayerActionKey.self] = newValue }
+    }
+}
+
+/// REM 2026-11-22 — the spine's thickness, reported to the layout that centers it on the fold.
+struct SpineThicknessKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// REM 2026-11-22 — a plain button whose tap area is at least 44 × 44 on iOS (the zoom pill).
+struct TouchTargetButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .touchTarget()
+            .opacity(configuration.isPressed ? 0.5 : 1)
     }
 }
 
