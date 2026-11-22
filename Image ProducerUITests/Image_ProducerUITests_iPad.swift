@@ -1582,11 +1582,18 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         if runs("120") {
             opensSaver("A-120", "Export layer PDF")
             let flat = app.switches["Flatten transparency onto a matte"].firstMatch
-            if reveal(flat) { let v0 = flat.value as? String; flat.tap(); sleep(1)
-                check("A-120", "Flatten onto a matte switches", (flat.value as? String) != v0); flat.tap(); sleep(1) }
-            else { check("A-120", "Flatten switch found", false) }
+            // REM 15:5x — the Matte color well exists only while Flatten is ON (ContentView: if flattenLayerPDF); the old test
+            // switched Flatten back off before looking for it. Now: on → well shows → off → well gone.
             let matte = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Matte color'")).firstMatch
-            check("A-120", "Matte color well shows", reveal(matte))
+            if reveal(flat) { let v0 = flat.value as? String
+                let knob = flat.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+                if v0 == "1" { knob.tap(); sleep(1) }   // start from off
+                knob.tap(); sleep(1)
+                check("A-120", "Flatten onto a matte switches on", (flat.value as? String) == "1", "\(v0 ?? "?") → \(flat.value ?? "?")")
+                check("A-120", "Matte color well shows while Flatten is on", reveal(matte))
+                if reveal(flat) { knob.tap(); sleep(1) }
+                check("A-120", "Matte color well hides when Flatten is off", (flat.value as? String) == "0" && !matte.exists, "flatten=\(flat.value ?? "?")")
+            } else { check("A-120", "Flatten switch found", false) }
             opensSaver("A-120", "Import layer PDF")
         }
         // A-121 — File rows.
