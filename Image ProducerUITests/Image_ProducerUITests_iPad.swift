@@ -29,7 +29,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         continueAfterFailure = true
         // testDuoLook runs in whatever shape Claude set in Device Hub — don't turn the device for it.
         // So does the shakedown (testShakedownLayout): every shape is set by hand in Device Hub first.
-        if !name.contains("testDuoLook") && !name.contains("testShakedownLayout") && !name.contains("testShapeChange") && !name.contains("testElementsA") && !name.contains("testKeyProbe") { XCUIDevice.shared.orientation = .landscapeLeft }
+        if !name.contains("testDuoLook") && !name.contains("testShakedownLayout") && !name.contains("testShapeChange") && !name.contains("testElementsA") && !name.contains("testKeyProbe") && !name.contains("testNameFieldIdle") { XCUIDevice.shared.orientation = .landscapeLeft }
         app = XCUIApplication()
         app.launchArguments += ["-ImageProducerUITest"]
         app.launch()
@@ -1562,6 +1562,19 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             app.typeKey(XCUIKeyboardKey.escape, modifierFlags: []); sleep(2)
             record("| KEY | — | Esc, Name focused → sheet closed: \(!app.buttons["Create"].exists) |")
         }
+    }
+
+    /// A-114 stall (11-22): tap Project name on the Canvas page and hold 40 s, so the Mac can measure the app's CPU.
+    func testNameFieldIdle() throws {
+        XCUIDevice.shared.orientation = .portrait; sleep(2)
+        openNewImage(named: "A7 name idle")
+        press("Canvas Tool"); sleep(2)
+        let f = app.textFields["Project name"].firstMatch
+        record("| IDLE | — | READY tapping Project name |")
+        if f.waitForExistence(timeout: 5) { f.tap() }
+        record("| IDLE | — | TAPPED |")
+        sleep(40)
+        snapshot("IDLE-after")
     }
 
     func testPhoneFloatingPreviewSetting() throws {
