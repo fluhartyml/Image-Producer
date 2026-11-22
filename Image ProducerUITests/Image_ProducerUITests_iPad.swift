@@ -27,7 +27,8 @@ final class Image_ProducerUITests_iPad: XCTestCase {
 
     override func setUp() {
         continueAfterFailure = true
-        XCUIDevice.shared.orientation = .landscapeLeft
+        // testDuoLook runs in whatever shape Claude set in Device Hub — don't turn the device for it.
+        if !name.contains("testDuoLook") { XCUIDevice.shared.orientation = .landscapeLeft }
         app = XCUIApplication()
         app.launchArguments += ["-ImageProducerUITest"]
         app.launch()
@@ -619,6 +620,31 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         app.buttons["Neon Glow"].firstMatch.tap(); sleep(1)
         let back = (slider.value as? String) ?? "nil"
         check("glow", "Plasma → Neon keeps Intensity", back == before, "before \(before), back \(back)")
+    }
+
+    // REM 2026-11-21 18:3x — his Duo feedback on 439: "What the fuck dude the tool box is scrolling and the layers
+    // tool inspector and history are no where to be found" (landscape, "because portrait is worse"). His rulings:
+    // two rows of tools, never scrolling (Oct 04, build 249), then Tool | Layers | History (Nov 19). He watches
+    // this run in Device Hub: it opens an image on its side, picks the Layer tool, and holds so the layout shows.
+    // REM 18:5x his word: "reuse this test for every duo orientation as a proof of concept". The test no longer
+    // turns the device: Claude sets each shape in Device Hub (Closed / Open, Rotate Right) and runs it once per shape.
+    func testDuoLook() throws {
+        openNewImage()
+        press("Layer"); sleep(2)
+        let shape = (ProcessInfo.processInfo.environment["DUO_SHAPE"] ?? "")
+        let w = app.windows.firstMatch.frame.size
+        record("| duo | — | Shape \(shape): window \(Int(w.width)) × \(Int(w.height)) |")
+        app.screenshot().attach(self, "duo-\(shape)")
+        // The three must sit together as ONE switch: the Layers and History buttons in the top bar
+        // don't count (the 18:3x before-run passed Layers/History on those alone).
+        let tool = app.buttons["Tool"].firstMatch
+        check("duo", "Tool | Layers | History switch shows", tool.exists && {
+            let row = tool.frame.midY
+            let inRow = { (n: String) in self.app.buttons.matching(identifier: n).allElementsBoundByIndex.contains { abs($0.frame.midY - row) < 8 } }
+            return inRow("Layers") && inRow("History")
+        }())
+        check("duo", "Every tool is on screen (no scrolling)", button("Camera").exists && button("Camera").isHittable)
+        sleep(15)   // hold so he can look
     }
 
     func testPhoneFloatingPreviewSetting() throws {

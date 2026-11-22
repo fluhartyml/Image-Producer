@@ -572,15 +572,24 @@ struct ContentView: View {
                     }
                     Divider()
                 }
+                // REM 2026-11-21 18:5x — the closed Duo upright lands here, and the 4-shape shakedown found no
+                // Tool | Layers | History switch (compact panel). His rulings (Nov 19): two rows of tools, then
+                // the switch. Full switch now, as in phone landscape.
                 BottomPanel.PanelView(document: document, camera: camera, activeTool: activeTool,
                                       activeLayerID: $activeLayerID, selection: $bottomPanel,
-                                      fillColor: $fillColor, fileURL: fileURL, compact: true)
+                                      fillColor: $fillColor, fileURL: fileURL, compact: false)
                     .frame(maxHeight: .infinity)
             }
             .overlay(alignment: .topLeading) {
                 if toolsFloating { floatingToolPalette(in: geo.size) }
             }
         } else {
+            // REM 2026-11-21 18:4x — PHONE LANDSCAPE (the closed iPhone Duo on its side). His TestFlight note on 439:
+            // "What the fuck dude the tool box is scrolling and the layers tool inspector and history are no where to
+            // be found" · "the tool boxes were supposed to be two rows and not scrolling" (his ruling Oct 04, build
+            // 249; Nov 19: two rows of tools, then Tool | Layers | History). This branch had a one-line scrolling
+            // strip in a fixed 300 pt column and the compact panel (no switch). Now: half and half (his 10-04
+            // rule), every tool in two rows, and the full Tool | Layers | History switch.
             HStack(spacing: 0) {
                 canvasArea
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -589,16 +598,17 @@ struct ContentView: View {
                     if !toolsFloating {
                         HStack(spacing: 0) {
                             toolPaletteGrip
-                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { if usesPhoneLayout && $0.hasInspector { bottomPanel = .tool } }, lines: 1)
+                            ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { if usesPhoneLayout && $0.hasInspector { bottomPanel = .tool } }, wrap: true)
                         }
                         Divider()
                     }
                     BottomPanel.PanelView(document: document,
                                           camera: camera, activeTool: activeTool,
                                           activeLayerID: $activeLayerID, selection: $bottomPanel,
-                                          fillColor: $fillColor, fileURL: fileURL, compact: true)
+                                          fillColor: $fillColor, fileURL: fileURL, compact: false)
+                        .frame(maxHeight: .infinity)
                 }
-                .frame(width: 300)
+                .frame(width: geo.size.width / 2)
             }
             .overlay(alignment: .topLeading) {
                 if toolsFloating { floatingToolPalette(in: geo.size) }
