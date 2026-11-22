@@ -125,8 +125,20 @@ struct ContentView: View {
     /// REM 2026-11-18 — the phone's canvas/panel split is a handle he drags (his word: "the
     /// elements should be moveable and resizable like you normally do"). Stored as the most of
     /// the screen's height the canvas may take; the picture's own shape can still make it less.
-    @AppStorage("ip.phone.canvasShare", store: UITestDoor.defaults) private var phoneCanvasShare: Double = 0.66
+    /// 0 = never dragged: use `defaultCanvasShare`.
+    @AppStorage("ip.phone.canvasShare", store: UITestDoor.defaults) private var storedCanvasShare: Double = 0
     @State private var splitDragStart: Double?
+    /// REM 2026-11-21 21:2x — SHAKEDOWN A-001, his word on the closed Duo upright: "that scroll area is
+    /// TOO SMALL". At 66% the square canvas left the tool page 75 pt (a 30-pt scroll), so "Import Image
+    /// to New Layer…" sat below the screen's edge (his TestFlight note on 439: "The tool inspector is too
+    /// narrow to work in"). On an iPhone this branch is only the closed Duo upright (a plain iPhone held
+    /// upright is the tall phone), so the phone starts at 46% — the tool page gets about 180 pt. iPad
+    /// windows that fall into the phone layout keep 66%. The handle still drags it, and is remembered.
+    private var defaultCanvasShare: Double { ContentView.deviceIsPhone ? 0.46 : 0.66 }
+    private var phoneCanvasShare: Double {
+        get { storedCanvasShare > 0 ? storedCanvasShare : defaultCanvasShare }
+        nonmutating set { storedCanvasShare = newValue }
+    }
     /// True while the on-screen keyboard is up. His Duo note, 7:49 AM: "Everything is so cramped
     /// up no place for the keyboard when i tapped the name" — the canvas steps aside while typing.
     @State private var keyboardUp = false
@@ -439,7 +451,7 @@ struct ContentView: View {
                 phoneCanvasShare = min(0.85, max(0.15, start + Double(v.translation.height / max(1, height))))
             }
             .onEnded { _ in splitDragStart = nil })
-        .onTapGesture(count: 2) { withAnimation(.snappy) { phoneCanvasShare = 0.66 } }
+        .onTapGesture(count: 2) { withAnimation(.snappy) { storedCanvasShare = 0 } }
         .accessibilityElement()
         .accessibilityLabel("Canvas size")
         .accessibilityValue("\(Int((phoneCanvasShare * 100).rounded())) percent")
@@ -457,7 +469,13 @@ struct ContentView: View {
         Button { withAnimation(.snappy) { toolsFloating.toggle() } } label: {
             Image(systemName: "line.3.horizontal")
                 .rotationEffect(.degrees(90))
+                // REM 2026-11-21 — SHAKEDOWN A1, his rule 000.11: the grip took taps on an 18-pt wide strip,
+                // under Apple's 44-pt touch minimum. 44 wide on iPhone and iPad; the Mac keeps 18 for a pointer.
+                #if os(iOS)
+                .frame(width: 44, height: 76)
+                #else
                 .frame(width: 18, height: 76)
+                #endif
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -492,6 +510,8 @@ struct ContentView: View {
                             .background(RoundedRectangle(cornerRadius: 8)
                                 .fill(activeTool == tool ? Color.accentColor.opacity(0.25) : .clear))
                             .foregroundStyle(activeTool == tool ? Color.accentColor : Color.primary)
+                            // REM 2026-11-21 — shakedown 000.11: the whole cell takes the tap, not just the glyph.
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(tool.accessibilityName)
@@ -575,9 +595,11 @@ struct ContentView: View {
                 // REM 2026-11-21 18:5x — the closed Duo upright lands here, and the 4-shape shakedown found no
                 // Tool | Layers | History switch (compact panel). His rulings (Nov 19): two rows of tools, then
                 // the switch. Full switch now, as in phone landscape.
+                // REM 2026-11-21 21:2x — his word on the closed Duo upright: "that lable 'immage' is supposed to be
+                // a spine from bottom of the frame to the top" — his 11-21 spine ruling, here too (spine: true).
                 BottomPanel.PanelView(document: document, camera: camera, activeTool: activeTool,
                                       activeLayerID: $activeLayerID, selection: $bottomPanel,
-                                      fillColor: $fillColor, fileURL: fileURL, compact: false)
+                                      fillColor: $fillColor, fileURL: fileURL, compact: false, spine: true)
                     .frame(maxHeight: .infinity)
             }
             .overlay(alignment: .topLeading) {
@@ -1709,6 +1731,14 @@ struct ToolStrip: View {
                                                               : Color.clear)
                             )
                             .foregroundStyle(activeTool == tool ? Color.accentColor : Color.primary)
+                            // REM 2026-11-21 — SHAKEDOWN A1 (his rule 000.11: "be able to conceptually use a
+                            // human finger to manipulate a button"). A .plain button only takes taps on the
+                            // pixels it draws and the unselected background is clear, so each tool took taps
+                            // on its glyph alone (10–20 pt, measured on the Duo simulator). Apple's minimum is
+                            // 44 × 44: fill the whole cell, at least 44 tall, all of it tappable. The glyph
+                            // and its highlight keep their size.
+                            .frame(maxWidth: wrap ? .infinity : side, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     // simultaneous, not .onTapGesture — a Button already owns the tap,

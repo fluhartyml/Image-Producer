@@ -169,7 +169,14 @@ struct ProductionPiP: View {
     /// panel's own: drag it to another corner at any zoom (his 11-05 "movable like the PiP
     /// everywhere"). It is a button too — a tap sends it to the next corner — so a switch, Voice
     /// Control or Sticky Keys user never needs the drag (his rules).
+    /// REM 2026-11-21 — SHAKEDOWN A1, his rule 000.11 ("use a human finger to manipulate a button"): the
+    /// handle took taps on a 26-pt tall strip, under Apple's 44-pt touch minimum. On iPhone and iPad the
+    /// strip is now 44 tall (36 + the 8 it already added); the Mac keeps its pointer-sized 26.
+    #if os(iOS)
+    static let gripHeight: CGFloat = 36
+    #else
     static let gripHeight: CGFloat = 18
+    #endif
 
     private var moveDrag: some Gesture {
         DragGesture(minimumDistance: 2)

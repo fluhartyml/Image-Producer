@@ -211,8 +211,8 @@ struct SelectionInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Selection").scaledFont(18).bold()
-
+            // REM 2026-11-21 — shakedown A1: a bold "Selection" title sat under the inspector's own
+            // "Selection" header. His word 11-21: "the lable of eacj tool inspector should be listed only once".
             Text("Shape").scaledFont(18).foregroundStyle(.secondary)
             Picker("Shape", selection: $document.selectionShape) {
                 ForEach(SelectionShape.allCases) { s in

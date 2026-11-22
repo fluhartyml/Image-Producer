@@ -537,8 +537,8 @@ struct MaskInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Mask").scaledFont(18).bold()
-
+            // REM 2026-11-21 — shakedown A1: a bold "Mask" title repeated the inspector's own header.
+            // His word 11-21: "the lable of eacj tool inspector should be listed only once".
             if document.cropMask == nil {
                 Text("No mask. The mask marks what is KEPT — everything outside it dims, and Export trims to it.")
                     .scaledFont(18).foregroundStyle(.secondary)

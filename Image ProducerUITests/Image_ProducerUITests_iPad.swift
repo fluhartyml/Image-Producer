@@ -28,7 +28,8 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     override func setUp() {
         continueAfterFailure = true
         // testDuoLook runs in whatever shape Claude set in Device Hub — don't turn the device for it.
-        if !name.contains("testDuoLook") { XCUIDevice.shared.orientation = .landscapeLeft }
+        // So does the shakedown (testShakedownLayout): every shape is set by hand in Device Hub first.
+        if !name.contains("testDuoLook") && !name.contains("testShakedownLayout") { XCUIDevice.shared.orientation = .landscapeLeft }
         app = XCUIApplication()
         app.launchArguments += ["-ImageProducerUITest"]
         app.launch()
@@ -141,7 +142,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     }
 
     /// Launch screen → New Image → the editor (shared by the shakedown and the text-size check).
-    func openNewImage() {
+    func openNewImage(named name: String? = nil) {
         // Launch screen → New Image (the launch scene's own button; the system makes the file).
         sleep(5); snapshot("00-start")
         // REM: the launch scene and the document browser under it BOTH carry a "New Image"
@@ -182,6 +183,12 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         if alert.exists {
             record("| — | ⚠️ ALERT | \(alert.label): \(alert.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " ")) |")
             alert.buttons.firstMatch.tap(); sleep(1)
+        }
+        // REM 2026-11-21 — shakedown rule 000.7 (his word): one project file per subsection, named for it.
+        if let name, app.buttons["Create"].waitForExistence(timeout: 10) {
+            let field = app.textFields["File name"].firstMatch
+            if field.exists { field.tap(); field.typeText(name) }
+            else { record("| — | ℹ️ INFO | New Image sheet has no Name field; file keeps its automatic name |") }
         }
         if press("Create", 10) { sleep(2) }
     }
@@ -645,6 +652,188 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         }())
         check("duo", "Every tool is on screen (no scrolling)", button("Camera").exists && button("Camera").isHittable)
         sleep(15)   // hold so he can look
+    }
+
+    // REM 2026-11-21 — THE SHAKEDOWN (Workshop/Image-Producer-Shakedown-Amber-Sheet.html in the apartment).
+    // His word: "lets start the amber roadmap of your shake down for image producer". This is the layout pass,
+    // L1–L7, run once per device shape. Claude sets the shape in Device Hub; SHAPE_CODE (e.g. "A1") names the
+    // subsection and its project file (rule 000.7). His rules it checks: 000.8 a real photo, never clear pixels ·
+    // 000.11 every control at least 44 × 44 points, never covered · 000.12 every tab · his Oct 4 ruling, two rows
+    // of tools, no scrolling · "the lable of eacj tool inspector should be listed only once" (11-21).
+    func testShakedownLayout() throws {
+        let env = ProcessInfo.processInfo.environment
+        let code = env["SHAPE_CODE"] ?? "X"
+        let shapeName = env["SHAPE_NAME"] ?? "unnamed shape"
+        let win = app.windows.firstMatch
+        record("| \(code) | — | \(shapeName): window \(Int(win.frame.width)) × \(Int(win.frame.height)) |")
+
+        // Buttons smaller than Apple's 44 × 44 touch minimum, on whatever is on screen now (000.11).
+        func small(_ where_: String) -> [String] {
+            app.buttons.allElementsBoundByIndex.filter { $0.exists && $0.isHittable }.compactMap { b in
+                let f = b.frame
+                guard f.width > 0, f.height > 0, f.width < 44 || f.height < 44 else { return nil }
+                let n = b.label.isEmpty ? b.identifier : b.label
+                return "\(n.isEmpty ? "?" : n) \(Int(f.width))×\(Int(f.height))"
+            }
+        }
+        // Text cut off at the window's edge.
+        func offEdge() -> [String] {
+            let w = win.frame
+            return app.staticTexts.allElementsBoundByIndex.filter { $0.exists }.compactMap { t in
+                let f = t.frame
+                guard f.width > 0, f.minX < w.minX - 1 || f.maxX > w.maxX + 1 else { return nil }
+                return "\"\(t.label.prefix(30))\""
+            }
+        }
+
+        // L1 — the launch screen.
+        sleep(5)
+        let launchNew = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).allElementsBoundByIndex
+            .filter { $0.isHittable }.sorted { $0.frame.minY < $1.frame.minY }.first
+        snapshot("\(code)-L1-launch")
+        check(code, "L1 Launch: New Image is on screen and tappable", launchNew != nil)
+        let l1small = small("launch")
+        check(code, "L1 Launch: every button is at least 44 × 44", l1small.isEmpty, l1small.joined(separator: ", "))
+        let l1cut = offEdge()
+        check(code, "L1 Launch: no text cut off at the edge", l1cut.isEmpty, l1cut.joined(separator: ", "))
+
+        // L2 — a new image in its own named project, with a real photo on a layer.
+        openNewImage(named: "\(code) \(shapeName)")
+        snapshot("\(code)-L2-new")
+        check(code, "L2 The editor opened", app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 10))
+        press("Image"); sleep(2)
+        var placed = false
+        if press("Import Image to New Layer…", 5) {
+            sleep(3)
+            snapshot("\(code)-L2-picker")
+            let photo = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Shakedown Photo 1'")).firstMatch
+            if !photo.waitForExistence(timeout: 5) {
+                // The picker may open on Recents: Browse → On My iPhone → Image Producer.
+                if press("Browse", 3) { sleep(1) }
+                let onMy = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'On My iPhone'")).firstMatch
+                if onMy.waitForExistence(timeout: 3) { onMy.tap(); sleep(1) }
+                let folder = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Image Producer'")).firstMatch
+                if folder.waitForExistence(timeout: 3) { folder.tap(); sleep(1) }
+            }
+            snapshot("\(code)-L2-picker-folder")
+            if photo.waitForExistence(timeout: 5) { photo.tap(); sleep(4); placed = true }
+            // REM 20:3x A1 run: the picker never found the photo and stayed open over the editor, so every
+            // later check read nothing. If the photo wasn't picked, close the picker before going on.
+            if !placed {
+                for n in ["Cancel", "Close"] where app.buttons[n].firstMatch.exists { app.buttons[n].firstMatch.tap(); sleep(1); break }
+            }
+        }
+        let afterPhoto = probe()
+        snapshot("\(code)-L2-photo")
+        check(code, "L2 A real photo is placed on a layer (000.8)", placed && (afterPhoto?.layers ?? 0) >= 1,
+              "layers \(afterPhoto?.layers ?? -1), active \(afterPhoto?.active ?? "?")")
+        let pip = app.descendants(matching: .any)["pip.panel"].firstMatch
+        let back = app.buttons["BackButton"].firstMatch
+        if pip.exists, back.exists {
+            check(code, "L2 The floating preview stays clear of the Back button", !pip.frame.intersects(back.frame),
+                  String(format: "preview %.0f,%.0f %.0f×%.0f · Back %.0f,%.0f", pip.frame.minX, pip.frame.minY, pip.frame.width, pip.frame.height, back.frame.minX, back.frame.minY))
+        }
+
+        // L3 — the toolbox: two rows, no scrolling, every tool on screen.
+        let tools: [(String, String)] = [("Canvas Tool", "Canvas"), ("Color Palette", "Color Palette"), ("Move", "Move / Transform"),
+            ("Selection", "Selection"), ("Mask", "Mask"), ("Paint Drop Bucket", "Paint Drop / Bucket"), ("Pixel Pen", "Pen (Pixels)"),
+            ("Eraser", "Eraser"), ("Eyedropper", "Eyedropper"), ("Text", "Text"), ("Symbol", "Symbol"), ("Image", "Image"),
+            ("Image Playground", "Image Playground"), ("Layer", "Layer"), ("Remove Background", "Remove Background"),
+            ("Magic Lasso", "Magic Lasso"), ("Adjust", "Adjust"), ("Camera", "Camera")]
+        var offScreen: [String] = [], rows = Set<Int>(), toolSizes = Set<String>()
+        for (t, _) in tools {
+            let b = button(t)
+            guard b.waitForExistence(timeout: 3), b.isHittable, win.frame.contains(b.frame) else { offScreen.append(t); continue }
+            rows.insert(Int(b.frame.midY.rounded()))
+            toolSizes.insert("\(Int(b.frame.width))×\(Int(b.frame.height))")
+        }
+        snapshot("\(code)-L3-toolbox")
+        check(code, "L3 Every tool is on screen without scrolling", offScreen.isEmpty, offScreen.joined(separator: ", "))
+        check(code, "L3 Tools sit in two rows", rows.count == 2, "\(rows.count) row(s)")
+        check(code, "L3 Tool buttons are at least 44 × 44", toolSizes.allSatisfy { s in s.split(separator: "×").allSatisfy { Int($0) ?? 0 >= 44 } },
+              toolSizes.sorted().joined(separator: ", "))
+
+        // L4 — the Tool | Layers | History switch, every tab (000.12).
+        let tabTool = app.buttons["Tool"].firstMatch
+        let row = tabTool.frame.midY
+        let tabsTogether = tabTool.exists && ["Layers", "History"].allSatisfy { n in
+            app.buttons.matching(identifier: n).allElementsBoundByIndex.contains { abs($0.frame.midY - row) < 8 } }
+        check(code, "L4 Tool | Layers | History sit together as one switch", tabsTogether)
+        for tab in ["Layers", "History", "Tool"] {
+            let b = app.buttons.matching(identifier: tab).allElementsBoundByIndex.first { abs($0.frame.midY - row) < 8 }
+            b?.tap(); sleep(1)
+            snapshot("\(code)-L4-\(tab)")
+            check(code, "L4 \(tab) tab opens", b?.isSelected ?? false)
+            let s = small(tab), cut = offEdge()
+            check(code, "L4 \(tab) tab: every button at least 44 × 44", s.isEmpty, s.joined(separator: ", "))
+            check(code, "L4 \(tab) tab: no text cut off", cut.isEmpty, cut.joined(separator: ", "))
+        }
+
+        // L5 + L6 — every tool's page: opens, nothing cut off, name once, controls a finger can use.
+        for (i, (t, title)) in tools.enumerated() {
+            guard press(t, 3) else { check(code, "L5 \(title): tool button found", false); continue }
+            sleep(2)
+            if app.sheets.firstMatch.exists || app.alerts.firstMatch.exists {
+                snapshot(String(format: "%@-L5-%02d-%@-alert", code, i, t.replacingOccurrences(of: " ", with: "-")))
+                app.alerts.firstMatch.buttons.firstMatch.tap(); sleep(1)
+            }
+            snapshot(String(format: "%@-L5-%02d-%@", code, i, t.replacingOccurrences(of: " ", with: "-")))
+            // A button that DOES the tool's job ("Remove Background") is an action, not a second title:
+            // count only text that isn't a button's own caption.
+            let buttonFrames = app.buttons.matching(NSPredicate(format: "label == %@", title)).allElementsBoundByIndex.map(\.frame)
+            let named = app.staticTexts.matching(NSPredicate(format: "label == %@", title)).allElementsBoundByIndex
+                .filter { t in !buttonFrames.contains { $0.intersects(t.frame) } }.count
+            check(code, "L5 \(title): name shown once", named <= 1, "\(named) times")
+            let cut = offEdge(), s = small(title)
+            check(code, "L5 \(title): no text cut off", cut.isEmpty, cut.joined(separator: ", "))
+            check(code, "L5 \(title): every button at least 44 × 44", s.isEmpty, s.joined(separator: ", "))
+            // L6 — "The tool inspector is too narrow to work in" (his 439 feedback): sliders and fields need room.
+            let narrow = (app.sliders.allElementsBoundByIndex + app.textFields.allElementsBoundByIndex)
+                .filter { $0.exists && $0.isHittable && $0.frame.width < 120 }
+                .map { "\($0.label.isEmpty ? $0.identifier : $0.label) \(Int($0.frame.width)) wide" }
+            check(code, "L6 \(title): sliders and fields at least 120 wide", narrow.isEmpty, narrow.joined(separator: ", "))
+            // REM 2026-11-21 21:2x — his word on the Duo: "that lable 'immage' is supposed to be a spine from bottom
+            // of the frame to the top" · "that horizontal lable takes up too much realestate". The name must run
+            // vertically (taller than wide), and no horizontal copy of it may sit on the page.
+            let nameEls = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ AND elementType != %d", title,
+                                                                              XCUIElement.ElementType.button.rawValue))
+                .allElementsBoundByIndex.filter { $0.exists && $0.frame.width > 0 && !buttonFrames.contains($0.frame) }
+            let spine = nameEls.contains { $0.frame.height > $0.frame.width }
+            let flat = nameEls.filter { $0.frame.width > $0.frame.height && $0.elementType == .staticText }
+            check(code, "L6 \(title): name is a vertical spine on the left", spine,
+                  nameEls.map { "\(Int($0.frame.width))×\(Int($0.frame.height))" }.joined(separator: ", "))
+            check(code, "L6 \(title): no horizontal title", flat.isEmpty, "\(flat.count) horizontal")
+            // His word: "that scroll area is TOO SMALL" — the tool page's scroll area needs real room.
+            let panelBottom = app.segmentedControls["Panel"].firstMatch.exists ? app.segmentedControls["Panel"].firstMatch.frame.maxY : 0
+            let pageHeight = app.scrollViews.allElementsBoundByIndex.filter { $0.exists && $0.frame.minY >= panelBottom - 1 }
+                .map(\.frame.height).max() ?? 0
+            check(code, "L6 \(title): tool page at least 120 tall", pageHeight >= 120, "\(Int(pageHeight)) tall")
+            audit("\(code) \(title)")
+        }
+
+        // L7 — draw, leave the project, reopen it: the work is all there.
+        let before = probe()
+        press("Pixel Pen", 3); sleep(1)
+        let canvasEl = app.descendants(matching: .any)["uitest.canvas"].firstMatch
+        if canvasEl.exists { canvasEl.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.3)).tap(); sleep(2) }
+        let drawn = probe()
+        check(code, "L7 Drawing adds to the project", (drawn?.layers ?? 0) > (before?.layers ?? 0),
+              "layers \(before?.layers ?? -1) → \(drawn?.layers ?? -1)")
+        sleep(3)   // autosave runs 1.5 s after the last edit
+        if back.exists { back.tap(); sleep(3) }
+        snapshot("\(code)-L7-browser")
+        let file = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "\(code) ")).firstMatch
+        if file.waitForExistence(timeout: 8) { file.tap(); sleep(4) }
+        // REM 20:5x A1 run: a reopened project has no layer selected, and probe() only reads with one
+        // selected — read the layer count straight off the canvas probe instead.
+        var reopened: Probe? = nil
+        let anyProbe = app.descendants(matching: .any)["uitest.canvas"].firstMatch
+        if anyProbe.waitForExistence(timeout: 8), let r = anyProbe.label.range(of: "layers=") {
+            var p = Probe(); p.layers = Int(anyProbe.label[r.upperBound...].prefix { $0.isNumber }) ?? -1; reopened = p
+        }
+        snapshot("\(code)-L7-reopened")
+        check(code, "L7 Reopened project has the same layers", reopened != nil && reopened?.layers == drawn?.layers,
+              "before \(drawn?.layers ?? -1), after \(reopened?.layers ?? -1)")
     }
 
     func testPhoneFloatingPreviewSetting() throws {
