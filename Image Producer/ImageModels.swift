@@ -135,7 +135,12 @@ final class ImageDocument {
     /// own URL is NOT updated after that move, so autosave kept writing to the old name and
     /// re-created "Untitled" beside the renamed file (2026-10-03: "the file name didnt
     /// save"). Autosave and the Project name field prefer this when set.
-    @ObservationIgnored var movedFileURL: URL?
+    /// REM 2026-11-22 — OBSERVED now (was @ObservationIgnored). HIS REPORT, 451 on his real Duo: the title stayed
+    /// "Untitled" after Create until he tapped the canvas, then showed his name — the rename landed, but nothing
+    /// redrew the window. Setting this now redraws every view that shows the name. (Autosave is unaffected: it
+    /// watches only the list in observeSavedState().) The simulator renames before the first draw, so it can't
+    /// show the bug; his Duo is the check.
+    var movedFileURL: URL?
     /// Same, across a reopen of the same document object this launch.
     static var askedForNewImage: Set<ObjectIdentifier> = []
 

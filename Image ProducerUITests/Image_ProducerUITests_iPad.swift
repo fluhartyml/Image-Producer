@@ -796,6 +796,19 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         // L2 — a new image in its own named project, with a real photo on a layer.
         openNewImage(named: "\(code) \(shapeName)")
         snapshot("\(code)-L2-new")
+        // REM 2026-11-22 — HIS REPORT on 451, real Duo: the title stayed "Untitled" until he tapped the canvas, then
+        // became the name he typed; and the image did not open on the Canvas tool's page. Both read with NO touch.
+        let typed = "\(code) \(shapeName)"
+        let titled = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", typed)).firstMatch
+        let titleShown = titled.waitForExistence(timeout: 6)
+        let untitled = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Untitled'")).firstMatch
+        check(code, "L2 The title shows the typed name without a tap", titleShown && !untitled.exists,
+              titleShown ? (untitled.exists ? "\"\(untitled.label)\" still on screen" : "") : "no \"\(typed)\" on screen")
+        let toolTab = app.buttons["Tool"].firstMatch
+        check(code, "L2 A new image opens on the Canvas tool's page", !toolTab.exists || toolTab.isSelected,
+              "panel shows \(["Layers", "History"].first { app.buttons[$0].firstMatch.isSelected } ?? "?")")
+        // Short run for a single bug: SHAPE_STOP_AFTER_NEW=1 stops here.
+        if !(env["SHAPE_STOP_AFTER_NEW"] ?? "").isEmpty { snapshot("\(code)-L2-stop"); return }
         check(code, "L2 The editor opened", app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 10))
         let placed = placeShakedownPhoto(code)
         let afterPhoto = probe()

@@ -369,7 +369,19 @@ struct ContentView: View {
     /// project". A tap now always brings that tool's page up on a phone.
     private func pickTool(_ tool: Tool) {
         activeTool = tool
-        if usesPhoneLayout && tool.hasInspector { bottomPanel = .tool }
+        // REM 2026-11-22 — HIS WORD (451 on his real Duo): "it is supposed to open to canvas tool /inspector upon
+        // open anyways (bug)". The OPEN Duo reports regular size classes, so usesPhoneLayout was false and the
+        // panel stayed on Layers. Any iPhone (idiom .phone — the Duo included) now shows the tool's page too.
+        // iPad and Mac unchanged (his 11-19: a change lands only on the device he names).
+        if (usesPhoneLayout || isPhoneIdiom) && tool.hasInspector { bottomPanel = .tool }
+    }
+
+    private var isPhoneIdiom: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
     }
 
     /// REM 2026-11-18 — short side under 600 pt = phone layout (see editorBody).
