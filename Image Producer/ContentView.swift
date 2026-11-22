@@ -6992,13 +6992,15 @@ struct CanvasView: View {
                             .allowsHitTesting(false)
                             .accessibilityElement()
                             .accessibilityIdentifier("uitest.canvas")
-                            .accessibilityLabel(String(format: "Test probe w=%d h=%d layers=%d hidden=%d active=%@ x=%.4f y=%.4f",
+                            // REM 2026-11-22 shakedown A-109/A-110 — zoom added: the closed Duo has no on-canvas zoom readout.
+                            .accessibilityLabel(String(format: "Test probe w=%d h=%d layers=%d hidden=%d active=%@ x=%.4f y=%.4f zoom=%.2f",
                                                        document.canvasWidth, document.canvasHeight,
                                                        document.layers.count,
                                                        document.layers.filter { !$0.isVisible }.count,
                                                        l?.name ?? "none",
                                                        Double(l?.transform.center.x ?? -1),
-                                                       Double(l?.transform.center.y ?? -1)))
+                                                       Double(l?.transform.center.y ?? -1),
+                                                       Double(zoom)))
                     }
                 }
             }

@@ -32,7 +32,11 @@ enum UITestDoor {
     // suite, wiped at each launch so every run starts from the default — his stay untouched.
     nonisolated(unsafe) static let defaults: UserDefaults = {
         guard isOpen, let suite = UserDefaults(suiteName: "ImageProducerUITest") else { return .standard }
-        suite.removePersistentDomain(forName: "ImageProducerUITest")
+        // REM 2026-11-22 shakedown A-105 ("its spot is remembered"): a relaunch launched with
+        // -ImageProducerUITestKeep keeps the test's settings, so a remembered value can be checked.
+        if !ProcessInfo.processInfo.arguments.contains("-ImageProducerUITestKeep") {
+            suite.removePersistentDomain(forName: "ImageProducerUITest")
+        }
         return suite
     }()
 
