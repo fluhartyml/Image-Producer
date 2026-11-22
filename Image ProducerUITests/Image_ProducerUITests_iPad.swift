@@ -1400,12 +1400,26 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         let canvasLines = ["114", "115", "116", "117", "118", "119", "120", "121"]
         /// Scroll the tool page until the element can be tapped (the closed Duo shows a few rows at a time).
         func reveal(_ e: XCUIElement) -> Bool {
-            for _ in 0..<10 {
+            for _ in 0..<14 {
                 if e.exists && e.isHittable { return true }
-                let page = app.buttons["Tool"].firstMatch
-                let start = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
-                    .withOffset(CGVector(dx: 230, dy: (page.exists ? page.frame.maxY : 420) + 160))
-                start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -120)))
+                // REM 14:5x — drag inside the settings list itself (the lowest scroll view on screen, 175 pt tall on the
+                // closed Duo), toward the control: up when it sits above the list, down otherwise. Guessing from the Tool
+                // tab put drags outside the list, so the page never moved (A-117–A-121 "not found" with the control on screen).
+                // REM 14:5x (2) — a coordinate drag landed on fields/switches, which ate it (the list moved 8 pt in two runs).
+                // XCUITest's own slow swipe on the list element scrolls it like a finger on the list.
+                let lists = app.scrollViews.allElementsBoundByIndex.filter { $0.exists && $0.frame.height > 60 }
+                guard let list = lists.max(by: { $0.frame.minY < $1.frame.minY }) else { sleep(1); continue }
+                // REM 15:1x — the slow swipe overshot (Bleed found, Units 100 pt below lost; A-116 passed before it). Now a
+                // MEASURED drag on the list's left margin (6 pt in: controls start 16 pt in, so nothing eats it), moving the
+                // control toward the list's middle, at most 120 pt per step, held at the end so it cannot coast.
+                let f = list.frame
+                let delta: CGFloat = e.exists ? max(-120, min(120, e.frame.midY - f.midY)) : 120
+                let x = (f.minX + 6) / app.windows.firstMatch.frame.width
+                let win = app.windows.firstMatch.frame.height
+                let y0 = (f.midY + delta / 2) / win, y1 = (f.midY - delta / 2) / win
+                let a = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y0))
+                let b = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y1))
+                a.press(forDuration: 0.1, thenDragTo: b, withVelocity: .slow, thenHoldForDuration: 0.4)
                 sleep(1)
             }
             return e.exists && e.isHittable
@@ -1475,28 +1489,56 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         }
         // A-116 — Units, Resolution and the 5 common resolutions, Print size readout.
         if runs("116") {
-            for u in ["in", "mm", "pt", "px"] { check("A-116", "Units: \(u) can be picked", pickMenu("Units", u)) }
+            snapshot("A116-start")
+            // REM 14:1x — Units is a segmented picker (labelsHidden), not a menu: its four segments are buttons named in/mm/pt/px; there is no "Units" button.
+            for u in ["in", "mm", "pt", "px"] {
+                let seg = app.buttons[u].firstMatch
+                var ok = false
+                if reveal(seg) { seg.tap(); sleep(1); ok = seg.isSelected }
+                check("A-116", "Units: \(u) can be picked", ok, seg.exists ? "selected=\(seg.isSelected)" : "segment not found")
+            }
+            if !app.textFields["Resolution"].firstMatch.exists { snapshot("A116-no-resolution") }
             let res = app.textFields["Resolution"].firstMatch
             if reveal(res) {
                 for (label, v) in [("72 —", "72"), ("150 —", "150"), ("300 —", "300"), ("360 —", "360"), ("600 —", "600")] {
                     let ok = pickMenu("Common resolutions", label)
                     check("A-116", "Common resolution \(v) sets Resolution", ok && (res.value as? String)?.replacingOccurrences(of: ",", with: "") == v, "\(res.value ?? "")")
                 }
-                let print = app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' in' OR label CONTAINS ' mm'")).allElementsBoundByIndex.map(\.label)
-                record("| A-116 | ℹ️ INFO | Print size readout: \(print.prefix(2).joined(separator: " · ")) |")
+                // REM 15:0x — the readout is attrRow("Print size", "W … × H … <unit>"); in px it reads pixels, so pick inches first. 600 PPI was set last.
+                let inSeg = app.buttons["in"].firstMatch
+                if reveal(inSeg) { inSeg.tap(); sleep(1) }
+                let readout = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'W ' AND label CONTAINS ' × H ' AND label ENDSWITH ' in'")).firstMatch
+                let w = Double(res.value as? String ?? "") ?? 0
+                _ = reveal(readout)
+                check("A-116", "Print size readout shows inches", readout.exists, readout.exists ? readout.label : "no 'W … × H … in' text (PPI \(w))")
             } else { check("A-116", "Resolution field found", false) }
         }
         // A-117 — Canvas size presets menu (A-103 applied all 11 groups); the ratio warning.
         if runs("117") {
+            // REM 14:2x — A-103's proven path: wait for the group, then wait for the item; a screenshot when either is missing.
+            // REM 15:3x — the warning half: on the 1024 × 1024 canvas, Social → "X header" (3:1, 1500 px minimum long edge)
+            // must keep the shape and say the resolution is too low (applyAspectPreset: "say it, don't fix it").
+            let orange = NSPredicate(format: "label BEGINSWITH 'Canvas is W' AND label CONTAINS 'minimum long edge'")
+            var warned = false
+            if pickMenu("Canvas size presets", "Social") {
+                let x = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'X header'")).firstMatch
+                if x.waitForExistence(timeout: 5) && x.isHittable { x.tap(); sleep(2)
+                    let w = app.staticTexts.matching(orange).firstMatch
+                    warned = reveal(w)
+                    let s0 = canvasSize()
+                    check("A-117", "Ratio preset below its minimum shows the orange warning (X header on 1024 → 1024 × 341)", warned && s0.w == 1024 && s0.h == 341, warned ? "\(s0.w)×\(s0.h) · \(w.label.prefix(60))" : "no warning · \(s0.w)×\(s0.h)")
+                } else { snapshot("A117-no-xheader"); app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap(); sleep(1)
+                    check("A-117", "X header preset found", false) }
+            } else { check("A-117", "Social group found", false) }
             let ok = pickMenu("Canvas size presets", "App Store Connect")
             if ok {
-                let item = app.buttons.allElementsBoundByIndex.first { $0.label.hasPrefix("iPhone 6.9") && $0.isHittable }
-                item?.tap(); sleep(2)
-            }
+                let item = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'iPhone 6.9'")).firstMatch
+                if item.waitForExistence(timeout: 5) && item.isHittable { item.tap(); sleep(2) }
+                else { snapshot("A117-no-item"); app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap(); sleep(1) }
+            } else { snapshot("A117-no-group") }
             let s = canvasSize()
             check("A-117", "Canvas size presets menu applies (iPhone 6.9″ → 1260 × 2736)", s.w == 1260 && s.h == 2736, "\(s.w)×\(s.h)")
-            let warn = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'at least' OR label CONTAINS 'minimum'")).allElementsBoundByIndex.map(\.label)
-            record("| A-117 | ℹ️ INFO | Orange ratio warning on screen now: \(warn.isEmpty ? "none (size is above every minimum)" : warn.joined(separator: " · ")) |")
+            if warned { check("A-117", "Orange warning clears once a full-size preset applies", !app.staticTexts.matching(orange).firstMatch.exists) }
         }
         // A-118 — Print setup: Bleed + presets, Safe margin, Crop / trim marks, Registration marks, Color RGB / CMYK.
         if runs("118") {
@@ -1505,12 +1547,17 @@ final class Image_ProducerUITests_iPad: XCTestCase {
                 check("A-118", "Bleed preset 0.125 in", pickMenu("Bleed presets", "0.125") && (bleed.value as? String) == "0.125", "\(bleed.value ?? "")")
                 check("A-118", "Bleed preset None", pickMenu("Bleed presets", "None") && (bleed.value as? String) == "0", "\(bleed.value ?? "")")
                 let safe = app.textFields["Safe margin"].firstMatch
-                if reveal(safe) { setField(safe, "0.25"); bleed.tap(); sleep(1)
+                if reveal(safe) { setField(safe, "0.25"); safe.typeText("\n"); sleep(1)   // REM 15:3x — Return, not a tap on Bleed: that raised a keyboard over the switches
                     check("A-118", "Safe margin takes a value", (safe.value as? String) == "0.25", "\(safe.value ?? "")") }
                 for t in ["Crop / trim marks", "Registration marks"] {
                     let sw = app.switches[t].firstMatch
-                    if reveal(sw) { let v0 = sw.value as? String; sw.tap(); sleep(1)
-                        check("A-118", "\(t) switches", (sw.value as? String) != v0, "\(v0 ?? "?") → \(sw.value ?? "?")"); sw.tap(); sleep(1)
+                    // REM 15:4x — tap the toggle knob at the row's right end, not the row's middle (Registration marks sat at the
+                    // list's clipped bottom edge and its centre tap did nothing: 0 → 0). Screenshot when it still doesn't flip.
+                    if reveal(sw) { let v0 = sw.value as? String
+                        let knob = sw.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)); knob.tap(); sleep(1)
+                        let flipped = (sw.value as? String) != v0
+                        if !flipped { snapshot("A118-\(t.prefix(4))-no-flip") }
+                        check("A-118", "\(t) switches", flipped, "\(v0 ?? "?") → \(sw.value ?? "?") · y \(Int(sw.frame.midY))"); if flipped { knob.tap(); sleep(1) }
                     } else { check("A-118", "\(t) found", false) }
                 }
                 let cmyk = app.buttons["CMYK"].firstMatch, rgb = app.buttons["RGB"].firstMatch
