@@ -264,12 +264,12 @@ struct SelectionInspector: View {
             // Select ▸ Inverse then Delete, in one button.
             .accessibilityLabel("Clear outside")
             Button { onCopy() } label: {
-                Label("Copy  (⌘C)", systemImage: "doc.on.doc").scaledFont(18).frame(maxWidth: .infinity)
+                Label("Copy  (⌘C)", systemImage: "doc.on.doc").scaledFont(18).frame(maxWidth: .infinity).touchTarget()   // REM 2026-11-22 shakedown A2: 23 pt tall on iPhone (000.11, HIG) — touchTarget() is iOS only
             }
             .controlSize(.large)
             .disabled(document.selection == nil)
             Button { document.selection = nil; document.selectionPathPoints = [] } label: {
-                Label("Deselect  (Esc)", systemImage: "xmark.square").scaledFont(18).frame(maxWidth: .infinity)
+                Label("Deselect  (Esc)", systemImage: "xmark.square").scaledFont(18).frame(maxWidth: .infinity).touchTarget()   // REM 2026-11-22 shakedown A2: 23 pt tall on iPhone (000.11, HIG) — touchTarget() is iOS only
             }
             .controlSize(.large)
             .disabled(document.selection == nil && document.selectionPathPoints.isEmpty)

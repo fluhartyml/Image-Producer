@@ -627,7 +627,11 @@ struct ContentView: View {
                     BottomPanel.PanelView(document: document,
                                           camera: camera, activeTool: activeTool,
                                           activeLayerID: $activeLayerID, selection: $bottomPanel,
-                                          fillColor: $fillColor, fileURL: fileURL, compact: false)
+                                          fillColor: $fillColor, fileURL: fileURL, compact: false, spine: true)
+                        // REM 2026-11-22 shakedown A2 (closed Duo on its side) — every tool page here still had the
+                        // horizontal title. His word 11-21: "the word 'image' is supposed to be vertical not horizontal
+                        // it should be to the left of the tool tab" · "i hope you are testing every other tool inspector
+                        // because that horizontal lable takes up too much realestate". Spine here too (phone layout only).
                         .frame(maxHeight: .infinity)
                 }
                 .frame(width: geo.size.width / 2)
@@ -1886,7 +1890,10 @@ struct ToolInspector: View {
             // REM 2026-11-21 — the settings column claims the rest of the width, so the spine stays on
             // the left edge even when a tool has nothing to show (Zoom, his "go with option 2"). The
             // 16e simulator pass showed "Zoom" drifting to the middle of an empty page without this.
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // REM 2026-11-22 — his word on A2 (Duo on its side): "canvas spine bleads off the frame". The Canvas
+            // page's settings wanted more than the half-screen column, so the whole page overflowed and the spine
+            // slid 16 pt onto the canvas. minWidth 0: the settings take only the width they're given.
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height - Self.spinePad * 2 } action: { spineHeight = max(40, $0) }
     }
@@ -1912,7 +1919,9 @@ struct ToolInspector: View {
     private var spineMetrics: (fontSize: CGFloat, thickness: CGFloat) {
         let own = Self.spineFit(activeTool.title, height: spineHeight)
         let cap = Self.spineFit(Tool.colorPalette.title, height: spineHeight)
-        let fontSize = min(own.fontSize, cap.fontSize)
+        // REM 2026-11-22 — his word on A2: "then the canvas word need a one or two point lower font height".
+        // Every spine shares the Color Palette size, so all of them drop 2 pt together and stay matched.
+        let fontSize = max(10, min(own.fontSize, cap.fontSize) - 2)
         return (fontSize, Self.spineThickness(fontSize))
     }
 
@@ -2327,7 +2336,7 @@ struct CanvasInspector: View {
                     Picker("Size rule", selection: $sizeRule) {
                         ForEach(CanvasSizeRule.allCases) { Text($0.rawValue).tag($0) }
                     }
-                    .pickerStyle(.menu).labelsHidden().scaledFont(18).fixedSize()
+                    .pickerStyle(.menu).labelsHidden().scaledFont(18).fixedSize().touchTarget()   // REM 2026-11-22 shakedown A2: under Apple's 44 pt on iPhone (000.11, HIG) — touchTarget() is iOS only
                     InfoTip("What is the size rule?", label: "Size rule info",
                             "Exact: type any width and height. Fixed ratio: the shape is locked — change one side and the other follows. Fluid width: the height stays put and the width is free; fluid height is the reverse. A fluid change adds or removes canvas on that side and the artwork keeps its size and stays centered — nothing is letterboxed.")
                 }
@@ -2353,7 +2362,7 @@ struct CanvasInspector: View {
                     Button("300 — Standard print / photo labs")  { document.ppi = 300 }
                     Button("360 — Epson photo inkjet")           { document.ppi = 360 }
                     Button("600 — Fine art / line art")          { document.ppi = 600 }
-                } label: { MenuInvite(title: "Common resolutions") }
+                } label: { MenuInvite(title: "Common resolutions").touchTarget() }   // REM 2026-11-22 shakedown A2: under Apple's 44 pt on iPhone (000.11, HIG) — touchTarget() is iOS only
                 .menuIndicator(.hidden)   // MenuInvite draws the one chevron; the Mac added a second
                 .fixedSize()
 

@@ -677,7 +677,9 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             // REM 2026-11-21 21:5x — Apple's own controls (the system toolbar, the segmented switch, List's reorder
             // grip) are Apple's components, sized by Apple: not counted here. The toolbox's tool buttons have their
             // own check (L3), so they're not repeated on every page.
-            let system = (app.toolbars.buttons.allElementsBoundByIndex + app.segmentedControls.buttons.allElementsBoundByIndex)
+            // REM 2026-11-22 — Apple's Stepper (its − / + halves) joins the exempt Apple components.
+            let system = (app.toolbars.buttons.allElementsBoundByIndex + app.segmentedControls.buttons.allElementsBoundByIndex
+                          + app.steppers.buttons.allElementsBoundByIndex)
                 .map(\.frame)
             let toolLabels = Set(tools.map(\.0))
             return app.buttons.allElementsBoundByIndex.filter { $0.exists && $0.isHittable }.compactMap { b in
@@ -702,8 +704,13 @@ final class Image_ProducerUITests_iPad: XCTestCase {
 
         // L1 — the launch screen.
         sleep(5)
-        let launchNew = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).allElementsBoundByIndex
-            .filter { $0.isHittable }.sorted { $0.frame.minY < $1.frame.minY }.first
+        // REM 2026-11-22 A2 — held sideways, Apple's own document browser covers the launch title page and its
+        // "Create Document" tile is the way in (Apple's component, HIG). Either path counts as "New Image".
+        let launchNew = app.descendants(matching: .any).matching(NSPredicate(format: "(elementType == %d AND label == 'New Image') OR (elementType == %d AND label == 'Create Document')",
+                XCUIElement.ElementType.button.rawValue, XCUIElement.ElementType.cell.rawValue)).allElementsBoundByIndex
+            // REM 2026-11-22 A2 — the Create Document cell reports not-hittable while it is plainly on screen (and L2
+            // taps through it fine); count it when it exists inside the window.
+            .filter { $0.isHittable || ($0.exists && win.frame.contains($0.frame)) }.sorted { $0.frame.minY < $1.frame.minY }.first
         snapshot("\(code)-L1-launch")
         check(code, "L1 Launch: New Image is on screen and tappable", launchNew != nil)
         let l1small = small("launch")
@@ -815,6 +822,11 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             check(code, "L6 \(title): name is a vertical spine on the left", spine,
                   nameEls.map { "\(Int($0.frame.width))×\(Int($0.frame.height))" }.joined(separator: ", "))
             check(code, "L6 \(title): no horizontal title", flat.isEmpty, "\(flat.count) horizontal")
+            // REM 2026-11-22 — his word on A2: "canvas spine bleads off the frame". The spine stays in its own page.
+            let canvasFrame = app.descendants(matching: .any)["canvas.element"].firstMatch.frame
+            let bleed = nameEls.filter { $0.frame.height > $0.frame.width && $0.frame.intersection(canvasFrame).width > 1 }
+            check(code, "L6 \(title): spine stays off the canvas", bleed.isEmpty,
+                  bleed.map { String(format: "spine x %.0f–%.0f, canvas ends %.0f", $0.frame.minX, $0.frame.maxX, canvasFrame.maxX) }.joined())
             // His word: "that scroll area is TOO SMALL" — the tool page's scroll area needs real room.
             let panelBottom = app.segmentedControls["Panel"].firstMatch.exists ? app.segmentedControls["Panel"].firstMatch.frame.maxY : 0
             let pageHeight = app.scrollViews.allElementsBoundByIndex.filter { $0.exists && $0.frame.minY >= panelBottom - 1 }
