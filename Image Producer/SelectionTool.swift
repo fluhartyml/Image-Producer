@@ -223,6 +223,7 @@ struct SelectionInspector: View {
             .labelsHidden()
             .scaledFont(18)
             .controlSize(.large)
+            .touchTarget()   // REM 2026-11-22 shakedown A1: under Apple's 44 pt on iPhone (000.11, HIG) — touchTarget() is iOS only
 
             Text(document.selectionShape.howTo)
                 .scaledFont(18).foregroundStyle(.secondary)
@@ -247,6 +248,7 @@ struct SelectionInspector: View {
             Button { onClear() } label: {
                 Label { twoLineTitle("Clear Inside", hint: "(Delete)") } icon: { Image(systemName: "eraser").scaledFont(18) }
                     .frame(maxWidth: .infinity)
+                    .touchTarget()   // REM 2026-11-22 shakedown A1: under Apple's 44 pt on iPhone (000.11, HIG) — touchTarget() is iOS only
             }
             .controlSize(.large)
             .disabled(document.selection == nil)
@@ -254,6 +256,7 @@ struct SelectionInspector: View {
             Button { onClearOutside() } label: {
                 Label { twoLineTitle("Clear Outside", hint: "(Select Inverse)") } icon: { Image(systemName: "eraser.fill").scaledFont(18) }
                     .frame(maxWidth: .infinity)
+                    .touchTarget()   // REM 2026-11-22 shakedown A1: under Apple's 44 pt on iPhone (000.11, HIG) — touchTarget() is iOS only
             }
             .controlSize(.large)
             .disabled(document.selection == nil)

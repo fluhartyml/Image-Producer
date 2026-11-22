@@ -801,7 +801,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
                 // REM 2026-11-22 — a number field (Canvas W/H) hugs its number by his 10-11 design; the 120 bar
                 // is for sliders and text you type words into.
                 .filter { $0.exists && $0.isHittable && $0.frame.width < 120
-                          && !(($0.value as? String).map { !$0.isEmpty && $0.allSatisfy(\.isNumber) } ?? false) }
+                          && !(($0.value as? String).map { !$0.isEmpty && $0.filter { $0 != "," }.allSatisfy(\.isNumber) } ?? false) }
                 .map { "\($0.label.isEmpty ? $0.identifier : $0.label) \(Int($0.frame.width)) wide" }
             check(code, "L6 \(title): sliders and fields at least 120 wide", narrow.isEmpty, narrow.joined(separator: ", "))
             // REM 2026-11-21 21:2x — his word on the Duo: "that lable 'immage' is supposed to be a spine from bottom

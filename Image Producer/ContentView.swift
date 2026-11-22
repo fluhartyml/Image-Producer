@@ -3373,6 +3373,7 @@ struct ColorPaletteInspector: View {
 
             ColorPicker("Edit selected swatch", selection: selectedColorBinding, supportsOpacity: false)
                 .scaledFont(18)
+                .touchTarget()   // REM 2026-11-22 shakedown A1: under Apple's 44 pt on iPhone (000.11, HIG) — touchTarget() is iOS only
 
             Divider()
 
@@ -4281,6 +4282,7 @@ struct ImageImportInspector: View {
                 Button { toNewLayer = false; importing = true } label: {
                     Label("Import Image to Selected Layer…", systemImage: "photo")
                         .frame(maxWidth: .infinity)
+                        .touchTarget()   // REM 2026-11-22 shakedown A1: under Apple's 44 pt on iPhone (000.11, HIG) — touchTarget() is iOS only
                 }
                 .disabled(!activeIsContent)
                 Button { toNewLayer = true; importing = true } label: {
@@ -5240,6 +5242,7 @@ struct MoveTransformInspector: View {
             }
             .pickerStyle(.menu)
             .labelsHidden()
+            .touchTarget()   // REM 2026-11-22 shakedown A1: under Apple's 44 pt on iPhone (000.11, HIG) — touchTarget() is iOS only
             if cropAspect != .original {
                 // Apply (destructive) sits a short space below the aspect picker.
                 // Non-destructive now (makes a new cropped layer), so no "can't be undone"

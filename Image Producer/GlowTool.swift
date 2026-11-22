@@ -469,7 +469,12 @@ struct LayerInspector: View {
                 if let i = targetIndex { apply(at: i) }
             }
             .buttonStyle(.borderedProminent)
+            // REM 2026-11-22 shakedown A1: small Apply was 63 × 30 on iPhone — Apple's large size on iOS (000.11, HIG); Mac keeps small.
+            #if os(iOS)
+            .controlSize(.large)
+            #else
             .controlSize(.small)
+            #endif
             .disabled(!hasSomethingToApply)
             // REM: ⌘Return applies — his 2026-11-20 ask: "you should have a keybosrd shortcut for apply".
             .keyboardShortcut(.return, modifiers: .command)
@@ -568,6 +573,7 @@ struct LayerInspector: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .touchTarget()   // REM 2026-11-22 shakedown A1: under Apple's 44 pt on iPhone (000.11, HIG) — touchTarget() is iOS only
         .contentShape(Rectangle())
         .onTapGesture { withAnimation { expanded.wrappedValue.toggle() } }
     }
