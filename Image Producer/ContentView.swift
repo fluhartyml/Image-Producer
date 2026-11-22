@@ -728,7 +728,11 @@ struct ContentView: View {
                             ToolStrip(activeTool: $activeTool, onDoubleTap: { if $0 == .zoom { toggleZoomAllTheWayOut() } }, onPick: { if usesPhoneLayout && $0.hasInspector { bottomPanel = .tool } })
                         }
                     }
-                    ActiveToolLabel(tool: activeTool)
+                    // REM 2026-11-22 09:5x — shakedown A5 (the OPEN Duo turned sideways lands here). His word, looking at
+                    // it: "that lable needs to be a spine here too" (his 11-21 spine ruling). On a phone (the open Duo
+                    // is the only phone that reaches this branch) the horizontal tool label goes and the page gets the
+                    // spine. iPad is not a phone, so it keeps its label (000.3: the change lands only on the Duo).
+                    if !ContentView.deviceIsPhone { ActiveToolLabel(tool: activeTool) }
                     Divider()
                     BottomPanel.PanelView(document: document,
                                           camera: camera,
@@ -736,7 +740,8 @@ struct ContentView: View {
                                           activeLayerID: $activeLayerID,
                                           selection: $bottomPanel,
                                           fillColor: $fillColor,
-                                          fileURL: fileURL)
+                                          fileURL: fileURL,
+                                          spine: ContentView.deviceIsPhone)
                 }
                 .overlay(alignment: .topLeading) {
                     if toolsFloating { floatingToolPalette(in: geo.size) }

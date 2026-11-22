@@ -29,7 +29,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         continueAfterFailure = true
         // testDuoLook runs in whatever shape Claude set in Device Hub — don't turn the device for it.
         // So does the shakedown (testShakedownLayout): every shape is set by hand in Device Hub first.
-        if !name.contains("testDuoLook") && !name.contains("testShakedownLayout") { XCUIDevice.shared.orientation = .landscapeLeft }
+        if !name.contains("testDuoLook") && !name.contains("testShakedownLayout") && !name.contains("testShapeChange") { XCUIDevice.shared.orientation = .landscapeLeft }
         app = XCUIApplication()
         app.launchArguments += ["-ImageProducerUITest"]
         app.launch()
@@ -671,6 +671,38 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     // subsection and its project file (rule 000.7). His rules it checks: 000.8 a real photo, never clear pixels ·
     // 000.11 every control at least 44 × 44 points, never covered · 000.12 every tab · his Oct 4 ruling, two rows
     // of tools, no scrolling · "the lable of eacj tool inspector should be listed only once" (11-21).
+    /// L2's photo step (000.8), shared by the shape checks and A6: Image tool → Import → "Shakedown Photo 1".
+    func placeShakedownPhoto(_ code: String) -> Bool {
+        press("Image"); sleep(2)
+        // REM 2026-11-22 A3 — the open Duo's new image came up on the Layers tab, so Import was never on screen.
+        // Open the Tool tab first, the way a person would.
+        if !app.buttons["Import Image to New Layer…"].firstMatch.exists {
+            app.buttons.matching(identifier: "Tool").allElementsBoundByIndex.first { $0.isHittable }?.tap(); sleep(1)
+        }
+        var placed = false
+        if press("Import Image to New Layer…", 5) {
+            sleep(3)
+            snapshot("\(code)-L2-picker")
+            let photo = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Shakedown Photo 1'")).firstMatch
+            if !photo.waitForExistence(timeout: 5) {
+                // The picker may open on Recents: Browse → On My iPhone → Image Producer.
+                if press("Browse", 3) { sleep(1) }
+                let onMy = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'On My iPhone'")).firstMatch
+                if onMy.waitForExistence(timeout: 3) { onMy.tap(); sleep(1) }
+                let folder = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Image Producer'")).firstMatch
+                if folder.waitForExistence(timeout: 3) { folder.tap(); sleep(1) }
+            }
+            snapshot("\(code)-L2-picker-folder")
+            if photo.waitForExistence(timeout: 5) { photo.tap(); sleep(4); placed = true }
+            // REM 20:3x A1 run: the picker never found the photo and stayed open over the editor, so every
+            // later check read nothing. If the photo wasn't picked, close the picker before going on.
+            if !placed {
+                for n in ["Cancel", "Close"] where app.buttons[n].firstMatch.exists { app.buttons[n].firstMatch.tap(); sleep(1); break }
+            }
+        }
+        return placed
+    }
+
     func testShakedownLayout() throws {
         let env = ProcessInfo.processInfo.environment
         let code = env["SHAPE_CODE"] ?? "X"
@@ -761,33 +793,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         openNewImage(named: "\(code) \(shapeName)")
         snapshot("\(code)-L2-new")
         check(code, "L2 The editor opened", app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 10))
-        press("Image"); sleep(2)
-        // REM 2026-11-22 A3 — the open Duo's new image came up on the Layers tab, so Import was never on screen.
-        // Open the Tool tab first, the way a person would.
-        if !app.buttons["Import Image to New Layer…"].firstMatch.exists {
-            app.buttons.matching(identifier: "Tool").allElementsBoundByIndex.first { $0.isHittable }?.tap(); sleep(1)
-        }
-        var placed = false
-        if press("Import Image to New Layer…", 5) {
-            sleep(3)
-            snapshot("\(code)-L2-picker")
-            let photo = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Shakedown Photo 1'")).firstMatch
-            if !photo.waitForExistence(timeout: 5) {
-                // The picker may open on Recents: Browse → On My iPhone → Image Producer.
-                if press("Browse", 3) { sleep(1) }
-                let onMy = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'On My iPhone'")).firstMatch
-                if onMy.waitForExistence(timeout: 3) { onMy.tap(); sleep(1) }
-                let folder = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Image Producer'")).firstMatch
-                if folder.waitForExistence(timeout: 3) { folder.tap(); sleep(1) }
-            }
-            snapshot("\(code)-L2-picker-folder")
-            if photo.waitForExistence(timeout: 5) { photo.tap(); sleep(4); placed = true }
-            // REM 20:3x A1 run: the picker never found the photo and stayed open over the editor, so every
-            // later check read nothing. If the photo wasn't picked, close the picker before going on.
-            if !placed {
-                for n in ["Cancel", "Close"] where app.buttons[n].firstMatch.exists { app.buttons[n].firstMatch.tap(); sleep(1); break }
-            }
-        }
+        let placed = placeShakedownPhoto(code)
         let afterPhoto = probe()
         snapshot("\(code)-L2-photo")
         check(code, "L2 A real photo is placed on a layer (000.8)", placed && (afterPhoto?.layers ?? 0) >= 1,
@@ -914,6 +920,43 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         snapshot("\(code)-L7-reopened")
         check(code, "L7 Reopened project has the same layers", reopened != nil && reopened?.layers == drawn?.layers,
               "before \(drawn?.layers ?? -1), after \(reopened?.layers ?? -1)")
+    }
+
+    // MARK: A6 — changing shape with a picture open
+    // REM 2026-11-22 09:5x — his word: "keep going with A6". Sheet line A-006: "Fold, unfold and turn with a picture
+    // open: same picture, same tool, same layer, nothing lost." XCUITest can turn the phone but can't fold it, so the
+    // runner (Workshop/shakedown/a6.sh) presses Device Hub's Closed / Open / Rotate Right, one per "READY n" line
+    // written here; the test waits for the window to change, then checks nothing was lost.
+    func testShapeChange() throws {
+        let code = "A6"
+        let win = app.windows.firstMatch
+        record("| \(code) | — | Changing shape: starts \(Int(win.frame.width)) × \(Int(win.frame.height)) |")
+        openNewImage(named: "A6 Duo changing shape")
+        check(code, "The editor opened", app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 10))
+        let placed = placeShakedownPhoto(code)
+        check(code, "A real photo is placed on a layer (000.8)", placed)
+        press("Pixel Pen"); sleep(1)
+        let tool = app.buttons["Pixel Pen"].firstMatch
+        guard let before = probe() else { check(code, "Canvas state readable", false); return }
+        check(code, "Pixel Pen is the active tool before the change", tool.isSelected)
+        for (n, what) in ["folded closed", "opened again", "turned"].enumerated() {
+            let size0 = win.frame.size
+            record("| \(code) | — | READY \(n + 1) \(what) |")
+            var changed = false
+            for _ in 0..<60 { sleep(1); if win.frame.size != size0 { changed = true; break } }
+            sleep(3)
+            snapshot("\(code)-\(n + 1)-\(what.replacingOccurrences(of: " ", with: "-"))")
+            check(code, "The window changed shape when \(what)", changed,
+                  "\(Int(size0.width))×\(Int(size0.height)) → \(Int(win.frame.width))×\(Int(win.frame.height))")
+            let after = probe()
+            check(code, "\(what): same picture (canvas \(Int(before.w))×\(Int(before.h)))", after?.w == before.w && after?.h == before.h,
+                  "\(Int(after?.w ?? -1))×\(Int(after?.h ?? -1))")
+            check(code, "\(what): same layers (\(before.layers))", after?.layers == before.layers, "\(after?.layers ?? -1)")
+            check(code, "\(what): same active layer (\(before.active))", after?.active == before.active, after?.active ?? "?")
+            let t = app.buttons["Pixel Pen"].firstMatch
+            check(code, "\(what): Pixel Pen is still the active tool", t.waitForExistence(timeout: 3) && t.isSelected)
+        }
+        record("| \(code) | — | DONE |")
     }
 
     func testPhoneFloatingPreviewSetting() throws {
