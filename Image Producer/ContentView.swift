@@ -3935,6 +3935,7 @@ struct FontPickerInspector: View {
                 .accessibilityLabel("Layer text")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
             Button { newText() } label: {
                 Label("New Text Layer", systemImage: "plus.rectangle").frame(maxWidth: .infinity)
+                    .touchTarget()   // REM 2026-11-22 shakedown A5: 34 pt tall on the open Duo held sideways (000.11, HIG 44) — iOS only
             }
             .buttonStyle(.borderedProminent)
             // Kept to one line at his word, 2026-10-03: "the blurb under new text layer is too long".
@@ -4333,6 +4334,7 @@ struct ImageImportInspector: View {
                 Button { toNewLayer = true; importing = true } label: {
                     Label("Import Image to New Layer…", systemImage: "photo.badge.plus")
                         .frame(maxWidth: .infinity)
+                        .touchTarget()   // REM 2026-11-22 shakedown A5: 36 pt tall on the open Duo held sideways (000.11, HIG 44) — iOS only
                 }
                 .buttonStyle(.borderedProminent)
                 // Hover text, not a caption — his call, 2026-10-03.

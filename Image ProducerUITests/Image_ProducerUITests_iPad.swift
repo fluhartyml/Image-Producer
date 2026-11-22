@@ -727,9 +727,13 @@ final class Image_ProducerUITests_iPad: XCTestCase {
                           + app.navigationBars.buttons.allElementsBoundByIndex.filter { $0.frame.minY < 90 })
                 .map(\.frame)
             let toolLabels = Set(tools.map(\.0))
+            let browse = app.otherElements["Browse View"].firstMatch
             return app.buttons.allElementsBoundByIndex.filter { $0.exists && $0.isHittable }.compactMap { b in
                 let f = b.frame
-                guard !system.contains(f), !b.label.hasPrefix("Reorder"), !toolLabels.contains(b.label) else { return nil }
+                // REM 2026-11-22 A5 — Apple's document browser ("Browse View": Icons, More, Search, 40 × 40) is Apple's
+                // component, sized by Apple — exempt like the toolbar and Stepper above.
+                guard !system.contains(f), !b.label.hasPrefix("Reorder"), !toolLabels.contains(b.label),
+                      !(browse.exists && browse.frame.contains(f)) else { return nil }
                 // REM 2026-11-22 — measured to the nearest point: a 44-pt target lands at 43.7 after pixel rounding
                 // on a 3× screen, and that is still Apple's 44.
                 guard f.width > 0, f.height > 0, f.width.rounded() < 44 || f.height.rounded() < 44 else { return nil }

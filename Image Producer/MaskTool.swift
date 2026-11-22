@@ -544,6 +544,7 @@ struct MaskInspector: View {
                     .scaledFont(18).foregroundStyle(.secondary)
                 Button { addMask() } label: {
                     Label("Add Mask", systemImage: "square.dashed").frame(maxWidth: .infinity)
+                        .touchTarget()   // REM 2026-11-22 shakedown A5: 34 pt tall on the open Duo held sideways (000.11, HIG 44) — iOS only
                 }
                 .buttonStyle(.borderedProminent)
             } else {
