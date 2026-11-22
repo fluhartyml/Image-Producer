@@ -187,7 +187,9 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         // REM 2026-11-21 — shakedown rule 000.7 (his word): one project file per subsection, named for it.
         if let name, app.buttons["Create"].waitForExistence(timeout: 10) {
             let field = app.textFields["File name"].firstMatch
-            if field.exists { field.tap(); field.typeText(name) }
+            // REM 2026-11-22 09:3x — 1 run in 2 the first Create tap missed on the open Duo: the sheet is still
+            // sliding up for the keyboard when the test taps. Give it a beat (a finger sees where the button is).
+            if field.exists { field.tap(); field.typeText(name); sleep(1) }
             else { record("| — | ℹ️ INFO | New Image sheet has no Name field; file keeps its automatic name |") }
         }
         if press("Create", 10) { sleep(2) }
@@ -803,12 +805,16 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             let b = button(t)
             guard b.waitForExistence(timeout: 3), b.isHittable, win.frame.contains(b.frame) else { offScreen.append(t); continue }
             rows.insert(Int(b.frame.midY.rounded()))
-            toolSizes.insert("\(Int(b.frame.width))×\(Int(b.frame.height))")
+            toolSizes.insert("\(Int(b.frame.width.rounded()))×\(Int(b.frame.height.rounded()))")
         }
         snapshot("\(code)-L3-toolbox")
         check(code, "L3 Every tool is on screen without scrolling", offScreen.isEmpty, offScreen.joined(separator: ", "))
         check(code, "L3 Tools sit in two rows", rows.count == 2, "\(rows.count) row(s)")
-        check(code, "L3 Tool buttons are at least 44 × 44", toolSizes.allSatisfy { s in s.split(separator: "×").allSatisfy { Int($0) ?? 0 >= 44 } },
+        // REM 2026-11-22 09:1x — HIS RULING on the 37–38 pt wide tools: "it cant afford to get shorter why three
+        // rows? ... two rows on the screen right now loks good". Two rows win over Apple's 44 pt WIDTH (9 tools in
+        // ~340 pt can't be 44 wide), so width only has to stay at today's 37 pt or more; height still must be 44.
+        check(code, "L3 Tool buttons are 44 tall, ≥ 37 wide (two rows, his ruling 11-22)", toolSizes.allSatisfy { s in
+                  let p = s.split(separator: "×").map { Int($0) ?? 0 }; return p.count == 2 && p[0] >= 37 && p[1] >= 44 },
               toolSizes.sorted().joined(separator: ", "))
 
         // L4 — the Tool | Layers | History switch, every tab (000.12).
