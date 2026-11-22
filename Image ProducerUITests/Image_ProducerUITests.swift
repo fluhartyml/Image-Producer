@@ -157,10 +157,14 @@ final class Image_ProducerUITests: XCTestCase {
         _ = app.windows.firstMatch.waitForExistence(timeout: 10)
         if press("Create", 10) { sleep(2) }
         if welcome.exists { welcome.buttons["_XCUI:CloseWindow"].click(); sleep(1) }
-        check("glow-mac", "Add a layer", press("Add a layer")); sleep(1)
         // REM 18:0x his catch: "you didnt have an image in the layer to have glow o[n]" — give the layer art first.
-        check("glow-mac", "Paint bucket", press("Paint Drop Bucket")); sleep(1)
-        check("glow-mac", "Layer filled with paint", press("Fill Layer")); sleep(1)
+        // REM 18:1x his second catch: "you didnt have an object to have glowing eminating from" — a full
+        // paint fill has no edge for a glow to come from. Place a Star symbol on its own clear layer instead.
+        check("glow-mac", "Symbol tool", press("Symbol")); sleep(1)
+        check("glow-mac", "Star picked", press("Star")); sleep(1)
+        check("glow-mac", "Star placed on a new layer", press("Create New Layer")); sleep(2)
+        if let p = probe() { check("glow-mac", "Active layer is the Star", p.active.contains("Star"), p.active) }
+        snapshot("gm-star-placed")
         check("glow-mac", "Layer tool", press("Layer")); sleep(2)
         // REM 17:3x run: on the Mac the Glow reveal is a DisclosureTriangle "Glow", not a text row.
         let glowRow = app.disclosureTriangles["Glow"].firstMatch
