@@ -144,7 +144,8 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     /// Launch screen → New Image → the editor (shared by the shakedown and the text-size check).
     func openNewImage(named name: String? = nil) {
         // Launch screen → New Image (the launch scene's own button; the system makes the file).
-        sleep(5); snapshot("00-start")
+        // REM 16:3x (his "make the tests run faster without ruining quality"): wait for the launch screen, not a fixed 5 s.
+        _ = button("New Image").waitForExistence(timeout: 15); snapshot("00-start")
         // REM: the launch scene and the document browser under it BOTH carry a "New Image"
         // button; the 18:24 run's firstMatch tapped the browser's and opened its Shared tab.
         // Take the launch scene's: the hittable one nearest the top.
@@ -169,7 +170,8 @@ final class Image_ProducerUITests_iPad: XCTestCase {
                 record("| — | ↻ FALLBACK | New Image covered; tapped Create Document |"); create.tap()
             }
         }
-        sleep(3)
+        // REM 16:3x — was sleep(3): wait for the name sheet (or the editor) instead.
+        _ = app.buttons["Create"].waitForExistence(timeout: 3)
         // REM: the 19:14 run's tap left the launch screen up (a file from the 18:44 run sat in
         // On My iPad; the tap may have landed mid-refresh). One retry, then go on and report.
         if !app.descendants(matching: .any)["uitest.canvas"].firstMatch.waitForExistence(timeout: 5),
@@ -673,7 +675,9 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     // of tools, no scrolling · "the lable of eacj tool inspector should be listed only once" (11-21).
     /// L2's photo step (000.8), shared by the shape checks and A6: Image tool → Import → "Shakedown Photo 1".
     func placeShakedownPhoto(_ code: String) -> Bool {
-        press("Image"); sleep(2)
+        press("Image")
+        // REM 16:3x — was sleep(2): wait for the Image page's Import button.
+        _ = app.buttons["Import Image to New Layer…"].firstMatch.waitForExistence(timeout: 3)
         // REM 2026-11-22 A3 — the open Duo's new image came up on the Layers tab, so Import was never on screen.
         // Open the Tool tab first, the way a person would.
         if !app.buttons["Import Image to New Layer…"].firstMatch.exists {
@@ -681,7 +685,8 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         }
         var placed = false
         if press("Import Image to New Layer…", 5) {
-            sleep(3)
+            // REM 16:3x — was sleep(3): wait for the Files picker itself.
+            _ = app.descendants(matching: .any)["Browse View (Picker)"].firstMatch.waitForExistence(timeout: 4)
             snapshot("\(code)-L2-picker")
             let photo = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Shakedown Photo 1'")).firstMatch
             if !photo.waitForExistence(timeout: 5) {
@@ -699,7 +704,8 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             while !(photo.exists && photo.isHittable) && swipes < 6 {
                 app.descendants(matching: .any)["Browse View (Picker)"].firstMatch.swipeUp(); sleep(1); swipes += 1
             }
-            if photo.waitForExistence(timeout: 5) { photo.tap(); sleep(4); placed = true }
+            // REM 16:3x — was sleep(4): wait until the canvas reports an active layer (the photo landed), 8 s at most.
+            if photo.waitForExistence(timeout: 5) { photo.tap(); _ = probeElement.waitForExistence(timeout: 8); sleep(1); placed = true }
             // REM 20:3x A1 run: the picker never found the photo and stayed open over the editor, so every
             // later check read nothing. If the photo wasn't picked, close the picker before going on.
             if !placed {
@@ -1017,7 +1023,8 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         XCUIDevice.shared.orientation = .portrait; sleep(2)
         let win = app.windows.firstMatch
         record("| A7 | — | Element shape (Duo closed upright): window \(Int(win.frame.width)) × \(Int(win.frame.height)) |")
-        sleep(5)
+        // REM 16:3x — was sleep(5): wait for the launch screen.
+        _ = app.buttons.matching(NSPredicate(format: "label == 'New Image'")).firstMatch.waitForExistence(timeout: 10)
 
         // A-101 — launch screen: New Image, New from Import… (Files picker; Cancel makes nothing), icon, version line.
         if runs("101") {
@@ -1420,7 +1427,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
                 let a = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y0))
                 let b = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y1))
                 a.press(forDuration: 0.1, thenDragTo: b, withVelocity: .slow, thenHoldForDuration: 0.4)
-                sleep(1)
+                usleep(300_000)   // REM 16:3x — was sleep(1); the 0.4 s hold already stops the list coasting
             }
             return e.exists && e.isHittable
         }
@@ -1604,6 +1611,307 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             }
             check("A-121", "File rows: Location, Type, Last saved, Size, State", missing.isEmpty, missing.joined(separator: ", "))
             snapshot("A121-file-rows")
+        }
+        // A-122 / A-123 — Tool: Color Palette. Its own project file (000.7), a real photo (000.8).
+        if runs("122") || runs("123") {
+            openNewImage(named: "A7 color palette")
+            _ = placeShakedownPhoto("A122")
+            press("Color Palette"); sleep(2)
+            app.buttons.matching(identifier: "Tool").allElementsBoundByIndex.first { $0.isHittable }?.tap(); sleep(1)
+            snapshot("A122-start")
+        }
+        /// "Palette — N colors" → N (‑1 when the heading isn't there).
+        func paletteCount() -> Int {
+            let h = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Palette — '")).firstMatch
+            guard h.exists else { return -1 }
+            return Int(h.label.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? -1
+        }
+        // A-122 — Edit the selected swatch; Add color up to 24; Remove down to 8; long-press Remove.
+        if runs("122") {
+            // Edit: tap the well, pick a grid color, close; the Active color hex must change.
+            // REM 16:4x — the system color sheet runs outside the app, so its Grid/Sliders/hex controls are not in our
+            // accessibility tree (A122-color-sheet). Pick a grid cell by position (the bright orange-red row, closed Duo)
+            // and close with the sheet's X, the way a finger would.
+            let activeHex = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '#'")).firstMatch
+            let hex0 = activeHex.exists ? activeHex.label : "?"
+            let well = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Edit selected swatch'")).firstMatch
+            var edited = false
+            if reveal(well) {
+                // REM 16:2x — a center tap lands on the label text and opens nothing; the well is the circle at the right end.
+                well.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap(); sleep(2)
+                snapshot("A122-color-sheet")
+                let w = app.windows.firstMatch
+                w.coordinate(withNormalizedOffset: CGVector(dx: 180.0 / 466, dy: 390.0 / 678)).tap(); sleep(1)
+                w.coordinate(withNormalizedOffset: CGVector(dx: 418.0 / 466, dy: 186.0 / 678)).tap(); sleep(2)
+                edited = activeHex.exists && activeHex.label != hex0 && activeHex.label.hasPrefix("#")
+            }
+            check("A-122", "Edit selected swatch changes the Active color", edited, "\(hex0) → \(activeHex.exists ? activeHex.label : "?")")
+
+            // Add color up to 24, then Add is disabled.
+            let add = app.buttons["Add color"].firstMatch
+            let remove = app.buttons.matching(NSPredicate(format: "label == 'Remove'")).firstMatch
+            let n0 = paletteCount()
+            if reveal(add) {
+                var guardN = 0
+                while add.isEnabled && paletteCount() < 24 && guardN < 20 { add.tap(); usleep(400_000); guardN += 1 }
+            }
+            let nMax = paletteCount()
+            check("A-122", "Add color grows the palette to 24, then stops", nMax == 24 && !add.isEnabled, "\(n0) → \(nMax), Add enabled=\(add.isEnabled)")
+
+            // Remove down to 8, then Remove is disabled (the 8 base colors stay).
+            if reveal(remove) {
+                var guardN = 0
+                while remove.isEnabled && paletteCount() > 8 && guardN < 20 { remove.tap(); usleep(400_000); guardN += 1 }
+            }
+            let nMin = paletteCount()
+            check("A-122", "Remove shrinks the palette to 8, then stops", nMin == 8 && !remove.isEnabled, "\(nMax) → \(nMin), Remove enabled=\(remove.isEnabled)")
+
+            // Long-press Remove: at 8 the menu has no Remove; add one (9), long-press swatch 9, Remove → 8.
+            if reveal(add) { add.tap(); sleep(1) }
+            // REM 16:4x — the swatches sit in a LazyVGrid: iOS builds only rows on screen, so a swatch below or above the
+            // list's window does not exist yet and reveal() cannot aim at it. Bring the "Palette —" heading (a plain view,
+            // always in the tree) to the list's middle first; the rows under it get built.
+            let paletteHeading = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Palette — '")).firstMatch
+            _ = reveal(paletteHeading); usleep(500_000)
+            let s9 = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Color 9,'")).firstMatch
+            var lpOK = false
+            if paletteCount() == 9 && reveal(s9) {
+                s9.press(forDuration: 1.2); sleep(1)
+                let menuRemove = app.buttons.matching(NSPredicate(format: "label == 'Remove'")).allElementsBoundByIndex.first { $0.isHittable && $0.frame != remove.frame }
+                if let menuRemove { menuRemove.tap(); sleep(1); lpOK = paletteCount() == 8 }
+                else { snapshot("A122-no-context-remove"); app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap(); sleep(1) }
+            }
+            check("A-122", "Long-press a swatch → Remove takes it out (9 → 8)", lpOK, "count now \(paletteCount())")
+            let s1 = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Color 1,'")).firstMatch
+            _ = reveal(paletteHeading); usleep(500_000)
+            if reveal(s1) {
+                s1.press(forDuration: 1.2); sleep(1)
+                let shown = app.buttons.matching(NSPredicate(format: "label == 'Remove'")).count
+                // Only the bottom Remove button (disabled) may exist; the menu must offer no Remove at 8.
+                check("A-122", "At 8 colors the long-press menu offers no Remove", shown <= 1, "Remove buttons on screen: \(shown)")
+                app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap(); sleep(1)
+            }
+            snapshot("A122-end")
+        }
+        // REM 16:5x — HIS PACE RULINGS (11-22 16:4x): "you must be being too strict in your testing rules" and
+        // "small medium large ... that removes 357 steps" (000.15). From here: visit each control, try 3 sample values,
+        // snapshot. A line passes on what the screenshot shows; checks below are evidence, not gates to perfect.
+        func cancelPanel() {
+            for n in ["Cancel", "Close", "Done"] where app.buttons[n].firstMatch.exists { app.buttons[n].firstMatch.tap(); sleep(1); return }
+            app.windows.firstMatch.swipeDown(velocity: .fast); sleep(1)
+        }
+        func slide(_ label: String, _ code: String) {
+            let s = app.sliders[label].firstMatch
+            guard reveal(s) else { record("| \(code) | ❓ | \(label) slider not found |"); return }
+            var seen: [String] = []
+            // REM 16:5x — his "i am talking random samples": one random value in each third (small / middle / large),
+            // fresh each run. A slider that slips off screen mid-way is re-revealed, never allowed to stop the batch
+            // (16:48 run: a lost slider ended the whole test at A-124).
+            for band in [0.0, 0.34, 0.67] as [CGFloat] {
+                let v = band + CGFloat.random(in: 0.02...0.31)
+                guard s.exists || reveal(s) else { seen.append("lost"); break }
+                if !s.isHittable { _ = reveal(s) }
+                guard s.exists, s.isHittable else { seen.append("lost"); break }
+                s.adjust(toNormalizedSliderPosition: v); usleep(400_000)
+                seen.append("\(Int(v * 100))%→\(s.exists ? ((s.value as? String) ?? "?") : "lost")")
+            }
+            record("| \(code) | 👁 | \(label) random small/middle/large → \(seen.joined(separator: " · ")) |")
+        }
+        // A-123 — Save Palette / Load Palette (same Color Palette project, 000.7), plus a file that is not a palette.
+        if runs("123") {
+            if !runs("122") { openNewImage(named: "A7 color palette"); _ = placeShakedownPhoto("A123"); press("Color Palette"); sleep(2) }
+            if reveal(app.buttons["Save Palette"].firstMatch) {
+                app.buttons["Save Palette"].firstMatch.tap(); sleep(3); snapshot("A123-save-panel")
+                check("A-123", "Save Palette opens a save panel", app.otherElements["Browse View (Picker)"].exists || app.navigationBars.count > 0 || app.buttons["Save"].exists || app.buttons["Move"].exists)
+                cancelPanel()
+            }
+            if reveal(app.buttons["Load Palette"].firstMatch) {
+                app.buttons["Load Palette"].firstMatch.tap(); sleep(3); snapshot("A123-load-panel")
+                let photo = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Shakedown Photo 1'")).firstMatch
+                if photo.waitForExistence(timeout: 4) {
+                    photo.tap(); sleep(2); snapshot("A123-not-a-palette")
+                    record("| A-123 | 👁 | Picked a photo as a palette: alert=\(app.alerts.firstMatch.exists) · text: \(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'palette'")).allElementsBoundByIndex.map(\.label).prefix(3).joined(separator: " | ")) |")
+                    if app.alerts.firstMatch.exists { app.alerts.firstMatch.buttons.firstMatch.tap(); sleep(1) }
+                } else { cancelPanel() }
+            }
+        }
+        // A-124 to A-129 — the Move page: Crop, Straight line, Snap to Canvas, Scale, Position/Rotation, Apply/Flip/Center/Reset.
+        let moveLines = ["124", "125", "126", "127", "128", "129"]
+        if moveLines.contains(where: runs) {
+            openNewImage(named: "A7 move page")
+            _ = placeShakedownPhoto("A124")
+            press("Move"); sleep(2)
+            app.buttons.matching(identifier: "Tool").allElementsBoundByIndex.first { $0.isHittable }?.tap(); sleep(1)
+            snapshot("A124-move-page")
+        }
+        if runs("124") {
+            let aspects = ["Original", "Freeform", "Custom"]
+            for a in aspects { if pickMenu("Aspect", a) { snapshot("A124-aspect-\(a)"); if a == "Freeform" { slide("Width", "A-124"); slide("Height", "A-124") } } }
+            slide("Crop size", "A-124")
+            let w = app.steppers.matching(NSPredicate(format: "label BEGINSWITH 'W '")).firstMatch
+            if reveal(w) { w.buttons.element(boundBy: 1).tap(); w.buttons.element(boundBy: 1).tap(); record("| A-124 | 👁 | Custom W stepper → \(w.label) |") }
+            let apply = app.buttons["Apply Crop"].firstMatch
+            let before = canvasSize()
+            if reveal(apply) { apply.tap(); sleep(2) }
+            let after = canvasSize()
+            check("A-124", "Apply Crop changes the canvas", before != after, "\(before.w)×\(before.h) → \(after.w)×\(after.h)")
+            snapshot("A124-cropped"); app.typeKey("z", modifierFlags: .command)
+        }
+        if runs("125") {
+            for n in ["Up down only", "Left right only"] {
+                let b = app.buttons[n].firstMatch
+                if reveal(b) { b.tap(); usleep(500_000); record("| A-125 | 👁 | \(n) on: selected=\(b.isSelected) · value=\(b.value ?? "") |") }
+            }
+            snapshot("A125-straight-line")
+            // REM 16:5x — the in-test relaunch could not find the project again and stopped the batch; reopen is L7's job.
+        }
+        // A-124 recheck (16:5x): Height read 80% on three adjust() tries. Drag the thumb by hand, end to end.
+        if runs("124h") {
+            if !moveLines.contains(where: runs) { openNewImage(named: "A7 move page"); _ = placeShakedownPhoto("A124h"); press("Move"); sleep(2) }
+            _ = pickMenu("Aspect", "Freeform")
+            let h = app.sliders["Height"].firstMatch
+            if reveal(h) {
+                let v0 = (h.value as? String) ?? "?"
+                h.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).press(forDuration: 0.2, thenDragTo: h.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)))
+                sleep(1); let v1 = (h.value as? String) ?? "?"
+                check("A-124", "Height slider moves when dragged", v0 != v1, "\(v0) → \(v1)"); snapshot("A124h-height")
+            } else { record("| A-124 | ❓ | Height slider not found |") }
+        }
+        if runs("126") {
+            for n in ["Fit", "Fill"] { if reveal(app.buttons[n].firstMatch) { app.buttons[n].firstMatch.tap(); sleep(1); snapshot("A126-\(n)") } }
+        }
+        if runs("127") {
+            let pct = app.textFields["Scale percent"].firstMatch
+            for v in ["25", "100", "400"] where reveal(pct) { setField(pct, v); pct.typeText("\n"); usleep(600_000); record("| A-127 | 👁 | Scale % \(v) → px \(app.textFields["Size in pixels"].firstMatch.value ?? "?") |") }
+            let st = app.steppers["Scale"].firstMatch
+            if reveal(st) { st.buttons.element(boundBy: 1).press(forDuration: 1.5); record("| A-127 | 👁 | Scale stepper held → \(pct.value ?? "?") % |") }
+            slide("Scale", "A-127"); snapshot("A127-scale")
+        }
+        if runs("128") {
+            for (f, v) in [("Position X", "100"), ("Position Y", "200")] {
+                let t = app.textFields[f].firstMatch
+                if reveal(t) { setField(t, v); t.typeText("\n"); usleep(500_000); record("| A-128 | 👁 | \(f) \(v) → \(t.value ?? "?") |") }
+            }
+            let rot = app.textFields["Rotation degrees"].firstMatch
+            for v in ["90", "180", "-90"] where reveal(rot) { setField(rot, v); rot.typeText("\n"); usleep(500_000); record("| A-128 | 👁 | Rotation \(v) → \(rot.value ?? "?") |") }
+            slide("Rotation", "A-128"); snapshot("A128-position-rotation")
+        }
+        if runs("129") {
+            for n in ["Apply", "Flip Horizontal", "Flip Vertical", "Center", "Reset"] {
+                let b = app.buttons[n].firstMatch
+                if reveal(b) { b.tap(); usleep(700_000); snapshot("A129-\(n.replacingOccurrences(of: " ", with: "-"))") }
+                else { record("| A-129 | ❓ | \(n) not found |") }
+            }
+        }
+        // A-130 — on the canvas: drag the box and a corner (picture layer). Before/after shots + probe position.
+        if runs("130") {
+            if !moveLines.contains(where: runs) { openNewImage(named: "A7 move page"); _ = placeShakedownPhoto("A130"); press("Move"); sleep(2) }
+            let p0 = probe()
+            dragLayer(dx: CGFloat.random(in: 20...60), dy: CGFloat.random(in: 10...40)); snapshot("A130-dragged")
+            let p1 = probe()
+            record("| A-130 | 👁 | Drag the box: center \(p0.map { "\($0.x),\($0.y)" } ?? "?") → \(p1.map { "\($0.x),\($0.y)" } ?? "?") |")
+        }
+        // A-131 — arrow-key nudge: the iPhone simulator passes no hardware keys (testKeyProbe 11-22) → iPad pass.
+        if runs("131") { record("| A-131 | ℹ️ | Hardware keys don't reach the iPhone simulator (testKeyProbe); checked in the iPad section |") }
+        // A-132 to A-134 — Selection: shapes, Clear Inside/Outside, Copy, Deselect, double-tap.
+        let selLines = ["132", "133", "134"]
+        if selLines.contains(where: runs) {
+            openNewImage(named: "A7 selection")
+            _ = placeShakedownPhoto("A132")
+            press("Selection"); sleep(2)
+            app.buttons.matching(identifier: "Tool").allElementsBoundByIndex.first { $0.isHittable }?.tap(); sleep(1)
+            snapshot("A132-selection-page")
+        }
+        func dragOnCanvas() {
+            let c = app.descendants(matching: .any)["uitest.canvas"].firstMatch
+            guard c.exists else { return }
+            let a = c.coordinate(withNormalizedOffset: CGVector(dx: CGFloat.random(in: 0.2...0.35), dy: CGFloat.random(in: 0.3...0.4)))
+            let b = c.coordinate(withNormalizedOffset: CGVector(dx: CGFloat.random(in: 0.6...0.8), dy: CGFloat.random(in: 0.6...0.7)))
+            a.press(forDuration: 0.2, thenDragTo: b); sleep(1)
+        }
+        if runs("132") {
+            for s in ["Rectangle", "Oval", "App Icon", "Freehand"] {
+                if pickMenu("Shape", s) { dragOnCanvas(); snapshot("A132-\(s.replacingOccurrences(of: " ", with: "-"))") }
+                else { record("| A-132 | ❓ | Shape \(s) not found in the menu |") }
+            }
+            if pickMenu("Shape", "Path") {
+                let c = app.descendants(matching: .any)["uitest.canvas"].firstMatch
+                for (x, y) in [(0.3, 0.3), (0.7, 0.35), (0.5, 0.7)] { c.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y)).tap(); usleep(400_000) }
+                snapshot("A132-path-points")
+                record("| A-132 | 👁 | Path: Close Path=\(app.buttons["Close Path"].exists) · Cancel Path=\(app.buttons["Cancel Path"].exists) |")
+                if reveal(app.buttons["Close Path"].firstMatch) { app.buttons["Close Path"].firstMatch.tap(); sleep(1); snapshot("A132-path-closed") }
+            }
+        }
+        if runs("133") {
+            _ = pickMenu("Shape", "Rectangle")
+            for (n, code) in [("Clear inside", "inside"), ("Clear outside", "outside")] {
+                dragOnCanvas()
+                if reveal(app.buttons[n].firstMatch) { app.buttons[n].firstMatch.tap(); sleep(1); snapshot("A133-\(code)"); app.typeKey("z", modifierFlags: .command); sleep(1) }
+                else { record("| A-133 | ❓ | \(n) not found |") }
+            }
+            dragOnCanvas()
+            for n in ["Copy", "Deselect"] {
+                let b = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", n)).firstMatch
+                if reveal(b) { b.tap(); sleep(1); snapshot("A133-\(n)") } else { record("| A-133 | ❓ | \(n) not found |") }
+            }
+        }
+        if runs("134") {
+            let c = app.descendants(matching: .any)["uitest.canvas"].firstMatch
+            if c.exists { c.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).doubleTap(); sleep(1); snapshot("A134-double-tap") }
+        }
+        // A-135 to A-138 — Mask: Add, shapes, sides/points samples, character, SF Symbol, corners, Remove.
+        let maskLines = ["135", "136", "137", "138"]
+        if maskLines.contains(where: runs) {
+            openNewImage(named: "A7 mask")
+            _ = placeShakedownPhoto("A135")
+            press("Mask"); sleep(2)
+            app.buttons.matching(identifier: "Tool").allElementsBoundByIndex.first { $0.isHittable }?.tap(); sleep(1)
+            if reveal(app.buttons["Add Mask"].firstMatch) { app.buttons["Add Mask"].firstMatch.tap(); sleep(1) }
+            snapshot("A135-mask-added")
+        }
+        if runs("135") {
+            for s in ["Square", "Circle", "App Icon", "Polygon", "Star", "Character"] {
+                if pickMenu("Shape", s) {
+                    if s == "Polygon" || s == "Star" {
+                        let st = app.steppers.matching(NSPredicate(format: "label BEGINSWITH 'Sides' OR label BEGINSWITH 'Points'")).firstMatch
+                        if reveal(st) { for _ in 0..<Int.random(in: 1...4) { st.buttons.element(boundBy: 1).tap() }; record("| A-135 | 👁 | \(s) → \(st.label) |") }
+                    }
+                    snapshot("A135-\(s.replacingOccurrences(of: " ", with: "-"))")
+                } else { record("| A-135 | ❓ | Mask shape \(s) not found |") }
+            }
+        }
+        if runs("136") {
+            let f = app.textFields["Symbol name"].firstMatch
+            for name in ["heart.fill", "not.a.symbol.xyz"] where reveal(f) {
+                setField(f, name); if reveal(app.buttons["Use"].firstMatch) { app.buttons["Use"].firstMatch.tap(); sleep(1) }
+                snapshot("A136-\(name)")
+            }
+        }
+        if runs("137") {
+            if pickMenu("Corner ratio", "") { snapshot("A137-ratio-menu") }
+            let t = app.switches.matching(NSPredicate(format: "label BEGINSWITH 'Free corners'")).firstMatch
+            if reveal(t) { t.tap(); sleep(1); record("| A-137 | 👁 | Free corners → \(t.value ?? "?") |"); snapshot("A137-free-corners") }
+            if reveal(app.buttons["Remove Mask"].firstMatch) { app.buttons["Remove Mask"].firstMatch.tap(); sleep(1); snapshot("A137-removed"); record("| A-137 | 👁 | Remove Mask → Add Mask back=\(app.buttons["Add Mask"].exists) |") }
+        }
+        if runs("138") { dragOnCanvas(); snapshot("A138-mask-dragged") }
+        // A-139 / A-140 — Paint Drop Bucket: swatches, Fill Layer, Tolerance (random samples), tap inside / outside.
+        if runs("139") || runs("140") {
+            openNewImage(named: "A7 paint bucket")
+            _ = placeShakedownPhoto("A139")
+            press("Paint Drop Bucket"); sleep(2)
+            app.buttons.matching(identifier: "Tool").allElementsBoundByIndex.first { $0.isHittable }?.tap(); sleep(1)
+            snapshot("A139-bucket-page")
+        }
+        if runs("139") {
+            let fill = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Fill'")).firstMatch
+            if reveal(fill) { fill.tap(); sleep(1); snapshot("A139-filled"); app.typeKey("z", modifierFlags: .command); sleep(1) }
+            else { record("| A-139 | ❓ | Fill Layer not found |") }
+        }
+        if runs("140") {
+            slide("Tolerance", "A-140")
+            let c = app.descendants(matching: .any)["uitest.canvas"].firstMatch
+            if c.exists { c.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap(); sleep(1); snapshot("A140-tap-inside")
+                          c.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap(); sleep(1); snapshot("A140-tap-clear") }
         }
         record("| A7 | — | DONE |")
     }
