@@ -143,6 +143,67 @@ final class Image_ProducerUITests: XCTestCase {
         press("Canvas Tool"); sleep(1); press("Move"); sleep(1)
     }
 
+    // MARK: Glow style keeps Intensity
+
+    // REM 2026-11-21 — his word: "fix the plasma glow intensity bug", then "yes run it on the mac".
+    // Seen 11-20 on the Mac (build 430): Neon → Plasma dropped Intensity 1.00× → 0.13× unasked.
+    // The iPhone test held at the default 1.00×; this one also moves Intensity off its default first.
+    func testGlowStyleKeepsIntensityMac() throws {
+        let welcome = app.windows["Welcome to Image Producer"]
+        _ = welcome.waitForExistence(timeout: 10)
+        app.menuBars.menuBarItems["File"].click()
+        let newItem = app.menuItems["New Image"]
+        if newItem.waitForExistence(timeout: 5) { newItem.click() } else { app.typeKey(.escape, modifierFlags: []) }
+        _ = app.windows.firstMatch.waitForExistence(timeout: 10)
+        if press("Create", 10) { sleep(2) }
+        if welcome.exists { welcome.buttons["_XCUI:CloseWindow"].click(); sleep(1) }
+        check("glow-mac", "Add a layer", press("Add a layer")); sleep(1)
+        // REM 18:0x his catch: "you didnt have an image in the layer to have glow o[n]" — give the layer art first.
+        check("glow-mac", "Paint bucket", press("Paint Drop Bucket")); sleep(1)
+        check("glow-mac", "Layer filled with paint", press("Fill Layer")); sleep(1)
+        check("glow-mac", "Layer tool", press("Layer")); sleep(2)
+        // REM 17:3x run: on the Mac the Glow reveal is a DisclosureTriangle "Glow", not a text row.
+        let glowRow = app.disclosureTriangles["Glow"].firstMatch
+        check("glow-mac", "Glow section is on the Layer page", glowRow.waitForExistence(timeout: 5))
+        glowRow.click(); sleep(1)
+        let toggle = app.checkBoxes["Glow this layer"].firstMatch.exists
+            ? app.checkBoxes["Glow this layer"].firstMatch : app.switches["Glow this layer"].firstMatch
+        check("glow-mac", "Glow switch is there", toggle.waitForExistence(timeout: 3))
+        toggle.click(); sleep(1)
+        let slider = app.sliders["Intensity"].firstMatch
+        check("glow-mac", "Intensity slider is there", slider.waitForExistence(timeout: 3))
+        snapshot("gm00-glow-on")
+        let plasma = app.radioButtons["Plasma Glow"].firstMatch.exists
+            ? app.radioButtons["Plasma Glow"].firstMatch : app.buttons["Plasma Glow"].firstMatch
+        let neon = app.radioButtons["Neon Glow"].firstMatch.exists
+            ? app.radioButtons["Neon Glow"].firstMatch : app.buttons["Neon Glow"].firstMatch
+        // REM 17:5x run: on the Mac a slider's value is a number, not the "1.00×" string iOS gives — `as? String` read nil.
+        func v() -> String { slider.value.map { "\($0)" } ?? "nil" }
+
+        // 1 — at the default.
+        let d0 = v()
+        plasma.click(); sleep(1)
+        let d1 = v()
+        check("glow-mac", "Default: Neon → Plasma keeps Intensity", d0 == d1, "before \(d0), after \(d1)")
+        snapshot("gm01-plasma-default")
+        neon.click(); sleep(1)
+        let d2 = v()
+        check("glow-mac", "Default: Plasma → Neon keeps Intensity", d2 == d0, "before \(d0), back \(d2)")
+
+        // 2 — off the default (11-20 had 1.27× before the drop).
+        slider.adjust(toNormalizedSliderPosition: 0.6); sleep(1)
+        let n0 = v()
+        check("glow-mac", "Intensity moved off 1.00×", n0 != d0, "now \(n0)")
+        plasma.click(); sleep(1)
+        let n1 = v()
+        snapshot("gm02-plasma-moved")
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "gm02-plasma-moved"; shot.lifetime = .keepAlways; add(shot)
+        check("glow-mac", "Moved: Neon → Plasma keeps Intensity", n0 == n1, "before \(n0), after \(n1)")
+        neon.click(); sleep(1)
+        let n2 = v()
+        check("glow-mac", "Moved: Plasma → Neon keeps Intensity", n2 == n0, "before \(n0), back \(n2)")
+    }
+
     // MARK: The shakedown
 
     func testShakedown() throws {

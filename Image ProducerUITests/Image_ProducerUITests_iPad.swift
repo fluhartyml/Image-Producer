@@ -577,6 +577,50 @@ final class Image_ProducerUITests_iPad: XCTestCase {
     // REM 2026-11-21 — 438: the Floating Preview switch left the Canvas page for Settings. His word:
     // "move the PiP toggle to settings", then "test 438 in the 16e simulator". Checks the Canvas page
     // has no switch, the Settings app has it, and turning it off there hides the preview.
+    // REM 2026-11-21 — his word: "fix the plasma glow intensity bug". Seen 11-20 on the Mac (build 430):
+    // switching Neon → Plasma dropped Intensity 1.00× → 0.13× unasked. Reproduce before touching code.
+    func testGlowStyleKeepsIntensity() throws {
+        XCUIDevice.shared.orientation = .portrait
+        sleep(1)
+        openNewImage()
+        // A new image has no layer selected ("Select a layer to use these effects") — add one first.
+        app.buttons["Layers"].firstMatch.tap(); sleep(1)
+        check("glow", "Add a layer button is there", press("Add a layer")); sleep(1)
+        app.buttons["Tool"].firstMatch.tap(); sleep(1)
+        press("Layer"); sleep(2)
+        func find(_ e: XCUIElement) -> Bool {
+            var n = 0
+            // REM 16:0x run: app.swipeUp() landed on the canvas and panned it; scroll the inspector panel itself.
+            while !(e.exists && e.isHittable) && n < 8 {
+                let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.92))
+                from.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.72)))
+                sleep(1); n += 1
+            }
+            return e.exists && e.isHittable
+        }
+        let glowRow = app.staticTexts["Glow"].firstMatch
+        check("glow", "Glow section is on the Layer page", find(glowRow))
+        glowRow.tap(); sleep(1)
+        let toggle = app.switches["Glow this layer"].firstMatch
+        check("glow", "Glow switch is there", find(toggle))
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap(); sleep(1)
+        let slider = app.sliders["Intensity"].firstMatch
+        // REM 16:1x run: scrolling down to the slider pushed the style buttons off the top. Its value reads without scrolling.
+        check("glow", "Intensity slider is there", slider.waitForExistence(timeout: 3))
+        let before = (slider.value as? String) ?? "nil"
+        snapshot("g01-neon")
+        let plasma = app.buttons["Plasma Glow"].firstMatch
+        check("glow", "Plasma Glow button is there", find(plasma))
+        plasma.tap(); sleep(1)
+        let after = (slider.value as? String) ?? "nil"
+        snapshot("g02-plasma")
+        app.screenshot().attach(self, "g02-plasma")
+        check("glow", "Neon → Plasma keeps Intensity", before == after, "before \(before), after \(after)")
+        app.buttons["Neon Glow"].firstMatch.tap(); sleep(1)
+        let back = (slider.value as? String) ?? "nil"
+        check("glow", "Plasma → Neon keeps Intensity", back == before, "before \(before), back \(back)")
+    }
+
     func testPhoneFloatingPreviewSetting() throws {
         XCUIDevice.shared.orientation = .portrait
         sleep(1)
