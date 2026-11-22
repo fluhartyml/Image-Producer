@@ -1863,11 +1863,12 @@ struct ToolInspector: View {
                     .frame(width: length, height: g.size.width)
                     .rotationEffect(.degrees(-90))
                     .frame(width: g.size.width, height: g.size.height)
+                    // REM 2026-11-22 shakedown A1: the name was still exposed twice (a labeled wrapper around a
+                    // hidden word still left a nested copy in the tree). The word itself is now the ONE element —
+                    // his rule: "the lable of eacj tool inspector should be listed only once".
+                    .accessibilityAddTraits(.isHeader)
             }
             .frame(width: spineMetrics.thickness)
-            .accessibilityElement()
-            .accessibilityLabel(activeTool.title)
-            .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 0) {
                 if let name = activeLayerName {
                     Text("Layer: \(name)")
@@ -1876,7 +1877,11 @@ struct ToolInspector: View {
                         .padding(.horizontal)
                         .padding(.top, 10)
                 }
-                ScrollView { content }
+                // REM 2026-11-22 shakedown A1 — Apple's standard buttons came out 34 pt tall on the iPhone tool
+                // page; his rule 000.11 + "apple human interface guidelines are to be treated as the source of
+                // truth" (11-21) → Apple's own large control size, which meets the 44-pt minimum. The spine page
+                // is iPhone-only, so iPad and Mac keep their sizes (his "the change lands only on the device it is for").
+                ScrollView { content.controlSize(.large) }
             }
             // REM 2026-11-21 — the settings column claims the rest of the width, so the spine stays on
             // the left edge even when a tool has nothing to show (Zoom, his "go with option 2"). The
@@ -3303,6 +3308,9 @@ extension View {
     func paletteSwatchAccessibility(index: Int, hex: String, isSelected: Bool,
                                     onPress: @escaping () -> Void) -> some View {
         self
+            // REM 2026-11-22 shakedown A1: swatches were 28 pt tall on iPhone — a 44 × 44 tap area (000.11, HIG);
+            // the swatch itself looks the same, rows just get finger room. iOS only (touchTarget).
+            .touchTarget()
             .onTapGesture(perform: onPress)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Color \(index + 1), \(hex)")
@@ -4139,6 +4147,7 @@ struct FontPickerInspector: View {
                 .frame(width: 36, height: 30)
                 .background(RoundedRectangle(cornerRadius: 6)
                     .fill(flag.wrappedValue ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12)))
+                .touchTarget()   // REM 2026-11-22 shakedown A1: Bold/Italic/Underline/Outline were 36 × 30 on iPhone (000.11)
         }
         .buttonStyle(.plain)
         .help(label)
@@ -4284,7 +4293,7 @@ struct ImageImportInspector: View {
                 // Concise on screen, detail behind (i) — Michael, 2026-10-03: "the text on
                 // the screen should be concise or behind (i)".
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Button { showInfo.toggle() } label: { Image(systemName: "info.circle") }
+                    Button { showInfo.toggle() } label: { Image(systemName: "info.circle").touchTarget() }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                         .help("More about importing")
                         .accessibilityLabel("More about importing")
@@ -4937,7 +4946,7 @@ struct HistoryPanel: View {
                     }
                     .disabled(document.history.entries.isEmpty && document.history.baseline == nil)
                 } label: {
-                    Image(systemName: "ellipsis.circle").scaledFont(18)
+                    Image(systemName: "ellipsis.circle").scaledFont(18).touchTarget()
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
@@ -5089,6 +5098,7 @@ private struct HistoryEntryRow: View {
                         .scaledFont(12, weight: .semibold)
                         .foregroundStyle(.secondary)
                         .frame(width: 16)
+                        .touchTarget()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(expanded ? "Hide steps" : "Show steps")
@@ -5110,6 +5120,7 @@ private struct HistoryEntryRow: View {
                             .scaledFont(13)
                             .foregroundStyle(.secondary)
                     }
+                    .touchTarget()   // REM 2026-11-22 shakedown A1: 19 pt tall inside a 74-pt row on iPhone (000.11)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -7502,7 +7513,7 @@ struct LayerPanel: View {
                 if showsHeader { Text("Layers").font(.headline) }
                 Spacer()
                 Button { addLayer() } label: {
-                    Image(systemName: "plus").font(.headline)
+                    Image(systemName: "plus").font(.headline).touchTarget()
                 }
                 .buttonStyle(.plain)
                 .help("Add a layer")
@@ -7946,6 +7957,7 @@ struct LayerRow: View {
                             .scaledFont(15)
                             .frame(width: 20, height: 22)
                             .contentShape(Rectangle())
+                            .touchTarget()
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(isChecked ? Color.accentColor : .secondary)
@@ -8024,6 +8036,8 @@ struct LayerRow: View {
                     }
                     Spacer()
                 }
+                // REM 2026-11-22 shakedown A1: the name button was 23 pt tall inside a 78-pt row (000.11, HIG 44).
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -8058,6 +8072,7 @@ struct LayerRow: View {
                     .foregroundStyle(layer.isVisible ? Color.green : Color.red)
                     .frame(width: 32, height: 26)   // a target worth aiming at
                     .contentShape(Rectangle())
+                    .touchTarget()
             }
             .buttonStyle(.plain)
             .help(layer.isVisible ? "Visible — click to hide" : "Hidden — click to show")
@@ -8762,7 +8777,8 @@ struct InfoTip: View {
     }
 
     var body: some View {
-        Button { shown.toggle() } label: { Image(systemName: "info.circle").scaledFont(18) }
+        // REM 2026-11-22 shakedown A1: the (i) was 16 × 17 on iPhone — touchTarget() gives it Apple's 44 × 44 tap area (000.11).
+        Button { shown.toggle() } label: { Image(systemName: "info.circle").scaledFont(18).touchTarget() }
             .buttonStyle(.plain).foregroundStyle(.secondary)
             .help(help)
             .accessibilityLabel(label ?? help)
@@ -10261,5 +10277,18 @@ extension EnvironmentValues {
     var copyLayerAction: (ImageLayer.ID) -> Void {
         get { self[CopyLayerActionKey.self] }
         set { self[CopyLayerActionKey.self] = newValue }
+    }
+}
+
+// REM 2026-11-21 — SHAKEDOWN A1, his rule 000.11 ("conceptually use a human finger to manipulate a button
+// without getting into conflicts"; Apple's minimum is 44 × 44 pt on iPhone and iPad). Grows the TAP AREA to
+// 44 × 44 around a small glyph without changing how it looks. iOS only: the Mac keeps pointer-sized targets.
+extension View {
+    @ViewBuilder func touchTarget() -> some View {
+        #if os(iOS)
+        self.frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+        #else
+        self
+        #endif
     }
 }

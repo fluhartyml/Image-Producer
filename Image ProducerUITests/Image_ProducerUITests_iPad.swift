@@ -668,10 +668,24 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         record("| \(code) | — | \(shapeName): window \(Int(win.frame.width)) × \(Int(win.frame.height)) |")
 
         // Buttons smaller than Apple's 44 × 44 touch minimum, on whatever is on screen now (000.11).
+        let tools: [(String, String)] = [("Canvas Tool", "Canvas"), ("Color Palette", "Color Palette"), ("Move", "Move / Transform"),
+            ("Selection", "Selection"), ("Mask", "Mask"), ("Paint Drop Bucket", "Paint Drop / Bucket"), ("Pixel Pen", "Pen (Pixels)"),
+            ("Eraser", "Eraser"), ("Eyedropper", "Eyedropper"), ("Text", "Text"), ("Symbol", "Symbol"), ("Image", "Image"),
+            ("Image Playground", "Image Playground"), ("Layer", "Layer"), ("Remove Background", "Remove Background"),
+            ("Magic Lasso", "Magic Lasso"), ("Adjust", "Adjust"), ("Camera", "Camera")]
         func small(_ where_: String) -> [String] {
-            app.buttons.allElementsBoundByIndex.filter { $0.exists && $0.isHittable }.compactMap { b in
+            // REM 2026-11-21 21:5x — Apple's own controls (the system toolbar, the segmented switch, List's reorder
+            // grip) are Apple's components, sized by Apple: not counted here. The toolbox's tool buttons have their
+            // own check (L3), so they're not repeated on every page.
+            let system = (app.toolbars.buttons.allElementsBoundByIndex + app.segmentedControls.buttons.allElementsBoundByIndex)
+                .map(\.frame)
+            let toolLabels = Set(tools.map(\.0))
+            return app.buttons.allElementsBoundByIndex.filter { $0.exists && $0.isHittable }.compactMap { b in
                 let f = b.frame
-                guard f.width > 0, f.height > 0, f.width < 44 || f.height < 44 else { return nil }
+                guard !system.contains(f), !b.label.hasPrefix("Reorder"), !toolLabels.contains(b.label) else { return nil }
+                // REM 2026-11-22 — measured to the nearest point: a 44-pt target lands at 43.7 after pixel rounding
+                // on a 3× screen, and that is still Apple's 44.
+                guard f.width > 0, f.height > 0, f.width.rounded() < 44 || f.height.rounded() < 44 else { return nil }
                 let n = b.label.isEmpty ? b.identifier : b.label
                 return "\(n.isEmpty ? "?" : n) \(Int(f.width))×\(Int(f.height))"
             }
@@ -735,11 +749,6 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         }
 
         // L3 — the toolbox: two rows, no scrolling, every tool on screen.
-        let tools: [(String, String)] = [("Canvas Tool", "Canvas"), ("Color Palette", "Color Palette"), ("Move", "Move / Transform"),
-            ("Selection", "Selection"), ("Mask", "Mask"), ("Paint Drop Bucket", "Paint Drop / Bucket"), ("Pixel Pen", "Pen (Pixels)"),
-            ("Eraser", "Eraser"), ("Eyedropper", "Eyedropper"), ("Text", "Text"), ("Symbol", "Symbol"), ("Image", "Image"),
-            ("Image Playground", "Image Playground"), ("Layer", "Layer"), ("Remove Background", "Remove Background"),
-            ("Magic Lasso", "Magic Lasso"), ("Adjust", "Adjust"), ("Camera", "Camera")]
         var offScreen: [String] = [], rows = Set<Int>(), toolSizes = Set<String>()
         for (t, _) in tools {
             let b = button(t)
@@ -789,7 +798,10 @@ final class Image_ProducerUITests_iPad: XCTestCase {
             check(code, "L5 \(title): every button at least 44 × 44", s.isEmpty, s.joined(separator: ", "))
             // L6 — "The tool inspector is too narrow to work in" (his 439 feedback): sliders and fields need room.
             let narrow = (app.sliders.allElementsBoundByIndex + app.textFields.allElementsBoundByIndex)
-                .filter { $0.exists && $0.isHittable && $0.frame.width < 120 }
+                // REM 2026-11-22 — a number field (Canvas W/H) hugs its number by his 10-11 design; the 120 bar
+                // is for sliders and text you type words into.
+                .filter { $0.exists && $0.isHittable && $0.frame.width < 120
+                          && !(($0.value as? String).map { !$0.isEmpty && $0.allSatisfy(\.isNumber) } ?? false) }
                 .map { "\($0.label.isEmpty ? $0.identifier : $0.label) \(Int($0.frame.width)) wide" }
             check(code, "L6 \(title): sliders and fields at least 120 wide", narrow.isEmpty, narrow.joined(separator: ", "))
             // REM 2026-11-21 21:2x — his word on the Duo: "that lable 'immage' is supposed to be a spine from bottom
@@ -823,7 +835,13 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         if back.exists { back.tap(); sleep(3) }
         snapshot("\(code)-L7-browser")
         let file = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "\(code) ")).firstMatch
-        if file.waitForExistence(timeout: 8) { file.tap(); sleep(4) }
+        // REM 2026-11-21 21:5x — the browser lists many files; the project can sit below the fold. Scroll for it.
+        let fileView = app.collectionViews["File View"].firstMatch
+        // REM 2026-11-22 — the 07:00 run: the file WAS saved, but the browser opened scrolled down and "A1 …" sorts
+        // to the top; swiping up only went further away. Look toward the top first, then down.
+        for _ in 0..<4 where !(file.exists && file.isHittable) && fileView.exists { fileView.swipeDown(); sleep(1) }
+        for _ in 0..<4 where !(file.exists && file.isHittable) && fileView.exists { fileView.swipeUp(); sleep(1) }
+        if file.waitForExistence(timeout: 4) { file.tap(); sleep(4) }
         // REM 20:5x A1 run: a reopened project has no layer selected, and probe() only reads with one
         // selected — read the layer count straight off the canvas probe instead.
         var reopened: Probe? = nil
