@@ -1736,3 +1736,26 @@
 //
 //  Attribution: Apple frameworks only — no credit line needed.
 //
+
+// ============================================================================
+// MARK: - 🤖 COMMAND MODE FOR BOTS — exit codes (bot driving 004/005, 2026-11-24)
+// ============================================================================
+//
+//  "Image Producer.app/Contents/MacOS/Image Producer" --command <job.json>
+//  "Image Producer.app/Contents/MacOS/Image Producer" --help
+//
+//  Jobs run in the JOB FOLDER Michael chose once in Settings (suggested
+//  ~/Image Producer Jobs), else the app's container Command folder. Full
+//  usage, steps and fields: run --help (text lives in CLIRunner.swift).
+//
+//  EXIT CODES — stable; a bot branches on the number (his lock, 005):
+//    0  every step ran, or --help printed
+//    1  a job step failed — the steps before it are kept and saved
+//    2  usage error — missing or unreadable job file, bad path, unknown --flag
+//
+//  Unknown DOUBLE-dash flags print usage and exit 2 with no window (004).
+//  Single-dash arguments (Xcode, macOS, -ImageProducerUITest) still open
+//  the app as before.
+//
+//  Every run also leaves <job name>.status.json in the job folder, written
+//  last and atomically (003), so a polling bot never reads half a file.
