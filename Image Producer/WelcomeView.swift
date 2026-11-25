@@ -195,62 +195,11 @@ struct WelcomeView: View {
         return String(n.prefix(200))
     }
 
-    /// OPEN .psd — his design, 2026-10-11: "if it cant find photoshop.psd then it opens a
-    /// new file named photoshop.psd". The typed name is looked up as <name>.psd in the
-    /// Image Producer folder: there → it opens; not there → a new one is made and opened.
-    /// "Open", not "New": opening a .psd is the plain, legal description (his word).
-    /// Empty name: a file picker for any .psd.
-    private func openPSD() {
-        if let staged = stagedURL, ImageDocument.isPSD(staged) { Task { await openRecent(staged) }; return }
-        let typed = cleanedName
-        if typed.isEmpty {
-            let panel = NSOpenPanel()
-            panel.allowedContentTypes = [.photoshopDocument]
-            panel.allowsMultipleSelection = false
-            panel.prompt = "Open"
-            guard panel.runModal() == .OK, let url = panel.url else { return }
-            Task { await open(url) }
-            return
-        }
-        Task {
-            let found = await Task.detached { () -> (psd: URL?, project: URL?) in
-                (ImageDocument.namedProjectURL(typed, ext: "psd"), ImageDocument.namedProjectURL(typed))
-            }.value
-            guard let url = found.psd else {
-                openError = "Could not find the Image Producer folder."
-                return
-            }
-            if !FileManager.default.fileExists(atPath: url.path) {
-                // An existing project by this name (staged, or found) comes in AS a .psd —
-                // its own content, no size question. Only a name with no file at all makes
-                // a blank new one.
-                let fm = FileManager.default
-                let project = stagedURL ?? found.project.flatMap { fm.fileExists(atPath: $0.path) ? $0 : nil }
-                if let project {
-                    var ok = false
-                    await RecentProjects.withAccess(project) {
-                        ok = ImageDocument.writePSD(fromProject: project, to: url)
-                    }
-                    guard ok else {
-                        openError = "Could not make \(url.lastPathComponent) from “\(project.deletingPathExtension().lastPathComponent)”."
-                        return
-                    }
-                } else {
-                    guard ImageDocument.writeNewPSD(at: url) else {
-                        openError = "Could not create \(url.lastPathComponent)."
-                        return
-                    }
-                }
-            }
-            await open(url)
-        }
-    }
-
     /// New Image / New from Import on a file that already exists: a NEW PROJECT made from
     /// it, named "<name> N" (first free number from 2), in the Image Producer folder, then
     /// opened. ALWAYS a project (.prd) — a staged .psd is brought in as a project too (his
-    /// screen, 2026-10-11: he pressed New Image on the .psd and got another .psd). Only
-    /// Open .psd stays in .psd. The source is never touched. The Image Producer folder,
+    /// screen, 2026-10-11: he pressed New Image on the .psd and got another .psd). A .psd opened
+    /// with Open… stays a .psd. The source is never touched. The Image Producer folder,
     /// not the source's own: a Recent can live anywhere and the sandbox only lets the app
     /// write its own folder.
     private func newFromCopy(of source: URL) async {
@@ -408,23 +357,16 @@ struct WelcomeView: View {
                 }
             }
 
-            HStack(spacing: 10) {
-                Button {
-                    createNew()
-                } label: {
-                    Label("New Image", systemImage: "plus")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                // OPEN .psd — his word, 2026-10-11: "not new psd 'open .psd'".
-                Button {
-                    openPSD()
-                } label: {
-                    Label("Open .psd", systemImage: "doc")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+            // REM 2026-11-24 ~20:5x — ONE OPEN. His word: "open should open psd why are there two
+            // buttons to open?" The Open .psd button (10-11) is gone; Open… below takes a
+            // project or a .psd. ("dont add a zillion buttons", same evening.)
+            Button {
+                createNew()
+            } label: {
+                Label("New Image", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.borderedProminent)
             .controlSize(.large)
 
             if let openError {
@@ -435,55 +377,6 @@ struct WelcomeView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // OPEN — Michael spotted the gap, 2026-09-06: "i just noticed a missng
-            // element… what about an open?"
-            //
-            // The window offered two ways to START something and no way to RETURN to
-            // something, which is why "New from Import" was reading as the open button
-            // and why he asked whether it should just be called "Open Image."
-            //
-            // ⛔ It must NOT be called that, and Import must not be renamed to it. They
-            // are different verbs: Open reopens an .imgprd PROJECT; New from Import
-            // creates a NEW project seeded from a foreign file and never writes back to
-            // it. "Open Image" would promise editing that PNG in place — so the first
-            // time someone opened one, edited, and saved, they would expect their PNG to
-            // have changed. It has not.
-            Button {
-                // Staged: open that exact file. A typed name that is a project in the
-                // Image Producer folder opens too. Otherwise, the file picker.
-                if let staged = stagedURL { Task { await openRecent(staged) }; return }
-                let typed = cleanedName
-                if !typed.isEmpty, let url = ImageDocument.namedProjectURL(typed),
-                   FileManager.default.fileExists(atPath: url.path) {
-                    Task { await open(url) }; return
-                }
-                let panel = NSOpenPanel()
-                panel.allowedContentTypes = [.imageProject]
-                panel.allowsMultipleSelection = false
-                panel.canChooseDirectories = false
-                panel.prompt = "Open"
-                panel.message = "Choose an Image Producer project to open."
-                // Start in the app's own iCloud folder. Without this, macOS reopens whatever
-                // folder any panel in this app used last — the Desktop, on 2026-09-16, and he
-                // expected "the image producer icloud folder."
-                panel.directoryURL = ImageDocument.projectsDirectory()
-                guard panel.runModal() == .OK, let url = panel.url else { return }
-                Task {
-                    RecentProjects.note(url)
-                    do {
-                        try await openDocument(at: url)
-                        dismissWindow(id: "welcome")
-                    } catch {
-                        NSLog("ImageProducer Open: openDocument failed for %@ — %@",
-                              url.path, String(describing: error))
-                    }
-                }
-            } label: {
-                Label("Open…", systemImage: "folder")
-                    .frame(maxWidth: .infinity)
-            }
-            .controlSize(.large)
-            .buttonStyle(.bordered)
 
             // New from Import — the launch surface IS the "no document open" state, so the
             // import-as-new-document path belongs right here next to New Image (not only in
@@ -604,6 +497,61 @@ struct WelcomeView: View {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(Color.primary.opacity(0.12))
             )
+
+            // REM 2026-11-24 ~20:5x — his word: "one open button should be under the recents list".
+            // OPEN — Michael spotted the gap, 2026-09-06: "i just noticed a missng
+            // element… what about an open?"
+            //
+            // The window offered two ways to START something and no way to RETURN to
+            // something, which is why "New from Import" was reading as the open button
+            // and why he asked whether it should just be called "Open Image."
+            //
+            // ⛔ It must NOT be called that, and Import must not be renamed to it. They
+            // are different verbs: Open reopens an .imgprd PROJECT; New from Import
+            // creates a NEW project seeded from a foreign file and never writes back to
+            // it. "Open Image" would promise editing that PNG in place — so the first
+            // time someone opened one, edited, and saved, they would expect their PNG to
+            // have changed. It has not.
+            Button {
+                // Staged: open that exact file. A typed name that is a project in the
+                // Image Producer folder opens too. Otherwise, the file picker.
+                if let staged = stagedURL { Task { await openRecent(staged) }; return }
+                let typed = cleanedName
+                // A typed name finds a project first, then a .psd of that name.
+                if !typed.isEmpty {
+                    for url in [ImageDocument.namedProjectURL(typed), ImageDocument.namedProjectURL(typed, ext: "psd")] {
+                        if let url, FileManager.default.fileExists(atPath: url.path) {
+                            Task { await open(url) }; return
+                        }
+                    }
+                }
+                let panel = NSOpenPanel()
+                panel.allowedContentTypes = [.imageProject, .photoshopDocument]
+                panel.allowsMultipleSelection = false
+                panel.canChooseDirectories = false
+                panel.prompt = "Open"
+                panel.message = "Choose an Image Producer project or a Photoshop .psd to open."
+                // Start in the app's own iCloud folder. Without this, macOS reopens whatever
+                // folder any panel in this app used last — the Desktop, on 2026-09-16, and he
+                // expected "the image producer icloud folder."
+                panel.directoryURL = ImageDocument.projectsDirectory()
+                guard panel.runModal() == .OK, let url = panel.url else { return }
+                Task {
+                    RecentProjects.note(url)
+                    do {
+                        try await openDocument(at: url)
+                        dismissWindow(id: "welcome")
+                    } catch {
+                        NSLog("ImageProducer Open: openDocument failed for %@ — %@",
+                              url.path, String(describing: error))
+                    }
+                }
+            } label: {
+                Label("Open…", systemImage: "folder")
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.large)
+            .buttonStyle(.bordered)
 
             Spacer(minLength: 0)
             // The faint "Open other files from the File menu." link lived here. It only
