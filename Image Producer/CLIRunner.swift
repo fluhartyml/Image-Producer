@@ -111,6 +111,10 @@ enum CommandMode {
           removeBackground         — keep the subject, original hidden below
           magicErase        color ("#RRGGBB", default #FFFFFF), tolerance (default 24)
           merge                    — merge every visible picture layer into one
+          resize            width or height (pixels) — scales the whole picture, canvas
+                            and every layer together; aspect is always kept, so the other
+                            side follows. Both must match the current aspect; to change
+                            the shape use crop, extend or scaleToFit instead.
           exportPNG         file   — write the canvas as a PNG
           saveProject       file   — write an .imgprd project to open and adjust
           imagePlayground   prompt — needs a person: saves the project and stops
@@ -163,6 +167,8 @@ enum CommandMode {
         var color: String?
         var tolerance: Int?
         var prompt: String?
+        var width: Int?
+        var height: Int?
     }
 
     enum Problem: Error, CustomStringConvertible {
@@ -357,6 +363,41 @@ enum CommandMode {
             if let why = mergeLayers(ids, in: doc) { throw Problem.say(why) }
             return "\(ids.count) visible layers merged into one"
 
+        // REM 2026-11-24 — BOT DRIVING 006 (his lock: "resize scales the whole picture (canvas
+        // and every layer together) and always keeps aspect; the job gives width or height and
+        // the other follows; both with a mismatched aspect fails and points to crop (007),
+        // extend (008) or scaleToFit (009)"). Why it is only a canvas-size change: layers are
+        // sized against the canvas's SHORT edge and placed as fractions of width × height, so
+        // a same-aspect canvas change scales every layer with it — the Canvas panel's Ratio
+        // rule does exactly this. History records it the way that panel does ("Canvas Size").
+        case "resize":
+            let w0 = doc.canvasWidth, h0 = doc.canvasHeight
+            let aspect = Double(w0) / Double(max(1, h0))
+            var w1: Int, h1: Int
+            switch (s.width, s.height) {
+            case (nil, nil):
+                throw Problem.say("needs \"width\" or \"height\" in pixels")
+            case let (w?, nil):
+                w1 = w; h1 = Int((Double(w) / aspect).rounded())
+            case let (nil, h?):
+                h1 = h; w1 = Int((Double(h) * aspect).rounded())
+            case let (w?, h?):
+                // Allow the one pixel a rounded side can be off by; anything more changes shape.
+                guard abs(Double(h) - Double(w) / aspect) <= 1 || abs(Double(w) - Double(h) * aspect) <= 1 else {
+                    throw Problem.say("\(w) by \(h) is not the picture's shape (\(w0) by \(h0)); resize keeps aspect — give only width or height, or use crop, extend or scaleToFit to change the shape")
+                }
+                w1 = w; h1 = h
+            }
+            guard (1...16384).contains(w1), (1...16384).contains(h1) else {
+                throw Problem.say("\(w1) by \(h1) is outside 1 to 16384 pixels")
+            }
+            doc.captureHistoryBaselineIfNeeded()
+            doc.canvasWidth = w1
+            doc.canvasHeight = h1
+            doc.recordHistory(toolID: Tool.canvas.rawValue, groupTitle: Tool.canvas.title,
+                              actionLabel: "Canvas Size", layerID: nil)
+            return "\(w0) by \(h0) → \(w1) by \(h1), every layer scaled with it"
+
         case "exportPNG":
             guard let f = s.file else { throw Problem.say("needs \"file\"") }
             guard let png = makeCanvasPNG(doc) else { throw Problem.say("could not render the picture") }
@@ -376,7 +417,7 @@ enum CommandMode {
             throw Problem.say("Image Playground needs a person: Apple's generator will not run with the app in the background, and is deprecated in OS 27. Saved \(url.lastPathComponent) — open it and use the Image Playground tool (A).")
 
         default:
-            throw Problem.say("unknown step \"\(s.do)\" — steps: open, addImage, removeBackground, magicErase, merge, exportPNG, saveProject, imagePlayground")
+            throw Problem.say("unknown step \"\(s.do)\" — steps: open, addImage, removeBackground, magicErase, merge, resize, exportPNG, saveProject, imagePlayground")
         }
     }
 
