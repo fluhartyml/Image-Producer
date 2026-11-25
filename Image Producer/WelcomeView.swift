@@ -110,7 +110,11 @@ enum RecentProjects {
     static func clear() {
         UserDefaults.standard.removeObject(forKey: key)
         NSDocumentController.shared.clearRecentDocuments(nil)
+        NotificationCenter.default.post(name: didClear, object: nil)
     }
+
+    /// Posted after clear(), so an open Welcome window empties its list at once.
+    static let didClear = Notification.Name("ImageProducer.recentsCleared")
 
     private static func resolve(_ bookmark: Data) -> URL? {
         var stale = false
@@ -631,6 +635,11 @@ struct WelcomeView: View {
         // Refresh when the app reactivates (e.g. returning to the Welcome window after
         // closing a document) so the recents list reflects the latest projects.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshRecents()
+        }
+        // File ▸ Open Recent ▸ Clear Menu empties this list too (his word, 2026-11-24).
+        .onReceive(NotificationCenter.default.publisher(for: RecentProjects.didClear)) { _ in
+            stagedURL = nil
             refreshRecents()
         }
     }

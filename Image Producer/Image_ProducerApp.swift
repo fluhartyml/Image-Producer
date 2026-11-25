@@ -169,6 +169,16 @@ struct ExportCommands: Commands {
 /// file on disk is never touched** — you get a project to work in, not an edit of the
 /// user's photo.
 final class ImageProducerAppDelegate: NSObject, NSApplicationDelegate {
+    // REM 2026-11-24 ~20:4x — CLEAR RECENTS. His word: "the file drop dowb menue should also
+    // clear the recents dont add a zillion buttons". File ▸ Open Recent ▸ Clear Menu sends
+    // clearRecentDocuments: up the responder chain, and the app delegate is asked BEFORE the
+    // document controller — so catching it here empties both lists in one place: AppKit's menu
+    // and the Welcome window's own bookmark list (RecentProjects), which the menu never knew
+    // about. No new button anywhere.
+    @objc func clearRecentDocuments(_ sender: Any?) {
+        RecentProjects.clear()
+    }
+
     /// The cryochamber's points last one session, by his design: gone on quit.
     func applicationWillTerminate(_ notification: Notification) {
         Cryochamber.discardSession()
