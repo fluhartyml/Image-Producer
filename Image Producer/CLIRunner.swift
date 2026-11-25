@@ -44,8 +44,9 @@
 //  command run is. The sheet needs a person to pick the picture. So "imagePlayground" stops the
 //  job after saving what is done so far, and names the project to open for that step.
 //
-//  Output: one line per step on stdout ("ok 2 removeBackground — …" / "FAIL …"), exit 0 when
-//  every step ran, 1 at the first failure (the steps before it are kept and saved). The same
+//  Output: one line per step on stdout ("ok 2 removeBackground — …" / "FAIL …"). Exit codes
+//  (005): 0 every step ran or --help, 1 at the first failed step (the steps before it are kept
+//  and saved), 2 usage error (missing/unreadable job file, bad path, unknown --flag). The same
 //  results go into <job name>.status.json in the job folder, written last (003).
 //
 
@@ -82,13 +83,63 @@ enum CommandMode {
         return "job folder: \(folder.path)"
     }
 
+    // REM 2026-11-24 — BOT DRIVING 004 + 005 (his locks). 004: "--help" prints usage and exits
+    // without a window; "only unknown double-dash flags (--anything) print usage and exit without
+    // a window; single-dash arguments from Xcode, macOS and the UI tests (-ImageProducerUITest)
+    // still open the app as today." Why: a bot must never open a window by accident with a typo.
+    // 005: stable exit codes a bot branches on — 0 every step ran (or --help), 1 a job step
+    // failed (work before it saved), 2 usage error (missing job file, bad path, unknown flag).
+    // An unreadable job file is also 2: nothing ran, so nothing was kept — it is bad input.
+    static let helpFlag = "--help"
+    static let exitOK: Int32 = 0, exitStepFailed: Int32 = 1, exitUsage: Int32 = 2
+
+    static var usage: String {
+        """
+        Image Producer command mode — runs a job with no window.
+
+        usage:
+          "Image Producer" --command <job.json>   run a job file from the job folder
+          "Image Producer" --help                 print this and exit
+
+        \(folderLine)
+        Every path in a job is a plain name inside the job folder (no /, ~ or ..).
+
+        job file: { "name": "…", "width": 1024, "height": 1024, "steps": [ … ] }
+        steps (each acts on the top visible picture layer):
+          open              file   — an .imgprd project to start from
+          addImage          file   — a picture on its own layer (the first sets the canvas)
+          removeBackground         — keep the subject, original hidden below
+          magicErase        color ("#RRGGBB", default #FFFFFF), tolerance (default 24)
+          merge                    — merge every visible picture layer into one
+          exportPNG         file   — write the canvas as a PNG
+          saveProject       file   — write an .imgprd project to open and adjust
+          imagePlayground   prompt — needs a person: saves the project and stops
+
+        output: one "ok" or "FAIL" line per step, then <job name>.status.json in the job
+        folder, written last (exit code, each step, every file written).
+
+        exit codes:
+          0  every step ran, or --help printed
+          1  a job step failed (the steps before it are kept and saved)
+          2  usage error: missing job file, bad path, unreadable job, unknown flag
+        """
+    }
+
     /// Called first thing from Image_ProducerApp.init(). Returns only when no job was asked for.
     @MainActor static func runIfRequested() {
-        let args = CommandLine.arguments
-        guard let i = args.firstIndex(of: flag) else { return }
-        guard i + 1 < args.count else { finish(1, "FAIL usage: --command <job.json>\n\(folderLine)") }
-        let code = run(jobName: args[i + 1])
-        finish(code, nil)
+        let args = Array(CommandLine.arguments.dropFirst())
+        if args.contains(helpFlag) { finish(exitOK, usage) }
+        if let i = args.firstIndex(of: flag) {
+            guard i + 1 < args.count else {
+                finish(exitUsage, "FAIL usage: --command <job.json>\n\(folderLine)\n(--help lists the steps and exit codes)")
+            }
+            finish(run(jobName: args[i + 1]), nil)
+        }
+        // Unknown double-dash flag: never fall through to a window (004). Single-dash
+        // arguments (Xcode, macOS, UI tests) still open the app.
+        if let unknown = args.first(where: { $0.hasPrefix("--") }) {
+            finish(exitUsage, "FAIL unknown flag \(unknown)\n\n\(usage)")
+        }
     }
 
     private static func finish(_ code: Int32, _ line: String?) -> Never {
@@ -151,7 +202,7 @@ enum CommandMode {
             print("FAIL job — \(why)")
             print(folderLine)
             status.problem = why
-            return finishStatus(&status, code: 1)
+            return finishStatus(&status, code: exitUsage)
         }
         if let name = job.name, !name.isEmpty { status.job = name }
         var saved = false
@@ -167,10 +218,10 @@ enum CommandMode {
                     print("kept the steps before it in \(auto.lastPathComponent)")
                     status.kept = auto.lastPathComponent
                 }
-                return finishStatus(&status, code: 1)
+                return finishStatus(&status, code: exitStepFailed)
             }
         }
-        return finishStatus(&status, code: 0)
+        return finishStatus(&status, code: exitOK)
     }
 
     // MARK: Status file (bot driving 003)
