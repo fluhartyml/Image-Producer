@@ -7577,7 +7577,7 @@ struct Checkerboard: View {
 /// The layer list. Shown TOP-of-stack first (the array is bottom-to-top, so the
 /// display is reversed). Tap a row to make that layer ACTIVE (highlighted). Each
 /// row: kind badge + editable name + eyeball; reorder is always-on (edit mode);
-/// rename is via the row's context menu. `showsHeader` is false inside the
+/// rename is via the row's context menu, or a second click on the selected layer's name (028). `showsHeader` is false inside the
 /// portrait swipe panel (the segmented control already labels it "Layers").
 struct LayerPanel: View {
     @Bindable var document: ImageDocument
@@ -7586,6 +7586,8 @@ struct LayerPanel: View {
     /// Copy from a row's right-click menu (his "it needs copy added (bug)", 2026-11-20).
     @Environment(\.copyLayerAction) private var onCopyLayer
     @State private var renamingID: ImageLayer.ID?
+    /// 028: the layer whose name is open for editing IN PLACE (Finder-style), if any.
+    @State private var inlineRenameID: ImageLayer.ID?
     /// Which groups are folded shut, keyed by base name. VIEW STATE ONLY — never
     /// saved, never sent to the document; closing a group changes nothing about the art.
     @State private var collapsedGroups: Set<String> = []
@@ -7751,6 +7753,11 @@ struct LayerPanel: View {
                 onActivate: { activeLayerID = layer.id },
                 onToggleVisibility: { toggleVisibility(layer.id) },
                 onRename: { beginRename(layer) },
+                isEditingName: inlineRenameID == layer.id,
+                draftName: $draftName,
+                onBeginInlineRename: { draftName = layer.name; inlineRenameID = layer.id },
+                onCommitName: { commitRename(inline: layer.id) },
+                onCancelName: { inlineRenameID = nil },
                 onCopy: { onCopyLayer(layer.id) },
                 onDuplicate: { duplicate(layer.id) },
                 onDelete: { delete(layer.id) }
@@ -7856,9 +7863,10 @@ struct LayerPanel: View {
         renamingID = layer.id
     }
 
-    private func commitRename() {
-        defer { renamingID = nil }
-        guard let id = renamingID,
+    /// `inline` = the in-place name field (028); otherwise the Rename Layer alert.
+    private func commitRename(inline: ImageLayer.ID? = nil) {
+        defer { renamingID = nil; inlineRenameID = nil }
+        guard let id = inline ?? renamingID,
               let index = document.layers.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
@@ -8029,9 +8037,88 @@ struct LayerRow: View {
     let onActivate: () -> Void
     let onToggleVisibility: () -> Void
     let onRename: () -> Void
+    // REM 2026-11-24 — BOT DRIVING 028 (his ask ~16:5x, locked as written): "a first click makes
+    // the layer active; a deliberate second click on its name edits the name in place, the way
+    // Finder renames. A fast double-click stays separate and never renames. On iPhone and iPad,
+    // a tap on the name of the layer already selected does the same." Return keeps the new
+    // name, Escape keeps the old. The menu's Rename (alert) is unchanged.
+    var isEditingName: Bool = false
+    var draftName: Binding<String> = .constant("")
+    var onBeginInlineRename: () -> Void = {}
+    var onCommitName: () -> Void = {}
+    var onCancelName: () -> Void = {}
     var onCopy: () -> Void = {}
     let onDuplicate: () -> Void
     let onDelete: () -> Void
+
+    /// When this row last became the active layer, and when its name was last clicked —
+    /// together they tell a deliberate second click from a double-click (028).
+    @State private var activatedAt = Date.distantPast
+    @State private var lastNameClick = Date.distantPast
+    @State private var pendingRename: Task<Void, Never>?
+    @FocusState private var nameFocused: Bool
+    @State private var nameSelection: TextSelection?
+
+    private static var doubleClickInterval: TimeInterval {
+        #if os(macOS)
+        NSEvent.doubleClickInterval
+        #else
+        0.5
+        #endif
+    }
+
+    /// A click on the name. Only a row that was ALREADY active, clicked once more after a
+    /// pause, opens the field; a second click inside the double-click time cancels it.
+    private func nameClicked() {
+        let now = Date()
+        let window = Self.doubleClickInterval
+        defer { lastNameClick = now }
+        if now.timeIntervalSince(lastNameClick) < window {   // a double-click: never rename
+            pendingRename?.cancel(); pendingRename = nil
+            return
+        }
+        guard isActive, !isEditingName, now.timeIntervalSince(activatedAt) >= window else { return }
+        pendingRename?.cancel()
+        pendingRename = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(window))
+            guard !Task.isCancelled, isActive else { return }
+            onBeginInlineRename()
+        }
+    }
+
+    /// The name: plain text, or the in-place field while renaming.
+    @ViewBuilder private var nameView: some View {
+        if isEditingName {
+            TextField("Layer name", text: draftName, selection: $nameSelection)
+                .textFieldStyle(.roundedBorder)
+                .scaledFont(18)
+                .focused($nameFocused)
+                .accessibilityLabel("Layer name")
+                .onSubmit { onCommitName() }
+                .onKeyPress(.escape) { onCancelName(); return .handled }
+                #if os(macOS)
+                .onExitCommand { onCancelName() }
+                #endif
+                .onAppear {
+                    let text = draftName.wrappedValue
+                    nameSelection = TextSelection(range: text.startIndex..<text.endIndex)
+                    nameFocused = true
+                }
+                // Clicking away keeps the new name, as Finder does.
+                .onChange(of: nameFocused) { _, focused in
+                    if !focused, isEditingName { onCommitName() }
+                }
+        } else {
+            Text(layer.name)
+                .scaledFont(18)
+                .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
+                // SHRINK TO FIT, 18 → 10 pt — his explicit exception to the 18 pt rule,
+                // 2026-10-04: "shrink to fit with a minimum of 10? because it gets bigger
+                // when you change focus from the tool inspector back to layers".
+                .lineLimit(1)
+                .minimumScaleFactor(10.0 / 18.0)
+        }
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -8095,14 +8182,9 @@ struct LayerRow: View {
                 Image(systemName: layer.displaySymbolName)
                     .frame(width: 18)
                     .foregroundStyle(.secondary)
-                Text(layer.name)
-                    .scaledFont(18)
-                    .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
-                    // SHRINK TO FIT, 18 → 10 pt — his explicit exception to the 18 pt rule,
-                    // 2026-10-04: "shrink to fit with a minimum of 10? because it gets bigger
-                    // when you change focus from the tool inspector back to layers".
-                    .lineLimit(1)
-                    .minimumScaleFactor(10.0 / 18.0)
+                nameView
+                    // Simultaneous, so List selection still gets the click (028).
+                    .simultaneousGesture(TapGesture().onEnded { nameClicked() })
                 if layer.linkGroup != nil {
                     Image(systemName: "link")
                         .scaledFont(12)
@@ -8114,17 +8196,13 @@ struct LayerRow: View {
             .contentShape(Rectangle())
             #else
             // iOS: tapping the badge/name area selects (activates) the layer.
-            Button(action: onActivate) {
+            // 028: a tap on the ALREADY-selected layer's name renames it in place.
+            Button(action: { if isActive { nameClicked() } else { onActivate() } }) {
                 HStack(spacing: 10) {
                     Image(systemName: layer.displaySymbolName)
                         .frame(width: 18)
                         .foregroundStyle(.secondary)
-                    Text(layer.name)
-                        .scaledFont(18)
-                        .foregroundStyle(layer.isVisible ? Color.primary : Color.secondary)
-                        // SHRINK TO FIT, 18 → 10 pt — his explicit exception (see macOS twin).
-                        .lineLimit(1)
-                        .minimumScaleFactor(10.0 / 18.0)
+                    nameView
                     if layer.linkGroup != nil {
                         Image(systemName: "link")
                             .scaledFont(12)
@@ -8177,6 +8255,9 @@ struct LayerRow: View {
             .accessibilityValue(layer.name)
         }
         .padding(.vertical, 2)
+        .onChange(of: isActive) { _, active in
+            if active { activatedAt = Date() } else { pendingRename?.cancel(); pendingRename = nil }
+        }
         // REM: EVERY MENU ITEM IS ALSO AN ACCESSIBILITY ACTION. Michael, 2026-11-20: "you need to
         // make it so I dont have to ... use my mouse ... what if a quadroplegic was using this eyes
         // or a puffer?" A right-click menu is a pointer path; these actions reach VoiceOver's
