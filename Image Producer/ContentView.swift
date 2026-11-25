@@ -8058,6 +8058,35 @@ struct LayerRow: View {
     @State private var pendingRename: Task<Void, Never>?
     @FocusState private var nameFocused: Bool
     @State private var nameSelection: TextSelection?
+    #if os(macOS)
+    /// While the name field is open: watches every click in the app (028 fix, below).
+    @State private var clickAwayMonitor: Any?
+    #endif
+
+    // REM 2026-11-24 ~20:1x — 028 FIX. His report: "the canvas ssseems broken" → "it was because
+    // the layer was waiting to be renamed". Why: the canvas never takes keyboard focus, so a click
+    // on it left the name field open AND focused — tool keys typed into the name, and the canvas
+    // looked dead. Finder ends a rename on ANY click outside the field, so we do too: a click that
+    // does not land in the text field keeps the new name and closes it. The click still goes on
+    // to whatever it hit (the canvas, a tool), so nothing has to be clicked twice.
+    private func startClickAway() {
+        #if os(macOS)
+        stopClickAway()
+        clickAwayMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { event in
+            let hit = event.window?.contentView?.hitTest(event.locationInWindow)
+            let inField = hit is NSText || hit is NSTextField || hit?.superview is NSTextField
+            if !inField { DispatchQueue.main.async { if isEditingName { onCommitName() } } }
+            return event
+        }
+        #endif
+    }
+
+    private func stopClickAway() {
+        #if os(macOS)
+        if let m = clickAwayMonitor { NSEvent.removeMonitor(m) }
+        clickAwayMonitor = nil
+        #endif
+    }
 
     private static var doubleClickInterval: TimeInterval {
         #if os(macOS)
@@ -8107,6 +8136,12 @@ struct LayerRow: View {
                 // Clicking away keeps the new name, as Finder does.
                 .onChange(of: nameFocused) { _, focused in
                     if !focused, isEditingName { onCommitName() }
+                }
+                .onAppear { startClickAway() }
+                .onDisappear { stopClickAway() }
+                // Another layer picked (keyboard, VoiceOver, a tool) also ends the rename.
+                .onChange(of: isActive) { _, active in
+                    if !active, isEditingName { onCommitName() }
                 }
         } else {
             Text(layer.name)
