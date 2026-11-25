@@ -1759,3 +1759,11 @@
 //
 //  Every run also leaves <job name>.status.json in the job folder, written
 //  last and atomically (003), so a polling bot never reads half a file.
+//
+//  STEPS ADDED FOR BOTS
+//    resize (006) — width OR height in pixels; the whole picture scales and
+//      aspect is always kept. Both given must match the current shape (one
+//      pixel of rounding allowed), else the step fails and names crop /
+//      extend / scaleToFit. It is only a canvas-size change: layers are sized
+//      against the short edge and placed as fractions, so they scale with it.
+//      History: "Canvas Size", same as the Canvas panel.
