@@ -1824,9 +1824,35 @@ struct XcodeProjectSettingsView: View {
                 .scaledFont(18)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            // REM 2026-11-24 — BOT DRIVING 002: the command-mode job folder, chosen once here
+            // (command mode never opens a window, so it can't ask). Same bookmark pattern as
+            // Save to Desktop. His lock: suggested ~/Image Producer Jobs, app stays sandboxed.
+            LabeledContent("Job Folder") {
+                Text(jobFolderPath ?? "Not chosen")
+                    .scaledFont(18)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+            }
+            .scaledFont(18)
+            Button("Choose Job Folder…") {
+                if let url = JobFolder.choose() { jobFolderPath = url.path }
+            }
+            .scaledFont(18)
+            .accessibilityLabel("Choose job folder")
+            Text("Command mode reads job files and pictures from this folder and saves results "
+                 + "there, so tools in Terminal can use it. Until you choose one, command mode "
+                 + "uses the app's private folder.")
+                .scaledFont(18)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(24)
         .frame(width: 520)
+        .onAppear { jobFolderPath = JobFolder.resolve()?.path }
     }
+
+    @State private var jobFolderPath: String?
 }
 #endif

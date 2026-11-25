@@ -12,9 +12,19 @@
 //
 //  Run (Mac only):
 //    "Image Producer.app/Contents/MacOS/Image Producer" --command job.json
-//  The app is sandboxed, so every path in a job is RELATIVE to the app's own Command folder:
-//    ~/Library/Containers/com.nightgard.Image-Producer/Data/Documents/Command/
+//  The app is sandboxed, so every path in a job is RELATIVE to the job folder:
+//    • the JOB FOLDER the person chose once in Image Producer ▸ Settings… (suggested
+//      ~/Image Producer Jobs), kept as a security-scoped bookmark — or, until one is chosen,
+//    • the app's own Command folder inside its container:
+//      ~/Library/Containers/com.nightgard.Image-Producer/Data/Documents/Command/
 //  Put input pictures there; results land there. Absolute paths are refused, not guessed.
+//
+//  REM 2026-11-24 — BOT DRIVING 002 (his lock: "the app stays sandboxed (App Store). Michael
+//  picks the job folder once (bookmark, same as Save to Desktop), suggested ~/Image Producer
+//  Jobs in the home folder, not under Documents, which macOS privacy guards from shell tools").
+//  Why: a shell tool could not even list the container folder ("Operation not permitted").
+//  The bookmark is the DesktopAccess.swift pattern; command mode can't show a panel (no
+//  window, ever), so the choosing happens in Settings and the CLI only resolves it.
 //
 //  Job file:
 //    { "name": "Two cats", "width": 1024, "height": 1024,
@@ -35,7 +45,8 @@
 //  job after saving what is done so far, and names the project to open for that step.
 //
 //  Output: one line per step on stdout ("ok 2 removeBackground — …" / "FAIL …"), exit 0 when
-//  every step ran, 1 at the first failure (the steps before it are kept and saved).
+//  every step ran, 1 at the first failure (the steps before it are kept and saved). The same
+//  results go into <job name>.status.json in the job folder, written last (003).
 //
 
 #if os(macOS)
@@ -45,19 +56,37 @@ import AppKit
 enum CommandMode {
     static let flag = "--command"
 
-    /// The app's Command folder inside its sandbox container.
-    static var folder: URL {
+    /// The folder every job path is relative to: the chosen job folder (002), else the app's
+    /// Command folder inside its sandbox container. Resolved once per run; the security scope
+    /// stays open until the process exits.
+    static let folder: URL = {
+        if let chosen = JobFolder.resolve(), chosen.startAccessingSecurityScopedResource() {
+            return chosen
+        }
+        return containerFolder
+    }()
+
+    /// The app's own Command folder inside its sandbox container (before a job folder is chosen).
+    static var containerFolder: URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let dir = docs.appendingPathComponent("Command", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
 
+    /// One line naming where jobs are read from — and, when no folder is chosen, how to choose.
+    static var folderLine: String {
+        if folder == containerFolder {
+            return "job folder: \(folder.path) — to use a folder shell tools can reach, choose one in Image Producer ▸ Settings… ▸ Job Folder (suggested \(JobFolder.suggested.path))"
+        }
+        return "job folder: \(folder.path)"
+    }
+
     /// Called first thing from Image_ProducerApp.init(). Returns only when no job was asked for.
     @MainActor static func runIfRequested() {
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: flag) else { return }
-        guard i + 1 < args.count else { finish(1, "FAIL usage: --command <job.json> (in \(folder.path))") }
+        guard i + 1 < args.count else { finish(1, "FAIL usage: --command <job.json>\n\(folderLine)") }
         let code = run(jobName: args[i + 1])
         finish(code, nil)
     }
@@ -99,6 +128,9 @@ enum CommandMode {
     }
 
     @MainActor static func run(jobName: String) -> Int32 {
+        written = []
+        // The status file is named after the job file until the job's own name is known.
+        var status = Status(job: (jobName as NSString).deletingPathExtension, jobFile: jobName)
         let doc: ImageDocument
         let job: Job
         do {
@@ -107,23 +139,86 @@ enum CommandMode {
             doc = ImageDocument(name: job.name ?? "Command", canvasWidth: job.width ?? 1024,
                                 canvasHeight: job.height ?? 1024)
         } catch {
-            print("FAIL job \(jobName): \(error)")
-            return 1
+            // Plain words, not a Cocoa error dump: a bot (or a person) reads this line.
+            let why: String
+            if (error as? CocoaError)?.code == .fileReadNoSuchFile {
+                why = "\(jobName) is not in the job folder"
+            } else if error is DecodingError {
+                why = "\(jobName) is not a readable job file (\(error))"
+            } else {
+                why = "\(error)"
+            }
+            print("FAIL job — \(why)")
+            print(folderLine)
+            status.problem = why
+            return finishStatus(&status, code: 1)
         }
+        if let name = job.name, !name.isEmpty { status.job = name }
         var saved = false
         for (n, step) in job.steps.enumerated() {
             do {
                 let note = try perform(step, on: doc, saved: &saved)
                 print("ok \(n + 1) \(step.do) — \(note)")
+                status.steps.append(.init(step: n + 1, do: step.do, result: "ok", note: note))
             } catch {
                 print("FAIL \(n + 1) \(step.do) — \(error)")
+                status.steps.append(.init(step: n + 1, do: step.do, result: "FAIL", note: "\(error)"))
                 if !saved, let auto = try? save(doc, as: "\(job.name ?? "Command") (unfinished).imgprd") {
                     print("kept the steps before it in \(auto.lastPathComponent)")
+                    status.kept = auto.lastPathComponent
                 }
-                return 1
+                return finishStatus(&status, code: 1)
             }
         }
-        return 0
+        return finishStatus(&status, code: 0)
+    }
+
+    // MARK: Status file (bot driving 003)
+
+    // REM 2026-11-24 — BOT DRIVING 003 (his lock: "the status file is JSON, named after the job
+    // (<job name>.status.json) so runs never overwrite each other, and written last in one
+    // atomic step so a polling bot never reads half a file"). Why: a bot polls the folder, not
+    // the terminal. It mirrors stdout: one entry per step, ok or FAIL, the exit code, every file
+    // the job wrote, and the "unfinished" project kept after a failure. Written LAST — so when it
+    // appears, everything it names is already on disk.
+
+    /// Every file this run wrote into the job folder, in order (exportPNG, saveProject, …).
+    @MainActor static var written: [String] = []
+
+    struct Status: Encodable {
+        struct StepResult: Encodable {
+            var step: Int
+            var `do`: String
+            var result: String
+            var note: String
+        }
+        var job: String
+        var jobFile: String
+        var exitCode: Int32 = 0
+        var ok = false
+        var steps: [StepResult] = []
+        var outputs: [String] = []
+        var kept: String?
+        var problem: String?
+        var finished = ""
+    }
+
+    /// Fill in the end of the run, write <job>.status.json atomically, and return the exit code.
+    @MainActor static func finishStatus(_ status: inout Status, code: Int32) -> Int32 {
+        status.exitCode = code
+        status.ok = code == 0
+        status.outputs = written
+        status.finished = ISO8601DateFormatter().string(from: Date())
+        let name = status.job.replacingOccurrences(of: "/", with: "-") + ".status.json"
+        do {
+            let enc = JSONEncoder()
+            enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            try enc.encode(status).write(to: folder.appendingPathComponent(name), options: .atomic)
+            print("status \(name)")
+        } catch {
+            print("FAIL status \(name): \(error)")
+        }
+        return code
     }
 
     // MARK: Steps — each calls the app's own tool code
@@ -215,6 +310,7 @@ enum CommandMode {
             guard let f = s.file else { throw Problem.say("needs \"file\"") }
             guard let png = makeCanvasPNG(doc) else { throw Problem.say("could not render the picture") }
             try png.write(to: try inside(f), options: .atomic)
+            written.append(f)
             return "\(f), \(ByteCountFormatter.string(fromByteCount: Int64(png.count), countStyle: .file))"
 
         case "saveProject":
@@ -238,7 +334,61 @@ enum CommandMode {
         let url = try inside(name.hasSuffix(".imgprd") ? name : name + ".imgprd")
         let data = try doc.encodedManifest()
         try ImageDocument.writeEncodedPackage(data, to: url)
+        written.append(url.lastPathComponent)
         return url
+    }
+}
+
+// MARK: - Job folder (bot driving 002)
+
+/// The job folder the person picks once, kept as a security-scoped bookmark — the same pattern
+/// as DesktopAccess. Chosen in Settings (a window); command mode only resolves it.
+enum JobFolder {
+    private static let bookmarkKey = "ImageProducer.commandJobFolderBookmark"
+
+    /// The real home folder, not the sandbox container's.
+    static var home: URL { DesktopAccess.realDesktop.deletingLastPathComponent() }
+
+    /// His suggestion: in the home folder, not under Documents (privacy-guarded from shell tools).
+    static var suggested: URL { home.appendingPathComponent("Image Producer Jobs", isDirectory: true) }
+
+    /// The chosen folder, or nil if none was chosen or the grant no longer resolves.
+    static func resolve() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope,
+                                 relativeTo: nil, bookmarkDataIsStale: &stale) else { return nil }
+        if stale, url.startAccessingSecurityScopedResource() {
+            remember(url)
+            url.stopAccessingSecurityScopedResource()
+        }
+        return url
+    }
+
+    /// Ask once with an open panel. Starts at the suggested folder when it exists, else the
+    /// home folder (New Folder is allowed). Returns the chosen folder, or nil on Cancel.
+    @MainActor static func choose() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        let start = FileManager.default.fileExists(atPath: suggested.path) ? suggested : home
+        panel.directoryURL = start
+        panel.message = "Choose the job folder for command mode. Shell tools put job files and pictures here, and results land here. Suggested: Image Producer Jobs in your home folder."
+        panel.prompt = "Use This Folder"
+        guard panel.runModal() == .OK, let chosen = panel.url else { return nil }
+        remember(chosen)
+        return chosen
+    }
+
+    static func forget() { UserDefaults.standard.removeObject(forKey: bookmarkKey) }
+
+    private static func remember(_ url: URL) {
+        if let data = try? url.bookmarkData(options: .withSecurityScope,
+                                            includingResourceValuesForKeys: nil, relativeTo: nil) {
+            UserDefaults.standard.set(data, forKey: bookmarkKey)
+        }
     }
 }
 #endif
