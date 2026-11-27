@@ -12,7 +12,9 @@ chmod +x "$ROOT/Scripts/stamp-build.sh"
 
 # ⚠️ PROVE IT RUNS. Installing a hook and never firing it is how the first version of
 # this went unnoticed through twelve commits. Do not report success on a copy alone.
-if "$ROOT/.git/hooks/post-commit"; then
+# 2026 NOV 24 — post-commit also pushes to GitHub. The verify run must not push;
+# GROK_NO_PUSH=1 skips that step so install never publishes a branch.
+if GROK_NO_PUSH=1 "$ROOT/.git/hooks/post-commit"; then
     echo "installed and verified: .git/hooks/post-commit"
 else
     echo "INSTALLED BUT FAILED TO RUN — exit $? — build number will NOT update" >&2

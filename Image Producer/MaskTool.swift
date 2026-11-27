@@ -607,13 +607,21 @@ struct MaskInspector: View {
                     .accessibilityLabel("Mask character")   // REM: his 2026-11-20 "100% accessability adaptive" — Mac text fields have no name without this
             }
             // A row of ready-made glyphs, because typing ❄ is harder than tapping it.
-            HStack(spacing: 6) {
+            // REM 2026-11-22 shakedown A-135, Duo closed: ten buttons in ONE fixed row came to ~460 pt, which
+            // widened the whole Mask inspector past a 382-pt screen (the SF Symbol row below ran off the right
+            // edge too) and squeezed each button until its glyph did not draw — blank pills. His 11-14 rule:
+            // "youre supposed to use contengent sizing so enerything fits naturally". The grid wraps to the
+            // width it is given, each button at least 48 pt (HIG 44 + room for the glyph).
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 48), spacing: 6)], alignment: .leading, spacing: 6) {
                 ForEach(Self.quickGlyphs, id: \.self) { g in
-                    Button(g) {
+                    Button {
                         glyphText = g
                         document.cropMask?.form = .glyph(g, fontName: nil)
+                    } label: {
+                        Text(g).scaledFont(22).frame(minWidth: 28, minHeight: 32)
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityLabel(g)
                 }
             }
             InfoTip("More about this", label: "Character info", "Any character from any installed font works — the mask uses the real glyph outline, so the marching ants trace its exact shape.")

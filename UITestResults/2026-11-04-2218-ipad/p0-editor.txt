@@ -1,0 +1,146 @@
+Optional(Attributes: Application, 0x10f9c1e00, pid: 94161, label: 'Image Producer'
+Element subtree:
+ →Application, 0x10f9c1e00, pid: 94161, label: 'Image Producer'
+    Window (Main), 0x10f9c1f40, {{0.0, 0.0}, {466.0, 678.0}}
+      Other, 0x10f9c1a40, {{0.0, 0.0}, {466.0, 678.0}}
+        Other, 0x10f9c1b80, {{0.0, 0.0}, {466.0, 678.0}}
+          Other, 0x10f9c1900, {{0.0, 0.0}, {466.0, 678.0}}
+            Other, 0x10f9c17c0, {{0.0, 0.0}, {466.0, 678.0}}
+              Other, 0x10f9c0dc0, {{0.0, 0.0}, {466.0, 678.0}}
+                Other, 0x10f9c03c0, {{0.0, 0.0}, {466.0, 678.0}}
+                  Other, 0x10f9c0000, {{0.0, 0.0}, {466.0, 678.0}}
+                    Other, 0x10f9c1400, {{0.0, 0.0}, {466.0, 678.0}}
+                      Other, 0x10f9c0780, {{0.0, 0.0}, {466.0, 678.0}}
+                        Other, 0x10f9c08c0, {{0.0, 0.0}, {466.0, 678.0}}
+                          Other, 0x10f9c1180, {{0.0, 24.0}, {382.0, 325.7}}
+                          Button, 0x10f9c12c0, {{0.0, 24.0}, {382.0, 325.7}}, identifier: 'canvas.element', label: 'Canvas'
+                          Other, 0x10f9c0140, {{28.3, 24.0}, {325.7, 325.7}}, identifier: 'uitest.canvas', label: 'Test probe w=1024 h=1024 layers=5 hidden=0 active=none x=-1.0000 y=-1.0000'
+                          StaticText, 0x10f9c0a00, {{8.0, 312.0}, {203.7, 29.7}}, label: '1024 by 1024, 5 layers'
+                          Other, 0x10f9c0500, {{10.3, 354.0}, {348.3, 129.3}}
+                            Button, 0x10f9c0640, {{10.3, 354.0}, {44.0, 44.0}}, identifier: 'photo.artframe', label: 'Canvas Tool', Selected
+                            Button, 0x10f9c0b40, {{74.7, 367.3}, {21.3, 17.7}}, identifier: 'paintpalette', label: 'Color Palette'
+                            Button, 0x10f9c0280, {{127.7, 365.7}, {20.7, 20.7}}, identifier: 'arrow.up.and.down.and.arrow.left.and.right', label: 'Move'
+                            Button, 0x10f9c1540, {{180.7, 368.0}, {21.0, 16.3}}, identifier: 'rectangle.dashed', label: 'Selection'
+                            Button, 0x10f9c1040, {{228.7, 365.7}, {30.3, 21.0}}, identifier: 'theatermasks', label: 'Mask'
+                            Button, 0x10f9c0f00, {{290.7, 367.0}, {12.3, 18.0}}, identifier: 'drop.fill', label: 'Paint Drop Bucket'
+                            Button, 0x10f9c0c80, {{344.0, 367.7}, {11.3, 16.7}}, identifier: 'pencil.tip', label: 'Pixel Pen'
+                            Button, 0x10f9c1680, {{23.3, 415.0}, {18.0, 18.0}}, identifier: 'eraser.fill', label: 'Eraser'
+                            Button, 0x10f9c1cc0, {{76.0, 414.7}, {19.0, 19.0}}, identifier: 'eyedropper', label: 'Eyedropper'
+                            Button, 0x107273e80, {{124.0, 410.0}, {28.0, 28.0}}, label: 'Text'
+                            Button, 0x107273840, {{181.0, 414.7}, {20.0, 19.0}}, identifier: 'star.fill', label: 'Symbol'
+                            Button, 0x1072735c0, {{230.0, 410.0}, {28.0, 28.0}}, label: 'Image'
+                            Button, 0x1072730c0, {{287.0, 413.7}, {19.7, 20.7}}, identifier: 'apple.image.playground', label: 'Image Playground'
+                            Button, 0x107273c00, {{340.7, 414.3}, {18.0, 19.7}}, identifier: 'square.3.layers.3d.middle.filled', label: 'Layer'
+                            Button, 0x107273d40, {{22.0, 463.0}, {21.0, 18.0}}, identifier: 'person.and.background.dotted', label: 'Remove Background'
+                            Button, 0x107273200, {{73.0, 460.7}, {21.3, 22.7}}, identifier: 'lasso.badge.sparkles', label: 'Magic Lasso'
+                            Button, 0x107273340, {{129.0, 464.7}, {18.0, 15.0}}, identifier: 'slider.horizontal.3', label: 'Adjust'
+                            Button, 0x107273480, {{182.3, 463.3}, {17.3, 17.7}}, identifier: 'magnifyingglass', label: 'Zoom'
+                            Button, 0x107273ac0, {{233.0, 463.7}, {21.7, 17.0}}, identifier: 'camera', label: 'Camera'
+                          CollectionView, 0x107273700, {{0.0, 498.3}, {382.0, 118.0}}
+                            Cell, 0x107273980, {{0.0, 498.3}, {382.0, 118.0}}
+                              Other, 0x10fb692c0, {{0.0, 498.3}, {382.0, 118.0}}
+                                Other, 0x10fb69400, {{0.0, 498.3}, {382.0, 118.0}}
+                                  Other, 0x10fb69540, {{0.0, 498.3}, {382.0, 118.0}}
+                                    Other, 0x10fb69680, {{0.0, 508.3}, {382.0, 108.0}}
+                                      StaticText, 0x10fb69900, {{16.0, 508.3}, {52.7, 20.3}}, label: 'Layers'
+                                      Button, 0x10fb69a40, {{349.7, 511.3}, {14.3, 14.3}}, identifier: 'plus', label: 'Add a layer'
+                                      CollectionView, 0x10fb69b80, {{0.0, 539.0}, {382.0, 77.3}}
+                                        Other, 0x10fb69cc0, {{0.0, 383.7}, {382.0, 586.7}}
+                                        Cell, 0x10fb69e00, {{0.0, 539.0}, {382.0, 60.0}}
+                                          Other, 0x10fb69f40, {{0.0, 539.0}, {382.0, 60.0}}
+                                            Other, 0x10fb6a080, {{0.0, 539.0}, {382.0, 60.0}}
+                                          Other, 0x10fb6a1c0, {{0.0, 539.0}, {358.0, 60.0}}
+                                            Other, 0x10fb6a800, {{0.0, 539.0}, {358.0, 60.0}}
+                                              Other, 0x10fb6be80, {{0.0, 539.0}, {358.0, 60.0}}
+                                                Button, 0x10fb6bd40, {{20.0, 558.0}, {20.0, 22.0}}, identifier: 'square', label: 'Select layer'
+                                                Button, 0x10fb6bc00, {{66.0, 558.3}, {242.0, 21.3}}, label: 'Foreground'
+                                                  Image, 0x10fb6bac0, {{67.3, 561.3}, {15.3, 15.3}}, identifier: 'square.dashed', label: 'Rectangular Selection'
+                                                  StaticText, 0x10fb6b980, {{94.0, 558.2}, {93.3, 21.7}}, label: 'Foreground'
+                                                Button, 0x10fb6b840, {{318.0, 556.0}, {32.0, 26.0}}, identifier: 'eye.fill', label: 'Hide layer'
+                                          Button, 0x10fb6b700, {{356.5, 547.0}, {27.0, 44.0}}, label: 'Reorder Select layer'
+                                            Image, 0x10fb6b5c0, {{356.5, 561.5}, {27.0, 15.0}}, identifier: 'line.horizontal.3', label: 'drag'
+                                        Cell, 0x10fb6b480, {{0.0, 599.0}, {382.0, 60.0}}
+                                          Other, 0x10fb6b340, {{0.0, 599.0}, {382.0, 60.0}}
+                                            Other, 0x10fb6b200, {{0.0, 599.0}, {382.0, 60.0}}
+                                          Other, 0x10fb6b0c0, {{0.0, 599.0}, {358.0, 60.0}}
+                                            Other, 0x10fb6af80, {{0.0, 599.0}, {358.0, 60.0}}
+                                              Other, 0x10fb6ae40, {{0.0, 599.0}, {358.0, 60.0}}
+                                                Button, 0x10fb6ad00, {{20.0, 618.0}, {20.0, 22.0}}, identifier: 'square', label: 'Select layer'
+                                                Button, 0x10fb6abc0, {{66.0, 618.3}, {242.0, 21.3}}, label: 'Midground'
+                                                  Image, 0x10fb6aa80, {{67.3, 621.3}, {15.3, 15.3}}, identifier: 'square.dashed', label: 'Rectangular Selection'
+                                                  StaticText, 0x10fb6a940, {{94.0, 618.2}, {87.3, 21.7}}, label: 'Midground'
+                                                Button, 0x10fb6a6c0, {{318.0, 616.0}, {32.0, 26.0}}, identifier: 'eye.fill', label: 'Hide layer'
+                                          Button, 0x10fb6a580, {{356.5, 607.0}, {27.0, 44.0}}, label: 'Reorder Select layer'
+                                            Image, 0x10fb6a440, {{356.5, 621.5}, {27.0, 15.0}}, identifier: 'line.horizontal.3', label: 'drag'
+                                        Other, 0x10fb6a300, {{94.0, 598.0}, {288.0, 1.0}}
+                                        Other, 0x10fb697c0, {{349.0, 539.0}, {30.0, 77.3}}, label: 'Vertical scroll bar, 4 pages', value: 0%
+                                          Other, 0x10f9ac000, {{376.0, 606.7}, {3.0, 7.0}}
+                                        Other, 0x10f9ac140, {{349.0, 539.0}, {30.0, 77.3}}, label: 'Vertical scroll bar, 4 pages', value: 0%
+                                          Other, 0x10f9ac280, {{376.0, 606.7}, {3.0, 7.0}}
+                            Other, 0x10f9ac3c0, {{349.0, 498.3}, {30.0, 118.0}}, label: 'Vertical scroll bar, 3 pages', value: 0%
+                              Other, 0x10f9ac500, {{376.0, 501.3}, {3.0, 112.3}}
+                            Other, 0x10f9ac640, {{349.0, 498.3}, {30.0, 118.0}}, label: 'Vertical scroll bar, 3 pages', value: 0%
+                              Other, 0x10f9ac780, {{376.0, 501.3}, {3.0, 112.3}}
+                          Image, 0x10f9ac8c0, {{13.3, 623.7}, {13.3, 13.3}}, identifier: 'wand.and.rays', label: 'Enhance'
+                          StaticText, 0x10f9aca00, {{36.0, 623.2}, {229.3, 14.3}}, label: 'New image: Untitled 8, W 1024 × H 1024'
+                          StaticText, 0x10f9acb40, {{321.3, 623.7}, {48.7, 13.3}}, label: '22:16:51'
+                          PageIndicator, 0x10f9acc80, {{0.0, 578.7}, {382.0, 30.7}}, value: page 2 of 3
+                      Other, 0x10f9acdc0, {{0.0, 0.0}, {466.0, 678.0}}
+                    Button, 0x10f9acf00, {{162.3, 329.0}, {141.7, 20.3}}, label: 'New from Import…'
+                      StaticText, 0x10f9ad040, {{162.3, 329.0}, {141.7, 20.3}}, label: 'New from Import…'
+                    Button, 0x10f9ad180, {{190.3, 329.0}, {85.3, 20.3}}, label: 'New Image'
+                      StaticText, 0x10f9ad2c0, {{190.3, 329.0}, {85.3, 20.3}}, label: 'New Image'
+            Toolbar, 0x10f9ad400, {{0.0, 0.0}, {466.0, 678.0}}, identifier: 'Toolbar', label: 'Toolbar'
+              Other, 0x10f9ad540, {{0.0, 0.0}, {466.0, 678.0}}
+                Other, 0x10f9ad680, {{0.0, 0.0}, {466.0, 678.0}}
+                  Other, 0x10f9ad7c0, {{0.0, 0.0}, {466.0, 678.0}}
+                    Other, 0x10f9ad900, {{0.0, 0.0}, {0.0, 0.0}}
+                      Other, 0x10f9ada40, {{394.0, 170.0}, {48.0, 48.0}}
+                        Other, 0x10f9adb80, {{394.0, 170.0}, {48.0, 48.0}}
+                          Other, 0x10f9adcc0, {{399.0, 175.0}, {38.0, 38.0}}
+                            Other, 0x10f9ade00, {{399.0, 175.0}, {38.0, 38.0}}
+                              Button, 0x10f9adf40, {{399.0, 175.0}, {38.0, 38.0}}, identifier: 'BackButton'
+                      Other, 0x10f9ae080, {{394.0, 230.0}, {48.0, 412.0}}
+                        Other, 0x10f9ae1c0, {{394.0, 230.0}, {48.0, 48.0}}
+                          Other, 0x10f9ae300, {{399.0, 235.0}, {38.0, 38.0}}
+                            Other, 0x10f9ae440, {{399.0, 235.0}, {38.0, 38.0}}
+                              Button, 0x10f9ae580, {{399.0, 235.0}, {38.0, 38.0}}, label: 'Export'
+                        Other, 0x10f9ae6c0, {{394.0, 282.0}, {48.0, 48.0}}
+                          Other, 0x10f9ae800, {{399.0, 287.0}, {38.0, 38.0}}
+                            Other, 0x10f9ae940, {{399.0, 287.0}, {38.0, 38.0}}
+                              Button, 0x10f9aea80, {{399.0, 287.0}, {38.0, 38.0}}, label: 'Share'
+                        Other, 0x10f9aebc0, {{394.0, 334.0}, {48.0, 48.0}}
+                          Other, 0x10f9aed00, {{399.0, 339.0}, {38.0, 38.0}}
+                            Other, 0x10f9aee40, {{399.0, 339.0}, {38.0, 38.0}}
+                              Button, 0x10f9aef80, {{399.0, 339.0}, {38.0, 38.0}}, label: 'About Image Producer'
+                        Other, 0x10f9af0c0, {{394.0, 386.0}, {48.0, 48.0}}
+                          Other, 0x10f9af200, {{399.0, 391.0}, {38.0, 38.0}}
+                            Other, 0x10f9af340, {{399.0, 391.0}, {38.0, 38.0}}
+                              Button, 0x10f9af480, {{399.0, 391.0}, {38.0, 38.0}}, label: 'Zoom in'
+                        Other, 0x10f9af5c0, {{394.0, 438.0}, {48.0, 48.0}}
+                          Other, 0x10f9af700, {{399.0, 443.0}, {38.0, 38.0}}
+                            Other, 0x10f9af840, {{399.0, 443.0}, {38.0, 38.0}}
+                              Button, 0x10f9af980, {{399.0, 443.0}, {38.0, 38.0}}, label: 'Zoom out', Disabled
+                        Other, 0x10f9afac0, {{394.0, 490.0}, {48.0, 48.0}}
+                          Other, 0x10f9afc00, {{399.0, 495.0}, {38.0, 38.0}}
+                            Other, 0x10f9afd40, {{399.0, 495.0}, {38.0, 38.0}}
+                              Button, 0x10f9afe80, {{399.0, 495.0}, {38.0, 38.0}}, label: 'Preview'
+                        Other, 0x10f9b4000, {{394.0, 542.0}, {48.0, 48.0}}
+                          Other, 0x10f9b4140, {{399.0, 547.0}, {38.0, 38.0}}
+                            Other, 0x10f9b4280, {{399.0, 547.0}, {38.0, 38.0}}
+                              Button, 0x10f9b43c0, {{399.0, 547.0}, {38.0, 38.0}}, label: 'Tool'
+                        Other, 0x10f9b4500, {{394.0, 594.0}, {48.0, 48.0}}
+                          Other, 0x10f9b4640, {{399.0, 599.0}, {38.0, 38.0}}
+                            Other, 0x10f9b4780, {{399.0, 599.0}, {38.0, 38.0}}
+                              Button, 0x10f9b48c0, {{399.0, 599.0}, {38.0, 38.0}}, identifier: 'BottomOverflowBarButtonItem', label: 'More'
+    Window, 0x10f9b4a00, {{0.0, 0.0}, {466.0, 678.0}}
+      Other, 0x10f9b4b40, {{0.0, 0.0}, {466.0, 678.0}}
+        Other, 0x10f9b4c80, {{0.0, 0.0}, {466.0, 678.0}}
+Path to element:
+ →Application, 0x10f9c1e00, pid: 94161, label: 'Image Producer'
+Query chain:
+ →Find: Target Application 'com.nightgard.Image-Producer'
+  Output: {
+    Application, 0x10f9b4dc0, pid: 94161, label: 'Image Producer'
+  }
+)

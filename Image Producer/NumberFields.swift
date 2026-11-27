@@ -32,6 +32,7 @@ struct PixelNumberField: View {
     let help: String
     @Binding var value: Double
     var fractionDigits: ClosedRange<Int> = 0...0
+    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -49,10 +50,41 @@ struct PixelNumberField: View {
                 .accessibilityLabel(spoken)
                 #if os(iOS)
                 .keyboardType(fractionDigits.upperBound > 0 ? .numbersAndPunctuation : .numberPad)
+                .focused($focused)
+                .modifier(PhoneNumberPadDone(focused: $focused))
                 #endif
         }
     }
 }
+
+#if os(iOS)
+/// REM: 2026-11-22 shakedown, Move page, his "that screenshot shows you violating apples human
+/// interface guidelines": the iPhone number pad has NO Return key, yet these fields only commit
+/// on Return or focus loss — so a typed value could never be finished, and the pad covered the
+/// inspector. Apple's pattern is a Done button in the keyboard's toolbar; Done drops focus,
+/// which commits the value. PHONE IDIOM ONLY (Duo included) — his 11-19 rule: a change lands
+/// only on the device it is for; iPad keyboards have their own dismiss key. The button exists
+/// only while THIS field is focused, so several fields never stack several Done buttons.
+private struct PhoneNumberPadDone: ViewModifier {
+    var focused: FocusState<Bool>.Binding
+
+    func body(content: Content) -> some View {
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            content.toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    if focused.wrappedValue {
+                        Spacer()
+                        Button("Done") { focused.wrappedValue = false }
+                            .accessibilityLabel("Done")
+                    }
+                }
+            }
+        } else {
+            content
+        }
+    }
+}
+#endif
 
 /// Left / Top / Width / Height, in canvas pixels, for a box stored in normalized canvas
 /// space (0...1, origin top-left).

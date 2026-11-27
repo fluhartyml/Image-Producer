@@ -1004,6 +1004,13 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         sleep(1)
     }
 
+    /// Finish a typed field. REM 17:1x — the iPhone number pad has no Return key, so "\n" never committed Position X/Y
+    /// (A-128 "100 → 5"); the app now puts Done above the pad on the phone. Tap it when it is there, else Return.
+    func commitField(_ f: XCUIElement) {
+        let done = app.toolbars.buttons["Done"].firstMatch
+        if done.exists && done.isHittable { done.tap() } else { f.typeText("\n") }
+    }
+
     /// The canvas size in pixels from the probe, blank images included (probe() skips a canvas with no layer).
     func canvasSize() -> (w: Int, h: Int) {
         let e = app.descendants(matching: .any)["uitest.canvas"].firstMatch
@@ -1019,6 +1026,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         let env = ProcessInfo.processInfo.environment
         let want = Set((env["ELEMENTS"] ?? "").split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) })
         func runs(_ n: String) -> Bool { want.isEmpty || want.contains(n) }
+        UITestNoAnimationWait.install()
         // His 11:07 screen: A6's turns left the Duo upside down. Section A's element shape is closed UPRIGHT.
         XCUIDevice.shared.orientation = .portrait; sleep(2)
         let win = app.windows.firstMatch
@@ -1408,7 +1416,13 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         /// Scroll the tool page until the element can be tapped (the closed Duo shows a few rows at a time).
         func reveal(_ e: XCUIElement) -> Bool {
             for _ in 0..<14 {
-                if e.exists && e.isHittable { return true }
+                // REM 17:2x — the app's own "History Is Too Heavy" alert (his 250 MB line, 09-16) fires mid-batch on full-size
+                // real photos and hid the bucket page (A-139/A-140 "not found"). It is working as designed: Cancel, go on.
+                let heavy = app.alerts["History Is Too Heavy"]
+                if heavy.exists { heavy.buttons["Cancel"].tap(); sleep(1) }
+                // REM 17:1x — isHittable said yes for the Crop Height slider at y 676–707 in a 678-pt window (A-124h
+                // "80 → 80": the drag landed off screen). Visible means inside the window, not just hittable.
+                if e.exists && e.isHittable && e.frame.maxY <= app.windows.firstMatch.frame.maxY - 4 { return true }
                 // REM 14:5x — drag inside the settings list itself (the lowest scroll view on screen, 175 pt tall on the
                 // closed Duo), toward the control: up when it sits above the list, down otherwise. Guessing from the Tool
                 // tab put drags outside the list, so the page never moved (A-117–A-121 "not found" with the control on screen).
@@ -1782,7 +1796,7 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         }
         if runs("127") {
             let pct = app.textFields["Scale percent"].firstMatch
-            for v in ["25", "100", "400"] where reveal(pct) { setField(pct, v); pct.typeText("\n"); usleep(600_000); record("| A-127 | 👁 | Scale % \(v) → px \(app.textFields["Size in pixels"].firstMatch.value ?? "?") |") }
+            for v in ["25", "100", "400"] where reveal(pct) { setField(pct, v); commitField(pct); usleep(600_000); record("| A-127 | 👁 | Scale % \(v) → px \(app.textFields["Size in pixels"].firstMatch.value ?? "?") |") }
             let st = app.steppers["Scale"].firstMatch
             if reveal(st) { st.buttons.element(boundBy: 1).press(forDuration: 1.5); record("| A-127 | 👁 | Scale stepper held → \(pct.value ?? "?") % |") }
             slide("Scale", "A-127"); snapshot("A127-scale")
@@ -1790,10 +1804,10 @@ final class Image_ProducerUITests_iPad: XCTestCase {
         if runs("128") {
             for (f, v) in [("Position X", "100"), ("Position Y", "200")] {
                 let t = app.textFields[f].firstMatch
-                if reveal(t) { setField(t, v); t.typeText("\n"); usleep(500_000); record("| A-128 | 👁 | \(f) \(v) → \(t.value ?? "?") |") }
+                if reveal(t) { setField(t, v); commitField(t); usleep(500_000); record("| A-128 | 👁 | \(f) \(v) → \(t.value ?? "?") |") }
             }
             let rot = app.textFields["Rotation degrees"].firstMatch
-            for v in ["90", "180", "-90"] where reveal(rot) { setField(rot, v); rot.typeText("\n"); usleep(500_000); record("| A-128 | 👁 | Rotation \(v) → \(rot.value ?? "?") |") }
+            for v in ["90", "180", "-90"] where reveal(rot) { setField(rot, v); commitField(rot); usleep(500_000); record("| A-128 | 👁 | Rotation \(v) → \(rot.value ?? "?") |") }
             slide("Rotation", "A-128"); snapshot("A128-position-rotation")
         }
         if runs("129") {
@@ -2036,3 +2050,35 @@ private extension XCUIScreenshot {
     }
 }
 #endif
+
+
+import ObjectiveC
+
+/// REM 2026-11-22 17:4x — WHY EVERY RUN TOOK 10–20 MINUTES. On the Move / Selection / Mask pages the marching
+/// ants animate for as long as the box is up (by design). XCUITest waits for "animations complete" before every
+/// tap, never got it, and gave up after 60 s EACH time ("App animations complete notification not received",
+/// 20× in one run). His word 16:3x: "it should be at the latest tomorrow afternoon but not days from now".
+/// The APP IS NOT CHANGED — the test still waits for the app's main run loop to go idle; it just stops waiting for
+/// animations to end, which these pages never do. Steps that need a control wait for it by name (waitForExistence).
+enum UITestNoAnimationWait {
+    private static var done = false
+    static func install() {
+        guard !done, let cls = NSClassFromString("XCUIApplicationProcess") else { return }
+        done = true
+        // Xcode 15+: waitForQuiescenceIncludingAnimationsIdle:isPreEvent:
+        let sel2 = NSSelectorFromString("waitForQuiescenceIncludingAnimationsIdle:isPreEvent:")
+        if let m = class_getInstanceMethod(cls, sel2) {
+            typealias F = @convention(c) (AnyObject, Selector, Bool, Bool) -> Void
+            let orig = unsafeBitCast(method_getImplementation(m), to: F.self)
+            let block: @convention(block) (AnyObject, Bool, Bool) -> Void = { me, _, pre in orig(me, sel2, false, pre) }
+            method_setImplementation(m, imp_implementationWithBlock(block))
+        }
+        let sel1 = NSSelectorFromString("waitForQuiescenceIncludingAnimationsIdle:")
+        if let m = class_getInstanceMethod(cls, sel1) {
+            typealias F = @convention(c) (AnyObject, Selector, Bool) -> Void
+            let orig = unsafeBitCast(method_getImplementation(m), to: F.self)
+            let block: @convention(block) (AnyObject, Bool) -> Void = { me, _ in orig(me, sel1, false) }
+            method_setImplementation(m, imp_implementationWithBlock(block))
+        }
+    }
+}

@@ -240,6 +240,10 @@ struct ProductionPiP: View {
     /// On the tall iPhone the canvas runs up under Apple's toolbar, so its top corners sat behind
     /// Back. `topReserve` is the strip the toolbar covers; the corners live in the canvas below it.
     var topReserve: CGFloat = 0
+    /// Room for the whole panel inside the canvas area (4 pt to spare each way).
+    private var fits: Bool {
+        bounds.width >= panel.width + 8 && bounds.height - topReserve >= panel.height + 8
+    }
     private var usable: CGSize { CGSize(width: bounds.width, height: max(panel.height, bounds.height - topReserve)) }
     private var home: CGPoint {
         let p = corner.point(in: usable, panel: panel)
@@ -290,6 +294,15 @@ struct ProductionPiP: View {
         // handle on top moves it.
         .gesture(viewport != nil ? nil : moveDrag)
         .simultaneousGesture(holdDrag)
+        // REM 2026-11-22 shakedown A-138, Duo closed: with the keyboard up the canvas shrank to a strip
+        // shorter than the panel, and the panel hung down over the paint bucket, pen, eraser and
+        // eyedropper. His word 16:5x: "that screenshot shows you violating apples human interface
+        // guidelines" — nothing may cover a control. Same answer as his 11-21 tall-iPhone ruling (it
+        // steps aside while you type), now for ANY canvas too small to hold it: it comes back when the
+        // canvas has room again.
+        .opacity(fits ? 1 : 0)
+        .allowsHitTesting(fits)
+        .accessibilityHidden(!fits)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pip.panel")
         .help(viewport == nil ? "Production preview — drag it to any corner. Never follows the canvas zoom."

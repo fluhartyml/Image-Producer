@@ -1,0 +1,294 @@
+Optional(Attributes: Application, 0x10fd25400, pid: 28902, label: 'Image Producer'
+Element subtree:
+ →Application, 0x10fd25400, pid: 28902, label: 'Image Producer'
+    Window (Main), 0x10fd25540, {{0.0, 0.0}, {1376.0, 1032.0}}
+      Other, 0x10fd25680, {{0.0, 0.0}, {1376.0, 1032.0}}
+        Other, 0x10fd257c0, {{0.0, 0.0}, {1376.0, 1032.0}}
+          Other, 0x10fd25900, {{0.0, 0.0}, {1376.0, 1032.0}}
+            Other, 0x10fd25a40, {{0.0, 0.0}, {1376.0, 1032.0}}
+              Other, 0x10fd25b80, {{0.0, 0.0}, {1376.0, 1032.0}}
+                Other, 0x10fd25cc0, {{0.0, 0.0}, {1376.0, 1032.0}}
+                  Other, 0x10fd25e00, {{0.0, 0.0}, {1376.0, 1032.0}}
+                    Other, 0x10fd25f40, {{0.0, 0.0}, {1376.0, 1032.0}}
+                      Other, 0x10fd26080, {{0.0, 0.0}, {1376.0, 1032.0}}
+                        Other, 0x10fd26580, {{0.0, 0.0}, {1376.0, 1032.0}}
+                          Other, 0x10fd266c0, {{0.0, 0.0}, {1376.0, 1032.0}}
+                            Other, 0x10fd270c0, {{0.0, 0.0}, {1376.0, 1032.0}}
+                        Other, 0x10fd27980, {{0.0, 0.0}, {1376.0, 1032.0}}
+                          Other, 0x10fd27ac0, {{0.0, 0.0}, {1376.0, 1032.0}}
+                            Other, 0x10fd27c00, {{0.0, 0.0}, {1376.0, 1032.0}}
+                            Other, 0x10fd27d40, {{0.0, 0.0}, {1376.0, 1032.0}}
+                              Other, 0x10fd27e80, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                Other, 0x10fd27200, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                  Other, 0x10fd27700, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                    Image, 0x10fd27840, {{640.0, 76.0}, {96.0, 96.0}}, label: 'LaunchHeroIcon'
+                                    StaticText, 0x10fd27480, {{561.8, 955.5}, {252.5, 32.5}}, label: 'Version 1.1 · Build 379'
+                            Other, 0x10fd275c0, {{313.0, 26.0}, {750.0, 980.0}}
+                              Other, 0x10fd27340, {{313.0, 26.0}, {750.0, 980.0}}
+                                StaticText, 0x10fd26940, {{333.0, 160.5}, {695.0, 96.0}}, label: '    Image Producer 1.1'
+                                Button, 0x10fd26a80, {{333.0, 276.0}, {349.0, 70.0}}, label: 'New Image'
+                                  StaticText, 0x10fd26bc0, {{424.0, 291.0}, {167.0, 39.5}}, label: 'New Image'
+                                Button, 0x10fd26d00, {{694.0, 276.0}, {349.0, 70.0}}, label: 'New from Import…'
+                                  StaticText, 0x10fd26f80, {{732.5, 291.0}, {272.0, 39.5}}, label: 'New from Import…'
+                              Other, 0x10fd26e40, {{313.0, 26.0}, {750.0, 980.0}}
+                                Other, 0x10fd26800, {{313.0, 26.0}, {750.0, 980.0}}
+                                  Other, 0x10fd261c0, {{313.0, 26.0}, {750.0, 980.0}}
+                                    Other, 0x10fd26300, {{313.0, 26.0}, {750.0, 980.0}}
+                                      Other, 0x10fd26440, {{313.0, 26.0}, {750.0, 980.0}}
+                                        Other, 0x10fd0c000, {{313.0, 26.0}, {750.0, 980.0}}
+                                    Other, 0x10fd0c140, {{313.0, 26.0}, {750.0, 980.0}}
+                                      Other, 0x10fd0c280, {{313.0, 26.0}, {750.0, 980.0}}
+                          Other, 0x10fd0c3c0, {{0.0, 0.0}, {1376.0, 1032.0}}
+                            Other, 0x10fd0c500, {{-1376.0, -1032.0}, {4128.0, 3096.0}}
+                            Other, 0x10fd0c640, {{0.0, 0.0}, {1376.0, 1032.0}}
+                              Other, 0x10fd0c780, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                Other, 0x10fd0c8c0, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                  Other, 0x10fd0ca00, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                  Other, 0x10fd0cb40, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                    Other, 0x10fd0cc80, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                      Other, 0x10fd0cdc0, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                        Other, 0x10fd0cf00, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                          Other, 0x10fd0d040, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                            Other, 0x10fd0d180, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                              Other, 0x10fd0d2c0, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                Other, 0x10fd0d400, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                  Other, 0x10fd0d540, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                    Other, 0x10fd0d680, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                      Other, 0x10fd0d7c0, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                        Other, 0x10fd0d900, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                          Other, 0x10fd0da40, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                        Other, 0x10fd0db80, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                        Other, 0x10fd0dcc0, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                          Other, 0x10fd0de00, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                            Other, 0x10fd0df40, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                              Other, 0x10fd0e080, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                Other, 0x10fd0e1c0, {{8.0, 473.0}, {1360.0, 551.0}}, identifier: 'Browse View'
+                                                                  Other, 0x10fd0e300, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                    Other, 0x10fd0e440, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                      Other, 0x10fd0e580, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                        Other, 0x10fd0e6c0, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                          Other, 0x10fd0e800, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                            Other, 0x10fd0e940, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                              Other, 0x10fd0ea80, {{8.0, 473.0}, {316.3, 551.0}}, identifier: 'Browse View'
+                                                                                CollectionView, 0x10fd0ebc0, {{8.0, 473.0}, {316.3, 551.0}}, identifier: 'Browse View'
+                                                                                  Other, 0x10fd0ed00, {{-7.8, -565.8}, {347.9, 1226.6}}
+                                                                                  Other, 0x10fd0ee40, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                                    Other, 0x10fd0ef80, {{8.0, 473.0}, {316.3, 102.8}}
+                                                                                  Other, 0x10fd0f0c0, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                                  Cell, 0x10fd0f200, {{23.8, 536.2}, {284.7, 57.3}}, identifier: 'DOC.sidebar.item.Recents', label: 'Recents'
+                                                                                    Other, 0x10fd0f340, {{23.8, 536.2}, {284.7, 57.3}}
+                                                                                    Other, 0x10fd0f480, {{23.8, 536.2}, {284.7, 57.3}}
+                                                                                      StaticText, 0x10fd0f5c0, {{39.6, 545.6}, {145.8, 39.0}}, label: 'Recents'
+                                                                                      Image, 0x10fd0f700, {{39.6, 554.0}, {21.7, 21.7}}, identifier: 'clock', label: 'clock'
+                                                                                  Cell, 0x10fd0f840, {{23.8, 593.6}, {284.7, 57.3}}, identifier: 'DOC.sidebar.item.Shared', label: 'Shared'
+                                                                                    Other, 0x10fd0f980, {{23.8, 593.6}, {284.7, 57.3}}
+                                                                                    Other, 0x10fd0fac0, {{23.8, 593.6}, {284.7, 57.3}}
+                                                                                      StaticText, 0x10fd0fc00, {{39.6, 603.0}, {139.9, 39.0}}, label: 'Shared'
+                                                                                      Image, 0x10fd0fd40, {{39.6, 611.4}, {30.6, 21.7}}, identifier: 'person.2', label: 'Two people'
+                                                                                  Other, 0x10fd0fe80, {{-7.8, 660.8}, {347.9, 271.8}}
+                                                                                  Cell, 0x10fd10000, {{23.8, 660.8}, {284.7, 60.8}}, identifier: 'DOC.sidebar.header.Locations', label: 'Locations'
+                                                                                    Other, 0x10fd10140, {{23.8, 660.8}, {284.7, 60.8}}
+                                                                                    Other, 0x10fd10280, {{23.8, 660.8}, {240.7, 60.8}}
+                                                                                      StaticText, 0x10fd103c0, {{39.6, 671.6}, {141.3, 39.0}}, label: 'Locations'
+                                                                                    Other, 0x10fd10500, {{256.6, 669.7}, {44.0, 43.5}}, identifier: 'DOC.sidebar.header.Locations', label: 'Locations'
+                                                                                      Image, 0x10fd10640, {{264.7, 681.8}, {28.2, 19.8}}, identifier: 'chevron.forward', label: 'Forward'
+                                                                                    Other, 0x10fd10780, {{256.6, 669.7}, {44.0, 43.5}}, identifier: 'DOC.sidebar.header.Locations', label: 'Locations'
+                                                                                      Image, 0x10fd108c0, {{264.7, 681.8}, {28.2, 19.8}}, identifier: 'chevron.forward', label: 'Forward'
+                                                                                  Cell, 0x10fd10a00, {{23.8, 721.6}, {284.7, 57.3}}, identifier: 'DOC.sidebar.item.iCloud Drive', label: 'iCloud Drive'
+                                                                                    Other, 0x10fd10b40, {{23.8, 721.6}, {284.7, 57.3}}
+                                                                                    Other, 0x10fd10c80, {{23.8, 721.6}, {284.7, 57.3}}
+                                                                                      StaticText, 0x10fd10dc0, {{39.6, 730.9}, {210.0, 39.0}}, label: 'iCloud Drive'
+                                                                                      Image, 0x10fd10f00, {{39.6, 739.3}, {29.7, 21.7}}, identifier: 'icloud', label: 'iCloud'
+                                                                                  Cell, 0x10fd11040, {{23.8, 778.9}, {284.7, 57.3}}, identifier: 'DOC.sidebar.item.On My iPad', label: 'On My iPad', Selected
+                                                                                    Other, 0x10fd11180, {{23.8, 778.9}, {284.7, 57.3}}
+                                                                                      Other, 0x10fd112c0, {{23.8, 778.9}, {284.7, 57.3}}
+                                                                                        Other, 0x10fd11400, {{23.8, 778.9}, {284.7, 57.3}}
+                                                                                    Other, 0x10fd11540, {{23.8, 778.9}, {284.7, 57.3}}
+                                                                                      StaticText, 0x10fd11680, {{39.6, 788.3}, {191.7, 39.0}}, label: 'On My iPad'
+                                                                                      Image, 0x10fd117c0, {{39.6, 796.7}, {18.3, 21.7}}, identifier: 'ipad', label: 'iPad'
+                                                                                  Cell, 0x10fd11900, {{23.8, 836.2}, {284.7, 86.5}}, identifier: 'DOC.sidebar.item.Recently Deleted', label: 'Recently Deleted'
+                                                                                    Other, 0x10fd11a40, {{23.8, 836.2}, {284.7, 86.5}}
+                                                                                    Other, 0x10fd11b80, {{23.8, 836.2}, {284.7, 86.5}}
+                                                                                      StaticText, 0x10fd11cc0, {{39.6, 840.2}, {246.1, 78.6}}, label: 'Recently Deleted'
+                                                                                      Image, 0x10fd11e00, {{39.6, 848.6}, {19.3, 21.7}}, identifier: 'trash', label: 'trash'
+                                                                                  Other, 0x10fd11f40, {{-7.8, 932.6}, {347.9, 1754.9}}
+                                                                                  Cell, 0x10fd12080, {{23.8, 932.6}, {284.7, 60.8}}, identifier: 'DOC.sidebar.header.Tags', label: 'Tags'
+                                                                                    Other, 0x10fd121c0, {{23.8, 932.6}, {284.7, 60.8}}
+                                                                                    Other, 0x10fd12300, {{23.8, 932.6}, {240.7, 60.8}}
+                                                                                      StaticText, 0x10fd12440, {{39.6, 943.4}, {67.7, 39.0}}, label: 'Tags'
+                                                                                    Other, 0x10fd12580, {{256.6, 941.5}, {44.0, 43.5}}, identifier: 'DOC.sidebar.header.Tags', label: 'Tags'
+                                                                                      Image, 0x10fd126c0, {{264.7, 953.6}, {28.2, 19.8}}, identifier: 'chevron.forward', label: 'Forward'
+                                                                                    Other, 0x10fd12800, {{256.6, 941.5}, {44.0, 43.5}}, identifier: 'DOC.sidebar.header.Tags', label: 'Tags'
+                                                                                      Image, 0x10fd12940, {{264.7, 953.6}, {28.2, 19.8}}, identifier: 'chevron.forward', label: 'Forward'
+                                                                                  Cell, 0x10fd12a80, {{23.8, 993.4}, {284.7, 57.3}}, identifier: 'DOC.sidebar.item.Red', label: 'Red'
+                                                                                    Other, 0x10fd12bc0, {{23.8, 993.4}, {284.7, 57.3}}
+                                                                                    Other, 0x10fd12d00, {{23.8, 993.4}, {284.7, 57.3}}
+                                                                                      StaticText, 0x10fd12e40, {{39.6, 1002.8}, {87.5, 39.0}}, label: 'Red'
+                                                                                      Image, 0x10fd12f80, {{39.6, 1011.2}, {21.7, 21.7}}
+                                                                                  Other, 0x10fd130c0, {{291.7, 536.2}, {29.7, 468.0}}, label: 'Vertical scroll bar, 3 pages', value: 0%
+                                                                                    Other, 0x10fd13200, {{318.3, 974.6}, {3.0, 6.9}}
+                                                                                  Other, 0x10fd13340, {{29.7, 971.6}, {294.5, 29.7}}, label: 'Horizontal scroll bar, 1 page', value: 0%
+                                                                                    Other, 0x10fd13480, {{11.0, 998.3}, {310.3, 3.0}}
+                                                                                  Other, 0x10fd135c0, {{291.7, 536.2}, {29.7, 468.0}}, label: 'Vertical scroll bar, 3 pages', value: 0%
+                                                                                    Other, 0x10fd13700, {{318.3, 974.6}, {3.0, 6.9}}
+                                                                                  Other, 0x10fd13840, {{29.7, 971.6}, {294.5, 29.7}}, label: 'Horizontal scroll bar, 1 page', value: 0%
+                                                                                    Other, 0x10fd13980, {{11.0, 998.3}, {310.3, 3.0}}
+                                                                          NavigationBar, 0x10fd13ac0, {{8.0, 482.9}, {316.3, 53.4}}, identifier: 'DOCSidebarView'
+                                                                            Button, 0x10fd13c00, {{199.7, 486.8}, {43.0, 35.6}}, label: 'More'
+                                                                            Button, 0x10fd13d40, {{258.6, 486.8}, {51.9, 35.6}}, identifier: 'ToggleSidebar', label: 'Hide Sidebar'
+                                                                          Toolbar, 0x10fd13e80, {{8.0, 473.0}, {316.3, 551.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                                                                            Other, 0x10fc04000, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                        Other, 0x10fc04140, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                          Other, 0x10fc04280, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                            Other, 0x10fc043c0, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                              Other, 0x10fc04500, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                                Other, 0x10fc04640, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                                  Other, 0x10fc04780, {{8.0, 473.0}, {316.3, 531.2}}
+                                                                              Other, 0x10fc048c0, {{8.0, 473.0}, {316.3, 551.0}}
+                                                                                Other, 0x10fc04a00, {{8.0, 473.0}, {316.3, 531.2}}
+                                                                      Other, 0x10fc04b40, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                        Other, 0x10fc04c80, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                          Other, 0x10fc04dc0, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                          Other, 0x10fc04f00, {{8.0, 473.0}, {1360.0, 551.0}}, identifier: 'DOC.browsingRoot Source: com.apple.FileProvider.LocalStorage, Title: On My iPad'
+                                                                            NavigationBar, 0x10fc05040, {{8.0, 482.9}, {1360.0, 53.4}}, identifier: 'FullDocumentManagerViewControllerNavigationBar'
+                                                                              Button, 0x10fc05180, {{338.1, 486.8}, {35.6, 35.6}}, identifier: 'DOC.navBarButton.backInHistory', label: 'Back', Disabled
+                                                                              Button, 0x10fc052c0, {{389.5, 486.8}, {35.6, 35.6}}, identifier: 'DOC.navBarButton.forwardInHistory', label: 'Forward', Disabled
+                                                                              StaticText, 0x10fc05400, {{440.9, 491.8}, {107.2, 25.7}}, label: 'On My iPad'
+                                                                              Button, 0x10fc05540, {{1078.4, 486.8}, {82.5, 35.6}}, label: 'Select'
+                                                                              Button, 0x10fc05680, {{1180.7, 486.8}, {51.4, 35.6}}, label: 'New Folder'
+                                                                              Button, 0x10fc057c0, {{1247.9, 486.8}, {45.0, 35.6}}, identifier: 'DOC.itemCollectionMenuButton.Icons', label: 'Icons'
+                                                                              Button, 0x10fc05900, {{1308.7, 486.8}, {45.5, 35.6}}, label: 'Search'
+                                                                            Other, 0x10fc05a40, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                              Other, 0x10fc05b80, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                Other, 0x10fc05cc0, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                  Other, 0x10fc05e00, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                    Other, 0x10fc05f40, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                      Other, 0x10fc06080, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                    ScrollView, 0x10fc061c0, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                      Other, 0x10fc06300, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                        Other, 0x10fc06440, {{8.0, 473.0}, {1360.0, 102.8}}
+                                                                                      Other, 0x10fc06580, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                      CollectionView, 0x10fc066c0, {{8.0, 473.0}, {1360.0, 551.0}}, identifier: 'File View', value: Icon Mode
+                                                                                        Other, 0x10fc06800, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                          Other, 0x10fc06940, {{8.0, 473.0}, {1360.0, 102.8}}
+                                                                                        Other, 0x10fc06a80, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                                        Cell, 0x10fc06bc0, {{353.9, 546.1}, {237.2, 379.5}}, identifier: 'Create Document', label: 'Create Document'
+                                                                                          Other, 0x10fc06d00, {{353.9, 546.1}, {237.2, 379.5}}
+                                                                                          Other, 0x10fc06e40, {{353.9, 546.1}, {237.2, 379.5}}
+                                                                                            Other, 0x10fc06f80, {{395.9, 550.1}, {153.2, 153.2}}
+                                                                                              Image, 0x10fc070c0, {{415.2, 550.1}, {114.7, 153.2}}
+                                                                                              Other, 0x10fc07200, {{415.2, 550.1}, {114.7, 153.2}}
+                                                                                            Other, 0x10fc07340, {{356.9, 713.2}, {231.3, 73.6}}
+                                                                                              StaticText, 0x10fc07480, {{356.9, 713.2}, {231.3, 35.6}}, label: 'Create Document'
+                                                                                              StaticText, 0x10fc075c0, {{356.9, 755.7}, {231.3, 31.1}}
+                                                                                        Cell, 0x10fc07700, {{603.0, 546.1}, {237.2, 379.5}}, identifier: 'Untitled 2, imgprd', label: 'Untitled 2, imgprd, Yesterday, 155 KB'
+                                                                                          Other, 0x10fc07840, {{603.0, 546.1}, {237.2, 379.5}}
+                                                                                          Other, 0x10fc07980, {{603.0, 546.1}, {237.2, 379.5}}
+                                                                                            Other, 0x10fc07ac0, {{645.0, 550.1}, {153.2, 153.2}}
+                                                                                              Image, 0x10fc07c00, {{645.0, 550.1}, {153.2, 153.2}}
+                                                                                              Other, 0x10fc07d40, {{645.0, 550.1}, {153.2, 153.2}}
+                                                                                            Other, 0x10fc07e80, {{606.0, 713.2}, {231.3, 104.8}}
+                                                                                              StaticText, 0x10fc68000, {{606.0, 713.2}, {231.3, 35.6}}, label: 'Untitled 2'
+                                                                                              StaticText, 0x10fc68140, {{606.0, 751.7}, {231.3, 31.1}}, label: 'Yesterday'
+                                                                                              StaticText, 0x10fc68280, {{606.0, 786.8}, {231.3, 31.1}}, label: '155 KB'
+                                                                                        Cell, 0x10fc683c0, {{852.1, 546.1}, {237.2, 379.5}}, identifier: 'Untitled 3, imgprd', label: 'Untitled 3, imgprd, Yesterday, 155 KB'
+                                                                                          Other, 0x10fc68500, {{852.1, 546.1}, {237.2, 379.5}}
+                                                                                          Other, 0x10fc68640, {{852.1, 546.1}, {237.2, 379.5}}
+                                                                                            Other, 0x10fc68780, {{894.1, 550.1}, {153.2, 153.2}}
+                                                                                              Image, 0x10fc688c0, {{894.1, 550.1}, {153.2, 153.2}}
+                                                                                            Other, 0x10fc68a00, {{855.0, 713.2}, {231.3, 104.8}}
+                                                                                              StaticText, 0x10fc68b40, {{855.0, 713.2}, {231.3, 35.6}}, label: 'Untitled 3'
+                                                                                              StaticText, 0x10fc68c80, {{855.0, 751.7}, {231.3, 31.1}}, label: 'Yesterday'
+                                                                                              StaticText, 0x10fc68dc0, {{855.0, 786.8}, {231.3, 31.1}}, label: '155 KB'
+                                                                                        Cell, 0x10fc68f00, {{1101.1, 546.1}, {237.2, 379.5}}, identifier: 'Untitled 4, imgprd', label: 'Untitled 4, imgprd, Yesterday, 97 KB'
+                                                                                          Other, 0x10fc69040, {{1101.1, 546.1}, {237.2, 379.5}}
+                                                                                          Other, 0x10fc69180, {{1101.1, 546.1}, {237.2, 379.5}}
+                                                                                            Other, 0x10fc692c0, {{1143.1, 550.1}, {153.2, 153.2}}
+                                                                                              Image, 0x10fc69400, {{1143.1, 550.1}, {153.2, 153.2}}
+                                                                                            Other, 0x10fc69540, {{1104.1, 713.2}, {231.3, 104.8}}
+                                                                                              StaticText, 0x10fc69680, {{1104.1, 713.2}, {231.3, 35.6}}, label: 'Untitled 4'
+                                                                                              StaticText, 0x10fc697c0, {{1104.1, 751.7}, {231.3, 31.1}}, label: 'Yesterday'
+                                                                                              StaticText, 0x10fc69900, {{1104.1, 786.8}, {231.3, 31.1}}, label: '97 KB'
+                                                                                        Cell, 0x10fc69a40, {{353.9, 937.5}, {237.2, 379.5}}, identifier: 'Untitled 5, imgprd', label: 'Untitled 5, imgprd, Yesterday, 3 KB'
+                                                                                          Other, 0x10fc69b80, {{353.9, 937.5}, {237.2, 379.5}}
+                                                                                          Other, 0x10fc69cc0, {{353.9, 937.5}, {237.2, 379.5}}
+                                                                                            Other, 0x10fc69e00, {{395.9, 941.5}, {153.2, 153.2}}
+                                                                                              Image, 0x10fc69f40, {{395.9, 941.5}, {153.2, 153.2}}
+                                                                                            Other, 0x10fc6a080, {{356.9, 1104.6}, {231.3, 104.8}}
+                                                                                              StaticText, 0x10fc6a1c0, {{356.9, 1104.6}, {231.3, 35.6}}, label: 'Untitled 5'
+                                                                                              StaticText, 0x10fc6a300, {{356.9, 1143.1}, {231.3, 31.1}}, label: 'Yesterday'
+                                                                                              StaticText, 0x10fc6a440, {{356.9, 1178.2}, {231.3, 31.1}}, label: '3 KB'
+                                                                                        Cell, 0x10fc6a580, {{603.0, 937.5}, {237.2, 379.5}}, identifier: 'Untitled 6, imgprd', label: 'Untitled 6, imgprd, Yesterday, 3 KB'
+                                                                                          Other, 0x10fc6a6c0, {{603.0, 937.5}, {237.2, 379.5}}
+                                                                                          Other, 0x10fc6a800, {{603.0, 937.5}, {237.2, 379.5}}
+                                                                                            Other, 0x10fc6a940, {{645.0, 941.5}, {153.2, 153.2}}
+                                                                                              Image, 0x10fc6aa80, {{645.0, 941.5}, {153.2, 153.2}}
+                                                                                            Other, 0x10fc6abc0, {{606.0, 1104.6}, {231.3, 104.8}}
+                                                                                              StaticText, 0x10fc6ad00, {{606.0, 1104.6}, {231.3, 35.6}}, label: 'Untitled 6'
+                                                                                              StaticText, 0x10fc6ae40, {{606.0, 1143.1}, {231.3, 31.1}}, label: 'Yesterday'
+                                                                                              StaticText, 0x10fc6af80, {{606.0, 1178.2}, {231.3, 31.1}}, label: '3 KB'
+                                                                                        Cell, 0x10fc6b0c0, {{852.1, 937.5}, {237.2, 379.5}}, identifier: 'Untitled 7, imgprd', label: 'Untitled 7, imgprd, Yesterday, 161 KB'
+                                                                                          Other, 0x10fc6b200, {{852.1, 937.5}, {237.2, 379.5}}
+                                                                                          Other, 0x10fc6b340, {{852.1, 937.5}, {237.2, 379.5}}
+                                                                                            Other, 0x10fc6b480, {{894.1, 941.5}, {153.2, 153.2}}
+                                                                                              Image, 0x10fc6b5c0, {{894.1, 941.5}, {153.2, 153.2}}
+                                                                                            Other, 0x10fc6b700, {{855.0, 1104.6}, {231.3, 104.8}}
+                                                                                              StaticText, 0x10fc6b840, {{855.0, 1104.6}, {231.3, 35.6}}, label: 'Untitled 7'
+                                                                                              StaticText, 0x10fc6b980, {{855.0, 1143.1}, {231.3, 31.1}}, label: 'Yesterday'
+                                                                                              StaticText, 0x10fc6bac0, {{855.0, 1178.2}, {231.3, 31.1}}, label: '161 KB'
+                                                                                        Cell, 0x10fc6bc00, {{1101.1, 937.5}, {237.2, 379.5}}, identifier: 'Untitled 8, imgprd', label: 'Untitled 8, imgprd, Yesterday, 3 KB'
+                                                                                          Other, 0x10fc6bd40, {{1101.1, 937.5}, {237.2, 379.5}}
+                                                                                          Other, 0x10fc6be80, {{1101.1, 937.5}, {237.2, 379.5}}
+                                                                                            Other, 0x10fc74000, {{1143.1, 941.5}, {153.2, 153.2}}
+                                                                                              Image, 0x10fc74140, {{1143.1, 941.5}, {153.2, 153.2}}
+                                                                                            Other, 0x10fc74280, {{1104.1, 1104.6}, {231.3, 104.8}}
+                                                                                              StaticText, 0x10fc743c0, {{1104.1, 1104.6}, {231.3, 35.6}}, label: 'Untitled 8'
+                                                                                              StaticText, 0x10fc74500, {{1104.1, 1143.1}, {231.3, 31.1}}, label: 'Yesterday'
+                                                                                              StaticText, 0x10fc74640, {{1104.1, 1178.2}, {231.3, 31.1}}, label: '3 KB'
+                                                                                        Other, 0x10fc74780, {{1335.4, 536.2}, {29.7, 466.0}}, label: 'Vertical scroll bar, 4 pages', value: 0%
+                                                                                          Other, 0x10fc748c0, {{1362.1, 539.2}, {3.0, 137.4}}
+                                                                                        Other, 0x10fc74a00, {{1335.4, 536.2}, {29.7, 466.0}}, label: 'Vertical scroll bar, 4 pages', value: 0%
+                                                                                          Other, 0x10fc74b40, {{1362.1, 539.2}, {3.0, 137.4}}
+                                                                                      Other, 0x10fc74c80, {{1335.4, 536.2}, {29.7, 466.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                                                                        Other, 0x10fc74dc0, {{1362.1, 559.0}, {3.0, 442.3}}
+                                                                                      Other, 0x10fc74f00, {{324.3, 971.6}, {1022.0, 29.7}}, label: 'Horizontal scroll bar, 1 page', value: 0%
+                                                                                        Other, 0x10fc75040, {{667.2, 998.3}, {697.8, 3.0}}
+                                                                                      Other, 0x10fc75180, {{1335.4, 536.2}, {29.7, 466.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                                                                        Other, 0x10fc752c0, {{1362.1, 559.0}, {3.0, 442.3}}
+                                                                                      Other, 0x10fc75400, {{324.3, 971.6}, {1022.0, 29.7}}, label: 'Horizontal scroll bar, 1 page', value: 0%
+                                                                                        Other, 0x10fc75540, {{667.2, 998.3}, {697.8, 3.0}}
+                                                                            Toolbar, 0x10fc75680, {{8.0, 473.0}, {1360.0, 551.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                                                                              Other, 0x10fc757c0, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                      Toolbar, 0x10fc75900, {{8.0, 473.0}, {1360.0, 551.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                                                                        Other, 0x10fc75a40, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                    Other, 0x10fc75b80, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                      Toolbar, 0x10fc75cc0, {{8.0, 473.0}, {1360.0, 551.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                                                                        Other, 0x10fc75e00, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                  Other, 0x10fc75f40, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                                    Other, 0x10fc76080, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                          Other, 0x10fc761c0, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                Other, 0x10fc76300, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                  Other, 0x10fc76440, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                    Other, 0x10fc76580, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                      Other, 0x10fc766c0, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                        Other, 0x10fc76800, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                          Other, 0x10fc76940, {{8.0, 473.0}, {1020.0, 531.2}}
+                                                      Other, 0x10fc76a80, {{8.0, 473.0}, {1360.0, 551.0}}
+                                                        Other, 0x10fc76bc0, {{8.0, 473.0}, {1020.0, 531.2}}
+                                            Other, 0x10fc76d00, {{0.0, 0.0}, {1376.0, 1032.0}}
+                                          Other, 0x10fc76e40, {{0.0, 0.0}, {0.0, 0.0}}
+                    Button, 0x10fc76f80, {{559.5, 496.5}, {257.0, 39.5}}, label: 'New from Import…'
+                    Button, 0x10fc770c0, {{608.5, 496.5}, {159.5, 39.5}}, label: 'New Image'
+            Toolbar, 0x10fc77200, {{0.0, 0.0}, {1376.0, 1032.0}}, identifier: 'Toolbar', label: 'Toolbar'
+              Other, 0x10fc77340, {{0.0, 0.0}, {1376.0, 1032.0}}
+    Window, 0x10fc77480, {{0.0, 0.0}, {1376.0, 1032.0}}
+      Other, 0x10fc775c0, {{0.0, 0.0}, {1376.0, 1032.0}}
+        Other, 0x10fc77700, {{0.0, 0.0}, {1376.0, 1032.0}}
+Path to element:
+ →Application, 0x10fd25400, pid: 28902, label: 'Image Producer'
+Query chain:
+ →Find: Target Application 'com.nightgard.Image-Producer'
+  Output: {
+    Application, 0x10fc77840, pid: 28902, label: 'Image Producer'
+  }
+)

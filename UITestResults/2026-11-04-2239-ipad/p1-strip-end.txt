@@ -1,0 +1,167 @@
+Optional(Attributes: Application, 0x10f730640, pid: 96590, label: 'Image Producer'
+Element subtree:
+ →Application, 0x10f730640, pid: 96590, label: 'Image Producer'
+    Window (Main), 0x10f731040, {{0.0, 0.0}, {466.0, 678.0}}
+      Other, 0x10f730f00, {{0.0, 0.0}, {466.0, 678.0}}
+        Other, 0x10f7308c0, {{0.0, 0.0}, {466.0, 678.0}}
+          Other, 0x10f730280, {{0.0, 0.0}, {466.0, 678.0}}
+            Other, 0x10f7303c0, {{0.0, 0.0}, {466.0, 678.0}}
+              Other, 0x10f730500, {{0.0, 0.0}, {466.0, 678.0}}
+                Other, 0x10f730140, {{0.0, 0.0}, {466.0, 678.0}}
+                  Other, 0x10f730000, {{0.0, 0.0}, {466.0, 678.0}}
+                    Other, 0x10f730780, {{0.0, 0.0}, {466.0, 678.0}}
+                      Other, 0x10f732080, {{0.0, 0.0}, {466.0, 678.0}}
+                        Other, 0x10f731f40, {{0.0, 0.0}, {466.0, 678.0}}
+                          Other, 0x10f731e00, {{0.0, 24.0}, {382.0, 325.7}}
+                          Button, 0x10f730a00, {{0.0, 24.0}, {382.0, 325.7}}, identifier: 'canvas.element', label: 'Canvas'
+                          Other, 0x10f731180, {{28.3, 24.0}, {325.7, 325.7}}, identifier: 'uitest.canvas', label: 'Test probe w=1024 h=1024 layers=5 hidden=0 active=none x=-1.0000 y=-1.0000'
+                          Other, 0x10f7312c0, {{15.5, 221.2}, {113.0, 113.0}}, label: 'Production icon preview at 96 points'
+                          Other, 0x10f731400, {{8.7, 357.0}, {368.3, 73.0}}
+                            Button, 0x10f731540, {{8.7, 363.0}, {21.0, 16.3}}, identifier: 'photo.artframe', label: 'Canvas Tool'
+                            Button, 0x10f731680, {{46.7, 362.3}, {21.3, 17.7}}, identifier: 'paintpalette', label: 'Color Palette'
+                            Button, 0x10f731a40, {{85.3, 360.7}, {20.7, 20.7}}, identifier: 'arrow.up.and.down.and.arrow.left.and.right', label: 'Move'
+                            Button, 0x10f731900, {{123.3, 363.0}, {21.0, 16.3}}, identifier: 'rectangle.dashed', label: 'Selection'
+                            Button, 0x10f7317c0, {{156.7, 360.7}, {30.3, 21.0}}, identifier: 'theatermasks', label: 'Mask'
+                            Button, 0x10f731b80, {{204.0, 362.0}, {12.3, 18.0}}, identifier: 'drop.fill', label: 'Paint Drop Bucket'
+                            Button, 0x10f731cc0, {{242.7, 362.7}, {11.3, 16.7}}, identifier: 'pencil.tip', label: 'Pixel Pen'
+                            Button, 0x10f730dc0, {{277.7, 362.0}, {18.0, 18.0}}, identifier: 'eraser.fill', label: 'Eraser'
+                            Button, 0x10f730c80, {{315.3, 361.7}, {19.0, 19.0}}, identifier: 'eyedropper', label: 'Eyedropper'
+                            Button, 0x10f730b40, {{349.0, 357.0}, {28.0, 28.0}}, label: 'Text'
+                            Button, 0x10f723480, {{305.7, 392.0}, {38.0, 38.0}}, identifier: 'camera', label: 'Camera', Selected
+                            Button, 0x10f66d7c0, {{9.0, 401.7}, {20.0, 19.0}}, identifier: 'star.fill', label: 'Symbol'
+                            Button, 0x10f71df40, {{43.3, 397.0}, {28.0, 28.0}}, label: 'Image'
+                            Button, 0x10f71d7c0, {{86.0, 400.7}, {19.7, 20.7}}, identifier: 'apple.image.playground', label: 'Image Playground'
+                            Button, 0x10f71d900, {{124.7, 401.3}, {18.0, 19.7}}, identifier: 'square.3.layers.3d.middle.filled', label: 'Layer'
+                            Button, 0x10f71ee40, {{161.3, 402.0}, {21.0, 18.0}}, identifier: 'person.and.background.dotted', label: 'Remove Background'
+                            Button, 0x10f71e940, {{198.0, 399.7}, {21.3, 22.7}}, identifier: 'lasso.badge.sparkles', label: 'Magic Lasso'
+                            Button, 0x10f71e800, {{239.3, 403.7}, {18.0, 15.0}}, identifier: 'slider.horizontal.3', label: 'Adjust'
+                            Button, 0x10f71dcc0, {{278.0, 402.3}, {17.3, 17.7}}, identifier: 'magnifyingglass', label: 'Zoom'
+                          CollectionView, 0x10f71ebc0, {{0.0, 432.3}, {382.0, 184.0}}
+                            Cell, 0x10f71ea80, {{0.0, 432.3}, {382.0, 184.0}}
+                              Other, 0x10f71ef80, {{0.0, 432.3}, {382.0, 184.0}}
+                                Other, 0x10f71ed00, {{0.0, 432.3}, {382.0, 184.0}}
+                                  Other, 0x10f71f340, {{0.0, 432.3}, {382.0, 184.0}}
+                                    Other, 0x10f71f200, {{0.0, 444.3}, {382.0, 172.0}}
+                                      Image, 0x10f71fac0, {{18.3, 446.0}, {24.3, 19.3}}, identifier: 'camera', label: 'Camera'
+                                      StaticText, 0x10f71fd40, {{53.0, 444.3}, {71.7, 24.0}}, label: 'Camera'
+                                      ScrollView, 0x10f71fe80, {{0.0, 476.7}, {382.0, 139.7}}
+                                        Other, 0x10f71f480, {{0.0, 476.7}, {382.0, 1195.0}}
+                                          StaticText, 0x10f586940, {{16.0, 492.7}, {184.3, 20.3}}, label: 'No frames captured yet.'
+                                          Button, 0x10f586a80, {{16.0, 529.0}, {122.7, 35.7}}, label: 'Capture'
+                                            StaticText, 0x10f586bc0, {{16.0, 529.0}, {122.7, 35.7}}, label: 'Capture'
+                                            Image, 0x10f586d00, {{30.3, 537.7}, {21.7, 17.0}}, identifier: 'camera', label: 'Camera'
+                                          StaticText, 0x10f586e40, {{16.0, 597.0}, {64.0, 20.3}}, label: 'Capture'
+                                          Switch, 0x10f586f80, {{16.0, 633.3}, {350.0, 28.0}}, label: 'Include background', value: 0
+                                            StaticText, 0x10f5870c0, {{16.0, 637.2}, {150.7, 20.3}}, label: 'Include background'
+                                            Switch, 0x10f587200, {{305.0, 633.3}, {63.0, 28.0}}, value: 0
+                                          StaticText, 0x10f587340, {{16.0, 677.3}, {215.7, 17.0}}, label: 'Transparent stamp of just the art.'
+                                          SegmentedControl, 0x10f587480, {{16.0, 710.3}, {350.0, 31.0}}
+                                            Button, 0x10f5875c0, {{16.0, 710.3}, {116.0, 32.0}}, label: '1×', Selected
+                                            Button, 0x10f587700, {{132.0, 710.3}, {117.0, 32.0}}, label: '2×'
+                                            Button, 0x10f587d40, {{249.0, 710.3}, {117.0, 32.0}}, label: '4×'
+                                          Switch, 0x10f587e80, {{16.0, 757.3}, {350.0, 28.0}}, label: 'Trim to art bounds', value: 0
+                                            StaticText, 0x10f587c00, {{16.0, 761.2}, {139.7, 20.3}}, label: 'Trim to art bounds'
+                                            Switch, 0x10f587ac0, {{305.0, 757.3}, {63.0, 28.0}}, value: 0
+                                          Stepper, 0x10f587980, {{16.0, 801.3}, {350.0, 32.0}}, label: 'Hold each capture: 1 beat', value: 1
+                                            Button, 0x10f587840, {{272.0, 801.3}, {47.0, 32.0}}, identifier: 'Decrement', label: 'Hold each capture: 1 beat, Decrement', value: 1, Disabled
+                                            Button, 0x10f728000, {{319.0, 801.3}, {47.0, 32.0}}, identifier: 'Increment', label: 'Hold each capture: 1 beat, Increment', value: 1
+                                          StaticText, 0x10f728140, {{16.0, 849.3}, {224.7, 17.0}}, label: 'On 1s — a new drawing every beat.'
+                                          StaticText, 0x10f728280, {{16.0, 898.7}, {96.7, 20.3}}, label: 'Stop Motion'
+                                          Switch, 0x10f7283c0, {{16.0, 935.0}, {350.0, 28.0}}, label: 'Animation mode', value: 0
+                                            StaticText, 0x10f728500, {{16.0, 938.8}, {124.0, 20.3}}, label: 'Animation mode'
+                                            Switch, 0x10f728640, {{305.0, 935.0}, {63.0, 28.0}}, value: 0
+                                          StaticText, 0x10f728780, {{16.0, 979.0}, {337.0, 17.0}}, label: 'Move keeps its own hidden copy of each placement.'
+                                          StaticText, 0x10f7288c0, {{16.0, 1012.0}, {150.7, 18.0}}, label: '0 shot · 0 frames total'
+                                          StaticText, 0x10f728a00, {{16.0, 1062.3}, {69.3, 20.3}}, label: 'Lightbox'
+                                          Switch, 0x10f728b40, {{16.0, 1098.7}, {350.0, 28.0}}, label: 'Onion skin', value: 0
+                                            StaticText, 0x10f728c80, {{16.0, 1102.5}, {80.0, 20.3}}, label: 'Onion skin'
+                                            Switch, 0x10f728dc0, {{305.0, 1098.7}, {63.0, 28.0}}, value: 0
+                                          StaticText, 0x10f728f00, {{16.0, 1159.0}, {72.3, 20.3}}, label: 'Playback'
+                                          Button, 0x10f729040, {{16.0, 1195.3}, {54.7, 20.3}}, label: 'Play', Disabled
+                                            StaticText, 0x10f729180, {{16.0, 1195.3}, {54.7, 20.3}}, label: 'Play', Disabled
+                                            Image, 0x10f7292c0, {{18.0, 1198.7}, {12.7, 14.0}}, identifier: 'play.fill', label: 'Play', Disabled
+                                          Button, 0x10f729400, {{78.7, 1195.3}, {91.7, 20.3}}, label: 'Exit preview', Disabled
+                                          Switch, 0x10f729540, {{16.0, 1231.7}, {350.0, 28.0}}, label: 'Loop', value: 1
+                                            StaticText, 0x10f729680, {{16.0, 1235.5}, {38.0, 20.3}}, label: 'Loop'
+                                            Switch, 0x10f7297c0, {{305.0, 1231.7}, {63.0, 28.0}}, value: 1
+                                          StaticText, 0x10f729900, {{16.0, 1275.7}, {35.3, 18.0}}, label: '8 fps'
+                                          Slider, 0x10f729a40, {{16.0, 1295.7}, {350.0, 31.0}}, label: 'Frames per second', value: 8
+                                          StaticText, 0x10f729b80, {{16.0, 1359.0}, {100.7, 20.3}}, label: 'In-Betweens'
+                                          Stepper, 0x10f729cc0, {{16.0, 1395.3}, {350.0, 32.0}}, label: 'Frames between: 1', value: 1
+                                            Button, 0x10f729e00, {{272.0, 1395.3}, {47.0, 32.0}}, identifier: 'Decrement', label: 'Frames between: 1, Decrement', value: 1, Disabled
+                                            Button, 0x10f729f40, {{319.0, 1395.3}, {47.0, 32.0}}, identifier: 'Increment', label: 'Frames between: 1, Increment', value: 1
+                                          Button, 0x10f72a080, {{16.0, 1443.3}, {138.3, 34.3}}, label: 'Easing, Slow in + out'
+                                            StaticText, 0x10f72a1c0, {{27.7, 1450.3}, {98.0, 20.3}}, label: 'Slow in + out'
+                                          Button, 0x10f72a300, {{17.7, 1495.3}, {18.0, 18.0}}, identifier: 'info.circle', label: 'Easing info'
+                                          StaticText, 0x10f72a440, {{16.0, 1531.0}, {138.3, 18.0}}, label: 'Path smoothing  0%'
+                                          Slider, 0x10f72a580, {{16.0, 1551.0}, {350.0, 31.0}}, label: 'Path smoothing', value: 0 percent
+                                          Button, 0x10f72a6c0, {{17.7, 1599.7}, {18.0, 18.0}}, identifier: 'info.circle', label: 'Smoothing info'
+                                          Button, 0x10f72a800, {{16.0, 1635.3}, {70.3, 20.3}}, label: 'Generate', Disabled
+                                          Button, 0x10f72a940, {{94.3, 1635.3}, {40.0, 20.3}}, label: 'Clear'
+                                        Other, 0x10f72aa80, {{349.0, 476.7}, {30.0, 139.7}}, label: 'Vertical scroll bar, 9 pages', value: 0%
+                                          Other, 0x10f72abc0, {{376.0, 606.7}, {3.0, 7.0}}
+                                        Other, 0x10f72ad00, {{349.0, 476.7}, {30.0, 139.7}}, label: 'Vertical scroll bar, 9 pages', value: 0%
+                                          Other, 0x10f72ae40, {{376.0, 606.7}, {3.0, 7.0}}
+                            Other, 0x10f72af80, {{349.0, 432.3}, {30.0, 184.0}}, label: 'Vertical scroll bar, 3 pages', value: 0%
+                              Other, 0x10f72b0c0, {{376.0, 435.3}, {3.0, 178.0}}
+                            Other, 0x10f72b200, {{349.0, 432.3}, {30.0, 184.0}}, label: 'Vertical scroll bar, 3 pages', value: 0%
+                              Other, 0x10f72b340, {{376.0, 435.3}, {3.0, 178.0}}
+                          Image, 0x10f72b480, {{13.3, 623.7}, {13.3, 13.3}}, identifier: 'wand.and.rays', label: 'Enhance'
+                          StaticText, 0x10f72b5c0, {{36.0, 623.2}, {233.0, 14.3}}, label: 'New image: Untitled 11, W 1024 × H 1024'
+                          StaticText, 0x10f72b700, {{321.3, 623.7}, {48.7, 13.3}}, label: '22:37:52'
+                          PageIndicator, 0x10f72b840, {{0.0, 578.7}, {382.0, 30.7}}, value: page 1 of 3
+                      Other, 0x10f72b980, {{0.0, 0.0}, {466.0, 678.0}}
+                    Button, 0x10f72bac0, {{162.3, 329.0}, {141.7, 20.3}}, label: 'New from Import…'
+                      StaticText, 0x10f72bc00, {{162.3, 329.0}, {141.7, 20.3}}, label: 'New from Import…'
+                    Button, 0x10f72bd40, {{190.3, 329.0}, {85.3, 20.3}}, label: 'New Image'
+                      StaticText, 0x10f72be80, {{190.3, 329.0}, {85.3, 20.3}}, label: 'New Image'
+            Toolbar, 0x10f72c000, {{0.0, 0.0}, {466.0, 678.0}}, identifier: 'Toolbar', label: 'Toolbar'
+              Other, 0x10f72c140, {{0.0, 0.0}, {466.0, 678.0}}
+                Other, 0x10f72c280, {{0.0, 0.0}, {466.0, 678.0}}
+                  Other, 0x10f72c3c0, {{0.0, 0.0}, {466.0, 678.0}}
+                    Other, 0x10f72c500, {{0.0, 0.0}, {0.0, 0.0}}
+                      Other, 0x10f72c640, {{394.0, 170.0}, {48.0, 48.0}}
+                        Other, 0x10f72c780, {{394.0, 170.0}, {48.0, 48.0}}
+                          Other, 0x10f72c8c0, {{399.0, 175.0}, {38.0, 38.0}}
+                            Other, 0x10f72ca00, {{399.0, 175.0}, {38.0, 38.0}}
+                              Button, 0x10f72cb40, {{399.0, 175.0}, {38.0, 38.0}}, identifier: 'BackButton'
+                      Other, 0x10f72cc80, {{394.0, 230.0}, {48.0, 360.0}}
+                        Other, 0x10f72cdc0, {{394.0, 230.0}, {48.0, 48.0}}
+                          Other, 0x10f72cf00, {{399.0, 235.0}, {38.0, 38.0}}
+                            Other, 0x10f72d040, {{399.0, 235.0}, {38.0, 38.0}}
+                              Button, 0x10f72d180, {{399.0, 235.0}, {38.0, 38.0}}, label: 'Export'
+                        Other, 0x10f72d2c0, {{394.0, 282.0}, {48.0, 48.0}}
+                          Other, 0x10f72d400, {{399.0, 287.0}, {38.0, 38.0}}
+                            Other, 0x10f72d540, {{399.0, 287.0}, {38.0, 38.0}}
+                              Button, 0x10f72d680, {{399.0, 287.0}, {38.0, 38.0}}, label: 'Share'
+                        Other, 0x10f72d7c0, {{394.0, 334.0}, {48.0, 48.0}}
+                          Other, 0x10f72d900, {{399.0, 339.0}, {38.0, 38.0}}
+                            Other, 0x10f72da40, {{399.0, 339.0}, {38.0, 38.0}}
+                              Button, 0x10f72db80, {{399.0, 339.0}, {38.0, 38.0}}, label: 'About Image Producer'
+                        Other, 0x10f72dcc0, {{394.0, 386.0}, {48.0, 48.0}}
+                          Other, 0x10f72de00, {{399.0, 391.0}, {38.0, 38.0}}
+                            Other, 0x10f72df40, {{399.0, 391.0}, {38.0, 38.0}}
+                              Button, 0x10f72e080, {{399.0, 391.0}, {38.0, 38.0}}, label: 'Zoom in'
+                        Other, 0x10f72e1c0, {{394.0, 438.0}, {48.0, 48.0}}
+                          Other, 0x10f72e300, {{399.0, 443.0}, {38.0, 38.0}}
+                            Other, 0x10f72e440, {{399.0, 443.0}, {38.0, 38.0}}
+                              Button, 0x10f72e580, {{399.0, 443.0}, {38.0, 38.0}}, label: 'Zoom out', Disabled
+                        Other, 0x10f72e6c0, {{394.0, 490.0}, {48.0, 48.0}}
+                          Other, 0x10f72e800, {{399.0, 495.0}, {38.0, 38.0}}
+                            Other, 0x10f72e940, {{399.0, 495.0}, {38.0, 38.0}}
+                              Button, 0x10f72ea80, {{399.0, 495.0}, {38.0, 38.0}}, label: 'Layers'
+                        Other, 0x10f72ebc0, {{394.0, 542.0}, {48.0, 48.0}}
+                          Other, 0x10f72ed00, {{399.0, 547.0}, {38.0, 38.0}}
+                            Other, 0x10f72ee40, {{399.0, 547.0}, {38.0, 38.0}}
+                              Button, 0x10f72ef80, {{399.0, 547.0}, {38.0, 38.0}}, label: 'History'
+    Window, 0x10f72f0c0, {{0.0, 0.0}, {466.0, 678.0}}
+      Other, 0x10f72f200, {{0.0, 0.0}, {466.0, 678.0}}
+        Other, 0x10f72f340, {{0.0, 0.0}, {466.0, 678.0}}
+Path to element:
+ →Application, 0x10f730640, pid: 96590, label: 'Image Producer'
+Query chain:
+ →Find: Target Application 'com.nightgard.Image-Producer'
+  Output: {
+    Application, 0x10f72f480, pid: 96590, label: 'Image Producer'
+  }
+)

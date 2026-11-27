@@ -17,8 +17,45 @@
 # That is the exact failure the machinery was built to prevent — a thing everyone
 # believes is happening and nothing is doing. `git rev-parse --show-toplevel` answers
 # the question directly and cannot be fooled by where the file was copied to.
+#
+# 2026 NOV 24 — after the stamp, also push to GitHub. The hook has never committed
+# the stamp: post-commit fires after the commit object exists, so the new number
+# lands in the working tree only (BUILD-NUMBER-STANDARD.md, finding 2026-09-09).
+# Amending would change the SHA the stamp just recorded. Claude's routine was:
+# commit the work, let this hook restamp the working tree, then `git push` the
+# commit as it stands (feedback_build_success_means_commit_push; his word
+# 2026-11-04, "push it to github as you see fit whenever, you dont need to get
+# permission"). That push was a standing order, not machinery. The hook now does
+# it in the background so a session cannot drop it. The stamp itself stays
+# uncommitted and is typically picked up by a later commit, the same as before.
+# Skip the push when GROK_NO_PUSH=1, when there is no origin or no upstream, or
+# during a rebase, merge, cherry-pick, revert, or bisect.
 set -e
-GIT=/usr/bin/git
+# -c and the GIT_CONFIG_* exports let /usr/bin/git work in a clone owned by
+# another user (this grok.developer copy is owned by grok, commits may be
+# made by michaelfluharty). Harmless on a repo you already own.
+GIT="/usr/bin/git -c safe.directory=*"
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=safe.directory
+export GIT_CONFIG_VALUE_0="*"
 ROOT=$($GIT rev-parse --show-toplevel) || exit 0
 [ -x "$ROOT/Scripts/stamp-build.sh" ] || exit 0
-exec /bin/sh "$ROOT/Scripts/stamp-build.sh" >/dev/null 2>&1
+/bin/sh "$ROOT/Scripts/stamp-build.sh" >/dev/null 2>&1 || true
+
+# Auto-push the commit that just landed — not the stamp, which is not in this commit.
+if [ "${GROK_NO_PUSH:-0}" = "1" ]; then
+    exit 0
+fi
+GITDIR=$($GIT rev-parse --git-dir) || exit 0
+if [ -d "$GITDIR/rebase-merge" ] || [ -d "$GITDIR/rebase-apply" ] \
+    || [ -f "$GITDIR/MERGE_HEAD" ] || [ -f "$GITDIR/CHERRY_PICK_HEAD" ] \
+    || [ -f "$GITDIR/REVERT_HEAD" ] || [ -f "$GITDIR/BISECT_LOG" ]; then
+    exit 0
+fi
+$GIT remote get-url origin >/dev/null 2>&1 || exit 0
+$GIT rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1 || exit 0
+
+{
+    echo "----- $($GIT -C "$ROOT" log -1 --format='%h %s')  $(date '+%Y-%m-%d %H:%M:%S') -----"
+} >>"$GITDIR/push.log" 2>&1
+nohup $GIT -C "$ROOT" push >>"$GITDIR/push.log" 2>&1 &

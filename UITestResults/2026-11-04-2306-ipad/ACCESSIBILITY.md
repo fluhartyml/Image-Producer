@@ -1,0 +1,287 @@
+# Accessibility audit (iPad)
+
+### Launch — 0 issue(s)
+
+### Editor (Canvas tool) — 36 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled 13' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Pixel Pen' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Camera' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color Palette' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Project name info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Size info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Size rule info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Bleed info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Safe margin info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Crop marks info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Registration info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color mode info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Export info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 131072) · 49 '' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 131072) · 48 'Background' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 131072) · 49 '' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 131072) · 49 '' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 131072) · 49 '' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New image: Untitled 13, W 1024 × H 1024' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '23:01:36' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Web folder (PNG @1x/2x/3x)' · Contrast failed
+
+### Color Palette — 30 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled 13' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Canvas Tool' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Pixel Pen' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Camera' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Palette info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 131072) · 48 'Background' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New image: Untitled 13, W 1024 × H 1024' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '23:01:36' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Add color' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Remove' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Save Palette' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Load Palette' · Contrast failed
+
+### Move / Transform — 59 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled 13' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Canvas Tool' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Pixel Pen' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Camera' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color Palette' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-90' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-135' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '0' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-45' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '45' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '135' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '90' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '180' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-180' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 131072) · 49 'Size in pixels' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '23:03:00' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Fit' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Fill' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '¼' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '½' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '¾' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '1.5' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '2' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '2.5' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '3' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-180' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-135' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-90' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-45' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '45' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '90' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '135' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '180' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Center' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Reset' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Apply' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Flip Horizontal' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Flip Vertical' · Contrast failed
+
+### Move / Transform after drags — 61 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled 13' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Canvas Tool' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Pixel Pen' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Camera' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color Palette' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '135' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '45' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-180' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '90' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-135' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-90' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '0' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '180' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 65536) · 48 '-45' · Dynamic Type font sizes are unsupported
+- XCUIAccessibilityAuditType(rawValue: 131072) · 49 'Size in pixels' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Autosaved — 123 KB' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '23:03:49' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Fit' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Fill' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '¼' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '½' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '¾' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '1.5' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '2' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '2.5' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '3' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-180' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-135' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-90' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '-45' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '45' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '90' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '135' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '180' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Center' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Reset' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Apply' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Flip Horizontal' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Flip Vertical' · Contrast failed
+
+### Pixel Pen with cursor — 36 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled 13' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Canvas Tool' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Camera' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color Palette' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Colors info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Brand palette info' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '23:04:33' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '2' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '32' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '1024' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Save Palette' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Load Palette' · Contrast failed
+
+### After the tool walk — 38 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Untitled 13' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Full-screen canvas' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom in' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Canvas Tool' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Pixel Pen' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eyedropper' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Symbol' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Remove Background' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Adjust' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Color Palette' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Selection' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Paint Drop Bucket' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Eraser' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Zoom' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Add a layer' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 4) · screen · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 8) · 43 '' · Element has no description
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Autosaved — 161 KB' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '23:04:33' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'No frames captured yet.' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Transparent stamp of just the art.' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'On 1s — a new drawing every beat.' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Move keeps its own hidden copy of each placement.' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 '0 shot · 0 frames total' · Contrast nearly passed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'Exit preview' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Play' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 2) · screen · Potentially inaccessible text
+
+### Launch — 0 issue(s)
+
+### Color Palette at Accessibility Large — 8 issue(s)
+- XCUIAccessibilityAuditType(rawValue: 4) · 9 'Fit width' · Hit area is too small
+- XCUIAccessibilityAuditType(rawValue: 131072) · 48 'Background' · Text clipped
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New from Import…' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 9 'New Image' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Add color' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Remove' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Save Palette' · Contrast failed
+- XCUIAccessibilityAuditType(rawValue: 1) · 48 'Load Palette' · Contrast failed
